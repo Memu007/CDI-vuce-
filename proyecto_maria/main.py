@@ -1240,19 +1240,62 @@ async def _migrate_catalogo_sin_tope():
 
     if IS_SQLITE:
         return
-    async with engine.begin() as conn:
-        # Si otra conexión tiene tomada la tabla, falla rápido y el reinicio
-        # lo vuelve a intentar, en vez de colgar el arranque.
-        await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
-        res = await conn.exec_driver_sql(
-            "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = current_schema() "
-            "AND ((table_name = 'vendor_catalog_products' AND column_name IN ('product_key', 'descripcion', 'origen', 'vendor_nombre')) "
-            "OR (table_name = 'client_product_history' AND column_name = 'origen_frecuente')) "
-            "AND character_maximum_length IS NOT NULL"
-        )
-        for tabla, columna in res.fetchall():
-            await conn.exec_driver_sql(f"ALTER TABLE {tabla} ALTER COLUMN {columna} TYPE TEXT")
+    # Una tabla por transacción: guardar-uso escribe las dos en otro orden y,
+    # trabadas juntas, se esperaban una a la otra.
+    for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "origen", "vendor_nombre")),
+                            ("client_product_history", ("origen_frecuente",))):
+        async with engine.begin() as conn:
+            # Si otra conexión tiene tomada la tabla, falla rápido y el reinicio
+            # lo vuelve a intentar, en vez de colgar el arranque.
+            await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
+            res = await conn.exec_driver_sql(
+                "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() "
+                f"AND table_name = '{tabla}' AND column_name IN ({', '.join(repr(c) for c in columnas)}) "
+                "AND character_maximum_length IS NOT NULL"
+            )
+            cambiadas = [columna for columna, in res.fetchall()]
+            for columna in cambiadas:
+                await conn.exec_driver_sql(f"ALTER TABLE {tabla} ALTER COLUMN {columna} TYPE TEXT")
+        for columna in cambiadas:
             print(f"✅ Migracion: {tabla}.{columna} pasa a TEXT")
+
+
+async def _migrate_catalogo_claves():
+    """Da la clave de hoy a las filas cuya descripción no tiene letras ni números
+    latinos y quedaron con otra: si no, guardarla de nuevo armaba una segunda fila."""
+    from sqlalchemy import text
+    from proyecto_maria.core import catalog_service as catalog_svc
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+
+    sin_latinas = "NOT GLOB '*[A-Za-z0-9]*'" if IS_SQLITE else "!~ '[A-Za-z0-9]'"
+    try:
+        async with engine.begin() as conn:
+            if not IS_SQLITE:
+                await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
+            res = await conn.execute(text(
+                "SELECT id, descripcion, product_key FROM vendor_catalog_products "
+                f"WHERE descripcion {sin_latinas} AND descripcion <> '' AND product_key NOT LIKE '~%'"
+            ))
+            movidas = choques = 0
+            for fila_id, descripcion, clave in res.fetchall():
+                nueva = catalog_svc.clave_de_producto(descripcion)
+                if nueva == clave or not nueva.startswith("~"):
+                    continue
+                # Si la clave nueva ya es de otra fila del mismo proveedor, quedan las dos.
+                hecho = await conn.execute(text(
+                    "UPDATE vendor_catalog_products SET product_key = :nueva WHERE id = :id AND NOT EXISTS ("
+                    "SELECT 1 FROM vendor_catalog_products o WHERE o.owner_username = "
+                    "vendor_catalog_products.owner_username AND o.vendor_id = vendor_catalog_products.vendor_id "
+                    "AND o.product_key = :nueva)"
+                ), {"nueva": nueva, "id": fila_id})
+                if hecho.rowcount:
+                    movidas += 1
+                else:
+                    choques += 1
+        if movidas or choques:
+            print(f"✅ Migracion: {movidas} claves del catálogo al día, {choques} quedan por un choque")
+    except Exception as mig_err:
+        print(f"⚠️ Migracion claves del catálogo (no critica): {mig_err!r}")
 
 
 async def _migrate_add_grupo_id_column():
@@ -1525,6 +1568,7 @@ async def lifespan(app: FastAPI):
     await _migrate_sync_operations_columns()
     await _migrate_widen_pieza_column()
     await _migrate_catalogo_sin_tope()
+    await _migrate_catalogo_claves()
     await _migrate_add_grupo_id_column()
     await _migrate_add_unidad_column()
     await _migrate_add_product_history_counts()
@@ -7872,8 +7916,7 @@ def _sin_nul(valor):
 
 
 _AVISO_DIGITOS = "El NCM tiene que estar escrito con dígitos del 0 al 9."
-_AVISO_MEDIO_PAR = "Hay un carácter que no se puede guardar."
-_AVISO_NO_ES_OBJETO = "Cada producto tiene que ser un objeto."
+from proyecto_maria.core.catalog_service import AVISO_MEDIO_PAR as _AVISO_MEDIO_PAR, AVISO_NO_ES_OBJETO as _AVISO_NO_ES_OBJETO  # noqa: E402
 _AVISO_NCM_INVALIDO = "El NCM no es válido: tiene que tener sus 8 dígitos."
 
 
@@ -10247,8 +10290,13 @@ async def guardar_uso_ncm(
     db: AsyncSession = Depends(get_db),
 ):
     """Guarda una confirmación para historial, cliente y proveedor."""
-    descripcion = data.get("descripcion", "").strip()
-    ncm = data.get("ncm", "").strip()
+    try:
+        descripcion = catalog_svc.texto_para_guardar(data.get("descripcion"))
+        ncm = catalog_svc.texto_para_guardar(data.get("ncm"), "El NCM")
+        vendor_name = catalog_svc.texto_para_guardar(data.get("vendor_name"), "El proveedor")
+        origin = catalog_svc.texto_para_guardar(data.get("origen"), "El origen")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not descripcion or not ncm:
         return {"success": False}
     from proyecto_maria.services.client_memory import (
@@ -10266,13 +10314,6 @@ async def guardar_uso_ncm(
     if ncm_base is None:
         raise HTTPException(status_code=400, detail=_AVISO_NCM_INVALIDO)
     client_id = str(data.get("client_id") or "").strip()
-    vendor_name = _sin_nul(str(data.get("vendor_name") or "")).strip()
-    origin = _sin_nul(str(data.get("origen") or "")).strip()
-    try:
-        catalog_svc.validar_largo(vendor_name, "El proveedor")
-        catalog_svc.validar_largo(origin, "El origen")
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
     # Nunca aceptar un client_id ajeno sólo porque vino desde el navegador.
     # La memoria es por despachante y por cliente; esta verificación también
@@ -11818,10 +11859,12 @@ async def catalog_save_products(
     _require_valid_vendor_id(vendor_id)
     try:
         body = await request.json()
-        vendor_name = body.get("vendor_name", vendor_id)
-        productos = body.get("productos", [])
-        if not productos:
+        productos = body.get("productos") if isinstance(body, dict) else None
+        if not productos or not isinstance(productos, list):
             raise HTTPException(status_code=400, detail="No se enviaron productos")
+        vendor_name = body.get("vendor_name")
+        if vendor_name is None:
+            vendor_name = vendor_id
         return await catalog_svc.save_products(
             db, vendor_name, productos, owner_username=user["username"]
         )
@@ -11870,7 +11913,8 @@ async def catalog_get_vendor(
 
 def _validate_product_key(product_key: str) -> None:
     """Sanity-check defensivo de la clave de producto que llega por path."""
-    if not product_key or len(product_key) > catalog_svc.MAX_DESCRIPCION:
+    if (not product_key or len(product_key) > catalog_svc.MAX_DESCRIPCION
+            or "\x00" in product_key or catalog_svc._MEDIO_PAR.search(product_key)):
         raise HTTPException(status_code=400, detail="product_key inválido")
 
 

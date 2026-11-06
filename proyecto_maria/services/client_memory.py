@@ -32,12 +32,11 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database.models import ClientProductHistory
-from ..core.catalog_service import _normalize, _similarity, validar_largo  # reuso de normalizador
+from ..core.catalog_service import _MEDIO_PAR, AVISO_MEDIO_PAR, _normalize, _similarity, validar_largo  # reuso de normalizador
 
 FUZZY_THRESHOLD = 0.80
 # Lo que se guarda como promedio: más grande no es un valor de verdad.
 _MAX_VALOR = 1e12
-_MEDIO_PAR = re.compile("[\ud800-\udfff]")  # no se puede escribir en UTF-8
 # Un número escrito con dígitos del 0 al 9: float() acepta «1_000» y «٣».
 _DECIMAL = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
 
@@ -135,7 +134,7 @@ def descripcion_del_producto(descripcion) -> str:
     if not texto:
         raise ValueError("Falta la descripción.")
     if _MEDIO_PAR.search(texto):
-        raise ValueError("Hay un carácter que no se puede guardar.")
+        raise ValueError(AVISO_MEDIO_PAR)
     texto = unicodedata.normalize("NFC", texto)
     validar_largo(texto)
     return texto

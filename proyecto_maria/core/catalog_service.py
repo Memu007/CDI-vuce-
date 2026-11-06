@@ -49,6 +49,25 @@ def validar_largo(texto: str, que: str = "La descripción") -> None:
         raise ValueError(f"{que} pasa de {MAX_DESCRIPCION} caracteres.")
 
 
+_MEDIO_PAR = re.compile("[\ud800-\udfff]")  # no se puede escribir en UTF-8
+AVISO_MEDIO_PAR = "Hay un carácter que no se puede guardar."
+AVISO_NO_ES_OBJETO = "Cada producto tiene que ser un objeto."
+
+
+def texto_para_guardar(valor, que: str = "La descripción") -> str:
+    """El texto como se guarda: sin NUL ni espacios en los bordes; None es vacío.
+    ValueError con el motivo para el usuario si no se puede guardar."""
+    if valor is None:
+        return ""
+    if not isinstance(valor, str):
+        raise ValueError(f"{que} tiene que ser texto.")
+    valor = valor.replace("\x00", "").strip()
+    if _MEDIO_PAR.search(valor):
+        raise ValueError(AVISO_MEDIO_PAR)
+    validar_largo(valor, que)
+    return valor
+
+
 # Patron valido para vendor_id (slug generado por _vendor_key).
 _VENDOR_ID_RE = re.compile(r"^[a-z0-9_]{1,60}$")
 
@@ -329,6 +348,25 @@ async def match_items(
 # Escritura publica
 # -----------------------------------------------------------------
 
+def _producto_valido(prod) -> Optional[tuple]:
+    """(descripción, ncm, origen, unidad, precio) de un producto del lote, o
+    None si no tiene descripción. ValueError si un campo no se puede guardar."""
+    if not isinstance(prod, dict):
+        raise ValueError(AVISO_NO_ES_OBJETO)
+    desc = texto_para_guardar(prod.get("descripcion"))
+    if not desc:
+        return None
+    ncm = texto_para_guardar(prod.get("ncm"), "El NCM") or texto_para_guardar(prod.get("pieza"), "El NCM")
+    origen = texto_para_guardar(prod.get("origen"), "El origen")
+    unidad = texto_para_guardar(prod.get("unidad_medida"), "La unidad")
+    precio = prod.get("valor_unitario")
+    try:
+        precio = float(precio) if precio not in (None, "") else None
+    except (TypeError, ValueError):
+        precio = None
+    return desc, ncm, origen, unidad, precio
+
+
 async def save_products(
     db: AsyncSession,
     vendor_name: str,
@@ -351,30 +389,16 @@ async def save_products(
             "owner_username": owner_username,
         }
 
-    validar_largo(vendor_name, "El proveedor")
+    vendor_name = texto_para_guardar(vendor_name, "El proveedor")
     vendor_id = _vendor_key(vendor_name)
+    # Todo el lote se valida antes de escribir: uno malo no deja la mitad guardada.
+    validos = [p for p in map(_producto_valido, productos_in) if p]
 
     saved = 0
     updated = 0
 
-    for prod in productos_in:
-        desc = (prod.get("descripcion") or "").strip()
-        if not desc:
-            continue
-        validar_largo(desc)
-        ncm = (prod.get("ncm") or prod.get("pieza") or "").strip()
-        origen = (prod.get("origen") or "").strip()
-        validar_largo(origen, "El origen")
-
+    for desc, ncm, origen, unidad, precio in validos:
         product_key = clave_de_producto(desc)
-
-        unidad = prod.get("unidad_medida")
-        precio = prod.get("valor_unitario")
-        try:
-            precio = float(precio) if precio not in (None, "") else None
-        except (TypeError, ValueError):
-            precio = None
-
         extra_blob = {"unidad_medida": unidad} if unidad else None
 
         existing_stmt = select(VendorCatalogProduct).where(
@@ -469,31 +493,31 @@ async def update_product(
     if row is None:
         return None
 
-    new_desc = row.descripcion or ""
-    if "descripcion_original" in updates and updates["descripcion_original"] is not None:
-        val = str(updates["descripcion_original"]).strip()
-        validar_largo(val)
-        if val:
-            new_desc = val
+    # None es «no cambia»; todos los textos se validan antes de tocar la fila.
+    textos = {campo: texto_para_guardar(updates.get(campo), que) for campo, que in (
+        ("descripcion_original", "La descripción"), ("ncm", "El NCM"),
+        ("origen", "El origen"), ("unidad_medida", "La unidad"),
+    ) if updates.get(campo) is not None}
 
-    if "ncm" in updates and updates["ncm"] is not None:
-        row.ncm = str(updates["ncm"]).strip() or None
-    if "origen" in updates and updates["origen"] is not None:
-        origen = str(updates["origen"]).strip()
-        validar_largo(origen, "El origen")
-        row.origen = origen or None
+    new_desc = textos.get("descripcion_original") or row.descripcion or ""
+    if "ncm" in textos:
+        row.ncm = textos["ncm"] or None
+    if "origen" in textos:
+        row.origen = textos["origen"] or None
     if "precio_ref" in updates and updates["precio_ref"] is not None:
         try:
             row.valor_unitario = float(updates["precio_ref"])
         except (TypeError, ValueError):
             pass
-    if "unidad_medida" in updates and updates["unidad_medida"] is not None:
+    if "unidad_medida" in textos:
         merged = dict(row.extra or {})
-        merged["unidad_medida"] = str(updates["unidad_medida"]).strip() or None
+        merged["unidad_medida"] = textos["unidad_medida"] or None
         row.extra = merged
 
     new_key = product_key
-    if new_desc:
+    # Sólo una descripción nueva mueve la clave: una fila con clave de antes
+    # sigue editable por la clave que tiene.
+    if new_desc != (row.descripcion or ""):
         candidate = clave_de_producto(new_desc)
         if candidate != product_key:
             colision_stmt = select(VendorCatalogProduct).where(

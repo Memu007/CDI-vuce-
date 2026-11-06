@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-06 · fix: una entrada mala del catálogo da 400 sin perder el lote, y la fila vieja no se duplica (CATALOGO-LARGO-2, devolución)
+
+- Un texto nulo, que no es texto o con un carácter que no se puede guardar da 400 con el motivo al guardar el catálogo, cambiar un producto o confirmar un NCM, y no se guarda nada del lote; el NUL se limpia en todos los campos.
+- Un producto guardado antes con una descripción sin letras latinas (china, emoji) recibe en el arranque la clave de hoy: volver a guardarlo no arma otra fila y la vieja sigue editable.
+- El arranque amplía las columnas de a una tabla por vez, sin trabarse con un guardado en curso, y avisa la migración recién cuando quedó guardada.
+
 ## 2026-11-06 · fix: un link para restablecer la contraseña sirve una sola vez (RESET-1)
 
 - Cambiar la clave o el email, o restablecerla con otro link, deja sin uso los links pedidos antes.
