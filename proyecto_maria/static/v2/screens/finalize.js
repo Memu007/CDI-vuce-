@@ -18,8 +18,9 @@
 
     let lastValidation = null;    // { errores, advertencias, sugerencias, estadisticas }
     let lastValidationTs = 0;
+    let lastValidationPedido = '';  // el pedido del que salió lastValidation
     let lastMaria = null;         // { filename, download_url, content }
-    let validatingInFlight = false;
+    let turnoValidacion = 0;      // sólo la validación más reciente pinta la pantalla
     let generateInFlight = false;
     // Lo que se pide mientras otra generación espera se genera cuando ésa vuelve.
     let pedidaMientrasOtra = false;
@@ -101,32 +102,30 @@
 
     async function runValidation(force) {
         init();
-        if (validatingInFlight) return;
-        const now = Date.now();
-        // Cache: si ya tenemos resultado de hace menos de 60s y no forzamos, reusar
-        if (!force && lastValidation && (now - lastValidationTs) < 60000) {
-            renderValidation(lastValidation);
-            return;
-        }
-
-        validatingInFlight = true;
         show(vLoading);
         hide(vResults);
-
         const items = buildItemsForValidation();
+        const turno = ++turnoValidacion;
         try {
+            const pedido = JSON.stringify({ items, operacion: cabeceraParaValidar() });
+            // Se reusa sólo el resultado de este mismo pedido, de hace menos de 60 s.
+            if (!force && lastValidation && pedido === lastValidationPedido && (Date.now() - lastValidationTs) < 60000) {
+                renderValidation(lastValidation);
+                return;
+            }
+            lastValidation = null;
             const startedAt = Date.now();
-            const res = await CDI.api('/api/validate/smart', {
-                method: 'POST',
-                body: JSON.stringify({ items, operacion: cabeceraParaValidar() })
-            });
+            const res = await CDI.api('/api/validate/smart', { method: 'POST', body: pedido });
             const data = await res.json();
             const dur = Date.now() - startedAt;
+            // Otra carga pidió después: esta respuesta ya no es la que se ve.
+            if (turno !== turnoValidacion) return;
             if (!res.ok || !data || data.success === false) {
                 throw new Error((data && data.detail) || 'No se pudo validar');
             }
             lastValidation = data;
             lastValidationTs = Date.now();
+            lastValidationPedido = pedido;
             CDI.track('validation_ok', {
                 errores: (data.errores || []).length,
                 advertencias: (data.advertencias || []).length,
@@ -135,6 +134,8 @@
             });
             renderValidation(data);
         } catch (err) {
+            if (turno !== turnoValidacion) return;
+            lastValidation = null;
             console.error('[validating]', err);
             CDI.track('validation_error', { message: String(err && err.message || err) });
             CDI.toast('Error al validar', String(err && err.message || err), 'error');
@@ -145,8 +146,6 @@
                 sugerencias: [],
                 estadisticas: { total_items: items.length, total_valor_usd: 0, total_peso_kg: 0, ncms_unicos: 0 }
             });
-        } finally {
-            validatingInFlight = false;
         }
     }
 
@@ -1376,8 +1375,6 @@
         onLeave() {
             // Si el usuario va a 'upload' (nueva operacion), limpiamos cache
             lastMaria = null;
-            lastValidation = null;
-            lastValidationTs = 0;
             // Fuera de «Listo», la carga que esperaba no genera sola.
             pedidaMientrasOtra = false;
         }
