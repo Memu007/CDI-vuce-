@@ -69,6 +69,25 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## RESET-1: aceptada sobre `02a21e7`, sin integrar (2026-11-06 PM)
+
+Acta: `REPRODUCCION-RESET-1-2026-11-06.md`. Coincide con tu informe:
+`test_reset1.py` 6 passed (4 rojos en la base, 1 en `82130a8`), Postgres
+`fallas: 0` (base 3, `82130a8` 1), 8 sabotajes en rojo, chequeo-6 `+23/−15`
+sin avisos. La suite da `5 failed, 4951 passed`: los 5 de D73, que dan igual
+sobre la base. Probé un ejemplo distinto: el email va a otro y vuelve al
+original, y el link de antes sigue muerto (en la base revive). Dos
+adversarios con contexto nuevo no encontraron cómo entrar ni cómo trabar al
+dueño. Bien también que avisaras el orden y por qué.
+
+- **D82:** (a), queda así. Decidido por la PM.
+- **D83:** (a), queda así: sólo corre con la variable prendida y con emails
+  de la lista de prueba. Decidido por la PM.
+
+**Sigue igual:** primero esta devolución de CATALOGO-LARGO-2, después
+PYPDF-1 y después RESET-2 (en `ROADMAP.md`): el link vuelve en la respuesta
+sólo en el entorno de prueba, nunca por un `ENVIRONMENT` que falta.
+
 ## CATALOGO-LARGO-2: devolución, sobre `ccfe640` (2026-11-06 PM)
 
 Lo central está bien. TAIWAN y CHILE llegan enteros al TXT (antes, «TAI» y
@@ -310,22 +329,6 @@ Lo demás del revisor (XFF y `TRUSTED_PROXY_HOPS`, IPv6, deadlock con
 ventanas cortas, filas sin tope, tiempos del login) va a riesgos en tu
 informe, sin tocar producto.
 
-## SEGURO-1: aceptada sobre `5dfaf47` (2026-10-28 18:15 UTC)
-
-`test_seguro1.py` `48 passed` (corrida de la PM). Se integra con la cadena,
-después de SUFIJOS-2. Evidencia: `REPRODUCCION-SEGURO-1-2026-10-28.md`.
-
-Se suma, en commits aparte junto con la vuelta de SUFIJOS-2:
-- **Una prueba que fije la lista de los cinco.** Hoy sumar `DAT` (o `DDU`,
-  `DAF`, `DES`, `DEQ`) a `INCOTERMS_CON_SEGURO` deja `48 passed`.
-- **`/generate_maria/avisos` normaliza el incoterm igual que
-  `/generate_maria`**: con `"CIF\x00"` hoy los avisos ofrecen el 1 % y
-  generar da 400. Una sola función para los dos.
-- A riesgos: el 1 % mandado sin `seguro_calculado` entra al TXT (es lo
-  encargado; lo cubre SEGURO-2, que espera a Emi); seguro mayor que el FOB
-  sin aviso (preexistente); la revisión dice «no los sumes dos veces» y el
-  400 dice «cargá el de la factura».
-
 ## SUFIJOS-2: devolución, sobre `bd76f9f` (2026-10-28 18:05 UTC)
 
 Evidencia en `REPRODUCCION-SUFIJOS-2-2026-10-28.md`. Va en la cola después
@@ -377,95 +380,6 @@ Toca el TXT: el golden no se toca.
   arriba), OBSERVABILIDAD-1 (`39be45e`, devolución arriba) y ORG-1 + D40
   (`b358827`, devolución arriba).
 
-## EMAIL-1: aceptada sobre `2b93071` (2026-10-28 17:46 UTC)
-
-Lo de la pieza está bien: ningún camino manda el correo de una cuenta a
-otra y la respuesta no cambia exista o no. Se integra con la cadena.
-Evidencia en `REPRODUCCION-EMAIL-1-2026-10-28.md`. Sumá, encima de la
-cadena: una prueba que dé rojo si `if not email: return None` de
-`_cuenta_por_email` pasa a `if False:` (hoy `24 passed`).
-
-**A riesgos, sin tocar producto** (todo es de antes de la pieza): el nombre
-va sin escapar en el HTML de los dos correos de recuperación (phishing
-desde el remitente de CDI, reproducido); el envío síncrono delata la cuenta
-por tiempo y traba el worker; un token de recuperación viejo sigue valiendo
-tras usar uno nuevo; `dev_token_hint` fuera de producción; el 500 sin
-`FRONTEND_URL`. El 1, el 2 y el token se los propongo a Emi como pieza
-aparte: **no los arregles hasta que diga que sí**.
-
-## DATOS-1: aceptada sobre `c996ad4` (2026-10-28 17:41 UTC)
-
-El producto hace lo que pedía la D32 (a): sin fuga a otro dueño, una sola
-transacción, `/health` sin texto del error. Se integra con la cadena, cuando
-se acepte DESPACHO-1b (está debajo). Evidencia en
-`REPRODUCCION-DATOS-1-2026-10-28.md`. Sumá, encima de la cadena:
-
-1. **Un cliente con dos operaciones compartidas** (reproducido por la PM):
-   con `in_(op_ids[:1])` en el borrado de presupuestos, `test_datos1.py`
-   sigue en `9 passed`. Es el caso normal; la prueba tiene que tenerlo.
-2. **El orden presupuestos → operaciones** sólo lo frena
-   `datos1_postgres.py`, que no corre en la suite. Hacelo rojo en SQLite
-   (`PRAGMA foreign_keys=ON` en esa prueba) o decí por qué no se puede.
-3. **Verificá y proponé (D43):** una operación del cliente con
-   `owner_username` NULL (dato viejo) no entra en `op_ids`: el borrado dice
-   «eliminadas: 1», la operación queda y su presupuesto compartido sigue
-   accesible (revisor, Postgres 16; no lo reproduje). ¿Puede existir hoy
-   una fila así, según las migraciones? Si sí, proponé el arreglo.
-4. **A riesgos:** más de 32 767 operaciones dan 500 (límite de parámetros
-   del `in_`, ya existía); `api_logs.operation_id` frenaría el borrado si
-   algo lo llenara (hoy nada); la copia de `system_backups`
-   (`client_migration`) guarda datos del cliente borrado; los 502 con
-   `{err}`. La copia de `system_backups` la paso yo a Emi.
-
-## DESTINO-1: aceptada sobre `f887b4a` con `b9881fb` (2026-10-28 17:52 UTC)
-
-`test_destino1.py` `32 passed` y `destino1.sh b9881fb` 19 de 19 en rojo
-(corrida de la PM). Integrada `f887b4a` en la rama de la PM; `b9881fb`
-entra con la cadena. Evidencia: `REPRODUCCION-DESTINO-1-2026-10-28.md`.
-
-- **Punto 2(b), decidido por la PM: queda así.** Tenías razón: vacío es «el
-  de la operación», y ese grupo no se genera. No heredes el del primero.
-- Los tres riesgos y la premisa del golden quedan como los escribiste.
-
-## ORG-1: aceptada sobre `4ce6d22`, con ORG-1b y DESPACHO-1a (2026-10-28 17:38 UTC)
-
-Integrada en la rama de la PM (merge `cda3320`). Evidencia en
-`REPRODUCCION-ORG-1-2026-10-28.md`. Los guardas del producto están bien;
-faltan pruebas y un 500. Todo va **encima de la cadena**, en los commits de
-la D40, después de las 18:00 y antes de publicar.
-
-- **D40: (1)**, decidido por la PM. Al invitar, el email que ya tiene cuenta
-  da 400 y no ocupa lugar (misma respuesta en este estudio o en otro). Al
-  registrarse con una invitación, las otras pendientes del mismo email en
-  ese estudio quedan usadas.
-- **Sumá, con la D40** (reproducido por la PM sobre `4ce6d22`):
-  1. *Reingreso del sacado* (Postgres 16): dos invitaciones al mismo email,
-     X entra con la primera, el dueño lo saca, X cambia su email en el
-     perfil y entra con la segunda (`200`). La regla 2 de la D40 lo cierra;
-     la prueba es el recorrido entero. El email del perfil sin verificar va
-     a riesgos.
-  2. *Email que el registro rechaza*: invitar `josé@example.com` o
-     `ana@estudio` da 200 y ocupa lugar. Al invitar, la misma regla que el
-     registro: 400 y no ocupa lugar.
-  3. *Email largo*: en Postgres 16, invitar un email de 101 caracteres da
-     **500** (`Invitation.email` es `String(100)`); de 100, 200. Tiene que
-     dar 400 con la regla del 2. **Causa:** el largo lo frena la base, no
-     la ruta; revisá los otros campos de la invitación.
-  4. *Pruebas de los guardas.* Con cada uno de estos cambios
-     `test_org1.py` + `test_despacho1a.py` siguen en `59 passed`
-     (reproducidos por la PM: el filtro por estudio de `/mine`, el 403 al
-     que no es dueño y el borrar de otro estudio; los demás, del revisor):
-     invitar sin estudio (400), invitar sin ser dueño (403), «ya es
-     miembro» con y sin filtro por estudio, pendientes menos miembros (sin
-     `- set(emails_miembros)`), la validación de «@», el vencimiento de 7
-     días, validar con el estudio borrado (404), sacar a alguien de otro
-     estudio, sacar sin estudio (400), sacar no borra al usuario, `/mine`
-     filtra los miembros por estudio, `is_owner`, y el texto «última vez»
-     de DESPACHO-1a. Un caso por guarda, rojo con su sabotaje, en SQLite;
-     los de base, también en Postgres 16.
-- Al aceptar la última pieza de la cadena entran `6b9762e`, `3aaa3c4` y
-  estos arreglos. Nada se publica antes.
-
 ## D38 y D39 (2026-10-28)
 
 Cerradas. Quedan resumidas en `DECISIONS.md` («D38 y D39 de la Dev MARIA»).
@@ -499,7 +413,8 @@ Cerradas. Quedan resumidas en `DECISIONS.md` («D28 a D34 de la Dev MARIA»).
 ## Lo encargado de las piezas entregadas, todavía en revisión
 
 Lo de ORG-1, ORG-1b, DESPACHO-1a, DESTINO-1, DATOS-1, EMAIL-1 y DISCO-1 (aceptadas o con devolución
-arriba) salió del canal: `git show 1f648c3:docs/pm/PARA-DEV-2.md`.
+arriba) salió del canal: `git show 1f648c3:docs/pm/PARA-DEV-2.md`. Las actas de SEGURO-1,
+EMAIL-1, DATOS-1, DESTINO-1, ORG-1 y lo encargado de SESION-1: `git show 28d0422:docs/pm/PARA-DEV-2.md`.
 
 ### ABUSO-1 — hecha, sin entregar (encargada 2026-10-28 10:00 UTC)
 
@@ -541,38 +456,6 @@ Pruebas: cada hallazgo en rojo antes del arreglo, en PG16 y SQLite; una IP
 inventada en `X-Forwarded-For` no esquiva el límite ni bloquea a otro; un
 evento sin sesión o demasiado grande no se guarda; un sabotaje por regla.
 Línea en `CHANGELOG.md`. Es autenticación y registro: revisión fuerte.
-
-### SESION-1 — hecha, sin entregar (encargada 2026-10-28 09:00 UTC)
-
-OBSERVABILIDAD-1 quedó hecha (`39be45e`). Lo tuyo que queda espera a gente
-de afuera, así que te paso otra pieza de la Fase 3 que era de la técnica:
-**SESION-1**, el hallazgo S3 de `AUDITORIA-2026-10-06.md`. Decidido por la
-PM; dentro del roadmap. En commits aparte encima de `39be45e`, con su
-propio `/entregar` después del de OBSERVABILIDAD-1.
-
-- **El problema (S3):** resetear o cambiar la contraseña revive las
-  sesiones viejas, incluso las ya revocadas; cerrar sesión no revoca; con
-  una sesión robada se cambia el email sin contraseña y se toma la cuenta.
-- **Premisa primero:** reproducí cada parte sobre `39be45e` (PG16 en el
-  55432 y SQLite) antes de tocar nada, y decí dónde vive hoy la revocación
-  (jti, versión de token, lo que haya) y qué rutas cambian contraseña o
-  email. Si alguna parte ya no se reproduce, decilo con la prueba.
-- **Qué hacer:** cambiar o resetear la contraseña y cerrar sesión revocan
-  de verdad las sesiones que corresponden (las otras, y en cerrar sesión la
-  propia), y una revocada no vuelve; cambiar el email pide la contraseña
-  actual. Usá el mecanismo de revocación que ya exista; si no hay uno o hay
-  dos que compiten, preguntá en la **D35** antes de inventar otro.
-- **Fuera de alcance:** los hallazgos vecinos de Argon
-  (`REPRODUCCION-ARGON-2026-10-24.md`, filas 10, 13.2 y 14: link de
-  verificación reutilizable, reset con cookie vieja, contador de intentos,
-  tokens de reset paralelos, `/auth/me` y el jti). Si tu cambio arregla
-  alguno de paso, decilo; si no, una línea por cada uno a «riesgos». No
-  los arregles a propósito: eso lo prioriza Emi.
-
-Pruebas: cada parte de S3 en PG16 y SQLite, con la sesión vieja que ya no
-entra después de cada acción y la sesión nueva que sí; cambiar el email sin
-contraseña o con una equivocada falla y no cambia nada; un sabotaje por
-regla. Línea en `CHANGELOG.md`. Es autenticación: revisión fuerte.
 
 ### OBSERVABILIDAD-1 — hecha, sin entregar (encargada 2026-10-28 08:00 UTC)
 
