@@ -63,12 +63,12 @@ if ! "${CORRE[@]}" >/dev/null 2>&1; then
 fi
 
 sabotaje $CS "el catálogo mide el largo sin pasar a NFC" \
-  '    if len(unicodedata.normalize("NFC", descripcion)) > MAX_DESCRIPCION:' \
-  '    if len(descripcion) > MAX_DESCRIPCION:' \
+  '    if len(unicodedata.normalize("NFC", texto)) > MAX_DESCRIPCION:' \
+  '    if len(texto) > MAX_DESCRIPCION:' \
   "FAILED $T::test_guardar_en_el_catalogo_respeta_el_tope[nfc-que-crece]"
 sabotaje $CS "el tope no deja entrar el máximo" \
-  '    if len(unicodedata.normalize("NFC", descripcion)) > MAX_DESCRIPCION:' \
-  '    if len(unicodedata.normalize("NFC", descripcion)) >= MAX_DESCRIPCION:' \
+  '    if len(unicodedata.normalize("NFC", texto)) > MAX_DESCRIPCION:' \
+  '    if len(unicodedata.normalize("NFC", texto)) >= MAX_DESCRIPCION:' \
   "FAILED $T::test_guardar_en_el_catalogo_respeta_el_tope[2000]"
 sabotaje $CS "guardar en el catálogo no controla el largo" \
   '        validar_largo(desc)' \
@@ -79,13 +79,13 @@ sabotaje $CS "cambiar un producto no controla el largo" \
   '        pass' \
   "FAILED $T::test_cambiar_un_producto_respeta_el_tope_y_alcanza_claves_largas"
 sabotaje $M "el historial y guardar-uso miden el largo sin pasar a NFC" \
-  '            ("La descripción", descripcion, len(unicodedata.normalize("NFC", descripcion)),' \
-  '            ("La descripción", descripcion, len(descripcion),' \
+  '        catalog_svc.validar_largo(descripcion)' \
+  '        if len(descripcion) > catalog_svc.MAX_DESCRIPCION: raise ValueError("largo")' \
   "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfd-que-achica]" \
   "FAILED $T::test_importar_el_historial_respeta_el_tope[nfc-que-crece]"
 sabotaje $M "el historial y guardar-uso no tienen el tope del catálogo" \
-  '             catalog_svc.MAX_DESCRIPCION),' \
-  '             10**9),' \
+  '        catalog_svc.validar_largo(descripcion)' \
+  '        pass' \
   "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfc-que-crece]" \
   "FAILED $T::test_importar_el_historial_respeta_el_tope[2001]"
 sabotaje $M "el catálogo da 500 en vez de 400 al guardar" \
@@ -108,7 +108,7 @@ if [ -n "$PG_URL" ]; then
     echo "BASE  | la prueba en Postgres ya está en rojo sin sabotaje"; FALLAS=$((FALLAS+1))
   else
     sabotaje $M "el arranque no pasa las columnas a text" \
-      '            await conn.exec_driver_sql(f"ALTER TABLE vendor_catalog_products ALTER COLUMN {columna} TYPE TEXT")' \
+      '            await conn.exec_driver_sql(f"ALTER TABLE {tabla} ALTER COLUMN {columna} TYPE TEXT")' \
       '            pass' \
       "FALLA | primer arranque: las columnas son text"
     sabotaje $M "el arranque sigue si la migración falla" \

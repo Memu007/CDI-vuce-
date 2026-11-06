@@ -196,15 +196,19 @@ sabotaje "las tandas reordenan por clave" 1 \
 # Lo distingue sólo importar: en confirmar, 2001 letras también las frena el
 # tope del catálogo.
 sabotaje "sin tope de descripción" 1 \
-  '             catalog_svc.MAX_DESCRIPCION),' '             10**9),' \
+  '        catalog_svc.validar_largo(descripcion)' '        pass' \
   "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[BBBB"
 sabotaje "sin tope de NCM" 1 \
   '_HISTORIAL_MAX_NCM = 20' '_HISTORIAL_MAX_NCM = 10**9' \
   "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba sintetica-888" \
   "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[Bomba sintetica-8413.70.10.0000000000000"
+# El tope se cuenta en catalog_service, el único lugar que lo mide.
+M=proyecto_maria/core/catalog_service.py
 sabotaje "el tope no deja entrar el máximo" 1 \
-  '        if largo > tope:' '        if largo >= tope:' \
+  '    if len(unicodedata.normalize("NFC", texto)) > MAX_DESCRIPCION:' \
+  '    if len(unicodedata.normalize("NFC", texto)) >= MAX_DESCRIPCION:' \
   "FAILED $T::test_confirmar_en_el_tope_entra"
+M=proyecto_maria/main.py
 sabotaje "el NUL pasa" 1 \
   $'        if "\\x00" in texto:' $'        if False:' \
   "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba\\x00sintetica" \
