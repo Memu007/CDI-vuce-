@@ -9,7 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-06 · fix: lo que se valida con la clave actual no gana contra un cambio de clave en el medio, y contar intentos no traba la app (SESION-1, vuelta 2)
 
 - Cambiar la contraseña o el email después de validar la clave actual no guarda nada si la clave cambió mientras tanto (un reset del dueño gana): contesta 409 y no da un token. Dos cambios de clave a la vez: uno entra y el otro da 409.
-- Contar intentos fallidos usa la conexión del pedido: muchos pedidos con la clave mala a la vez ya no dejan a los demás sin entrar.
+- Contar intentos fallidos usa la conexión del pedido, y revisar la sesión devuelve la suya antes de la ruta: muchos pedidos a la vez, con la clave mala o con sesión, ya no dejan a los demás sin entrar.
 - Los tokens se firman y se abren con la misma clave, y uno sin vencimiento no vale.
 
 ## 2026-11-05 · fix: el catálogo del proveedor guarda entero el origen y el nombre del proveedor (CATALOGO-LARGO-2)
