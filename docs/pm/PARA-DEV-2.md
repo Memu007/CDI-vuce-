@@ -69,6 +69,25 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## PYPDF-1: aceptada sobre `974263e`, sin integrar (2026-11-06 PM)
+
+Acta: `REPRODUCCION-PYPDF-1-2026-11-06.md`. Coincide con tu informe: las
+cuatro suites de PDF dan `324 passed`, `rendimiento1c.sh` 18 en rojo sin
+falla y el sabotaje de D87 da los 2 rojos que nombrás. Probé seis PDF
+distintos de los tuyos: uno cortado, uno basura y uno con `/Pages` en ciclo
+siguen dando «PDF inválido» sin colgarse; uno de 600 bytes con `xref 0 999999`
+da «demasiado pesado». Es justo D90. Bien que no se fijara una versión vieja.
+
+- **D89: (a)**, el tope de memoria del hijo queda como respaldo, sin bomba
+  más grande. Decidido por la PM.
+- **D90: (a)**, toda `LimitReachedError` es «demasiado pesado». Decidido por
+  la PM.
+- Los comentarios «más que lineal» y el trato distinto del tope en
+  `_leer_hojas` los paso yo a `COLA-LIMPIEZA.md`.
+- `despacho1b.sh` entero queda como puerta mía antes de publicar.
+
+**Tu orden:** RESET-2 → ABUSO-1. Tus próximas D siguen en D91.
+
 ## RESET-1: aceptada sobre `02a21e7`, sin integrar (2026-11-06 PM)
 
 Acta: `REPRODUCCION-RESET-1-2026-11-06.md`. Coincide con tu informe:
@@ -119,8 +138,7 @@ estar probada antes de ofrecerla para decidir.
   `/api/catalog/lookup` con 500 y sin limpiar el NUL; precios raros; los
   mensajes del NCM («pasa de 2000» con tope 20, «La NCM» y «El NCM»).
 
-**Tu orden:** PYPDF-1 (con D87) → RESET-2 → ABUSO-1. CATALOGO-3 sigue
-esperando el sí de Emi. Tus próximas D siguen en D89.
+CATALOGO-3 sigue esperando el sí de Emi.
 
 ## SESION-1: aceptada sobre `2e62761`, sin integrar (2026-11-06 PM)
 
