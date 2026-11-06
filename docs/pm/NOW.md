@@ -206,6 +206,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-06 01:55 UTC: vuelta. Límite `allowed` en todas; contexto 135k/137k. MARIA sigue SESION-1 (`25a2718`), técnica esperando sus sabotajes de `555cd98` (33/67) antes de subir. Emi me pidió responderle a la sesión de limpieza: la superviso. Su LIMPIEZA-1 (`0a410ac`) choca con la de técnica que mi rama ya trae (`8747c4c`, `tests/test_limpieza1.py`); le pedí mergear mi rama en la suya y volver con suite. La v1 (`085ec1d`) entra después de aceptar SESION-1; D60 se cierra con eso.
+
 2026-11-05 23:55 UTC: vuelta. Límite semanal `allowed` en las tres; contexto 120k/135k/137k de 200k. Técnica rehace COBRO-CORTE-1 (corre sabotajes sobre `fbea636`), MARIA rehace SESION-1; ninguna entrega nueva ni D abierta. Una sesión del chat suelto de Emi armó LIMPIEZA-1 y el retiro de la UI v1 en `ccr-39e9acae-e1hve5` (`085ec1d`); no integrado: espera que Emi me lo confirme a mí y que cierre SESION-1. Si se va la v1, D60 se cierra.
 
 2026-11-05 23:30 UTC: **SESION-1 vuelve con devolución** (`c429307`, MARIA). Lo prometido aguanta: 29 passed, 29 sabotajes en rojo, mi negativo de once tokens ajenos da 401 y distingue. Dos causas reproducidas: un reset del dueño no gana contra un cambio de clave o de email ya validado (el atacante sale con token vigente), y el tope de la clave actual abre una segunda conexión: 40 pedidos a la vez dan `{400: 3, 500: 37}` y otro usuario espera 29 s (base: 0,6 s). D71 (b) pieza aparte. Suite `5 failed` también en la base: `pypdf 6.21.4` sin tope cambió el error de los PDF bomba; no es de la pieza, va en una D de MARIA.
@@ -239,8 +241,6 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 2026-11-05 13:58 UTC: Vuelta sin entregas cerradas. Límite semanal `allowed` en las tres sesiones; contexto bien. MARIA termina de sumar a su informe el merge con mi rama (arregló un `NameError` del merge en `file_security.py` y una carrera del caso de las diez subidas) y corre sabotajes sobre `515821a`; técnica corre la suite y ORDEN-1 sobre `9e37673` (CSRF-1 vuelta 2) antes de subir. A la cola de limpieza: el `logger` inexistente de `main.py:8048`.
 
 2026-11-05 13:05 UTC: **La integración de `885ee89` trajo código no aceptado.** COBRO-MP-1 y ORDEN-1b están encima de commits de COBRO-CORTE-1, COBRO-MP-2, AISLAMIENTO-2, LIMPIEZA-1 y BACKUP-1a (siguen 🔵, sin revisar). No se revierte: las Devs traen esta rama y un revert les borraría su código. Desde `e0b8626` ningún SHA de esta rama se le propone a Emi para publicar hasta que esas cinco estén ✅; el último sin código no aceptado es `9018d77`. LIMPIEZA-1 cambia `ci.yml` (+5/−19): el CI de esta rama ya corre con eso. EXCEL-2b ya quedó integrada en ese rango.
-
-2026-11-05 12:55 UTC: **COBRO-MP-1 aceptada** (vuelta 5, `736fed6`): 148 sabotajes en rojo, suite `4419 passed`, 6 negativos míos y el adversario sin nada que bloquee. ✅ en el roadmap; integrada con ORDEN-1b hasta `885ee89` (sin CSRF-1, que volvió con devolución). Queda para Emi la pieza D51: cancelar con organización tiene que actuar sobre la cuenta que da el acceso, y sólo quien corresponda.
 
 ## /compact conservar de la PM principal
 
