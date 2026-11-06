@@ -3,60 +3,60 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Veredicto de COBRO-CORTE-1, vuelta (2026-11-05 22:00 UTC): devolución por dos causas
+## Veredicto de COBRO-CORTE-1, vuelta 3 (2026-11-06 PM): devolución corta
 
-Sobre `0b9ccde`. Evidencia: `docs/pm/REPRODUCCION-COBRO-CORTE-1-v2-2026-11-05.md`.
-Lo de la vuelta anterior está cumplido: identidad por operación, sin 409,
-borrar cliente no recuenta, 402 igual dos veces, `trial` sin 500, sin atajo
-`testing`, D61 b. Los casos (82) y el chequeo-6 (`+131/−149`, 0 avisos) dan
-como dijiste. Lo que vuelve son dos bordes de esa identidad nueva.
+Sobre `8295bb5`. Evidencia: `docs/pm/REPRODUCCION-COBRO-CORTE-1-v3-2026-11-06.md`.
+El servidor aguanta. Tus casos dan `126 passed`, con 9 rojos en la base, y
+el caso de Postgres da `fallas: 0`. El chequeo-6 da `+122/−60` con 4 AVISOs,
+los mismos que explicaste. Opus no encontró doble cobro, generación gratis
+ni escape del directorio, tampoco con dos regeneraciones a la vez en
+Postgres. La causa 1 queda cerrada, igual que los puntos 3, 4 y 5. Vuelve
+por la causa 2, que no está cerrada entera, y por una regresión chica.
 
-**Causa 1: se cobra antes de entregar.** `_contar_maria` confirma el conteo y
-la fila antes de escribir el TXT (`main.py:4776`, `:4928`). Si algo falla
-después, la persona recibe un 500 sin archivo ni `operacion_id`, y el
-reintento cuenta otra. Lo reproduje en Postgres con la escritura fallando en
-el primer pedido: `500 ops 1`, reintento `200 ops 2`, dos filas. En `375edbc`
-el mismo reintento daba `ops 1`.
-Pido: lo que no se entregó no queda cobrado. Familia: falla al escribir el
-TXT, excepción del generador después de contar, y lo mismo en exportación.
+**Causa 2, sigue: una respuesta tardía escribe en la carga que sigue.** El
+aprendizaje del catálogo quedó afuera. `saveCatalogLearn(items)`
+(`finalize.js:1271`, llamada en `:728`) recibe los ítems de A pero toma el
+proveedor de `CDI.state`, que ya es B. Lo reproduje en Chromium,
+demorando la respuesta de A con `page.route`. Sale
+`POST /api/catalog/proveedor_b_sa/productos` con «Lona de PVC gris de la
+carga A»: el catálogo de B aprende un NCM de A. Si B no tiene proveedor, lo
+de A se pierde. En la base pasa igual, pero es la misma causa que se pidió
+cerrar.
+Pido: todo lo que hace la respuesta sale de la carga que la pidió. Familia
+como datos: historial, catálogo y el cliente del guardado. Hoy, en v2,
+`saveOperationToHistory` lee `carga.clienteActivo` al volver, y v1 lo toma
+al pedir: que las dos tomen el cliente igual.
 
-**Causa 2: una respuesta tardía escribe el id en la carga que sigue.**
-`finalize.js` asigna `CDI.state.operacionId` cuando vuelve `/generate_maria`
-y cuando vuelve el guardado al cliente, sin mirar si la carga sigue siendo la
-misma. Si la persona empieza otra carga en esa ventana, la nueva hereda el id:
-no se cuenta y pisa la fila y el archivo de la anterior. Lo reprodujeron por
-separado Opus y Sonnet, demorando la respuesta con `page.route`: `ops antes 3
-despues 3`, una sola fila para dos facturas.
-Pido: una respuesta sólo escribe en la carga que la pidió. Familia: respuesta
-de generar, respuesta del guardado, y v1 (`app.js:3390`, `:3751`, mismo
-patrón, no corrido). Esas líneas las agregaste vos: son tuyas; el resto de
-`saveOperationToHistory` y `reSave…` sigue siendo de MARIA.
+**La carga nueva que llega a «Listo» con la anterior en espera no se alcanza
+en la pantalla real.** Con A en vuelo, «Generar» de B queda deshabilitado
+(`finalize.js:557`, `:616`). Nada lo vuelve a pintar cuando A termina, así
+que B queda trabada en «validating» hasta salir y volver. Reproducido: `boton
+disabled = true` antes y después de volver A, un solo pedido. Tu caso llega a
+«Listo» con `CDI.goTo('ready')` directo, así que no distingue lo que vive el
+usuario.
+Pido: cuando A vuelve, B puede generar. El caso maneja la pantalla con
+clics, no con `goTo`. Si `pedidaMientrasOtra` queda sin camino real, sacalo.
 
-**Además, chicos (a cero, como pidió Emi para seguridad y datos):**
-3. Un `operacion_id` que la base no acepta (NUL, surrogate suelto) da 500 en
-   Postgres en `/generate_maria`, en exportación con surrogate y en el
-   guardado. No cobra, pero el 500 devuelve `dev_detail` con SQL en test.
-   Pido: un id que no es de una operación propia es operación nueva, nunca
-   500, en las tres rutas. En SQLite no se ve: el caso corre en Postgres.
-4. El aviso de borrar cliente (`clientes.js:1594`) dice que se borra el
-   historial de operaciones, y quedan como «Sin cliente». Que diga lo que pasa.
-5. `delete_cliente` reescribe `extra` sin `_cuenta_bloqueada`. Plausible, no
-   reproducido: una huella pisada es una regeneración gratis. Que tome el
-   mismo candado.
+**Regresión chica: si `os.link` falla, nunca más se regenera lo entregado.**
+`main.py:5966`. Con `os.link` fallando (`PermissionError`), regenerar da
+`[500, 500, 500]` sin cobrar. En la base daba `[200, 200, 200]`. Railway
+probablemente acepta hardlinks, pero la pieza no debería depender de eso.
+Pido: regenerar funciona aunque no se pueda enlazar, sin perder lo ya
+entregado si el commit falla. Un caso con el enlace fallando.
 
-Un caso por causa con la familia como datos, rojo antes en `0b9ccde`, y su
-sabotaje. Uno de cada familia lo pruebo yo con otro ejemplo.
+Un caso por causa, rojo antes en `8295bb5`, y su sabotaje. Uno de cada
+familia lo pruebo yo con otro ejemplo.
 
-**Quedan como están** (decidido por la PM): el mensaje del tope que le dice a
-Premium «actualizá a Premium» (previo; cola de limpieza); los dos relojes del
-inicio de período, dentro del riesgo de 1 s ya aceptado; pestañas abiertas
-durante una publicación que no mandan el id, mismo riesgo declarado.
-`d528a67` (comentarios sin historia) y `9213536` llegaron después de la
-entrega: entran en la próxima vuelta.
+**Quedan como están** (decidido por la PM): el commit que llega a la base y
+tira error en Python (cobra y el reintento cobra otra; de antes, raro; a la
+cola). Los candados de `delete_cliente` (usuario y después organización)
+contra sacar a un miembro (al revés): deadlock razonado, no reproducido; da
+500, no pierde datos; a la cola. En v1, el alert y la descarga de una
+respuesta vieja: v1 se retira (D60).
 
 **CSRF-3: aceptada** sobre `9fe55d4` (2026-11-05 19:20 UTC), integrada. Evidencia: `docs/pm/REPRODUCCION-CSRF-3-2026-11-05.md`. Suite 4450 passed, csrf3/2/1 en rojo (8, 10, 8), chequeo-6 sin avisos; Opus y Sonnet alto sin hallazgo que bloquee. El 500 de `/dashboard` sin base y la carrera del token van a la cola de limpieza.
 
-**Tu orden:** la devolución de COBRO-CORTE-1 → COBRO-MP-2 → COBRO-MP-3 →
+**Tu orden:** esta devolución de COBRO-CORTE-1 → COBRO-MP-2 → COBRO-MP-3 →
 AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. Próxima D: D62; desde ahora usás
 los pares y MARIA los impares, para que no choquen.
 
