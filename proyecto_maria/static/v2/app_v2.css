@@ -1,8 +1,8 @@
 /* ============================================================
    CDI v2 — Apple minimal design system (PROD base CSS)
    Fuente: proyecto_maria/mockups/styles.css
-   Alcance: solo dashboard_v2.html (opt-in via cookie cdi_ui=v2).
-   v1 (dashboard.html + app.css) NO se ve afectado.
+   Alcance: dashboard_v2.html, la única interfaz
+   (la v1, dashboard.html + app.css, se retiró el 2026-11-05).
    ============================================================ */
 
 /* ---------- Billing banner (trial restante / past_due) ---------- */

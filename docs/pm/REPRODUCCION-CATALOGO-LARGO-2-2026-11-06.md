@@ -50,6 +50,15 @@ En la base, «ボルト\x00» también da 200 con el latino guardado.
 
 ## Puertas del informe
 
-Corriendo en `$S/lote7.sh`, después de la tanda de limpieza. No cambian el
-veredicto: la devolución sale de lo reproducido arriba. Se agregan acá cuando
-terminen.
+Corridas por la PM sobre `ccfe640`. No cambian el veredicto: la devolución
+sale de lo reproducido arriba.
+
+| Puerta | resultado |
+|---|---|
+| `tests/test_catalogo_largo2.py` | `20 passed`; en la base `15 failed, 5 passed` |
+| `chequeo-6.py 93cbdef 68bef16` | `producto +29/−24`, `avisos: 0`, historia vacía |
+| `chequeo-6.py 195b96c ccfe640` | `producto +41/−27`, `avisos: 0`, historia vacía |
+| `scripts/testing/catalogo_largo2_postgres.py` (PG 16) | `fallas: 0` (13 OK) |
+
+Sabotajes y suite de esta entrega no se corrieron: la vuelta de la
+devolución los trae de nuevo.

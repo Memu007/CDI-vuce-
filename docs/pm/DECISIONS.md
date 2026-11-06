@@ -379,3 +379,12 @@ entero en PG, una fila vieja queda duplicada y sin editar, y la migración puede
 trabarse con `guardar-uso` y loguea antes del commit. D79 (a) en la vuelta.
 D76, D77, D78 y D80 van a Emi como pieza CATALOGO-3, recomendada. D81 queda:
 escapar el `value` va a la cola de limpieza.
+
+## 2026-11-06 — RESET-1 aceptada, D82 y D83, RESET-2 y la limpieza integrada (PM)
+
+RESET-1 aceptada sobre `02a21e7`, sin integrar. D82 (a): pedir un link nuevo
+no mata los anteriores. D83 (a): `_archived_test_email` no barre links. RESET-2
+sumada por la PM («a cero»): el link vuelve en la respuesta sólo en el entorno
+de prueba. La limpieza del repositorio (`07e7b5f`) se integra en `dd052d4`
+tras suite y sabotajes de CSRF-2 y COBRO-MP-1 en verde sobre `27b19d9`;
+cierra D60 (se retira la v1).

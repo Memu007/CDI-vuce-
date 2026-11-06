@@ -2,7 +2,8 @@
 # Negativos de CSRF-2: cada sabotaje deshace una parte del arreglo y la prueba
 # que la cubre tiene que fallar por ese motivo. Las rutas exentas y el alias de
 # cierre los mide tests/test_csrf.py; lo que mandan la landing y la pantalla
-# vieja, scripts/testing/pantalla_csrf2.js contra una API con CSRF_ENFORCE=true.
+# (v2; hasta el 2026-11-05, la v1), scripts/testing/pantalla_csrf2.js contra
+# una API con CSRF_ENFORCE=true.
 #
 # uso: PY=/ruta/al/venv/bin/python [PUERTO=8878] scripts/testing/sabotajes/csrf2.sh [SHA]
 PANTALLA=pantalla_csrf2.js
@@ -39,9 +40,9 @@ sabotaje pantalla $J "csrf.js tira con un pedido mal armado" \
 sabotaje pantalla proyecto_maria/templates/landing.html "la landing no carga csrf.js" \
   "FALLA: la telemetría de la landing dio 403" \
   $'<script src="/static/csrf.js"></script>\n' ''
-sabotaje pantalla proyecto_maria/templates/dashboard.html "la pantalla vieja no carga csrf.js" \
-  "FALLA: la copia de la pantalla vieja dio 403" \
-  $'    <script src="/static/csrf.js?v={{ version }}" defer></script>\n' ''
+sabotaje pantalla proyecto_maria/static/v2/app_v2.js "la pantalla no manda el token" \
+  "FALLA: la escritura de la pantalla dio 403" \
+  "                if (csrf) headers['X-CSRF-Token'] = csrf;" ""
 
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]

@@ -52,6 +52,18 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - Al generar, guardar la operación y aprender el catálogo van a la vez: si el catálogo no responde, la operación igual queda guardada y su aviso no se tapa. Red caída o plan vencido al confirmar un NCM o aprender el catálogo avisan como un error del servidor.
 - El id del proveedor se corta en 60 caracteres. Reintentar después de crear un cliente no crea otro. «Guardamos este NCM» sólo aparece si se guardó.
 
+## 2026-11-05 · feat: se retira la interfaz vieja (v1)
+
+- **feat(ui):** `/dashboard` sirve siempre la v2. Se van `dashboard.html`, `static/app.js` y `app.css`; `?v=1` y la cookie `cdi_ui` ya no cambian la pantalla. Ninguna ruta de API cambia.
+- **test:** se destapan veinte tests que esperaban `python-magic`, instalado hace tiempo.
+
+## 2026-11-05 · chore: repositorio ordenado (LIMPIEZA-1; la primera parte, CI y Google Cloud, es del 2026-10-28)
+
+- **chore(ci):** la CI ya no excluye a mano las 10 pruebas de presupuestos públicos, CSRF y el botón de NCM automático; una prueba falla si vuelve a sacar alguna.
+- Se borran `cloudbuild.yaml`, `setup_gcp.sh`, `scripts/deployment/deploy-cloud-run.sh` y las cinco guías de Google Cloud: el sitio se publica sólo por Railway.
+- **chore(repo):** se borra lo que ya no corre ni se cita: la `static/` de la raíz, `clients.json`, el script de migración desde JSON, `tests/old/`, `landing_legacy.html`, los informes de carga, los planes de otras herramientas (`.specify/`, `plans/`), la documentación duplicada o de chat (`docs/fixes`, `docs/misc`, `docs/guides`, `proyecto_maria/documentacion_tecnica`) y los scripts huérfanos de `scripts/`. Nada del producto cambia; todo queda en Git.
+- **docs(repo):** README nuevo con el stack real, cómo correr en local, cómo correr las pruebas y dónde está cada cosa; reemplaza a `QUICK_START.md`, `ARCHITECTURE.md` y `setup.sh`. Los planes de valuación pasan a `docs/negocio/`. `.gitignore` sin entradas personales.
+
 ## 2026-11-05 · fix: una sesión sin token CSRF lo recibe sola (CSRF-3)
 
 - **fix(seguridad):** si la sesión es válida y le falta la cookie `csrf_token`, la próxima lectura autenticada se la emite; la pantalla v2 ya la trae al abrir y escribe sin volver a entrar. Una sesión vencida, revocada o ausente no recibe nada, y un token que ya está no se cambia.
@@ -291,11 +303,6 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **feat(datos):** `scripts/datos/copia_base.py` saca la copia de Postgres (`pg_dump -Fc`), la restaura en una base descartable y compara, tabla por tabla, la cantidad de filas y un resumen del contenido; si no da igual, sale con error y no la marca como verificada.
 - `enviar` lleva sólo una copia verificada y sin cambios a una carpeta local de prueba. Adónde va de verdad y cuándo corre lo define Emi; todavía no corre en producción.
-
-## 2026-10-28 · chore: la CI corre la suite entera y se borra el camino a Google Cloud (LIMPIEZA-1)
-
-- **chore(ci):** la CI ya no excluye a mano las 10 pruebas de presupuestos públicos, CSRF y el botón de NCM automático; una prueba falla si vuelve a sacar alguna.
-- Se borran `cloudbuild.yaml`, `setup_gcp.sh`, `scripts/deployment/deploy-cloud-run.sh` y las cinco guías de Google Cloud: el sitio se publica sólo por Railway.
 
 ## 2026-10-28 · fix: los roles guardados como texto no dan administrador por una parte (AISLAMIENTO-2)
 

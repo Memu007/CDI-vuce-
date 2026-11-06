@@ -1,7 +1,6 @@
 # ============================================
 # CDI Sistema MARÍA - Dependencies
 # ============================================
-# Minimal set optimized for Google Cloud Run
 # Installation: pip install -r requirements.txt
 # Python version: 3.10+
 # ============================================

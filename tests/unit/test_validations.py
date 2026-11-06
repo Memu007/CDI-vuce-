@@ -874,7 +874,6 @@ class TestPasswordStrength:
 # TESTS PARA proyecto_maria.security.file_security
 # ============================================================================
 
-@pytest.mark.skip(reason="Requires python-magic module")
 @pytest.mark.unit
 class TestSanitizeFilename:
     """Tests para sanitize_filename."""
@@ -936,7 +935,6 @@ class TestSanitizeFilename:
         assert len(result) <= 255
 
 
-@pytest.mark.skip(reason="Requires python-magic module")
 @pytest.mark.unit
 class TestValidateFilePath:
     """Tests para validate_file_path."""
@@ -982,7 +980,6 @@ class TestValidateFilePath:
             assert ";" not in str(result)
 
 
-@pytest.mark.skip(reason="Requires python-magic module")
 @pytest.mark.unit
 class TestGetSafeTempFilename:
     """Tests para get_safe_temp_filename."""
@@ -1019,7 +1016,6 @@ class TestGetSafeTempFilename:
         assert result.endswith(".pdf")
 
 
-@pytest.mark.skip(reason="Requires python-magic module + pytest-asyncio")
 @pytest.mark.unit
 class TestValidateFileUpload:
     """Tests para validate_file_upload (async)."""
