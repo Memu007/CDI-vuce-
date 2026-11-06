@@ -55,7 +55,6 @@ PYEOF
 }
 
 M=proyecto_maria/main.py
-M=proyecto_maria/main.py
 N=test_el_link_no_sirve_despues_de_un_cambio
 VIEJO='el link viejo sigue sirviendo'
 TODOS='    if hecho.rowcount == 1 and valores.keys() & {"password", "email"}:
@@ -84,6 +83,8 @@ sabotaje $M "cambiar el email no mata los links de antes" \
   "FAILED $T::${N}[cambio de email]" "$VIEJO"
 sabotaje $M "el reset guarda sin compare-and-swap ni consumo" "$GUARDA" "$SIN_GUARDA" \
   "FAILED $T::${N}[otro reset]" "$VIEJO"
+sabotaje $M "el consumo no mira el vencimiento" ', PasswordResetToken.expires_at > datetime.now(timezone.utc)' '' \
+  "FAILED $T::test_un_link_que_vence_antes_de_guardar_no_cambia_la_clave"
 
 if [ -n "$PG_URL" ]; then
   CORRE=("${PRUEBA_PG[@]}")
@@ -101,6 +102,11 @@ if [ -n "$PG_URL" ]; then
       "FALLA | el mismo link dos veces a la vez" "FALLA | el cambio de email que llega primero mata el link"
     sabotaje $M "el reset guarda sin compare-and-swap ni consumo" "$GUARDA" "$SIN_GUARDA" \
       "FALLA | el mismo link dos veces a la vez" "FALLA | el cambio de email que llega primero mata el link"
+    sabotaje $M "pedir un link no traba la cuenta" \
+      '        user = (await db.execute(select(User).where(
+            User.username == user.username, User.email == user.email).with_for_update())).scalars().first()' \
+      '        pass' \
+      "FALLA | el link pedido mientras se guarda el cambio de email no sirve"
   fi
 else
   echo "SALTO | sin PG_URL: los usos a la vez no se midieron"

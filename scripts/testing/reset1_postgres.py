@@ -5,7 +5,12 @@ se sueltan juntos. Comprueba que:
 1. el mismo link usado dos veces a la vez cambia la clave una sola vez: un
    200 y un 400;
 2. un cambio de email que llega primero mata el link que se usa a la vez:
-   el perfil da 200, el reset 400 y la clave no cambia.
+   el perfil da 200, el reset 400 y la clave no cambia;
+3. un link pedido a la vez que un cambio de email, que leyó la cuenta antes
+   del cambio y la guarda después, no sirve: un disparador de esta base de
+   prueba frena el guardado del link hasta que se suelta;
+4. un link pedido detrás de un cambio de email que ya trabó la cuenta no
+   sale, o no sirve.
 
 uso (con un Postgres local y descartable, nunca el de producción; el usuario
 tiene que poder crear bases):
@@ -61,12 +66,14 @@ def sql(consulta, *args):
         return cur.fetchall()
 
 
-def esperan_un_bloqueo(n):
-    """Hasta que n conexiones de la base esperan un bloqueo (60 s como mucho)."""
+def esperan_un_bloqueo(n, o_termina=None):
+    """Hasta que n conexiones de la base esperan un bloqueo, o `o_termina`
+    termina (60 s como mucho)."""
     hasta = time.monotonic() + 60
     while time.monotonic() < hasta:
-        if sql("select count(*) from pg_stat_activity where datname=%s and wait_event_type='Lock'",
-               BASE)[0][0] >= n:
+        if (o_termina is not None and o_termina.done()) or sql(
+                "select count(*) from pg_stat_activity where datname=%s and wait_event_type='Lock'",
+                BASE)[0][0] >= n:
             return True
         time.sleep(0.01)
     return False
@@ -136,6 +143,45 @@ try:
                  f"el cambio de email que llega primero mata el link: en cola {en_cola}, perfil "
                  f"{r_perfil.status_code}, reset {r_reset.status_code} {r_reset.text[:120]}, "
                  f"clave sin cambiar {clave_es(u, CLAVE)}")
+
+        def el_pedido_no_sirve(que, u, en_cola, r_perfil, r_link):
+            token = r_link.json().get("dev_token_hint")
+            r_reset = resetear(token, CLAVE3)() if token else None
+            chequear(en_cola and r_perfil.status_code == 200 and r_link.status_code == 200
+                     and (r_reset is None or r_reset.status_code == 400) and clave_es(u, CLAVE),
+                     f"{que} no sirve: en cola {en_cola}, perfil {r_perfil.status_code}, pedido "
+                     f"{r_link.status_code}, reset {r_reset.status_code if r_reset else 'sin link'}, "
+                     f"clave sin cambiar {clave_es(u, CLAVE)}")
+
+        # 3. el link se pide con el email viejo y se guarda después del cambio
+        sql("""create function frenar_link() returns trigger language plpgsql as
+               $$ begin perform pg_advisory_xact_lock(7311); return new; end $$;
+               create trigger frenar_link before insert on password_reset_tokens
+               for each row execute function frenar_link(); select 1""")
+        u, mail = usuario()
+        sesion = c.post("/auth/login", json={"username": u, "password": CLAVE}).json()["access_token"]
+        freno = psycopg2.connect(URL_BASE)
+        try:
+            with freno.cursor() as cur:
+                cur.execute("select pg_advisory_lock(7311)")
+            with concurrent.futures.ThreadPoolExecutor(2) as ex:
+                r_link = ex.submit(lambda: c.post("/auth/request-password-reset", json={"email": mail}))
+                en_cola = esperan_un_bloqueo(1)
+                r_perfil = ex.submit(cambiar_email)
+                en_cola = en_cola and esperan_un_bloqueo(2, o_termina=r_perfil)
+                with freno.cursor() as cur:
+                    cur.execute("select pg_advisory_unlock(7311)")
+                r_link, r_perfil = r_link.result(timeout=120), r_perfil.result(timeout=120)
+        finally:
+            freno.close()
+        el_pedido_no_sirve("el link pedido mientras se guarda el cambio de email", u, en_cola, r_perfil, r_link)
+
+        # 4. el cambio de email traba la cuenta primero y el link se pide detrás
+        u, mail = usuario()
+        sesion = c.post("/auth/login", json={"username": u, "password": CLAVE}).json()["access_token"]
+        en_cola, r_perfil, r_link = a_la_vez(
+            u, cambiar_email, lambda: c.post("/auth/request-password-reset", json={"email": mail}))
+        el_pedido_no_sirve("el link pedido detrás del cambio de email", u, en_cola, r_perfil, r_link)
 finally:
     try:
         admin(f'drop database if exists "{BASE}" with (force)')
