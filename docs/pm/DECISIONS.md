@@ -402,3 +402,8 @@ COBRO-MP-2 con devolución sobre `4f1822f`. D62 (a): una pausada de otro
 miembro frena el checkout con 409, como una autorizada; la lista de estados
 que pagan va en un solo lugar. Sacar del estudio sólo se frena por la que paga.
 
+
+### 2026-11-06 12:06 UTC (Emi)
+
+Sí a la pieza nueva VALIDACION-1 (Dev técnica, después de COBRO-MP-2): la
+validación de una carga nunca muestra ni guarda lo de otra.
