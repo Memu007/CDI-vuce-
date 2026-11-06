@@ -58,3 +58,5 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   su métrica («value too long»).
 - `proyecto_maria/pdf_extractor.py:927` y `:936`: `'\-'` sin `r''` da
   `SyntaxWarning` en `compileall` (Python 3.12).
+- Dos `get_db` iguales, en `proyecto_maria/main.py:165` y
+  `proyecto_maria/auth/dependencies.py:21`: dejar uno (D75 de MARIA).
