@@ -134,30 +134,36 @@ def test_la_memoria_del_cliente_guarda_el_origen_entero(client, via, origenes):
 
 
 GIGANTE = "x" * 2001
+NCM_LARGO = "7" * 21
+DE_MAS = {"proveedor": ("El proveedor pasa de 2000 caracteres.", "El proveedor pasa de 2000 caracteres."),
+          "origen": ("El origen pasa de 2000 caracteres.", "El origen pasa de 2000 caracteres."),
+          "ncm": ("El NCM pasa de 20 caracteres.", "La NCM pasa de 20 caracteres.")}
 
 
 @pytest.mark.parametrize("via, campo", [
-    ("catalogo", "proveedor"), ("catalogo", "origen"), ("cambiar-origen", "origen"),
-    ("guardar-uso", "proveedor"), ("guardar-uso", "origen")])
-def test_un_proveedor_o_un_origen_de_mas_de_2000_dan_400_sin_guardar(client, via, campo):
+    ("catalogo", "proveedor"), ("catalogo", "origen"), ("catalogo", "ncm"),
+    ("cambiar", "origen"), ("cambiar", "ncm"),
+    ("guardar-uso", "proveedor"), ("guardar-uso", "origen"), ("guardar-uso", "ncm")])
+def test_un_texto_de_mas_da_400_sin_guardar(client, via, campo):
     owner = _dueno(_cliente(client))
     vendor = GIGANTE if campo == "proveedor" else VENDOR
     origen = GIGANTE if campo == "origen" else "CN"
+    ncm = NCM_LARGO if campo == "ncm" else NCM
     url = f"/api/catalog/{VENDOR_ID}/productos"
-    if via == "cambiar-origen":
+    if via == "cambiar":
         assert client.post(url, json={"vendor_name": VENDOR, "productos": [
             {"descripcion": "TORNILLO", "ncm": NCM, "origen": "CN"}]}).status_code == 200
-        r = client.put(f"{url}/tornillo", json={"origen": origen})
+        r = client.put(f"{url}/tornillo", json={campo: {"origen": origen, "ncm": ncm}[campo]})
     elif via == "catalogo":
         r = client.post(url, json={"vendor_name": vendor, "productos": [
-            {"descripcion": "TORNILLO", "ncm": NCM, "origen": origen}]})
+            {"descripcion": "TORNILLO", "ncm": ncm, "origen": origen}]})
     else:
         r = client.post("/api/ncm/guardar-uso", json={
-            "descripcion": "TORNILLO", "ncm": NCM, "vendor_name": vendor, "origen": origen})
+            "descripcion": "TORNILLO", "ncm": ncm, "vendor_name": vendor, "origen": origen})
 
-    motivo = {"proveedor": "El proveedor", "origen": "El origen"}[campo]
-    assert (r.status_code, r.json().get("detail")) == (400, f"{motivo} pasa de 2000 caracteres."), r.text
-    esperado = [(VENDOR, "TORNILLO", NCM, "CN")] if via == "cambiar-origen" else []
+    motivo = DE_MAS[campo][via == "guardar-uso"]
+    assert (r.status_code, r.json().get("detail")) == (400, motivo), r.text
+    esperado = [(VENDOR, "TORNILLO", NCM, "CN")] if via == "cambiar" else []
     assert _filas(owner) == esperado
     assert _sql("select count(*) from ncm_historial where owner_username=:o", o=owner) == [(0,)]
 
