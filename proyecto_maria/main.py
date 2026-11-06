@@ -1679,7 +1679,11 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
     
     # 1. Buscar usuario
     user = await _cuenta_por_email(db, request.email)
-    
+    if user:
+        # Trabar la cuenta con el email leído: un cambio de clave o email a la vez barre este link o lo impide.
+        user = (await db.execute(select(User).where(
+            User.username == user.username, User.email == user.email).with_for_update())).scalars().first()
+
     if not user:
         # Por seguridad, no decimos si el email existe o no, pero simulamos éxito
         # Opcional: sleep aleatorio para evitar timing attacks
@@ -1929,17 +1933,17 @@ CLAVE_CAMBIADA_EN_EL_MEDIO = "La contraseña cambió mientras se guardaba. Volv�
 
 async def guardar_si_la_clave_sigue(db: AsyncSession, username: str, hash_validado: str,
                                     consumir: str | None = None, **valores) -> bool:
-    """Guarda `valores` y lo pendiente del pedido sólo si la clave sigue siendo
-    la validada y, con `consumir`, si ese link de reset sigue sin usar; si no,
-    deshace todo: un cambio de clave en el medio gana. Cambiar la clave o el
-    email deja sin uso los links de reset pedidos antes."""
+    """Guarda `valores` si la clave sigue siendo la validada y, con `consumir`, si ese link sigue vigente;
+    si no, deshace todo. Cambiar la clave o el email deja sin uso los links de reset pedidos antes."""
     hecho = await db.execute(sa_update(User).where(
         User.username == username, User.password == hash_validado).values(**valores))
     links = sa_update(PasswordResetToken).where(
         PasswordResetToken.user_username == username, PasswordResetToken.is_used == False  # noqa: E712
     ).values(is_used=True)
     if hecho.rowcount == 1 and consumir is not None:
-        hecho = await db.execute(links.where(PasswordResetToken.token == consumir))
+        hecho = await db.execute(links.where(
+            PasswordResetToken.token == consumir, PasswordResetToken.expires_at > datetime.now(timezone.utc)
+        ).execution_options(synchronize_session=False))
     if hecho.rowcount == 1 and valores.keys() & {"password", "email"}:
         await db.execute(links)
     if hecho.rowcount != 1:

@@ -10,6 +10,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - Cambiar la clave o el email, o restablecerla con otro link, deja sin uso los links pedidos antes.
 - El mismo link usado dos veces a la vez cambia la clave una sola vez; si la clave o el email cambian en el medio, el link da 400 «Token inválido o expirado».
+- Un link pedido mientras se cambia el email, o que vence entre que se valida y se guarda la clave nueva, tampoco sirve.
 
 ## 2026-11-06 · fix: el origen se recuerda entero y proveedor u origen demasiado largos dan 400 (CATALOGO-LARGO-2)
 
