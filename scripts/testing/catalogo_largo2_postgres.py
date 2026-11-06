@@ -3,12 +3,18 @@ de las columnas y el corte no se ve.
 
 1. Crea una base descartable en el servidor de la URL y arranca ahí la
    versión anterior (un worktree, 93cbdef por defecto): registra un usuario,
-   un cliente y guarda en el catálogo un producto con origen «CN».
+   un cliente y guarda en el catálogo un producto con origen «CN» y tres con
+   clave latina a los que después les cambia la descripción por CJK, emoji y
+   la mezcla de los dos.
 2. Arranca la versión nueva sobre la misma base: una con la tabla tomada por
-   otra conexión y dos sin.
+   otra conexión, una con escrituras en curso sobre las dos tablas y dos
+   sin.
 
 Comprueba:
 - que con la tabla tomada el arranque falla en vez de seguir con el corte;
+- que una escritura que traba la memoria del cliente y después el catálogo,
+  como guardar-uso, no se traba con el arranque: andan los dos, y el log
+  dice «pasa a TEXT» sólo de lo que quedó guardado;
 - que origen y vendor_nombre del catálogo y el origen de la memoria del
   cliente pasan a text y la fila vieja queda igual, y que arrancar otra vez
   no cambia nada;
@@ -17,22 +23,31 @@ Comprueba:
   y que guardar-uso con un cliente guarda también el origen entero en la
   memoria del cliente;
 - que guardar-uso de «螺丝» con proveedor y sin cliente guarda la fila;
+- que un carácter nulo, medio par UTF-16, null o false en el proveedor, la
+  descripción o el origen no dan 500 por el lote, guardar-uso ni el cambio:
+  un 200 guarda lo bueno y un 400 trae un motivo legible y no escribe nada;
+- que la versión nueva guarda las descripciones CJK de la fila vieja en esa
+  misma fila, y que la fila sigue editable;
 - que 2000 caracteres CJK distintos se guardan por el catálogo, por
   guardar-uso y por cambiar la descripción: la clave entra en el índice único.
 
 uso (con un Postgres local y descartable, nunca el de producción; el usuario
 tiene que poder crear bases):
-  python scripts/testing/catalogo_largo2_postgres.py postgresql://cdi@127.0.0.1:5432/postgres [SHA anterior]
+  python scripts/testing/catalogo_largo2_postgres.py postgresql://cdi@127.0.0.1:<puerto>/postgres [SHA anterior]
 """
 import asyncio
 import contextlib
+import io
+import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import uuid
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 URL = sys.argv[1] if len(sys.argv) > 1 else ""
 ANTERIOR = sys.argv[2] if len(sys.argv) > 2 else "93cbdef"
@@ -58,6 +73,9 @@ LARGO_ID = ("proveedor_largo_" + "x" * 204)[:60]
 NCM = "73181500"
 # Variados: repetidos, Postgres los comprime y entran en el índice igual.
 CJK_LARGO = "".join(chr(0x4E00 + i * 7) for i in range(2000))
+# La versión anterior les dejó la clave latina al cambiarles la descripción.
+VIEJAS = (("VIEJO CJK", "螺丝钉"), ("VIEJO EMOJI", "🔩🔩"), ("VIEJO MEZCLA", "螺丝🔩"))
+MALOS = {"nulo": "x\x00", "medio par": "x\ud800", "null": None, "false": False}
 
 
 def chequear(ok, que):
@@ -99,18 +117,35 @@ def columnas():
                " order by column_name")
 
 
+def esperar(consulta, *args):
+    """Hasta que la consulta devuelve algo (60 s como mucho)."""
+    hasta = time.monotonic() + 60
+    while time.monotonic() < hasta:
+        if sql(consulta, *args):
+            return True
+        time.sleep(0.01)
+    return False
+
+
+def legible(r):
+    detalle = r.json().get("detail") if r.headers.get("content-type", "").startswith("application/json") else None
+    return isinstance(detalle, str) and not any(p in detalle.lower() for p in ("codec", "surrogate", "\\u"))
+
+
 def fila(vendor_id, descripcion):
     return sql("select vendor_nombre, ncm, origen from vendor_catalog_products where owner_username=%s"
                " and vendor_id=%s and descripcion=%s", USUARIO, vendor_id, descripcion)
 
 
 VIEJA = r'''
+import json
 import sys
 from fastapi.testclient import TestClient
 import proyecto_maria.main as m
 from proyecto_maria.core.rate_limit import limiter
 limiter.enabled = False
 usuario, clave, vendor, vendor_id, ncm = sys.argv[1:6]
+viejas = json.loads(sys.argv[6])
 with TestClient(m.app, raise_server_exceptions=False) as c:
     r = c.post("/auth/register", json={"username": usuario, "password": clave,
                "email": f"{usuario}@example.com", "name": usuario})
@@ -121,6 +156,12 @@ with TestClient(m.app, raise_server_exceptions=False) as c:
     r = c.post(f"/api/catalog/{vendor_id}/productos", json={"vendor_name": vendor,
                "productos": [{"descripcion": "TORNILLO", "ncm": ncm, "origen": "CN"}]})
     assert r.status_code == 200, r.text
+    for vieja, nueva in viejas:
+        r = c.post(f"/api/catalog/{vendor_id}/productos", json={"vendor_name": vendor,
+                   "productos": [{"descripcion": vieja, "ncm": ncm}]})
+        assert r.status_code == 200, r.text
+        r = c.put(f"/api/catalog/{vendor_id}/productos/{vieja.lower()}", json={"descripcion_original": nueva})
+        assert r.status_code == 200, r.text
 print("vieja ok " + cid)
 '''
 
@@ -130,7 +171,8 @@ try:
     # --- 1. la versión anterior
     subprocess.run(["git", "-C", REPO, "worktree", "add", "--detach", WT, ANTERIOR],
                    check=True, capture_output=True)
-    r = subprocess.run([sys.executable, "-c", VIEJA, USUARIO, CLAVE, VENDOR, VENDOR_ID, NCM],
+    r = subprocess.run([sys.executable, "-c", VIEJA, USUARIO, CLAVE, VENDOR, VENDOR_ID, NCM,
+                        json.dumps(VIEJAS)],
                        cwd=WT, env={**os.environ, **entorno(URL_BASE), "PYTHONPATH": WT},
                        capture_output=True, text=True, timeout=600)
     if r.returncode != 0 or "vieja ok" not in r.stdout:
@@ -138,10 +180,14 @@ try:
         sys.exit("la versión anterior no arrancó o no guardó el producto")
     CID = r.stdout.split("vieja ok ")[1].split()[0]
     viejo = fila(VENDOR_ID, "TORNILLO")
+    claves_viejas = sql("select descripcion, product_key from vendor_catalog_products where descripcion in %s"
+                        " order by descripcion", tuple(n for _, n in VIEJAS))
     chequear(columnas() == [("origen", "character varying", 5), ("origen_frecuente", "character varying", 3),
                             ("vendor_nombre", "character varying", 200)]
-             and viejo == [(VENDOR, NCM, "CN")],
-             f"la base de {ANTERIOR} tiene las columnas cortas y el producto viejo: {columnas()} {viejo}")
+             and viejo == [(VENDOR, NCM, "CN")]
+             and sorted(k for _, k in claves_viejas) == sorted(v.lower() for v, _ in VIEJAS),
+             f"la base de {ANTERIOR} tiene las columnas cortas, el producto viejo y las claves latinas: "
+             f"{columnas()} {viejo} {claves_viejas}")
 
     # --- 2. la versión nueva sobre la misma base
     os.environ.update(entorno(URL_BASE))
@@ -172,6 +218,47 @@ try:
         tomada.close()
     chequear(not arranco and {t for _, t, _ in columnas()} == {"character varying"},
              f"con la tabla tomada el arranque falla en vez de seguir con las columnas cortas: {columnas()}")
+
+    # Guardar-uso traba la memoria del cliente y después el catálogo.
+    escritura = psycopg2.connect(URL_BASE)
+    salida, arranque = io.StringIO(), {}
+
+    def arrancar():
+        try:
+            with Arranque(main_mod.app, raise_server_exceptions=False):
+                arranque["fin"] = "anduvo"
+        except Exception as e:
+            arranque["fin"] = repr(e)[:200]
+            asyncio.run(engine.dispose(close=False))
+    try:
+        cur = escritura.cursor()
+        cur.execute("set lock_timeout = '20s'")
+        cur.execute("lock table client_product_history in row exclusive mode")
+        with contextlib.redirect_stdout(salida):
+            hilo = threading.Thread(target=arrancar)
+            hilo.start()
+            en_cola = esperar("select 1 from pg_stat_activity where datname=%s and wait_event_type='Lock'"
+                              " and query ilike 'alter table client_product_history%%'", BASE)
+            try:
+                cur.execute("lock table vendor_catalog_products in row exclusive mode")
+                escritura.commit()
+                la_escritura = "anduvo"
+            except Exception as e:
+                escritura.rollback()
+                la_escritura = repr(e)[:200]
+            hilo.join(120)
+    finally:
+        escritura.close()
+    tipos = {c: t for c, t, _ in columnas()}
+    columna_de = {"vendor_catalog_products": ("origen", "vendor_nombre"),
+                  "client_product_history": ("origen_frecuente",)}
+    mentiras = [linea for linea in salida.getvalue().splitlines() if "pasa a TEXT" in linea
+                and any(c in linea and tipos.get(c) != "text" for t in columna_de for c in columna_de[t]
+                        if t in linea)]
+    print(salida.getvalue().strip())
+    chequear(en_cola and arranque.get("fin") == "anduvo" and la_escritura == "anduvo" and not mentiras,
+             f"el arranque y una escritura como guardar-uso andan los dos: en cola {en_cola}, arranque "
+             f"{arranque.get('fin')}, escritura {la_escritura}, log que no quedó guardado {mentiras}")
 
     for vez in ("primer", "segundo"):
         with Arranque(main_mod.app, raise_server_exceptions=False):
@@ -211,6 +298,68 @@ try:
                  f"guardar-uso de «螺丝» sin cliente guarda la fila: {r.status_code} {r.text[:120]}")
 
         url = f"/api/catalog/{VENDOR_ID}/productos"
+        for vieja, nueva in VIEJAS:
+            r = c.post(url, json={"vendor_name": VENDOR, "productos": [{"descripcion": nueva, "ncm": NCM}]})
+            claves = [k for k, in sql("select product_key from vendor_catalog_products where owner_username=%s"
+                                      " and vendor_id=%s and descripcion=%s", USUARIO, VENDOR_ID, nueva)]
+            cambios = [c.put(f"{url}/{quote(k, safe='')}", json={"origen": "CN"}).status_code for k in claves]
+            chequear(r.status_code == 200 and len(claves) == 1 and cambios == [200],
+                     f"«{nueva}» de una fila vieja es una sola fila y sigue editable: {r.status_code}, "
+                     f"claves {claves}, cambios {cambios}")
+
+        def escrito(desc):
+            return sql("select vendor_nombre, origen from vendor_catalog_products where owner_username=%s"
+                       " and descripcion=%s union all select null, origen_frecuente from client_product_history"
+                       " where descripcion=%s", USUARIO, desc, desc)
+
+        def sano(filas):
+            return bool(filas) and not any(v in ("None", "False") for f in filas for v in f)
+
+        def mandar(metodo, ruta, cuerpo):
+            return c.request(metodo, ruta, content=json.dumps(cuerpo), headers={"content-type": "application/json"})
+
+        for via in ("lote", "guardar-uso", "cambio"):
+            fallas = []
+            for campo in ("proveedor", "descripción", "origen"):
+                for nombre, valor in MALOS.items():
+                    if via == "cambio" and campo == "proveedor":
+                        continue
+                    bueno = f"BUENO {via} {campo} {nombre}"
+                    clave = {"proveedor": "vendor_name", "descripción": "descripcion"}.get(campo, campo)
+                    if via == "lote":
+                        malo = {"descripcion": "MALO " + bueno, "ncm": NCM, "origen": "CN"}
+                        cuerpo = {"vendor_name": VENDOR, "productos": [{"descripcion": bueno, "ncm": NCM}, malo]}
+                        (cuerpo if campo == "proveedor" else malo)[clave] = valor
+                        r = mandar("POST", url, cuerpo)
+                        guardo = r.status_code == 200 and sano(escrito(bueno))
+                        intacto = not escrito(bueno)
+                    elif via == "guardar-uso" and campo == "descripción":
+                        r = mandar("POST", "/api/ncm/guardar-uso", {"descripcion": valor, "ncm": NCM,
+                                                                    "vendor_name": bueno, "client_id": CID})
+                        guardo = r.status_code == 200 and not escrito("None") and not escrito("False")
+                        intacto = True
+                    elif via == "guardar-uso":
+                        cuerpo = {"descripcion": bueno, "ncm": NCM, "vendor_name": VENDOR, "origen": "CN",
+                                  "client_id": CID, clave: valor}
+                        r = mandar("POST", "/api/ncm/guardar-uso", cuerpo)
+                        guardo = r.status_code == 200 and r.json().get("historial_guardado") is True \
+                            and sano(escrito(bueno))
+                        intacto = not escrito(bueno)
+                    else:
+                        mandar("POST", url, {"vendor_name": VENDOR,
+                                             "productos": [{"descripcion": bueno, "ncm": NCM, "origen": "CN"}]})
+                        antes = fila(VENDOR_ID, bueno)
+                        k = sql("select product_key from vendor_catalog_products where owner_username=%s"
+                                " and descripcion=%s", USUARIO, bueno)[0][0]
+                        r = mandar("PUT", f"{url}/{quote(k, safe='')}",
+                                   {"descripcion_original" if campo == "descripción" else "origen": valor})
+                        despues = fila(VENDOR_ID, bueno)
+                        guardo = r.status_code == 200 and len(despues) == 1 and sano(despues)
+                        intacto = despues == antes
+                    if not (guardo or (r.status_code == 400 and legible(r) and intacto)):
+                        fallas.append(f"{campo} {nombre}: {r.status_code} {r.text[:80]}")
+            chequear(not fallas, f"una entrada mala por {via} no da 500 ni pierde lo bueno: {fallas}")
+
         for via, desc in (("catálogo", CJK_LARGO[:-1] + "一"), ("guardar-uso", CJK_LARGO[1:] + "一"),
                           ("cambiar la descripción", CJK_LARGO)):
             if via == "catálogo":
