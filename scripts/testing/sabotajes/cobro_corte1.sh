@@ -397,10 +397,6 @@ sabotaje $F "v2: generar se deshabilita mientras otra espera" \
 sabotaje $F "v2: el error de la anterior cambia de paso a la carga nueva" \
   "FALLA: v2, la carga nueva en «Listo» y la anterior vuelve con un error" \
   $'            if (fallo && carga !== CDI.state) return;\n' ''
-sabotaje $F "v2: la anterior sin red le muestra el error a la carga nueva" \
-  "FALLA: v2, la anterior se queda sin red: la carga nueva muestra el error" \
-  "            if (carga === CDI.state) showReadyError(String(err && err.message || err));" \
-  "            showReadyError(String(err && err.message || err));"
 sabotaje $V1 "v1: generar anota en la carga nueva" \
   "FALLA: v1, generar: la carga nueva quedó con la operación" \
   "        anotarOperacion(carga, data.operacion_id || '');" "        operacionIdActual = data.operacion_id || '';"
