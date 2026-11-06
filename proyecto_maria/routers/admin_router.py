@@ -342,7 +342,7 @@ async def get_cohort_retention(
 ) -> Dict[str, Any]:
     """
     Extrae datos de retención de cohortes para los usuarios activos o en trial.
-    El control de admin lo pone el router al montarse (require_admin, ADMIN-2).
+    El control de admin lo pone el router al montarse (require_admin).
     SOLO LECTURA. No expone PII sensible ni tokens.
     """
     # 1. Obtener los usuarios relevantes

@@ -306,7 +306,7 @@ def run_smart_validations(items: List[Item], grupos: list | None = None) -> dict
         )
     
     # El FOB como sale en el TXT, con la misma cuenta que el generador: los
-    # productos de un grupo van en una línea (devolución de MARIA-5).
+    # productos de un grupo van en una línea.
     grupos = list(grupos) if grupos is not None else [None] * len(items)
     con_valor = [(it, g) for it, g in zip(items, grupos)
                  if (it.cantidad or 0) > 0 and (it.valor_unitario or 0) > 0]

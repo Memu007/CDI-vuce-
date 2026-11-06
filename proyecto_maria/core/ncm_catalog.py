@@ -149,7 +149,7 @@ def load_catalog(
     notes_path: Path = DATA_DIR / "ncm_notas.json",
 ) -> list[NCMItem]:
     """Carga el catálogo ARCA. Sin el archivo, el catálogo queda vacío: el CSV
-    breve de respaldo tenía códigos que ya no existen (CATALOGO-NCM-1)."""
+    breve de respaldo tenía códigos que ya no existen."""
     selected_path = csv_path
     if not selected_path.exists():
         return []
@@ -209,7 +209,7 @@ def _con_puntos(codigo8: str) -> str:
 
 def ncm_de_baja(code: str) -> dict | None:
     """La NCM, si estaba en un nomenclador anterior de ARCA y no está en el
-    vigente: {descripcion, baja, estaba_en}. Si no, None (CATALOGO-NCM-1)."""
+    vigente: {descripcion, baja, estaba_en}. Si no, None."""
     codigo = _ncm8(code)
     if len(codigo) != 8:
         return None
@@ -282,8 +282,7 @@ def search_term(term: str, limit: int = 5, catalog: list[NCMItem] | None = None)
         exact = next((item for item in items if item.codigo == code_query[:8]), None)
         return [exact] if exact else []
     # Un código parcial («8471.30») se busca sólo por prefijo: por palabras
-    # sueltas devolvía cualquier cosa si la partida se había dado de baja
-    # (CATALOGO-NCM-1).
+    # sueltas devolvería cualquier cosa si la partida se dio de baja.
     if len(code_query) >= 4 and re.fullmatch(r"[\d.\s-]+", raw):
         return [item for item in items if item.codigo.startswith(code_query)][:limit]
     ranked: list[tuple[int, NCMItem]] = []

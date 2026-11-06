@@ -1,6 +1,6 @@
-"""La regla de la fecha de inicio de actividad del alta (CLIENTE-1b), en un
-solo lugar: la usan el alta y la edición (`main.py`) y la importación
-(`migration_service.py`, D25 b)."""
+"""La regla de la fecha de inicio de actividad del alta, en un solo lugar:
+la usan el alta y la edición (`main.py`) y la importación
+(`migration_service.py`)."""
 from __future__ import annotations
 
 import re
