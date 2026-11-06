@@ -61,11 +61,11 @@ echo "BASE  | $T en verde"
 
 TRABADO="FAILED $T::test_un_mercado_pago_trabado_no_frena_el_servidor"
 sabotaje $M "Mercado Pago se consulta en el hilo del servidor" "$TRABADO" \
-  "    return await anyio.to_thread.run_sync(functools.partial(fn, *args, **kw), limiter=_HILOS_MP)" \
+  "    llamada = functools.partial(fn, *args, **kw)" \
   "    return fn(*args, **kw)"
 sabotaje $M "las consultas a Mercado Pago usan los hilos de todo el servidor" "$TRABADO" \
-  "    return await anyio.to_thread.run_sync(functools.partial(fn, *args, **kw), limiter=_HILOS_MP)" \
-  "    return await anyio.to_thread.run_sync(functools.partial(fn, *args, **kw))"
+  "run_sync(llamada, limiter=_HILOS_MP)" "run_sync(llamada)" \
+  "run_sync(llamada, limiter=_HILOS_MP, abandon_on_cancel=True)" "run_sync(llamada, abandon_on_cancel=True)"
 sabotaje $M "el pago de un aviso se consulta fuera del hilo" "$TRABADO" \
   '        pay_resp = await _en_hilo_mp(_consultar_mp, lambda: sdk.payment().get(payment_id), f"pago {payment_id}")' \
   '        pay_resp = _consultar_mp(lambda: sdk.payment().get(payment_id), f"pago {payment_id}")'
@@ -73,7 +73,7 @@ sabotaje $M "la recarga crea el cobro fuera del hilo" "$TRABADO" \
   "        checkout = await _en_hilo_mp(billing_service.create_topup_checkout, db_user," \
   "        checkout = (billing_service.create_topup_checkout)(db_user,"
 sabotaje $M "el checkout crea la suscripción fuera del hilo" "$TRABADO" \
-  "        checkout = await _en_hilo_mp(billing_service.create_checkout, db_user, plan_id, org_id=org_id)" \
+  "        checkout = await _en_hilo_mp(billing_service.create_checkout, db_user, plan_id, org_id=org_id, hasta=plazo)" \
   "        checkout = billing_service.create_checkout(db_user, plan_id, org_id=org_id)"
 sabotaje $M "la recarga con Mercado Pago cortado da 500" "FAILED $T::test_la_recarga_con_mercado_pago_cortado_da_503" \
   $'    except requests.RequestException as e:\n        print(f"⚠️ Recarga de {db_user.username}: {type(e).__name__}: {e}")\n        raise HTTPException(status_code=503, detail="Mercado Pago no contestó. Probá de nuevo en unos minutos.")\n' ""
