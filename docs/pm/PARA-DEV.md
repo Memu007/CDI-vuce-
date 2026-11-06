@@ -3,60 +3,32 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Veredicto de COBRO-CORTE-1, vuelta 3 (2026-11-06 PM): devolución corta
+## Veredicto de COBRO-CORTE-1, vuelta 4 (2026-11-06 PM): aceptada, sin integrar
 
-Sobre `8295bb5`. Evidencia: `docs/pm/REPRODUCCION-COBRO-CORTE-1-v3-2026-11-06.md`.
-El servidor aguanta. Tus casos dan `126 passed`, con 9 rojos en la base, y
-el caso de Postgres da `fallas: 0`. El chequeo-6 da `+122/−60` con 4 AVISOs,
-los mismos que explicaste. Opus no encontró doble cobro, generación gratis
-ni escape del directorio, tampoco con dos regeneraciones a la vez en
-Postgres. La causa 1 queda cerrada, igual que los puntos 3, 4 y 5. Vuelve
-por la causa 2, que no está cerrada entera, y por una regresión chica.
+Sobre `ca50916`. Evidencia: `docs/pm/REPRODUCCION-COBRO-CORTE-1-v4-2026-11-06.md`.
+`test_cobro_corte1.py` da `98 passed`; tus sabotajes, 88 `ROJO` y
+`sabotajes con falla: 0`; la suite completa, `4284 passed, 335 skipped,
+3 xfailed`, rc=0. El chequeo-6 da los 3 avisos que explicaste. Opus y Sonnet
+alto no encontraron doble cobro ni datos de una carga en otra; lo de la
+devolución queda cerrado (la respuesta escribe en la carga que la pidió, B
+genera cuando vuelve A, regenerar no depende de `os.link`). No la integro
+todavía: tu rama lleva debajo piezas sin aceptar desde `e0b8626`.
 
-**Causa 2, sigue: una respuesta tardía escribe en la carga que sigue.** El
-aprendizaje del catálogo quedó afuera. `saveCatalogLearn(items)`
-(`finalize.js:1271`, llamada en `:728`) recibe los ítems de A pero toma el
-proveedor de `CDI.state`, que ya es B. Lo reproduje en Chromium,
-demorando la respuesta de A con `page.route`. Sale
-`POST /api/catalog/proveedor_b_sa/productos` con «Lona de PVC gris de la
-carga A»: el catálogo de B aprende un NCM de A. Si B no tiene proveedor, lo
-de A se pierde. En la base pasa igual, pero es la misma causa que se pidió
-cerrar.
-Pido: todo lo que hace la respuesta sale de la carga que la pidió. Familia
-como datos: historial, catálogo y el cliente del guardado. Hoy, en v2,
-`saveOperationToHistory` lee `carga.clienteActivo` al volver, y v1 lo toma
-al pedir: que las dos tomen el cliente igual.
+**A la cola de limpieza** (decidido por la PM, no son de esta pieza):
+Enter doble en «Reintentar» o «Generar» (dos generaciones, sin cobro extra),
+`CDI.api` sin timeout (spinner colgado), la falla doble commit + restaurar
+`.anterior`, y `PUERTO` de `con_pg16.sh` que pisa el de tus sabotajes
+(renombrar a `PG_PUERTO`; si tocás `backup1a.sh` en BACKUP-1a, hacelo ahí).
 
-**La carga nueva que llega a «Listo» con la anterior en espera no se alcanza
-en la pantalla real.** Con A en vuelo, «Generar» de B queda deshabilitado
-(`finalize.js:557`, `:616`). Nada lo vuelve a pintar cuando A termina, así
-que B queda trabada en «validating» hasta salir y volver. Reproducido: `boton
-disabled = true` antes y después de volver A, un solo pedido. Tu caso llega a
-«Listo» con `CDI.goTo('ready')` directo, así que no distingue lo que vive el
-usuario.
-Pido: cuando A vuelve, B puede generar. El caso maneja la pantalla con
-clics, no con `goTo`. Si `pedidaMientrasOtra` queda sin camino real, sacalo.
+**Aparte:** la validación de 60 s cruza cargas (`finalize.js:103-108`, de
+antes). Se la propongo a Emi como pieza nueva; no la toques.
 
-**Regresión chica: si `os.link` falla, nunca más se regenera lo entregado.**
-`main.py:5966`. Con `os.link` fallando (`PermissionError`), regenerar da
-`[500, 500, 500]` sin cobrar. En la base daba `[200, 200, 200]`. Railway
-probablemente acepta hardlinks, pero la pieza no debería depender de eso.
-Pido: regenerar funciona aunque no se pueda enlazar, sin perder lo ya
-entregado si el commit falla. Un caso con el enlace fallando.
-
-Un caso por causa, rojo antes en `8295bb5`, y su sabotaje. Uno de cada
-familia lo pruebo yo con otro ejemplo.
-
-**Quedan como están** (decidido por la PM): el commit que llega a la base y
-tira error en Python (cobra y el reintento cobra otra; de antes, raro; a la
-cola). Los candados de `delete_cliente` (usuario y después organización)
-contra sacar a un miembro (al revés): deadlock razonado, no reproducido; da
-500, no pierde datos; a la cola. En v1, el alert y la descarga de una
-respuesta vieja: v1 se retira (D60).
+**COBRO-MP-2 (`4f1822f`):** la estoy revisando, con dos adversarios. D62
+va con el veredicto.
 
 **CSRF-3: aceptada** sobre `9fe55d4` (2026-11-05 19:20 UTC), integrada. Evidencia: `docs/pm/REPRODUCCION-CSRF-3-2026-11-05.md`. Suite 4450 passed, csrf3/2/1 en rojo (8, 10, 8), chequeo-6 sin avisos; Opus y Sonnet alto sin hallazgo que bloquee. El 500 de `/dashboard` sin base y la carrera del token van a la cola de limpieza.
 
-**Tu orden:** esta devolución de COBRO-CORTE-1 → COBRO-MP-2 → COBRO-MP-3 →
+**Tu orden:** COBRO-MP-2 (en revisión) → COBRO-MP-3 →
 AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. Próxima D: D62; desde ahora usás
 los pares y MARIA los impares, para que no choquen.
 

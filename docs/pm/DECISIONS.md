@@ -388,3 +388,11 @@ sumada por la PM («a cero»): el link vuelve en la respuesta sólo en el entorn
 de prueba. La limpieza del repositorio (`07e7b5f`) se integra en `dd052d4`
 tras suite y sabotajes de CSRF-2 y COBRO-MP-1 en verde sobre `27b19d9`;
 cierra D60 (se retira la v1).
+
+### 2026-11-06 11:20 UTC (PM)
+
+COBRO-CORTE-1 aceptada sobre `ca50916`, sin integrar (debajo hay piezas
+técnicas sin aceptar desde `e0b8626`). Cuatro bajas a la cola de limpieza.
+La validación de 60 s que cruza cargas (`finalize.js:103-108`, de antes) se
+propone a Emi como pieza nueva.
+
