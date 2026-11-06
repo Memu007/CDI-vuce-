@@ -988,12 +988,12 @@ def test_un_pdf_que_da_mucho_trabajo_deja_de_leerse_por_tiempo_de_cpu():
 
 
 def test_una_sola_hoja_cara_se_corta_en_el_tope_de_cpu():
-    """Una hoja de 80 KB de «T*» cuesta unos 6 s: el tope se miraba sólo
-    entre hojas y esa hoja se leía entera."""
+    """Una hoja que cuesta más de 1 s: el tope se miraba sólo entre hojas y
+    esa hoja se leía entera."""
     import time
     from proyecto_maria.core.despacho_lector import leer_despacho
     from tests.pdf_bombas import una_hoja_cara
-    data = una_hoja_cara(80)
+    data = una_hoja_cara()
     antes = time.process_time()
     leido = leer_despacho(data, 0.5)
     gastado = time.process_time() - antes
@@ -1004,7 +1004,7 @@ def test_una_sola_hoja_cara_se_corta_en_el_tope_de_cpu():
 def test_el_lector_aparte_corta_una_sola_hoja_cara():
     from proyecto_maria.core.despacho_lector import leer_despacho_aparte
     from tests.pdf_bombas import una_hoja_cara
-    leido = asyncio.run(leer_despacho_aparte(una_hoja_cara(80), 120, limite_cpu_s=0.5))
+    leido = asyncio.run(leer_despacho_aparte(una_hoja_cara(), 120, limite_cpu_s=0.5))
     assert "El PDF da demasiado trabajo: leí hasta la hoja 0." in leido["avisos"], leido["avisos"]
 
 
@@ -1028,7 +1028,7 @@ def test_el_tope_de_cpu_deja_la_senal_como_estaba():
     from proyecto_maria.core.despacho_lector import leer_despacho
     from tests.pdf_bombas import una_hoja_cara
     antes = signal.getsignal(signal.SIGPROF)
-    leer_despacho(una_hoja_cara(80), 0.5)
+    leer_despacho(una_hoja_cara(), 0.5)
     assert signal.getsignal(signal.SIGPROF) is antes
     assert signal.getitimer(signal.ITIMER_PROF) == (0.0, 0.0)
 
@@ -2001,7 +2001,7 @@ def test_las_hojas_leidas_antes_del_corte_dan_sus_productos(monkeypatch):
         return leer_texto(texto)
     monkeypatch.setattr(despacho_lector, "leer_texto", entender_cuesta_50_ms)
     pdf = PdfWriter()
-    for data in (_despacho(), una_hoja_cara(80)):
+    for data in (_despacho(), una_hoja_cara()):
         for hoja in PdfReader(io.BytesIO(data)).pages:
             pdf.add_page(hoja)
     salida = io.BytesIO()
@@ -2014,7 +2014,7 @@ def test_las_hojas_leidas_antes_del_corte_dan_sus_productos(monkeypatch):
 def test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado():
     from proyecto_maria.core.despacho_lector import AVISO_SIN_TEXTO, leer_despacho
     from tests.pdf_bombas import una_hoja_cara
-    r = leer_despacho(una_hoja_cara(80), limite_cpu_s=0.05)
+    r = leer_despacho(una_hoja_cara(), limite_cpu_s=0.05)
     assert r["sin_texto"] is False, r
     assert AVISO_SIN_TEXTO not in r["avisos"]
     assert [a.startswith("El PDF da demasiado trabajo") for a in r["avisos"]] == [True], r

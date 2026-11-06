@@ -128,8 +128,11 @@ sabotaje $FS "sin lugar vuelve a ser un 400" \
   'raise HTTPException(400, "No pudimos abrir el PDF: tardó demasiado. Probá con otro archivo.")' \
   "(['b', 'c'], (400, 'No pudimos abrir el PDF: tardó demasiado"
 sabotaje $DL "quedarse sin memoria en C vuelve a ser un PDF inválido" \
-  'except (MemoryError, SystemError) as e:' 'except MemoryError as e:' \
+  'except (MemoryError, SystemError, LimitReachedError) as e:' 'except (MemoryError, LimitReachedError) as e:' \
   'DID NOT RAISE'
+sabotaje $DL "un tope propio de pypdf vuelve a ser un PDF inválido" \
+  'except (MemoryError, SystemError, LimitReachedError) as e:' 'except (MemoryError, SystemError) as e:' \
+  'Invalid PDF file: Maximum page tree page entry limit exceeded!'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"

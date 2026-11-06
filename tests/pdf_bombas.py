@@ -105,12 +105,13 @@ def parseo_caro(hojas=200, renglones=500):
     return _pdf(armar)
 
 
-def una_hoja_cara(kb=80):
-    """Una sola hoja con `kb` KB de saltos de renglón («T*»): pesa poco y
-    queda debajo del tope de bytes, pero leerla cuesta el cuadrado de lo que
-    pesa (80 KB, unos 6 s). El tope de CPU entre hojas no la cortaba."""
+def una_hoja_cara(kb=500):
+    """Una sola hoja con `kb` KB de renglones de una letra («(X) '»), debajo
+    del tope de bytes por hoja: cada renglón cuesta lo mismo, así que leerla
+    cuesta lo que pesa (500 KB, más de 1 s), sin depender de que pypdf sea
+    lento en alguna operación."""
     def armar(add, objs):
-        return _hojas(add, objs, [_flujo(add, b"BT /F1 9 Tf 1 TL " + b"T* " * (kb * 1024 // 3), 0, b"ET\n")])
+        return _hojas(add, objs, [_flujo(add, b"BT /F1 9 Tf 1 TL " + b"(X) ' " * (kb * 1024 // 6), 0, b"ET\n")])
     return _pdf(armar)
 
 
