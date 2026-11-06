@@ -1,7 +1,6 @@
 {
   "name": "despanchte-nuevo",
   "version": "1.0.0",
-  "main": "test_ncm_browser.js",
   "directories": {
     "test": "tests"
   },

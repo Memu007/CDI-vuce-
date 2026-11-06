@@ -237,9 +237,9 @@ def _subir(contenido: bytes):
     return TestClient(main.app).post("/upload_excel_v2/", files={"file": ("factura.xlsx", contenido)})
 
 
-def test_mirar_las_otras_hojas_de_un_libro_armado_corta_solo():
+def test_mirar_las_otras_hojas_de_un_libro_armado_corta_solo(tmp_path):
     """La lectura misma se corta (no sólo la espera): el hilo queda libre."""
-    ruta = "/tmp/_libro_armado_maria1b.xlsx"
+    ruta = str(tmp_path / "libro_armado.xlsx")
     with open(ruta, "wb") as f:
         f.write(_libro_armado())
     t0 = time.monotonic()
