@@ -69,6 +69,71 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## CATALOGO-LARGO-2: devolución, sobre `ccfe640` (2026-11-06 PM)
+
+Lo central está bien. TAIWAN y CHILE llegan enteros al TXT (antes, «TAI» y
+«CHI» daban país mal o rechazo). Un texto de más de 2000 da 400 sin guardar
+nada. La migración de 200 000 filas no reescribe la tabla. Con HTML en origen
+o proveedor no hay XSS en v2. Vuelve por tres causas, las tres nuevas de la
+pieza. Acta: `REPRODUCCION-CATALOGO-LARGO-2-2026-11-06.md`.
+
+1. **Un texto que Postgres no puede guardar ahora rompe el lote entero.**
+   Antes, una descripción sin letras latinas se salteaba. Ahora entra a
+   insertar, así que un NUL o un medio par sustituto (`\ud800`) da 500 y se
+   pierde todo el lote, también los productos buenos.
+   - Lo reproduje en PG 16 con `POST /api/catalog/{id}/productos`, un ítem
+     latino más «🔩\ud800»: en `ccfe640` da 500 y el catálogo queda vacío; en
+     la base, 200 y se guarda el latino.
+   - Ese texto da hoy 400 con el mensaje del codec de Python
+     (`'utf-8' codec can't encode…`), y `vendor_name` en `null` o `false` da
+     500 (TypeError).
+   - **Pedido:** ninguna entrada mala da 500 ni pierde lo bueno del lote. Da
+     400 con un motivo para el usuario, o se limpia como ya hace
+     `_sin_nul`; elegí una regla y que valga en todos los campos.
+   - El caso lleva como datos NUL, medio par y `null` en descripción, origen
+     y proveedor, por el lote, `guardar-uso` y `PUT`, **en Postgres**.
+   - Es tu D79: (a), dentro de esta vuelta.
+2. **Una fila vieja cuya clave guardada no es la que calcula
+   `clave_de_producto` queda duplicada y sin poder editarse.**
+   - Ejemplo: clave latina con descripción CJK, que la base dejaba armar con
+     `PUT`. Guardar otra vez esa descripción crea una segunda fila `~…`.
+   - Después, cualquier `PUT` a la fila vieja da 404, porque `update_product`
+     recalcula la clave y choca con la nueva (`catalog_service.py:495-505`).
+     Quedan dos productos con la misma descripción y distinto NCM.
+   - **Pedido:** un producto tiene una sola fila, también con datos de antes
+     de la pieza, y la fila vieja sigue editable.
+   - El caso arma la fila con el camino de la base y lleva como datos CJK,
+     emoji y mezcla.
+3. **El arranque puede trabarse con un `guardar-uso` en curso, y el log
+   miente.**
+   - La migración toma `vendor_catalog_products` y después
+     `client_product_history` en una transacción; `guardar-uso` las toma al
+     revés. Eso da deadlock, se vuelve atrás todo y el arranque falla.
+   - El «✅ Migracion» se imprime antes del commit (`main.py:1244-1256`).
+   - **Pedido:** el arranque no se traba con escrituras en curso, y el log
+     dice «migrado» sólo si quedó guardado.
+   - La prueba va en PG. Si un caso con dos conexiones sale caro, alcanza con
+     mostrar el orden en el código y el rojo del log.
+
+Cada una con su rojo en la base o con el arreglo revertido, y `/entregar`
+entero.
+
+- **D76 y D77: anteriores a la pieza, no entran en esta vuelta.** Las dos
+  mezclan datos de verdad en facturas chinas: un proveedor sólo CJK comparte
+  catálogo con todos los demás, y «电线 2mm» con «钢管 2mm» se pisan el NCM sin
+  aviso. Se las propongo a Emi, recomendadas, como pieza **CATALOGO-3**,
+  junto con D78 y D80. No las empezás sin su sí.
+- **D78: (a)**, en CATALOGO-3. Hoy `historial_guardado: true` guarda una
+  fila que nunca se vuelve a encontrar.
+- **D79: (a)**, en esta vuelta (causa 1).
+- **D80:** en CATALOGO-3; el recorte a 3 de `pdf_extractor.py:574` va ahí.
+- **D81: queda.** No es XSS real, según los dos adversarios: `item.origen`
+  viene del archivo o de la tabla, y `updateField` corta en 3. Escapar ese
+  `value` va a `COLA-LIMPIEZA.md`. Decidido por la PM.
+- El tope de 2000 queda así.
+- **Tu orden: esta devolución primero**, después RESET-1. Tus próximas D
+  siguen en D82.
+
 ## SESION-1: aceptada sobre `2e62761`, sin integrar (2026-11-06 PM)
 
 Acta: `REPRODUCCION-SESION-1-v3-2026-11-06.md`. Coincide con tu informe:
@@ -136,18 +201,6 @@ estaba antes (va al acta).
 - **CATALOGO-LARGO-2: Emi dijo que sí.** Va después de SESION-1. Tu próxima
   D es D71.
 - SESION-1: ver arriba.
-
-### CATALOGO-LARGO-2: sí de Emi (05/11 21:41), va después de SESION-1
-
-Misma familia que CATALOGO-LARGO-1: lo que no entra en la columna se pierde
-sin aviso.
-
-- Un origen de más de 5 caracteres (por ejemplo «TAIWAN») o un proveedor de
-  más de 200 nunca dan 200 sin guardar ni 500. Se guardan enteros o reciben
-  un 400 con el motivo a la vista.
-- Una descripción que normaliza a vacío (sólo CJK o emoji) nunca contesta
-  `historial_guardado: true` sin haber guardado, ni se cruza con otra igual.
-- El tope de 2000 se cuenta igual en los dos lugares.
 
 ## Orden desde el 2026-10-29
 
@@ -413,23 +466,9 @@ la D40, después de las 18:00 y antes de publicar.
 - Al aceptar la última pieza de la cadena entran `6b9762e`, `3aaa3c4` y
   estos arreglos. Nada se publica antes.
 
-## D38 y D39 (2026-10-28 14:00 UTC): sobre `2b93071` y `30c0e97`
+## D38 y D39 (2026-10-28)
 
-- **D38: (1)**, como lo hiciste: si el email coincide exacto con una cuenta,
-  esa; si hay varias y ninguna exacta, ninguna, con la misma respuesta que
-  cuando no existe. Decidido por la PM. La (2) no: un pedido no manda
-  correos de varias cuentas. La (3) (unificar pares e índice único sobre
-  `lower(email)`) espera el conteo de Emi en producción; si da cero, el
-  índice entra como paso nuevo sin tocar datos, y si no, decide Emi. En
-  riesgos: quien tiene un par y escribe otras mayúsculas no recupera hasta
-  la (3).
-- **D39: (1) por ahora**: los 50 de 50 con 40 logins malos a la vez van a
-  riesgos de CONEXIONES-1, con tus números. Decidido por la PM. Tu (2), la
-  medición chica con 60 a 100 a la vez, es pieza nueva: se la propongo a
-  Emi, recomendada, y no la empezás sin su sí.
-
-EMAIL-1 y CONEXIONES-1 quedan hechas, sin entregar; las entregás después de
-las 18:00 UTC en tu orden. Tu próxima D es la **D41**.
+Cerradas. Quedan resumidas en `DECISIONS.md` («D38 y D39 de la Dev MARIA»).
 
 ## Emi dijo que sí a las dos (2026-10-28 12:15 UTC): EMAIL-1 y CONEXIONES-1
 
