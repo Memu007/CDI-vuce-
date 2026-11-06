@@ -25,6 +25,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 import pytest
+import requests
 
 from sqlalchemy.future import select
 
@@ -756,6 +757,11 @@ class _NoContesta:
             raise httpx.ReadTimeout("simulado: Mercado Pago no contestó", request=pedido)
         raise TimeoutError("simulado: Mercado Pago no contestó")
 
+    @staticmethod
+    def corta_el_sdk(_):
+        # El SDK real corta solo a los 10 s, antes del tope, con un error de requests.
+        raise requests.exceptions.ConnectTimeout("simulado: Mercado Pago no contestó")
+
 
 _CANCELAR = ("post", "/api/billing/cancel")
 _CHECKOUT = ("post", "/api/billing/checkout")
@@ -766,17 +772,20 @@ _CHECKOUT = ("post", "/api/billing/checkout")
 @pytest.mark.parametrize("quien, pedido, traba, estado", [
     ("abrio", _CANCELAR, "GET", "authorized"), ("abrio", _CANCELAR, "PUT", "authorized"),
     ("abrio", _CHECKOUT, "GET", "authorized"), ("abrio", _CHECKOUT, "PUT", "pending"),
-    ("abrio", _CHECKOUT, "create", "cancelled"),
+    ("abrio", _CHECKOUT, "create", "cancelled"), ("abrio", _CHECKOUT, "create_corta", "cancelled"),
     ("duena", _SACAR_ABRIO, "GET", "pending"), ("duena", _SACAR_ABRIO, "PUT", "pending"),
 ], ids=["cancelar_lee", "cancelar_cancela", "checkout_lee", "checkout_cancela", "checkout_crea",
-        "sacar_lee", "sacar_cancela"])
+        "checkout_crea_sdk_corta", "sacar_lee", "sacar_cancela"])
 def test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope(client, monkeypatch, quien, pedido, traba, estado):
     import proyecto_maria.main as main_mod
     from tests.test_cobro_mp1 import _leer_org
     monkeypatch.setattr(main_mod, "_TOPE_MP", 1.0, raising=False)
     nombres, sid, org_id, _ = _org_con_suscripcion(client, quien)
     SUS[sid] = estado
-    FALLA[traba] = _NoContesta.esperar
+    if traba == "create_corta":
+        FALLA["create"] = _NoContesta.corta_el_sdk
+    else:
+        FALLA[traba] = _NoContesta.esperar
     antes = _leer_org(org_id), {k: _leer(u) for k, u in nombres.items()}
     # La que ya figura cancelada en Mercado Pago deja de figurar aunque después falle.
     antes[1]["abrio"]["mp_preapproval_id"] = None if estado == "cancelled" else sid

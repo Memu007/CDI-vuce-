@@ -247,11 +247,15 @@ for fila in cancelar_cancela sacar_lee sacar_cancela cancelar_lee checkout_lee c
 done
 sabotaje $M "el checkout sin respuesta de Mercado Pago da 500" \
   "FAILED $T::test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope[checkout_crea]" \
-  "    except _SuscripcionMPError as e:
-        print(f\"⚠️ Checkout de {username}: {e}\")
+  "    except (_SuscripcionMPError, requests.RequestException) as e:
+        # El SDK corta solo (requests) antes del tope: también es que MP no contestó.
+        print(f\"⚠️ Checkout de {username}: {type(e).__name__}: {e}\")
         await db.commit()
         raise HTTPException(status_code=503, detail=\"Mercado Pago no contestó. Probá de nuevo en unos minutos.\")
 " ""
+sabotaje $M "el checkout da 500 cuando el SDK corta solo antes del tope" \
+  "FAILED $T::test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope[checkout_crea_sdk_corta]" \
+  "    except (_SuscripcionMPError, requests.RequestException) as e:" "    except _SuscripcionMPError as e:"
 
 # --- Un pago no pierde días (D7.1)
 sabotaje $M "el pago suma desde el fin sólo si está activa" \
