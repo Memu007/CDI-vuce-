@@ -543,10 +543,9 @@ def test_ningun_lugar_acepta_un_token_que_no_es_la_sesion_vigente():
 
 def test_un_token_sin_vencimiento_no_es_una_sesion():
     import jwt
-    from proyecto_maria.config import get_settings
+    from proyecto_maria.auth.dependencies import settings as s
     u, _ = _usuario()
     _login(u)
-    s = get_settings()
     token = jwt.encode({"sub": u, "jti": _fila(u).active_jti}, s.jwt_secret, algorithm=s.jwt_algorithm)
     assert _entra(token) == 401
 
@@ -555,8 +554,10 @@ def test_se_firma_y_se_verifica_con_la_misma_clave(monkeypatch):
     """La clave sale de un solo lugar: si cambia, lo que se firma después
     se verifica con ella (con dos lugares, JWT_SECRET_KEY vacía daba login
     200 y todas las demás rutas 401)."""
-    from proyecto_maria.config import get_settings
-    monkeypatch.setattr(get_settings(), "jwt_secret", "otra-clave-sintetica-de-mas-de-32-caracteres")
+    # El objeto que leen firma y verificación: otro test puede vaciar el
+    # caché de get_settings() y dejar uno nuevo que nadie usa.
+    from proyecto_maria.auth.dependencies import settings
+    monkeypatch.setattr(settings, "jwt_secret", "otra-clave-sintetica-de-mas-de-32-caracteres")
     u, _ = _usuario()
     assert _entra(_login(u)) == 200
     _poner(u, is_verified=False)
