@@ -130,6 +130,8 @@ antes de cerrar la Fase 3.
    facturas chinas mezclan datos: todos los proveedores con nombre sólo en
    chino caen en un mismo catálogo, y «电线 2mm» pisa el NCM de «钢管 2mm».
    Viene de antes; no se pierde plata, pero se sugiere un NCM equivocado.
+   Sumaría que, si un producto de la factura no se puede aprender, la
+   pantalla diga cuál (hoy dice «algunos» y no queda ninguno).
 
 ## Quién hace qué
 
