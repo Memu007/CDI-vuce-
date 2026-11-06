@@ -8,7 +8,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, field_validator
 from datetime import datetime, timedelta, timezone
 from typing import Any
-import jwt
 import glob
 import hashlib
 import json

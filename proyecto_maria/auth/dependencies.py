@@ -154,8 +154,8 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
             await db.refresh(user)
         except Exception:
             await db.rollback()
-    # Devuelve la conexión antes de la ruta, que abre su propia sesión: con
-    # las dos tomadas a la vez, más pedidos que conexiones traban el pool.
+    # Devuelve la conexión antes de la ruta: las de main.py abren otra sesión y,
+    # con las dos tomadas a la vez, más pedidos que conexiones traban el pool.
     await db.commit()
 
     team_owner = getattr(user, "team_owner_username", None)

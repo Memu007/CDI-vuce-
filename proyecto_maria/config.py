@@ -18,7 +18,6 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("JWT_SECRET_KEY", "SECRET_KEY", "JWT_SECRET"),
     )
     jwt_algorithm: str = Field("HS256", alias="JWT_ALGORITHM")
-    jwt_exp_minutes: int = Field(60, alias="JWT_EXP_MINUTES")
 
     # Rate Limiting (diferenciado por plan)
     # Ajustado para soportar 2000 usuarios (200 concurrentes)
