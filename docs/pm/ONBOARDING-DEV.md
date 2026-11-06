@@ -1,7 +1,7 @@
 # Arranque para una Dev nueva
 
 Leé este archivo completo una vez. Después tu día a día pasa por tu canal
-(`PARA-DEV.md` la Dev 1, `PARA-DEV-2.md` la Dev 2) y, cuando haga falta,
+(`PARA-DEV.md` la Dev 1, `PARA-DEV-N.md` la Dev N) y, cuando haga falta,
 `NOW.md` y los documentos que la tarea cite.
 
 La tarea activa, Git y la evidencia reproducible mandan. Los límites que no se
@@ -71,9 +71,10 @@ local), Gemini para leer PDFs y sugerir NCM. Todo el backend vive en
 
 Si un caso nuevo podría dar verde sin mirar el estado real, entregá también su
 **negativo discriminante**: el sabotaje que lo pone rojo por la razón
-correcta. Al entregar corrés sólo los sabotajes de tu pieza; los de piezas
-anteriores los corre la PM antes de publicar («Publicar» en
-`ONBOARDING-PM.md`) y un rojo ahí vuelve como devolución.
+correcta (guion propio sólo donde lo pide `CLAUDE.md` §6; en lo demás, el
+rojo con el arreglo revertido). Al entregar corrés sólo los sabotajes de tu
+pieza; los de piezas anteriores los corre la PM antes de publicar
+(«Publicar» en `ONBOARDING-PM.md`) y un rojo ahí vuelve como devolución.
 
 No repitas una prueba hasta que dé verde sin explicar por qué falló.
 
@@ -92,8 +93,9 @@ Breve y autosuficiente:
 5. desvíos o riesgos;
 6. lo que decide la PM, numerado D1, D2…, con opciones y recomendación.
 
-Reemplazá todo el cuerpo anterior de `PARA-PM.md`. Al final: «Última vuelta:
-<hora>», y siempre tu `/compact conservar: …` al día.
+Reemplazá todo el cuerpo anterior de tu canal (`PARA-PM.md` o
+`PARA-PM-N.md`). Al final: «Última vuelta: <hora>», y siempre tu
+`/compact conservar: …` al día.
 
 Al terminar una pieza: commit, push, comprobar que el remoto tiene tu HEAD y
 después el informe. Nada terminado queda sólo en local.

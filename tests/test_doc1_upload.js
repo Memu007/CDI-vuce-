@@ -16,16 +16,17 @@ function harness() {
         appendChild() {} setAttribute() {} getAttribute() { return this.id; } click() { return this.listeners.click?.({preventDefault(){}}); }
     }
     const node = id => {if(!nodes.has(id))nodes.set(id,new Node(id));return nodes.get(id);};
-    const storage = new Map([['cdi_v2_state','old-draft'],['history-must-stay','saved-operation']]);
+    const storage = new Map([['cdi_v2_state:esta-pestana','old-draft'],['cdi_v2_state:otra-pestana','other-tab-draft'],['history-must-stay','saved-operation']]);
     const session = new Map([['cdi.pending_create_client','old-client']]);
     const calls=[], routes=[], toasts=[], clients=[];
     const CDI={state:{filename:'A.pdf',operacion:{numero_factura:'A'},items:[{pieza:'OLD-NCM'}],catalogAutofillBanner:{old:true},clienteActivo:{id:'persistent-client'}},
+        borrador:{borrar(){storage.delete('cdi_v2_state:esta-pestana');}},
         track(){},toast:Object.assign((...args)=>toasts.push(args),{error:(...args)=>toasts.push(args)}),
         registerScreen(name,screen){this.screen=screen;},goTo(name){routes.push(name);},normalizeCuit:s=>s,
         getClienteActivo(){return this.state.clienteActivo;},setClienteActivo(c){this.state.clienteActivo=c;clients.push(c);},
         api(url,opts){const d=deferred();calls.push({url,opts,...d});return d.promise;}};
     const document={getElementById:node,querySelectorAll:()=>[node('pdf'),node('excel')],addEventListener(type,fn){if(type==='DOMContentLoaded')this.init=fn;},createElement:()=>new Node(),createTextNode:()=>({})};
-    const context={window:{CDI,addEventListener(){}},document,sessionStorage:{removeItem:k=>session.delete(k),setItem:(k,v)=>session.set(k,v)},localStorage:{removeItem:k=>storage.delete(k),clear:()=>storage.clear()},
+    const context={window:{CDI,addEventListener(){}},document,sessionStorage:{removeItem:k=>session.delete(k),setItem:(k,v)=>session.set(k,v)},localStorage:{removeItem:k=>storage.delete(k),clear:()=>storage.clear(),key:i=>[...storage.keys()][i]??null,get length(){return storage.size;}},
         FormData:class{append(){}},console:{log(){},warn(){},error(){}},setTimeout:()=>1,clearTimeout(){},Date};
     vm.runInNewContext(source,context);document.init();
     return {CDI,calls,routes,toasts,clients,storage,session,node,upload(name='B.pdf',size=10){return node('uploadFileInput').listeners.change({target:{files:[{name,size,type:'application/pdf'}]}});}};
@@ -37,11 +38,12 @@ function harness() {
         assert.equal(h.CDI.state.operacion.numero_factura,undefined);
         assert.equal(h.CDI.state.catalogAutofillBanner,null);
         assert.equal(h.CDI.state.clienteActivo.id,'persistent-client','keep selected client until valid PDF');
-        assert.equal(h.storage.has('cdi_v2_state'),false,'reload cannot restore A draft');
+        assert.equal(h.storage.has('cdi_v2_state:esta-pestana'),false,'reload cannot restore A draft');
         assert.equal(h.storage.get('history-must-stay'),'saved-operation');
+        assert.equal(h.storage.get('cdi_v2_state:otra-pestana'),'other-tab-draft','another tab keeps its draft');
         h.calls[0].resolve(rejected());await flush();
         assert.equal(h.CDI.state.items.length,0);assert.deepEqual(h.routes,[]);
-        assert.equal(h.storage.has('cdi_v2_state'),false,'failed B cannot restore the old draft');
+        assert.equal(h.storage.has('cdi_v2_state:esta-pestana'),false,'failed B cannot restore the old draft');
         assert.equal(h.storage.get('history-must-stay'),'saved-operation','failed B keeps saved history');
         assert.match(h.node('uploadError').textContent,/no es una factura.*empezar de nuevo/);
         h.upload('C.pdf');h.calls[1].resolve(response(invoice('C.pdf')));await flush();

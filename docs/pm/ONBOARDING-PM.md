@@ -2,7 +2,8 @@
 
 Leé este archivo completo una vez. Después el trabajo diario pasa por `NOW.md`
 y los canales (`PARA-DEV.md`/`PARA-PM.md` de la Dev 1; si hay PM visual,
-`ENTRE-PMS.md`, `VISUAL.md` y `PARA-DEV-2.md`/`PARA-PM-2.md`).
+`ENTRE-PMS.md`, `VISUAL.md` y `PARA-DEV-2.md`/`PARA-PM-2.md`; con más Devs,
+uno por cada una, «Estructura»).
 
 ## Cuando Emi diga «ponete al día»
 
@@ -100,8 +101,9 @@ evidencia y comportamiento.
 - La PM reproduce de forma independiente lo que define la aceptación, sobre
   ese SHA y en un entorno limpio.
 - **Negativo discriminante:** todo caso nuevo que podría dar verde sin mirar
-  el estado real trae su sabotaje, que lo pone rojo por el motivo correcto.
-  La PM lo reproduce antes de creer el verde, y suma uno o dos propios que
+  el estado real muestra su rojo por el motivo correcto (guion de sabotaje
+  propio sólo donde lo pide `CLAUDE.md` §6; en lo demás, el arreglo
+  revertido). La PM lo reproduce antes de creer el verde, y suma uno o dos propios que
   ataquen otro borde.
 - Suite completa cuando hay dinero, autenticación, permisos, órdenes, stock,
   migraciones, datos, seguridad, cambio transversal, un rojo inesperado o una
@@ -125,8 +127,13 @@ veredicto se escriben así, con la pieza primero y un veredicto por commit:
 
 - `PM: <PIEZA> aceptada …` o `PM: <PIEZA> vuelve …` (la PM visual,
   `PM visual: <PIEZA> …`);
-- integrar sin veredicto nuevo: `… integrada`;
-- escape (un problema de una pieza ya aceptada): `PM: escape en <PIEZA> — <qué>`.
+- integrar sin veredicto nuevo: `… integrada`.
+
+**Escapes, con la misma forma siempre.** Un problema de una pieza ya
+aceptada que la PM no marcó al aceptarla (lo encuentre Emi, un
+subagente, otra revisión o producción) se registra con un commit propio
+`PM: escape en <PIEZA> — <qué>`, que cuenta `medir.py`. Lo que la PM marcó
+al revisar y mandó a la pieza siguiente no es un escape.
 
 ## Subagentes
 
@@ -141,6 +148,22 @@ antes de publicar una migración.
 esto pierde datos, cobra mal, deja entrar a quien no debe o se traba»).
 Devuelve hallazgos con archivo, línea y cómo reproducirlos. Lo que encuentra
 es una hipótesis: la PM lo reproduce o lo descarta antes de llevarlo al canal.
+
+**Código de producto sólo con camino de hoy.** Ningún hallazgo suma código
+de producto sin camino de hoy, venga de un subagente, de `/code-review` o de
+la Dev, o lo pida o lo acepte la PM. El camino se muestra con
+`archivo:línea`:
+
+- una entrada que existe hoy (ruta, formulario, tarea programada, paso del
+  despliegue);
+- la línea que falla;
+- qué la hace fallar desde esa entrada.
+
+Que la función tenga llamadores no alcanza: tiene que haber algo que la haga
+fallar. En dinero y datos personales alcanza el camino leído en el código,
+sin reproducirlo en vivo, pero el disparador no se exime. Una entrada
+inventada, o un camino que hoy no existe (una migración que nadie escribió
+todavía), va al informe como riesgo con su severidad, sin código.
 
 **Cuántos y quién los corre:** los de la fila de la pieza, de los dos
 lados. La Dev, antes de entregar (`/entregar`); la PM que revisa, los suyos
@@ -165,16 +188,13 @@ dos. En la primera entrega de la pieza, los dos.
 - **Consejero (`/advisor fable`), sólo la PM principal**, sólo en los
   momentos caros: antes de aceptar o devolver, antes de publicar, antes de
   cambiar una regla, antes de mandar una tarea de plata, sesión o permisos
-  y cuando algo no cierra. Nunca en la vuelta horaria sin novedades. Cada
-  consulta deja una fila en `archivo/MEDICION-CONSEJERO.md`.
+  y cuando algo no cierra. Nunca en una vuelta de rutina sin novedades.
 - **Ningún subagente usa Fable**, ni de la PM ni de las Devs (Emi,
   2026-10-07). Fable es sólo el consejero de la PM principal.
 - **Las Devs, hasta esfuerzo alto** (Emi, 2026-10-07): su sesión y sus
   subagentes. Los `adversario-*-muy-alto` son sólo de la PM. Las Devs no usan
   el consejero.
-- El veredicto anota por subagente: hallazgos, cuántos reproducidos y cuántos
-  no había visto nadie, con modelo y esfuerzo. La fila va en
-  `archivo/MEDICION-SUBAGENTES.md`.
+- El informe y el veredicto dicen modelo y esfuerzo de cada subagente.
 - La revisión de la Dev con sus subagentes es autorrevisión: suma, no
   reemplaza la de PM.
 
@@ -191,6 +211,13 @@ cuando hay una cola visual/UX que justifique dos canales.
 | **PM visual** | maquetas, UX, revisa a la Dev 2 | sólo la PM principal | `VISUAL.md`, `PARA-DEV-2.md`, su parte de `ENTRE-PMS.md` |
 | **Dev 1 (técnica)** | plata, sesión, permisos, datos | su PM por el canal | código y `PARA-PM.md` |
 | **Dev 2 (visual)** | pantallas, estilos, UX | su PM por el canal | código y `PARA-PM-2.md` |
+| **Dev N (si hay más)** | la cola que le da la PM principal | su PM por el canal | código y `PARA-PM-N.md` |
+
+**Un canal por Dev, cuantas haya.** La Dev N lee `PARA-DEV-N.md` y escribe
+`PARA-PM-N.md` (la Dev 1, sin número). Esta sección dice qué PM revisa a
+cada una; si no dice nada, la principal. La PM visual puede revisar también
+las piezas de otra Dev que no tocan cuentas, plata, sesión, permisos ni
+datos: la lista de esas piezas va al pie del canal de esa Dev.
 
 **Reglas duras de la PM visual:** recibe tareas sólo de la PM principal por
 `ENTRE-PMS.md`; trabaja dentro de las maquetas aprobadas y propone lo nuevo
@@ -214,8 +241,13 @@ Second Brain).
 ## Modo automático y un solo chat
 
 - **Modo automático:** Emi habla sólo con la PM principal. Cada sesión
-  tiene una rutina horaria con `create_trigger` en su propia sesión
-  (sobrevive a los reinicios; un `/loop` no). Ids de rutinas y sesiones en
+  tiene una rutina con `create_trigger` en su propia sesión
+  (sobrevive a los reinicios; un `/loop` no), cada 2 horas en el horario de
+  Emi y dos veces de noche: de 8 a 22 y a las 2 y a las 5,
+  `CRON_TZ=America/Argentina/Buenos_Aires <min> 2,5,8,10,12,14,16,18,20,22 * * *`,
+  con un `<min>` distinto para cada sesión (PM 55, Dev técnica 15, Dev MARIA
+  35). Las Devs avisan al entregar y la PM las despierta al contestar
+  («Timbres»), así que el día a día no espera a la rutina. Ids de rutinas y sesiones en
   `NOW.md`, «Quién hace qué».
 - **Al despertar:** lo que estás haciendo va primero. Si dejaste algo largo
   corriendo, sólo mirá si terminó. Si no hay nada nuevo, una línea. Anotá
@@ -288,7 +320,9 @@ Para que una sesión nueva lea sólo lo vigente. Lo que sale queda en Git.
 2. **Canales:** quedan la regla mínima, la última decisión de cada pieza
    abierta, la tarea activa y la cola. Una pieza publicada sale entera.
 3. **`NOW.md`:** sólo estado vigente, cola, «Para Emi», bloqueos y
-   restricciones. Lo de más de 7 días que ya no obliga a nada sale.
+   restricciones. Lo de más de 7 días que ya no obliga a nada sale. La
+   deuda para después del lanzamiento va en `COLA-LIMPIEZA.md`: no abre
+   tarea ni ocupa `NOW.md`.
 4. **Topes:** `NOW.md` 25 KB; cada `PARA-DEV*.md` 40 KB; `VISUAL.md` 10 KB;
    `ENTRE-PMS.md` 5 KB; una viñeta 1,5 KB.
 5. **Una regla, una copia:** antes de escribir una regla, buscarla con
@@ -331,9 +365,13 @@ se da la razón para quedar bien.
    cambiaron desde lo último publicado (conviene un script que los liste;
    no la cadena entera, que tarda horas). En segundo plano y sin
    adversarios en paralelo. Un rojo vuelve como devolución a la Dev cuya
-   pieza cambió ese archivo. Un patrón que ya no se encuentra es una falla
-   del script, no un salto: lo arregla esa Dev, y el script tiene que salir
-   con error si no lo encuentra.
+   pieza cambió ese archivo.
+   **Sabotajes vencidos:** uno cuyo texto ancla ya no está una sola vez en
+   el código no puede dar rojo aunque la protección siga. Es una falla del
+   script, no un salto: tiene que salir con error si no encuentra su ancla,
+   y el vencido se anota en `herramientas/sabotajes-conocidos.txt` con su
+   dueño (la Dev que lo arregla) y su salida (retirarlo o reescribirlo). El
+   script que lista los sabotajes de la tanda no lo elige y lo nombra.
 2. Traer `main` a la rama de PM con `merge` y comprobar que el código no
    cambió. Sin secretos, `.env` ni archivos privados en el diff.
 3. **Autorización explícita de Emi para ese SHA** («dale»). La PM abre
@@ -417,13 +455,13 @@ es el molde, y ante una contradicción manda este repositorio.
 | Archivo | Cuándo abrirlo |
 |---|---|
 | `NOW.md` | siempre: estado, cola, bloqueos, «Para Emi» |
+| `COLA-LIMPIEZA.md` | deuda para después del lanzamiento; lo que se suma a esa cola va acá |
 | `PARA-DEV.md` / `PARA-PM.md` | canal de la Dev 1 |
 | `ENTRE-PMS.md` | lo que se piden las dos PMs |
 | `VISUAL.md` | estado de lo visual (lo escribe la PM visual) |
 | `ARRANQUE-PM-VISUAL.md` | arranque de una PM visual |
-| `PARA-DEV-2.md` / `PARA-PM-2.md` | canal de la Dev 2 |
+| `PARA-DEV-N.md` / `PARA-PM-N.md` | canal de la Dev 2 (MARIA) y de cada Dev más («Estructura») |
 | `DECISIONS.md` | decisiones durables |
-| `archivo/MEDICION-*.md` | medición de subagentes y consejero |
 | `herramientas/LEEME.md` | qué scripts tiene que tener el proyecto |
 | `PREGUNTAS-DESPACHANTE.md` | qué falta confirmar del archivo MARIA |
 | `AUDITORIA-2026-10-06.md` | la última auditoría y qué se reprodujo |

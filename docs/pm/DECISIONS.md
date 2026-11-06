@@ -10,6 +10,8 @@ repositorio.
 
 | Decisión | Fecha | En una línea |
 |---|---|---|
+| **EMAIL-1 y CONEXIONES-1 entran al roadmap** | 2026-10-28 | Emi: «1 sí, 2 sí». EMAIL-1: el email se busca y se controla sin distinguir mayúsculas; los pares que ya haya en producción no se tocan hasta que Emi los cuente. CONEXIONES-1: medir si quedan conexiones a la base tomadas y arreglar sólo si pasa. Las dos de la Dev MARIA, Fase 3, después de ABUSO-1 |
+| **DESPACHO-1 entra al roadmap** | 2026-10-28 | Emi: «Sí, hay que sumarlo»: subir despachos ya oficializados para armar y editar el catálogo de cada cliente y poder bajarlo. Pieza de la Dev MARIA en la Fase 1c, después de ORG-1; espera un despacho de ejemplo del despachante. No arma TXT ni operación |
 | **Emi autoriza guardar las tres ramas de esta retoma en GitHub** | 2026-10-20 | Ante la pregunta explícita de guardar las ramas del resumen sin modificar el sitio, Emi respondió «dale. y. anotalo asi. la prox. pm sabe». Abarca `codex/pm-retoma-txt` (incluida esta nota y el cierre PM), `codex/maria5d-unit-kg` (`254531b`) y `codex/doc1-block-invalid-pdf` (`fe0a101`) en `Memu007/CDI-vuce-`, y sus borradores de revisión. No volver a pedir permiso para este guardado ya autorizado. No autoriza fusionar a main, desplegar en Railway ni aceptar precisión del lector real. |
 | **DOC-1: bloquear el TXT incorrecto; no sumar exportación completa** | 2026-10-19 | Emi eligió «Primero bloquear el TXT incorrecto» al decidir sobre EC02. Reconocer/rechazar documentos no admitidos y frenar destinaciones EC* en el flujo de importación. Sin generar exportaciones, inventar factura ni cambiar campos del formato MARIA. |
 | **AFIP/WSAA y VUCE quedan simulados** | 2026-09-04 | Excluidos del alcance por decisión de producto. No se auditan ni se trabajan |
@@ -159,3 +161,205 @@ reunión, sin datos del cliente):
 Emi (2026-10-24): Codex deja de trabajar en CDI; la PM principal arma dos
 Devs nuevas en Claude: Dev MARIA en esfuerzo alto y Dev técnica en medio.
 Roadmap nuevo a tres meses en `ROADMAP.md`: **aprobado por Emi el 2026-10-24** («Dale. Comenzá»). Emi (2026-10-24): la lectura de fechas año/mes/día entra en MARIA-7 (punto 8).
+
+## 2026-10-25 — Base del seguro sugerido (PM, D13 de VALOR-1)
+
+Decidido por la PM: hasta PRORRATEO-1, el botón «Calcular seguro» calcula
+el 1 % sobre el FOB de la factura más el flete, no sobre el FOB casillero.
+Así el TXT no lleva un FOB sin ajustes con un seguro calculado con ajustes.
+Se revierte con una constante (`BASE_SEGURO_SUGERIDO`) cuando el casillero
+vaya al TXT. Pregunta 3 al despachante en `PREGUNTAS-DESPACHANTE.md`.
+
+## 2026-10-25 — Fechas de inicio y la prueba de aislamiento (PM, D15–D17 de CLIENTE-1b)
+
+Decidido por la PM:
+- D15 (b) y D16 (b): la fecha de inicio que se copia desde la operación y la de
+  la importación masiva se validan con la misma función que el alta y la
+  edición. Una que no sirve no se copia o queda vacía, y el informe de la
+  importación lo dice. Va como pieza chica, CLIENTE-1c. No se usa un
+  `@validates` en el modelo.
+- D17 (a): la Dev técnica arregla `ataque_aislamiento.sh` (el sufijo «01» que
+  la API rechaza desde MARIA-7), en un commit aparte.
+
+## 2026-10-25 — El sufijo general que nadie usa (PM, D18 de MARIA-9)
+
+Decidido por la PM: D18 (b). Si ningún sub-ítem ni renglón toma el sufijo
+de valor de la operación, no se valida nada de él (tampoco `=`, caracteres
+de control ni el largo) y `/generate_maria/avisos` no avisa por él. Es
+seguro porque el general sólo se escribe en `CSBTSVL` y siempre pasa por
+`limpiar_sufijo`. Cuando alguno lo toma, los controles siguen igual. Va en
+VALOR-1c.
+
+## 2026-10-25 — Un monto ilegible no viaja como 0 (PM, D19 de SEPARADORES-1)
+
+Decidido por la PM: D19 (b). Si la pantalla no puede leer el flete, el
+seguro o un ajuste, el pedido lleva el texto tal cual y el servidor lo
+rechaza con un mensaje claro; nunca un 0 silencioso. Es la segunda red: la
+pantalla ya no deja generar con un monto ilegible. Va en SEPARADORES-1b,
+junto con la familia «separador y tres dígitos sin miles bien formados»,
+que pasa a ser ambigua en la factura y en la pantalla (no en los precios).
+
+## 2026-10-25 — Los sufijos salen del arancel de ARCA (PM, D22 de SUFIJOS-1)
+
+Decidido por la PM: D22 (a). En el repositorio no hay ruta ni respuesta
+guardada de VUCE `/cice/sufijos`; escribir el lector sería inventar la
+forma. SUFIJOS-1 toma los sufijos y la unidad estadística del arancel de
+ARCA del 07/10/2026 (`docs/pm/datos/`), en una tabla local con su fecha a
+la vista; lo que no está se marca para el despachante. VUCE va en una pieza
+aparte cuando Emi guarde una respuesta real. Se le cuenta a Emi; se puede
+revertir.
+
+## 2026-10-25 — Un ajuste ilegible frena el seguro calculado; ceros adelante, aparte (PM, D20 y D21 de SEPARADORES-1b)
+
+Decidido por la PM. D20 (a): con el seguro calculado por el sistema, un
+ajuste que no se lee da 400 hasta corregirlo o elegir «Dejar el seguro como
+está»; sin el seguro calculado, se dice en las cuentas y no frena. D21 (b):
+el cero adelante y los grupos de miles mal formados en la factura, el
+«en blanco» distinto entre pantalla y servidor y la pregunta que sugiere
+tres decimales van en SEPARADORES-1c, después de SUFIJOS-1. Son de antes o
+piden saltearse la revisión.
+
+## 2026-10-27 — Gana el sufijo que escribió la persona; aviso del sufijo vacío (PM, H5 y D23 de SUFIJOS-1)
+
+Decidido por la PM. H5: la propuesta del arancel no pisa un AA, AB o AI que
+el despachante escribió en el sufijo de la operación; sólo agrega los
+códigos que faltan y, si propone otro valor, lo avisa en la fila. D23 (c):
+si todos los productos tienen sufijo propio, el de la operación vacío no
+frena, pero se avisa junto al botón. Las dos van en la vuelta de SUFIJOS-1.
+
+## 2026-10-28 — D28 a D34 de la Dev MARIA (PM)
+
+Decidido por la PM; el texto entero está en `git show 02d28b1:docs/pm/PARA-DEV-2.md`.
+D28 (a): el golden de 2025 no se toca; las pruebas comparan todo salvo el
+`MCPL` de `GANANCIASOP3`, que dice `USOPAR` (se reabre si la pregunta 7 dice
+otra cosa). D29 (a): `PIDE_NUMERO = ("Z",)`; los decimales de los `Z` van en
+la pregunta 10. D30 (a): SEGURO-1 avisa y no frena; frenar es SEGURO-2, para
+Emi. D31 (a): el catálogo guarda sólo lo que ya tiene columna. D32 (a):
+borrar un cliente borra sus presupuestos compartidos, en la misma
+transacción. D33 (a): el cargador de `ncm_historial_*.json` no cambia; si se
+rescatan los de producción lo decide Emi al publicar DISCO-1. D34 (a):
+OBSERVABILIDAD-1 sólo crea la columna y su índice.
+
+## 2026-10-28 — D35 a D37 de la Dev MARIA (PM)
+
+Decidido por la PM; el texto entero está en `git show 1f648c3:docs/pm/PARA-DEV-2.md`.
+D35 (1) en las cinco, para ABUSO-1: (a) un solo helper de IP para
+`login_attempts`, `reset_attempts` y slowapi, la última de X-Forwarded-For y
+log obligatorio en el 429 del login; (b) los números de la Dev; (c) los
+mensajes quedan y la enumeración figura mitigada, no cerrada; (d) sin sesión
+sólo tres acciones en lista explícita; (e) los contadores de login y
+recuperación van a una tabla con incremento atómico, tamaño acotado y
+migración `_migrate_*` en commit propio. D36 y D37 (2) por ahora; sus (1)
+son EMAIL-1 y CONEXIONES-1, que Emi aprobó.
+
+## 2026-10-28 — OBSERVABILIDAD-1: la métrica guarda el molde de la ruta (PM)
+
+Decidido por la PM, amplía la D34 (a). Al volver a grabar la métrica, la
+pieza dejaba en `api_logs` (y en `/api/dev/stats`) el camino crudo, con
+tokens de invitación, hashes de presupuestos públicos y CUIT. Se guarda el
+molde de la ruta, y `<sin ruta>` si no coincide ninguna. Sin eso,
+OBSERVABILIDAD-1 no se publica. Evidencia en
+`REPRODUCCION-OBSERVABILIDAD-1-2026-10-28.md`.
+
+## 2026-10-28 — ORG-1: la pendiente de un email con cuenta no ocupa lugar (PM)
+
+Decidido por la PM, generaliza la D40. Una invitación pendiente cuyo email
+ya tiene cuenta en CDI (en cualquier estudio o en ninguno) no se puede usar
+y no cuenta para el tope de usuarios del estudio. Evidencia en
+`REPRODUCCION-ORG-1-D40-2026-10-28.md`.
+
+## 2026-10-28 — EXCEL-2b: el historial liviano de sugerir es del despachante; D32 (b) como EXCEL-2c (PM)
+
+`/api/ncm/sugerir` muestra el historial liviano (`load_ncm_historial`) del
+despachante a cualquiera de sus clientes, con `source: historial`. Queda
+así: es el historial del propio usuario, ya existía y el NCM depende del
+producto. Lo que es de un cliente (`scope: cliente`) no se le muestra a
+otro. D32: (b), libros chicos pero caros al carril pesado por una medida
+previa a leer, como pieza aparte EXCEL-2c al final de la cola de la Dev
+técnica. Topes de entorno: un valor que no da un tope usable (no finito,
+no positivo o 0 en bytes) usa el defecto.
+
+## 2026-10-28 — Rutinas de las Devs cada 3 horas (Emi)
+
+Emi, 28/10 («Dale»): las rutinas de la Dev MARIA y de la Dev técnica pasan
+de cada hora a cada 3 horas (minutos 35 y 15). La de la PM principal sigue
+cada hora. El canal principal son los avisos entre sesiones (la Dev avisa
+al entregar; la PM la despierta con el veredicto); la vuelta horaria de la
+PM es la red que despierta a una Dev parada. Se vuelve atrás con
+`update_trigger`.
+
+## 2026-10-28 — Pausa hasta el sábado 31/10 (Emi)
+
+Emi, 28/10: «frenemos todo hasta el sábado (si están haciendo algo que lo
+terminen)», por el uso y una entrega de otro proyecto. Las rutinas de la PM
+principal y de las dos Devs quedan apagadas. Cada Dev termina la pieza en
+curso, sube el informe y frena; la PM no revisa hasta retomar. Se retoma
+cuando Emi lo diga, prendiendo las rutinas con `update_trigger`.
+
+## 2026-10-28 — Se levanta la pausa (Emi)
+
+Emi, 28/10 a la noche: «volver a trabajar tranqui», porque su entrega del
+otro proyecto pasó al martes. Se prenden de nuevo las tres rutinas con la
+misma frecuencia (PM cada hora, Devs cada 3 horas).
+
+## 2026-10-28 — Sin apurar: calidad antes que velocidad (Emi)
+
+Emi preguntó si el plan de tres meses podía hacerse en un mes y medio. La PM
+(con el advisor) contestó que el código puede adelantarse pero el calendario
+depende del despachante, de Emi y de los estudios, y que apurar baja la
+calidad y sube el uso. Emi: «seguimos así… que no se adelanten, que vamos
+tranqui. Si se estira un poquito más, no hay problema… pero que no se salten
+nada. Prioridad es tener un código que se sienta hecho por un senior».
+Queda escrito arriba de `PARA-DEV.md` y `PARA-DEV-2.md` («Ritmo y calidad»).
+Las fechas se re-estiman después de la primera sesión con el despachante.
+
+## 2026-10-29 — Pausa hasta el domingo 1/11 (Emi)
+
+Emi, 29/10 a la mañana: «frenamos hasta el domingo con el proyecto». Las
+rutinas de la PM principal y de las dos Devs quedan apagadas. Cada Dev frena
+ya: corta lo que corre en segundo plano y sube lo que tenga a medias como
+trabajo en curso, sin entregar. La PM no revisa hasta retomar. Se retoma
+cuando Emi lo diga, prendiendo las rutinas con `update_trigger`.
+
+## 2026-11-04 — Se retoma por 3 días, con corte por uso (Emi)
+
+Emi, 04/11 a las 18:36 de Argentina: «Continua por 3 días … revisa el
+secondbrain que cambiamos cosas, actualizate vos y a las devs y arranca. Si
+ves que en 2 días o menos llega al 50% de uso del límite semanal corta». Se
+trabaja hasta el **sábado 07/11, ~18:30 de Argentina**. Si el uso semanal
+llega al 50 % antes del viernes 06/11 a las ~18:30, la PM corta todo:
+apaga las tres rutinas, frena a las Devs y le avisa a Emi. La PM no ve un
+porcentaje exacto: mira en cada vuelta el estado del límite de cada sesión
+(`get_session`) y le pide a Emi que avise si su pantalla marca 50 %.
+
+## 2026-11-04 — Método al día con el secondbrain hasta 2026-10-31 (PM)
+
+Se aplican las entradas de `CAMBIOS.md` del 2026-10-22 al 2026-10-31, como
+el 2026-10-24 (mismo pedido de Emi: «actualizate»). Entra `CLAUDE.md` §6
+(código como lo dejaría una senior) con `herramientas/chequeo-6.py`
+(producto `proyecto_maria/`; arnés `scripts/testing/` y `tests/`), el camino
+de hoy para sumar código, los sabotajes vencidos, `COLA-LIMPIEZA.md` y un
+canal por Dev; sale la medición a mano de subagentes y consejero. **Reemplaza
+la fila «Rutinas de las Devs cada 3 horas» del 2026-10-28:** las tres
+rutinas pasan a cada 2 horas de 8 a 22 y a las 2 y a las 5 de Argentina (PM
+minuto 55, técnica 15, MARIA 35); son menos vueltas que antes en total (la
+PM bajaba de 24 a 10 por día). Siguen sin aplicarse el consejero para las
+Devs, Fable como subagente y el «muy alto» para las Devs.
+
+## 2026-11-04 — Respuestas de Emi a lo pendiente (Emi)
+
+Emi, 04/11 ~19:10 de Argentina. **Claves:** las cambia ella más adelante,
+«ahora está en prueba»; sigue pendiente. **`8b45207`** (publicada el 24/10):
+la probó y funciona bien. **Seguridad del cobro:** «si vamos a cobrar por
+Mercado Pago, sí; hay que hacer los webhooks y todo lo que haga falta»:
+entra COBRO-MP-3 (técnica, después de COBRO-MP-2). **Arreglos chicos de
+seguridad:** sí: CSRF-1 (técnica: telemetría v2 con CSRF y el logout, D16
+b). **Pieza por la descripción larga que se pierde:** sí: CATALOGO-LARGO-1
+(MARIA, después de RENDIMIENTO-1c). **SEGURO-2:** sí (D30 b; MARIA, después
+de SUFIJOS-2 y SEGURO-1). **Re-estimar fechas:** sí: dos semanas más, el
+piloto cierra el 07/02 (`ROADMAP.md`). Orden de las colas: decidido por la
+PM.
+
+**2026-11-05 21:41 UTC, Emi en el chat de la PM principal:** «CATALOGO-LARGO-2
+sí, dale». Entra en la cola de MARIA después de SESION-1, como estaba
+propuesta.

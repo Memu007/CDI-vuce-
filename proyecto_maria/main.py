@@ -7,10 +7,13 @@ from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, field_validator
 from datetime import datetime, timedelta, timezone
+from typing import Any
 import jwt
 import json
+import math
 import os
 import re
+import unicodedata
 import csv
 import io
 import smtplib
@@ -70,7 +73,8 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt
+from proyecto_maria.services.fecha_inic_activ import fecha_del_alta
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, importe_escrito, usa_el_sufijo_de_la_operacion, fecha_inicio_actividad
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     DocumentoNoAdmitido,
@@ -82,9 +86,11 @@ from proyecto_maria.pdf_extractor import (  # Importar el extractor
 import pandas as pd
 from proyecto_maria.core.vuce_connector import get_ncm_data  # VUCE activo en modo mock
 from proyecto_maria.core import ncm_catalog
+from proyecto_maria.core import sufijos_arca
 from proyecto_maria.routers import admin_router, quote_router
 from proyecto_maria.services import billing_service
 from proyecto_maria.auth.dependencies import get_current_user
+from proyecto_maria.auth.roles import roles_de
 
 # ============== Configuración de Autenticación ==============
 _DEFAULT_DEV_SECRET = "tu-clave-secreta-super-segura-cambiar-en-produccion"
@@ -132,7 +138,7 @@ security = HTTPBearer()
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from proyecto_maria.database.connection import get_async_session, init_db
-from proyecto_maria.database.models import User, Client, PasswordResetToken, Organization, Invitation
+from proyecto_maria.database.models import User, Client, PasswordResetToken, Organization, Invitation, Estudio, UsoCuitPerfil
 import uuid
 import logging
 from sqlalchemy.exc import IntegrityError
@@ -1639,15 +1645,15 @@ import secrets as _csrf_secrets
 CSRF_COOKIE_NAME = "csrf_token"
 CSRF_HEADER_NAME = "x-csrf-token"
 _CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
-# Paths donde NO aplica: el caller no es un browser con sesion por cookie.
-_CSRF_EXEMPT_PREFIXES = (
+# Rutas públicas que no actúan con la sesión: una cookie vieja no tiene que trabarlas.
+# Van exactas para que ninguna otra ruta que se les parezca quede sin control.
+_CSRF_EXEMPT_PATHS = frozenset({
     "/auth/login",
     "/auth/register",
-    "/auth/logout",
-    "/auth/verify-email",
-    "/static",
-    "/health",
-)
+    "/auth/request-password-reset",
+    "/auth/recover-username",
+    "/auth/reset-password",
+})
 
 
 def _csrf_enforce_enabled() -> bool:
@@ -1680,12 +1686,12 @@ class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         method = request.method.upper()
         path = request.url.path
-        if (
-            method in _CSRF_SAFE_METHODS
-            or path.startswith(_CSRF_EXEMPT_PREFIXES)
-            or "webhook" in path
-        ):
-            return await call_next(request)
+        if method in _CSRF_SAFE_METHODS or path in _CSRF_EXEMPT_PATHS:
+            response = await call_next(request)
+            # Una sesión válida sin csrf_token no podría escribir hasta volver a entrar.
+            if getattr(request.state, "sesion_valida", False) and not request.cookies.get(CSRF_COOKIE_NAME):
+                set_csrf_cookie(response)
+            return response
 
         # Solo nos importa si la sesion va por cookie. Sin cookie de sesion,
         # el caller usa Bearer (API/tests) y no es atacable via CSRF.
@@ -1737,7 +1743,7 @@ def _admin_usernames() -> set:
 
 
 def _es_admin(user) -> bool:
-    return user["username"] in _admin_usernames() or "admin" in (user.get("roles") or [])
+    return user["username"] in _admin_usernames() or "admin" in roles_de(user)
 
 
 async def require_admin(user=Depends(get_current_user)):
@@ -1761,16 +1767,119 @@ async def _get_billing_entity(db: AsyncSession, db_user: User):
     return db_user, False
 
 
+def _vencer_si_corresponde(entidad, ahora=None):
+    """Pasa a past_due una cuenta vencida y dice qué venció ("trial", "active") o None.
+    Sólo la suscripción tiene gracia: un webhook de renovación puede llegar tarde."""
+    ahora = ahora or datetime.now(timezone.utc)
+    fin = entidad.trial_ends_at
+    if fin is None:
+        return None
+    if fin.tzinfo is None:
+        fin = fin.replace(tzinfo=timezone.utc)
+    if entidad.billing_status == "trial" and fin < ahora:
+        entidad.billing_status = "past_due"
+        return "trial"
+    if (
+        entidad.billing_status == "active"
+        and fin < ahora - timedelta(days=BILLING_GRACE_DAYS_ACTIVE)
+    ):
+        entidad.billing_status = "past_due"
+        return "active"
+    return None
+
+
+def _detalle_402(entidad, razon_del_plan=None, vencio=None):
+    """El detail del 402 con la razón real: impago, vencido, cancelado, sin suscripción o tope.
+    Los code son los que ya lee la pantalla; el texto es el que distingue la razón."""
+    estado = entidad.billing_status
+    pago_real = getattr(entidad, "payment_provider", None) == "mercadopago"
+    if estado == "past_due":
+        if pago_real:
+            code = "SUBSCRIPTION_PAST_DUE"
+            message = ("Tenés un pago pendiente de tu suscripción. "
+                       "Regularizalo para seguir usando CDI.")
+        else:
+            # Sin pago de Mercado Pago, en producción sólo vence una prueba:
+            # el active sin MP sale de simulate-charge o de los usuarios demo.
+            code = "TRIAL_EXPIRED"
+            que = "tu suscripción" if vencio == "active" else "tu prueba gratis"
+            message = f"Venció {que}. Suscribite para seguir usando CDI."
+    elif billing_service.tiene_acceso(entidad):
+        code = "PLAN_LIMIT_EXCEEDED"
+        message = razon_del_plan or "Alcanzaste el límite de operaciones de tu plan."
+    elif estado == "canceled":
+        code = "SUBSCRIPTION_PAST_DUE" if pago_real else "TRIAL_EXPIRED"
+        message = "Cancelaste tu suscripción. Reactivala para seguir usando CDI."
+    else:
+        code = "SUBSCRIPTION_INACTIVE"
+        message = "No tenés una suscripción activa. Suscribite para seguir usando CDI."
+    return {"message": message, "code": code, "billing_status": estado}
+
+
+async def _cuenta_bloqueada(db: AsyncSession, username: str):
+    """Bloquea usuario y organización, siempre en ese orden, hasta el commit o rollback.
+    populate_existing: sin él, valen los contadores que get_current_user leyó antes del lock."""
+    result = await db.execute(
+        select(User)
+        .where(User.username == username)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    db_user = result.scalars().first()
+    if not db_user:
+        return None
+    if db_user.organization_id:
+        result = await db.execute(
+            select(Organization)
+            .where(Organization.id == db_user.organization_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        org = result.scalars().first()
+        if org:
+            return db_user, org
+    return db_user, db_user
+
+
+async def _vencer_y_guardar(db: AsyncSession, entidad):
+    vencio = _vencer_si_corresponde(entidad)
+    if vencio:
+        try:
+            await db.commit()
+            await db.refresh(entidad)
+        except Exception:
+            await db.rollback()
+    return vencio
+
+
+async def require_billing_vigente(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """402 si la cuenta no está al día. No mira el tope: ese se mira sólo donde se
+    cuenta, así lo ya contado se puede seguir validando y bajando."""
+    result = await db.execute(select(User).where(User.username == user["username"]))
+    db_user = result.scalars().first()
+    if not db_user:
+        if os.getenv("ENVIRONMENT") == "testing":
+            return User(username=user["username"], plan="premium", billing_status="active")
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+
+    entidad, _ = await _get_billing_entity(db, db_user)
+    vencio = await _vencer_y_guardar(db, entidad)
+    if not billing_service.tiene_acceso(entidad):
+        raise HTTPException(status_code=402, detail=_detalle_402(entidad, vencio=vencio))
+    return db_user
+
+
 async def require_active_billing(
     request: Request,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Dependencia: exige que el usuario tenga billing activo/trial y que no
-    haya excedido el límite de operaciones del plan. Usar en endpoints que
-    crean operaciones o clientes.
-
-    Devuelve HTTP 402 Payment Required si está vencido o sin ops.
+    """Dependencia: estado vigente y cupo del plan (402 si no). Mira el tope
+    sin bloquear: las rutas que cuentan lo vuelven a mirar con la cuenta
+    bloqueada, en la misma transacción que cuentan.
     """
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
@@ -1779,55 +1888,35 @@ async def require_active_billing(
             return User(username=user["username"], plan="premium", billing_status="active")
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
-    # Corte por vencimiento. Chequear la entidad de billing (org o user).
-    #  - trial vencido: sin gracia (nadie pagó todavía).
-    #  - active vencido: con BILLING_GRACE_DAYS_ACTIVE días de gracia (G7.3), para no
-    #    cortar por un webhook de renovación que llegó tarde.
-    billing_entity, is_org = await _get_billing_entity(db, db_user)
-    now = datetime.now(timezone.utc)
-    trial_end = billing_entity.trial_ends_at
-    if trial_end is not None and trial_end.tzinfo is None:
-        trial_end = trial_end.replace(tzinfo=timezone.utc)
-
-    # get_current_user ya pasa a past_due un `trial` vencido. Acá cubrimos al
-    # `active` vencido pasada la gracia (y al `trial` por si se llega sin pasar por
-    # get_current_user, p. ej. billing por organización).
-    if trial_end is not None:
-        vencido_trial = billing_entity.billing_status == "trial" and trial_end < now
-        vencido_active = (
-            billing_entity.billing_status == "active"
-            and trial_end < now - timedelta(days=BILLING_GRACE_DAYS_ACTIVE)
-        )
-        if vencido_trial or vencido_active:
-            billing_entity.billing_status = "past_due"
-            try:
-                await db.commit()
-                await db.refresh(billing_entity)
-            except Exception:
-                await db.rollback()
-
-    ok, reason = billing_service.can_create_operation(billing_entity)
+    entidad, _ = await _get_billing_entity(db, db_user)
+    vencio = await _vencer_y_guardar(db, entidad)
+    ok, reason = billing_service.can_create_operation(entidad)
     if not ok:
-        # 402 distinguible, para que Emi sepa la causa de un vistazo:
-        #  - past_due/canceled y pagó de verdad (payment_provider=="mercadopago",
-        #    lo setea el webhook real de MP; el registro con tarjeta deja
-        #    "simulated") → renovación impaga.
-        #  - past_due/canceled sin pago real → trial vencido (nunca pagó).
-        #  - trial/active vigente sin ops → límite del plan.
-        if billing_entity.billing_status in ("past_due", "canceled"):
-            pago_real = getattr(billing_entity, "payment_provider", None) == "mercadopago"
-            code = "SUBSCRIPTION_PAST_DUE" if pago_real else "TRIAL_EXPIRED"
-        else:
-            code = "PLAN_LIMIT_EXCEEDED"
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "message": reason,
-                "code": code,
-                "billing_status": billing_entity.billing_status,
-            },
-        )
+        raise HTTPException(status_code=402, detail=_detalle_402(entidad, reason, vencio))
     return db_user
+
+
+async def _contar_operacion_bloqueada(db: AsyncSession, username: str):
+    """Con la cuenta bloqueada: vence, mira el tope y cuenta; el que llama hace el único
+    commit. Si no puede contar, guarda el vencimiento, suelta el lock y tira 402."""
+    cuenta = await _cuenta_bloqueada(db, username)
+    if cuenta is None:
+        if os.getenv("ENVIRONMENT") == "testing":
+            return None
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+    return await _contar_en_la_cuenta(db, cuenta[1])
+
+
+async def _contar_en_la_cuenta(db: AsyncSession, entidad):
+    """El conteo de _contar_operacion_bloqueada, con la cuenta ya bloqueada."""
+    vencio = _vencer_si_corresponde(entidad)
+    ok, reason = billing_service.can_create_operation(entidad)
+    if not ok:
+        detalle = _detalle_402(entidad, reason, vencio)
+        await db.commit()
+        raise HTTPException(status_code=402, detail=detalle)
+    billing_service.record_operation_created(entidad)
+    return entidad
 
 
 # --- USER PROFILE ENDPOINTS ---
@@ -1999,29 +2088,66 @@ async def cancel_billing(
 ):
     """Cancela la suscripción del usuario.
 
-    No corta el servicio inmediatamente: deja `billing_status='canceled'` pero
-    mantiene `trial_ends_at` como fecha hasta cuándo el user ya pagó (o cuándo
-    vence el trial). Cuando esa fecha pase, get_current_user lo marca past_due.
+    Si hay una suscripción de Mercado Pago, primero se cancela allá; si no se
+    puede, no se cambia nada en CDI. Deja `billing_status='canceled'`, que
+    sigue generando hasta `trial_ends_at` (billing_service.tiene_acceso): la
+    cuenta en gracia o con la prueba vencida queda sin acceso
+    (billing_service.cancelar_corta_acceso). Con una suscripción abierta se
+    cancela desde cualquier estado, sin ganar acceso: si no, cobra cuando la
+    tarjeta vuelve y el checkout no tiene salida.
+
+    Toma la fila como el checkout: si uno está en curso, espera a que guarde
+    la suscripción nueva y la cancela; si no, quedaría cobrando sin que CDI
+    la conozca.
     """
-    result = await db.execute(select(User).where(User.username == user["username"]))
+    result = await db.execute(select(User).where(User.username == user["username"]).with_for_update())
     db_user = result.scalars().first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    if db_user.billing_status not in ("trial", "active"):
+    if db_user.billing_status not in ("trial", "active", "past_due") and not db_user.mp_preapproval_id:
         raise HTTPException(
             status_code=409,
             detail=f"No se puede cancelar desde el estado actual: {db_user.billing_status}",
         )
 
+    if db_user.mp_preapproval_id:
+        no_se_pudo = "No se pudo cancelar en Mercado Pago; tu plan sigue igual. Probá de nuevo en unos minutos."
+        if not billing_service.is_configured():
+            raise HTTPException(status_code=503, detail=no_se_pudo)
+        try:
+            await run_in_threadpool(_cancelar_suscripcion_mp, db_user.mp_preapproval_id)
+        except _SuscripcionMPError as e:
+            print(f"⚠️ No se pudo cancelar la suscripción de {db_user.username} en MP: {e}")
+            raise HTTPException(status_code=503, detail=no_se_pudo)
+        db_user.mp_preapproval_id = None
+
+    ahora = datetime.now(timezone.utc)
+    corta = billing_service.cancelar_corta_acceso(db_user, ahora)
+    if corta and billing_service.vigente(db_user.trial_ends_at, ahora):
+        # canceled da acceso hasta trial_ends_at: quien no lo tenía no lo gana.
+        db_user.trial_ends_at = ahora
     db_user.billing_status = "canceled"
     await db.commit()
-    print(f"🚪 User canceló suscripción: {db_user.username} (servicio activo hasta {db_user.trial_ends_at})")
-    return {
-        "success": True,
-        "billing_status": "canceled",
-        "service_until": db_user.trial_ends_at.isoformat() if db_user.trial_ends_at else None,
-    }
+    hasta = None if corta else db_user.trial_ends_at
+    print(f"🚪 User canceló suscripción: {db_user.username} (servicio hasta: {hasta or 'sin acceso'})")
+    return {"success": True, "billing_status": "canceled", "service_until": hasta and hasta.isoformat()}
+
+
+async def _pago_un_plan_mp(db: AsyncSession, db_user) -> bool:
+    """Si la cuenta pagó un plan con Mercado Pago. Una recarga sola no es un
+    plan: la prueba que recargó vuelve a la prueba (COBRO-MP-1, E). Sin
+    ningún pago aplicado en mp_pagos_aplicados (pagó antes del registro)
+    decide payment_provider, como antes: un rechazo no dice nada del plan."""
+    from proyecto_maria.database.models import PagoMercadoPagoAplicado
+    tipos = (await db.execute(
+        select(PagoMercadoPagoAplicado.tipo)
+        .where(PagoMercadoPagoAplicado.cuenta == db_user.username,
+               PagoMercadoPagoAplicado.estado == "aplicado")
+    )).scalars().all()
+    if not tipos:
+        return db_user.payment_provider == "mercadopago"
+    return any(tipo != "topup" for tipo in tipos)
 
 
 @app.post("/api/billing/reactivate")
@@ -2031,9 +2157,11 @@ async def reactivate_billing(
 ):
     """Reactiva una suscripción cancelada.
 
-    Si el `trial_ends_at` aún está en el futuro → simplemente vuelve a 'active'
-    (no hay que cobrar de nuevo, el user ya pagó hasta esa fecha).
-    Si ya venció → marca past_due y el front debe abrir el checkout.
+    Si ya venció → past_due y el front abre el checkout. Si no venció:
+    una prueba vuelve a 'trial' sin cobrar; un plan pagado con Mercado Pago
+    sigue 'canceled' hasta que se pague una suscripción nueva, que cobra
+    ahora y suma 30 días desde el fin del período ya pagado (COBRO-MP-2,
+    D7.3). Reactivar nunca deja la cuenta 'active' sin un pago.
     """
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
@@ -2056,14 +2184,26 @@ async def reactivate_billing(
             "message": "Tu período pagado ya terminó. Activá el plan para continuar.",
         }
 
-    db_user.billing_status = "active"
+    if await _pago_un_plan_mp(db, db_user):
+        return {
+            "success": True,
+            "billing_status": "canceled",
+            "needs_checkout": True,
+            "service_until": end.isoformat(),
+            "message": (
+                "Para reactivar se crea una suscripción nueva en Mercado Pago: te cobra ahora "
+                f"y suma 30 días desde el {end.strftime('%d/%m/%Y')}, fin del período ya pagado."
+            ),
+        }
+
+    db_user.billing_status = "trial"
     await db.commit()
-    print(f"🔄 User reactivó suscripción: {db_user.username}")
+    print(f"🔄 User reactivó la prueba: {db_user.username}")
     return {
         "success": True,
-        "billing_status": "active",
+        "billing_status": "trial",
         "needs_checkout": False,
-        "service_until": db_user.trial_ends_at.isoformat() if db_user.trial_ends_at else None,
+        "service_until": end.isoformat(),
     }
 
 
@@ -2137,6 +2277,29 @@ async def get_dev_wave1_kpis(
     """
     d = max(1, min(days, 120))
     return await _wave1_compute_kpis(db, days=d)
+
+
+@app.get("/api/dev/pagos-mp-rechazados", tags=["admin"])
+async def get_dev_pagos_mp_rechazados(
+    user=Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pagos de Mercado Pago aprobados que no se aplicaron porque no
+    alcanzaban (COBRO-MP-1): cada uno es un cliente que pagó y no recibió
+    nada. Los últimos 200, sólo admin."""
+    from proyecto_maria.database.models import PagoMercadoPagoAplicado as _Pago
+    filas = (await db.execute(
+        select(_Pago).where(_Pago.estado == "rechazado")
+        .order_by(desc(_Pago.aplicado_en)).limit(200)
+    )).scalars().all()
+    return {"pagos": [
+        {
+            "payment_id": f.payment_id, "cuenta": f.cuenta, "tipo": f.tipo,
+            "monto": f.monto, "moneda": f.moneda, "monto_esperado": f.monto_esperado,
+            "motivo": f.motivo, "aprobado_en": f.aprobado_en,
+            "registrado_en": f.aplicado_en.isoformat() if f.aplicado_en else None,
+        } for f in filas
+    ]}
 
 
 # --- FINANCIALS & STATUS API (Quick Win) ---
@@ -2260,13 +2423,19 @@ async def view_public_quote(request: Request, hash: str):
     )
 
 @app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request):
+async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     """Sirve el dashboard (v2, la única interfaz).
 
     La v1 (`dashboard.html` + `static/app.js`) se retiró el 2026-11-05. Quien
     todavía tenga la cookie `cdi_ui=v1` de la transición recibe v2 y la cookie
     se borra; `?v=1` y `?v=2` se ignoran.
     """
+    # Con la sesión abierta, la página llega con su csrf_token: la pestaña
+    # reconoce su sesión desde que abre y toma cualquier cambio como otro login.
+    try:
+        await get_current_user(request, Response(), db)
+    except HTTPException:
+        pass
     try:
         response = templates.TemplateResponse(
             name="dashboard_v2.html",
@@ -2681,10 +2850,12 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
     }
 
 @app.post("/auth/logout")
-async def logout(response: Response):
+async def logout(request: Request, response: Response):
     """Cierra sesión eliminando la cookie"""
-    response.delete_cookie("access_token")
-    response.delete_cookie(CSRF_COOKIE_NAME)
+    # Un form de otro sitio llega sin cookies y sin pasar por CSRF: no tiene que borrar nada.
+    if request.cookies.get("access_token"):
+        response.delete_cookie("access_token")
+        response.delete_cookie(CSRF_COOKIE_NAME)
     return {"message": "Sesión cerrada"}
 
 # ============== BACKUP/RESTORE LOCALSTORAGE ==============
@@ -2863,21 +3034,44 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
             raise HTTPException(status_code=400, detail="Token de invitación inválido")
         if invite_inv.status == "accepted":
             raise HTTPException(status_code=400, detail="Esta invitación ya fue usada")
-        if invite_inv.expires_at and invite_inv.expires_at < datetime.utcnow():
+        if invite_inv.expires_at and _utc(invite_inv.expires_at) < datetime.now(timezone.utc):
             raise HTTPException(status_code=400, detail="Esta invitación expiró")
-        invite_org = await db.execute(select(Organization).where(Organization.id == invite_inv.org_id))
+        # La invitación es para una persona: el email del registro tiene que
+        # ser el invitado (los dos se guardan con strip().lower()).
+        if request.email != (invite_inv.email or "").strip().lower():
+            raise HTTPException(status_code=400, detail="Esta invitación es para otro email. Registrate con el email al que te invitaron.")
+        # Bloquea el estudio hasta el commit (Postgres; SQLite lo ignora).
+        invite_org = await db.execute(
+            select(Organization).where(Organization.id == invite_inv.org_id).with_for_update()
+        )
         invite_org = invite_org.scalars().first()
         if not invite_org:
             raise HTTPException(status_code=400, detail="El estudio ya no existe")
+
+        # La invitación se gasta en la misma transacción que el alta, y sólo
+        # si sigue pendiente: de dos registros a la vez con el mismo token,
+        # el segundo no toca ninguna fila y no se crea. Va antes de contar los
+        # miembros porque esta escritura es la que, en SQLite, hace esperar
+        # al otro registro hasta que este termine.
+        from sqlalchemy import update as sa_update
+        gastada = await db.execute(
+            sa_update(Invitation)
+            .where(Invitation.id == invite_inv.id, Invitation.status == "pending")
+            .values(status="accepted")
+            .execution_options(synchronize_session=False)
+        )
+        if gastada.rowcount != 1:
+            await db.rollback()
+            raise HTTPException(status_code=400, detail="Esta invitación ya fue usada")
+
+        tope = billing_service.get_plan(invite_org.plan or "premium")["users"]
+        if len(await _emails_de_miembros(db, invite_org.id)) >= tope:
+            await db.rollback()  # la invitación queda pendiente
+            raise HTTPException(status_code=400, detail=f"El estudio ya tiene los {tope} usuarios de su plan.")
         new_user.organization_id = invite_org.id
 
     db.add(new_user)
     await db.commit()
-
-    # Marcar invitación como accepted (reutiliza el objeto ya cargado)
-    if invite_inv and invite_inv.status == "pending":
-        invite_inv.status = "accepted"
-        await db.commit()
 
     # Email de verificacion (solo si el toggle esta on). Lo mandamos en
     # background para no frenar el response. Pasamos strings, no el ORM,
@@ -3062,6 +3256,16 @@ async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(
         "clients_limit": plan["clients"],
         "users_limit": plan["users"],
         "organization_id": db_user.organization_id,
+        # «Próximo cobro» sólo si hay una suscripción que se renueva (D7.3). El id
+        # se guarda al abrir el checkout, antes de pagar: hace falta un pago de MP.
+        "renueva": (billing_entity.billing_status == "active" and bool(db_user.mp_preapproval_id)
+                    and getattr(billing_entity, "payment_provider", None) == "mercadopago"),
+        # Con una suscripción abierta el perfil muestra «Cancelar plan», como
+        # /api/billing/cancel, sea cual sea el estado.
+        "suscripcion_abierta": bool(db_user.mp_preapproval_id),
+        # De la cuenta que da el acceso, la misma que muestra esta respuesta: el
+        # perfil no promete días que no da.
+        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(billing_entity),
     }
 
 
@@ -3148,7 +3352,9 @@ async def create_manual_operation(
     total_value = sum(float(it.get("valor_unitario", 0) or 0) * float(it.get("cantidad", 0) or 0) for it in items_raw)
     total_weight = sum(float(it.get("peso_unitario", 0) or 0) * float(it.get("cantidad", 0) or 0) for it in items_raw)
 
-    # Crear operación
+    # Contar, calcular el op_code y crear la operación con la cuenta bloqueada,
+    # en un solo commit.
+    await _contar_operacion_bloqueada(db, username)
     op_code = await _next_op_code(db, username)
 
     operation = OperationModel(
@@ -3181,10 +3387,6 @@ async def create_manual_operation(
 
     await db.commit()
 
-    billing_entity, _ = await _get_billing_entity(db, db_user)
-    billing_service.record_operation_created(billing_entity)
-    await db.commit()
-
     return {
         "success": True,
         "operation_id": operation_id,
@@ -3200,6 +3402,7 @@ async def process_operation(
     request: Request,
     payload: OperationPayload,
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
 ):
     """
     Recibe los datos de una operación, los valida y genera el Excel.
@@ -3310,6 +3513,25 @@ def _pool_lectura_excel():
             hilos = 2
         _POOL_LECTURA_EXCEL = ThreadPoolExecutor(hilos, thread_name_prefix="lectura-excel")
     return _POOL_LECTURA_EXCEL
+
+
+# Carril liviano (EXCEL-2b): el libro que la validación midió chico se lee en
+# hilos propios y no espera detrás de las planillas pesadas.
+_POOL_LECTURA_EXCEL_LIVIANO = None
+
+
+def _pool_lectura_excel_carril(liviano: bool):
+    global _POOL_LECTURA_EXCEL_LIVIANO
+    if not liviano:
+        return _pool_lectura_excel()
+    if _POOL_LECTURA_EXCEL_LIVIANO is None:
+        from concurrent.futures import ThreadPoolExecutor
+        try:
+            hilos = max(1, int(os.getenv("EXCEL_READ_WORKERS", "2")))
+        except (TypeError, ValueError):
+            hilos = 2
+        _POOL_LECTURA_EXCEL_LIVIANO = ThreadPoolExecutor(hilos, thread_name_prefix="lectura-excel-liviano")
+    return _POOL_LECTURA_EXCEL_LIVIANO
 
 
 def _correr_lectura(funcion, *args):
@@ -3488,6 +3710,10 @@ def _rellenar_combinadas(df, combinadas, mapeo=None):
             campos[col] = next(iter(lo_que_es))
     primera, ultima = int(df.index.min()) + 2, int(df.index.max()) + 2
     hasta_donde = {}
+    # Qué celdas son copia de una combinada: no son el rótulo ni el origen
+    # propios de la fila (un origen combinado hasta el flete no lo vuelve
+    # producto; EXCEL-3b).
+    rellenadas = df.attrs.setdefault("celdas_rellenadas", {})
     for f1, c1, f2, _c2 in sorted(set(combinadas)):
         if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:
             continue
@@ -3505,6 +3731,7 @@ def _rellenar_combinadas(df, combinadas, mapeo=None):
         if desde <= hasta:
             filas = df.index[(df.index >= desde) & (df.index <= hasta)]
             df.loc[filas, col] = valor
+            rellenadas.setdefault(col, set()).update(filas)
     return df
 
 
@@ -3543,6 +3770,24 @@ def _con_encabezado(df, conocidas=()):
     return df
 
 
+def _combinadas_del_xls(ruta) -> list:
+    """Las celdas combinadas de la primera hoja de un .xls, como las de
+    _xlsx_solo_primera_hoja: [(fila1, col1, fila2, col2)], desde 1. Sin
+    ellas una especificación combinada hacia abajo sólo está en su primer
+    renglón (EXCEL-3b). Si xlrd no puede leerlas, el .xls se lee sin
+    rellenar, como antes."""
+    try:
+        import xlrd
+        libro = xlrd.open_workbook(ruta, formatting_info=True, on_demand=True)
+        try:
+            hoja = libro.sheet_by_index(0)
+            return [(f1 + 1, c1 + 1, f2, c2) for f1, f2, c1, c2 in hoja.merged_cells[:10_000]]
+        finally:
+            libro.release_resources()
+    except Exception:
+        return []
+
+
 def _leer_excel_ruta(ruta: str, engine: str, conocidas=()):
     # conocidas: el mapeo guardado del cliente, como pares (columna, campo) o
     # sólo los nombres de las columnas.
@@ -3555,6 +3800,8 @@ def _leer_excel_ruta(ruta: str, engine: str, conocidas=()):
         import io as _io
         contenido, combinadas = _xlsx_solo_primera_hoja(ruta, max_filas=_MAX_FILAS_EXCEL)
         origen = _io.BytesIO(contenido)
+    elif engine == "xlrd":
+        combinadas = _combinadas_del_xls(ruta)
     mapeo = dict(c for c in conocidas if isinstance(c, tuple) and len(c) == 2)
     nombres = set(mapeo) or {c for c in conocidas if isinstance(c, str)}
     df = _con_encabezado(pd.read_excel(origen, engine=engine, dtype=object), nombres)
@@ -3811,11 +4058,8 @@ async def _leer_pdf_aparte(funcion, *args, limite=None, que="el PDF", pool=None)
 
 
 def _get_max_upload_bytes() -> int:
-    try:
-        max_mb = float(os.getenv("MAX_UPLOAD_MB", "10"))
-    except (TypeError, ValueError):
-        max_mb = 10.0
-    return int(max_mb * 1024 * 1024)
+    from proyecto_maria.security.file_security import tope_de_entorno
+    return tope_de_entorno("MAX_UPLOAD_MB", 10, 1024 * 1024)
 
 
 
@@ -3922,6 +4166,7 @@ async def upload_pdf_public(
     request: Request,
     file: UploadFile = File(...),
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
 ):
     """
     Sube y procesa un archivo PDF para extraer items y datos de operación.
@@ -3990,8 +4235,13 @@ async def upload_pdf_public(
         if not items_data:
              raise HTTPException(status_code=400, detail="No se encontró tabla de items en el PDF. Asegurate de que el PDF tenga una tabla con columnas como: Model/Description, Price, Quantity.")
 
-        # Los dos pesos de una línea que no coinciden (devolución de MARIA-5).
-        avisos = operacion_data.pop('avisos_peso', []) if isinstance(operacion_data, dict) else []
+        # Los dos pesos de una línea que no coinciden (devolución de MARIA-5) y
+        # la fecha que no se pudo ordenar (MARIA-7, punto 8), cada uno con
+        # su título en la pantalla.
+        avisos, avisos_fecha = [], []
+        if isinstance(operacion_data, dict):
+            avisos_fecha = operacion_data.pop('avisos_fecha', [])
+            avisos = operacion_data.pop('avisos_peso', [])
 
         return {
             "message": "PDF procesado exitosamente",
@@ -4001,6 +4251,7 @@ async def upload_pdf_public(
             "items": items_data,  # Items extraídos
             "items_count": len(items_data),
             "avisos": avisos,
+            "avisos_fecha": avisos_fecha,
         }
 
     except HTTPException:
@@ -4013,6 +4264,38 @@ async def upload_pdf_public(
         )
 
 
+# El texto de «dónde cargarlo» del CUIT del despachante (ESTUDIO-1). El
+# generador avisa con FALTA_CUIT_DEL_DESPACHANTE; la API lo cambia por éste.
+FALTA_CUIT_DONDE_CARGARLO = (
+    "Falta el CUIT del despachante (CDDTAGR): elegí el estudio en la operación o "
+    "cargá uno en «Mi perfil», «Mis estudios». Sin él no se genera el TXT."
+)
+
+
+async def _estudio_elegido(db: AsyncSession, estudio_id, username: str):
+    """El estudio que eligió la operación, si es de la cuenta (ESTUDIO-1).
+
+    Sólo `""` (o la falta del campo) es «sin estudio»: sigue `cuit_agr` y el
+    perfil. Todo lo demás que no es un estudio de la cuenta («null», «N/A»,
+    espacios, un null de JSON, un número) es un error: no se cae en silencio
+    al CUIT del perfil (ESTUDIO-1b).
+    """
+    if estudio_id == "":
+        return None
+    estudio = None
+    if isinstance(estudio_id, str):
+        result = await db.execute(
+            select(Estudio).where(Estudio.id == estudio_id, Estudio.owner_username == username)
+        )
+        estudio = result.scalars().first()
+    if estudio is None:
+        raise HTTPException(
+            status_code=400,
+            detail="El estudio elegido no está en tu cuenta: elegí otro en la operación.",
+        )
+    return estudio
+
+
 class MariaRequest(BaseModel):
     """Request para generar archivo MARIA TXT."""
     operation_id: str
@@ -4022,6 +4305,10 @@ class MariaRequest(BaseModel):
     moneda: str = ""
     incoterm: str = ""
     cuit_agr: str = ""
+    # El estudio elegido en la operación (ESTUDIO-1): su CUIT va al CDDTAGR
+    # y manda sobre `cuit_agr` y el perfil. Sólo "" es «sin estudio»; sin
+    # tipo, para que lo demás llegue a `_estudio_elegido` y sea un 400.
+    estudio_id: Any = ""
     vendedor_nombre: str = ""
     vendedor_id: str = ""
     comprador_nombre: str = ""
@@ -4031,8 +4318,14 @@ class MariaRequest(BaseModel):
     # declaracion). El despachante los completa a mano en el Kit SIM.
     comprador_domicilio: str = ""
     comprador_fecha_inic_activ: str = ""
-    flete: float = 0
-    seguro: float = 0
+    # Flete, seguro y gastos aceptan texto: lo que la pantalla no pudo leer
+    # viaja tal cual y se rechaza con su mensaje, no con un 422 ni como 0
+    # (SEPARADORES-1b, D19). Ver `importe_valido`.
+    flete: float | str = 0
+    seguro: float | str = 0
+    # El seguro lo puso el botón «Calcular seguro» (VALOR-1c): si las cuentas
+    # de ahora dan otro, no se genera hasta recalcularlo o dejarlo.
+    seguro_calculado: bool = False
     # Transport data
     bl_numero: str = ""
     puerto_origen: str = ""
@@ -4051,14 +4344,23 @@ class MariaRequest(BaseModel):
     tipo_destinacion: str = "IC04"
     # Sufijo de valor SBT — obligatorio, específico de cada importador
     sbt_sufijo_valor: str = ""
+    # El número real de la factura, para LDVDREFDOC (MARIA-7).
+    numero_factura: str = ""
     # Gastos respecto del FOB: diferencia entre el valor en la condición de
     # venta pactada y el FOB declarado. El campo del TXT sale del incoterm
     # (EXW → GTOS-ANT-FOB, grupos C/D → GTOS-POS-FOB). Si no viene, en los
     # grupos C/D se usa flete + seguro y fuera de ellos no se declara nada.
-    gastos_fob: float | None = None
+    gastos_fob: float | str | None = None
     # MARIA-3. Gastos anteriores al FOB del campo de la pantalla: van al TXT
     # (GTOS-ANT-FOB) sólo con EXW, FCA o FAS. `gastos_fob` explícito manda.
-    gastos_anteriores_fob: float | None = None
+    gastos_anteriores_fob: float | str | None = None
+    # VALOR-1. Ajustes a incluir y a deducir que carga la persona: sólo para
+    # las cuentas del FOB casillero y del seguro sugerido. No van al TXT
+    # hasta saber en qué campo (D12): `/generate_maria` no los usa. Van sin
+    # tipo: uno que no es número no frena nada y se ve en `valor.error`
+    # (VALOR-1b).
+    ajustes_incluir: Any = None
+    ajustes_deducir: Any = None
     # MARIA-3. Procedencia de la operación (país desde donde se embarca, art. 15
     # del Código Aduanero). Va a cada producto que no traiga la suya.
     procedencia: str = ""
@@ -4077,6 +4379,7 @@ class MariaRequest(BaseModel):
         "bl_numero", "puerto_origen", "puerto_destino", "buque_nombre", "viaje_numero",
         "fecha_embarque", "fecha_emision", "contenedor_numero", "contenedor_tipo",
         "aduana_codigo", "tipo_destinacion", "sbt_sufijo_valor", "procedencia", "banco_bcra",
+        "numero_factura",
         mode="before",
     )
     @classmethod
@@ -4124,7 +4427,38 @@ def _supuestos_maria(request: MariaRequest, items: list, gastos_fob) -> list:
         comprador_nombre=request.comprador_nombre,
         comprador_cuit=request.comprador_cuit,
         moneda=request.moneda,
+        vendedor_id=request.vendedor_id,
+        numero_factura=request.numero_factura,
+        sbt_sufijo_valor=request.sbt_sufijo_valor,
     )
+
+
+SIN_PRODUCTOS = "No hay productos para generar: volvé a cargar la factura."
+
+
+def _seguro_calculado_viejo(request: MariaRequest, valor: dict) -> str | None:
+    """Un seguro que calculó el sistema con otros importes (VALOR-1c): la
+    persona elige recalcularlo o dejarlo; el TXT no lo lleva sin que elija."""
+    if not request.seguro_calculado:
+        return None
+    if valor.get("error"):
+        return (f"Seguro: lo calculó el sistema y ahora no se puede comprobar: {valor['error']} "
+                "Corregí las cuentas o dejá el seguro como está en «Ajustes y seguro».")
+    if valor["seguro"] == valor["seguro_sugerido"]:
+        return None
+    return (f"Seguro: lo calculó el sistema con otros importes; con los de ahora da "
+            f"{importe_escrito(valor['seguro_sugerido'])} y la operación lleva "
+            f"{importe_escrito(valor['seguro'])}. Recalculalo o dejalo como está en «Ajustes y seguro».")
+
+
+def _importes_como_numeros(request: MariaRequest) -> None:
+    """Flete, seguro y gastos como números, para las cuentas que siguen. Un
+    importe que no lo es (lo que la pantalla no pudo leer viene tal cual,
+    D19) es un ValueError con su mensaje (SEPARADORES-1b)."""
+    request.flete = importe_valido(request.flete, "Flete") or 0
+    request.seguro = importe_valido(request.seguro, "Seguro") or 0
+    request.gastos_fob = importe_valido(request.gastos_fob, "Gastos (gastos_fob)")
+    request.gastos_anteriores_fob = importe_valido(request.gastos_anteriores_fob, "Gastos (gastos anteriores a FOB)")
 
 
 def _rechazar_exportacion_en_importacion(request: MariaRequest) -> None:
@@ -4136,15 +4470,16 @@ def _rechazar_exportacion_en_importacion(request: MariaRequest) -> None:
 async def avisos_maria_endpoint(
     request: MariaRequest,
     user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Los avisos de `/generate_maria`, antes de generar (MARIA-3): la
     pantalla los muestra junto al botón. No genera ni guarda nada."""
     _rechazar_exportacion_en_importacion(request)
+    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])
     items = _items_con_procedencia(request)
     try:
         gastos = gastos_fob_para_el_txt(request.incoterm, request.gastos_fob, request.gastos_anteriores_fob)
-        importe_valido(request.flete, "Flete")
-        importe_valido(request.seguro, "Seguro")
+        _importes_como_numeros(request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     try:
@@ -4153,18 +4488,60 @@ async def avisos_maria_endpoint(
         # Productos mal formados: el error sale al generar.
         kit_warnings = []
     supuestos = _supuestos_maria(request, items, gastos)
+    # Sin CUIT del despachante no se genera (MARIA-7): se avisa antes.
+    if estudio is None and not str(request.cuit_agr or "").strip() and not str((user or {}).get("cuit") or "").strip():
+        supuestos = [FALTA_CUIT_DONDE_CARGARLO, *supuestos]
     # Lo que al generar es un error de procedencia, acá se avisa con el mismo texto.
     # La NCM dada de baja o que no está en el vigente, como en la validación
     # (CATALOGO-NCM-1): aviso, no freno.
     from proyecto_maria.core.controles_maria import avisos_de_ncm
     avisos_ncm = avisos_de_ncm(items)
-    return {"avisos": errores_de_procedencia(items) + kit_warnings + avisos_ncm + supuestos, "supuestos": supuestos}
+    valor, avisos_valor = _cuentas_del_valor(request, items)
+    viejo = _seguro_calculado_viejo(request, valor)
+    if viejo:
+        avisos_valor = [viejo, *avisos_valor]
+    if not items:
+        avisos_valor = [SIN_PRODUCTOS, *avisos_valor]
+    return {
+        "avisos": errores_de_procedencia(items) + kit_warnings + avisos_ncm + avisos_valor + supuestos,
+        "supuestos": supuestos,
+        "valor": valor,
+    }
+
+
+def _cuentas_del_valor(request: MariaRequest, items: list) -> tuple[dict, list]:
+    """Las cuentas del valor para la pantalla y su aviso (VALOR-1). Un ajuste
+    inválido o un producto mal formado no frena los avisos: va en `error`."""
+    malos = [n for n, it in enumerate(items, 1) if not isinstance(it, dict)]
+    if malos:
+        return {"error": f"Hay un producto mal formado (renglón {malos[0]}): no se pueden hacer las cuentas."}, []
+    try:
+        valor = cuentas_del_valor(
+            items, flete=request.flete, seguro=request.seguro,
+            ajustes_incluir=request.ajustes_incluir, ajustes_deducir=request.ajustes_deducir,
+        )
+    except ValueError as e:
+        return {"error": str(e)}, []
+    except TypeError:  # un dato que no es número y se escapó: sin el texto de Python
+        return {"error": "Hay un dato que no es un número: no se pueden hacer las cuentas."}, []
+    except ArithmeticError:  # un número que no entra en un float, como 10 ** 400
+        return {"error": "Hay un importe o una cantidad fuera de rango: no se pueden hacer las cuentas."}, []
+    if not (valor["ajustes_incluir"] or valor["ajustes_deducir"]):
+        return valor, []
+    moneda = (str(request.moneda or "").strip().upper() + " ") if str(request.moneda or "").strip() else ""
+    return valor, [
+        f"El TXT todavía lleva el FOB de la factura ({moneda}{importe_escrito(valor['fob_factura'])}); "
+        f"el FOB casillero con los ajustes ({moneda}{importe_escrito(valor['fob_casillero'])}) "
+        f"va al TXT en una próxima versión."
+    ]
 
 
 @app.post("/generate_maria")
 async def generate_maria_endpoint(
     request: MariaRequest,
     user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _cobro=Depends(require_billing_vigente),
 ):
     """
     Genera archivo TXT en formato MARIA para el sistema SIM de AFIP.
@@ -4174,6 +4551,9 @@ async def generate_maria_endpoint(
     Devuelve: archivo TXT descargable
     """
     _rechazar_exportacion_en_importacion(request)
+    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])
+    if not request.items:
+        raise HTTPException(status_code=400, detail=SIN_PRODUCTOS)
     try:
         from proyecto_maria.core.controles_maria import (
             CAMPOS_DE_TEXTO, CAMPOS_DE_TEXTO_DEL_ITEM, controles_antes_de_generar, limpiar_texto,
@@ -4224,6 +4604,9 @@ async def generate_maria_endpoint(
         # {cantidad, valor_unitario, sufijo} (SUBITEMS-1). Otra cosa es un
         # error con mensaje, no un 500.
         for _n, _it in enumerate(request.items or [], start=1):
+            # El sufijo propio de un renglón (MARIA-8) va a su [SBT].
+            if isinstance(_it, dict) and _it.get("sufijo") is not None and not isinstance(_it.get("sufijo"), str):
+                raise HTTPException(status_code=400, detail=f"Item {_n}: el sufijo de valor tiene que ser un texto.")
             _subs = _it.get("subitems") if isinstance(_it, dict) else None
             if _subs is None:
                 continue
@@ -4238,27 +4621,27 @@ async def generate_maria_endpoint(
 
         # Validar sbt_sufijo_valor: obligatorio, sin caracteres de control.
         #
-        # Cuando un ítem se declara partido en sub-ítems, cada sub-ítem trae su
-        # propio sufijo (un modelo por sufijo), así que el sufijo general deja
-        # de ser obligatorio. El generador igual exige que ningún sub-ítem
-        # quede sin sufijo.
+        # Cuando cada sub-ítem o renglón trae su propio sufijo (un modelo por
+        # sufijo), el general deja de ser obligatorio: es la misma regla con
+        # la que el generador lo valida (MARIA-9). El generador igual exige
+        # que ninguno quede sin sufijo.
         sbt_raw = (request.sbt_sufijo_valor or "").strip()
-        _hay_subitems = any(
-            (it.get("subitems") if isinstance(it, dict) else None)
-            for it in (request.items or [])
-        )
-        if not sbt_raw and not _hay_subitems:
+        usa_el_general = usa_el_sufijo_de_la_operacion(items)
+        if not sbt_raw and usa_el_general:
             raise HTTPException(
                 status_code=400,
                 detail="Falta el sufijo de valor SBT. Es un dato obligatorio y específico del importador. Consultar al despachante.",
             )
 
-        # Los sufijos que se validan son el general y los de cada sub-ítem; el
-        # de un sub-ítem dice cuál es (SUBITEMS-1).
-        _sufijos = [("", sbt_raw)] if sbt_raw else []
+        # Los sufijos que se validan son el general, el de cada renglón
+        # (MARIA-8) y los de cada sub-ítem; el error dice cuál es (SUBITEMS-1).
+        # El general, sólo si alguno lo usa: si no, no va al TXT (D18).
+        _sufijos = [("", sbt_raw)] if sbt_raw and usa_el_general else []
         for _n, it in enumerate(request.items or [], start=1):
             if not isinstance(it, dict):
                 continue
+            if (it.get("sufijo") or "").strip():
+                _sufijos.append((f"Item {_n}: ", it["sufijo"].strip()))
             for _m, sub in enumerate(it.get("subitems") or [], start=1):
                 if isinstance(sub, dict) and (sub.get("sufijo") or "").strip():
                     _sufijos.append((f"Item {_n}, sub-ítem {_m}: ", sub["sufijo"].strip()))
@@ -4283,11 +4666,16 @@ async def generate_maria_endpoint(
                 )
         if kit_errors or errores_1b:
             raise HTTPException(status_code=400, detail={"errors": list(dict.fromkeys([*errors, *kit_errors, *errores_1b]))})
+        _importes_como_numeros(request)
+        _viejo = _seguro_calculado_viejo(request, _cuentas_del_valor(request, items)[0])
+        if _viejo:
+            raise HTTPException(status_code=400, detail=_viejo)
 
         # Si el user tiene CUIT en su perfil y la request no manda cuit_agr,
         # usamos el del perfil (para que el despachante no tenga que re-escribir
         # su propio CUIT en cada operacion).
-        effective_cuit_agr = request.cuit_agr
+        # El estudio elegido manda (ESTUDIO-1); su CUIT se validó al guardarlo.
+        effective_cuit_agr = estudio.cuit if estudio is not None else request.cuit_agr
         try:
             if not effective_cuit_agr and user and user.get("cuit"):
                 effective_cuit_agr = str(user["cuit"]).strip()
@@ -4302,6 +4690,11 @@ async def generate_maria_endpoint(
                 raise HTTPException(status_code=400, detail={"errors": [
                     f"El CUIT del despachante «{effective_cuit_agr}» tiene que tener 11 dígitos (0-9). "
                     "Corregilo en la operación o en tu perfil."]})
+        # Sin estudio y con el CUIT del perfil (la pantalla lo manda en
+        # `cuit_agr`): cuenta como uso del perfil para la preselección
+        # (ESTUDIO-1b, D23 b). Un `cuit_agr` distinto no.
+        cuit_del_perfil = "".join(str((user or {}).get("cuit") or "").replace("-", "").split())
+        con_el_perfil = estudio is None and bool(effective_cuit_agr) and effective_cuit_agr == cuit_del_perfil
 
         # Sin número de factura, el de la operación: el mismo en el TXT y en
         # el nombre del archivo.
@@ -4339,6 +4732,7 @@ async def generate_maria_endpoint(
             banco_bcra=request.banco_bcra,
             empresa_digitalizacion=request.empresa_digitalizacion or "PSAD06",
             iva_adicional=request.iva_adicional or "NO_VALIDA",
+            numero_factura=request.numero_factura,
         )
         
         # Sanitizar operation_id para filename (prevenir path traversal)
@@ -4352,13 +4746,41 @@ async def generate_maria_endpoint(
         filename = f"MARIA_{safe_id}.TXT"
         filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
 
-        with open(filepath, 'w', encoding='utf-8') as f:
+        # La primera vez que se genera este id se cuenta la operación; con
+        # el tope lleno, 402 sin escribir el archivo.
+        await _contar_maria(db, user["username"], filename, txt_content,
+                            len(request.items or []))
+
+        # newline="": el archivo lleva los CRLF tal cual, sin traducir (MARIA-7).
+        with open(filepath, 'w', encoding='utf-8', newline='') as f:
             f.write(txt_content)
         
         # Campos que el sistema declaró sin preguntar. No bloquean, pero el
         # despachante los tiene que ver antes de pegar el TXT en el Kit: un
         # valor asumido en silencio se descubre recién en la aduana.
         supuestos = _supuestos_maria(request, items, gastos)
+
+        # Generó: el estudio, o el CUIT del perfil, pasa a ser lo último
+        # usado (se preselecciona). Si no se puede anotar, el TXT igual se
+        # entrega.
+        if estudio is not None:
+            try:
+                estudio.last_used_at = datetime.now(timezone.utc)
+                await db.commit()
+            except Exception as e:
+                await db.rollback()
+                print(f"No se anotó el uso del estudio {estudio.id}: {e}")
+        elif con_el_perfil:
+            try:
+                uso = await db.get(UsoCuitPerfil, user["username"])
+                if uso is None:
+                    uso = UsoCuitPerfil(owner_username=user["username"])
+                    db.add(uso)
+                uso.last_used_at = datetime.now(timezone.utc)
+                await db.commit()
+            except Exception as e:
+                await db.rollback()
+                print(f"No se anotó el uso del CUIT del perfil: {e}")
 
         return {
             "success": True,
@@ -4372,7 +4794,10 @@ async def generate_maria_endpoint(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # El generador lo controla al final (los demás errores primero); acá
+        # se dice también que se elige en la operación (ESTUDIO-1).
+        detalle = FALTA_CUIT_DONDE_CARGARLO if str(e) == FALTA_CUIT_DEL_DESPACHANTE else str(e)
+        raise HTTPException(status_code=400, detail=detalle)
     except Exception as e:
         print(f"Error generando MARIA TXT: {e}")
         raise HTTPException(status_code=500, detail=f"Error generando archivo MARIA: {str(e)}")
@@ -4400,6 +4825,8 @@ class MariaExportRequest(BaseModel):
 async def generate_maria_export_endpoint(
     request: MariaExportRequest,
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Genera archivo TXT en formato MARIA para EXPORTACIÓN.
@@ -4469,8 +4896,15 @@ async def generate_maria_export_endpoint(
         
         # Guardar archivo temporal en la carpeta propia del usuario (ver
         # _user_downloads_dir): el nombre sale del nro de factura y es adivinable.
-        filename = f"MARIA_EXPORT_{safe_id}.TXT"
+        # «MARIA-EXPORT_», con guion: con «_» la importación del id
+        # «EXPORT_<x>» daba el mismo archivo y la misma operación (COBRO-MP-1, g).
+        filename = f"MARIA-EXPORT_{safe_id}.TXT"
         filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
+
+        # Cuenta como /generate_maria: la primera vez que se genera este id;
+        # con el tope lleno, 402 sin escribir el archivo (COBRO-MP-1, B).
+        await _contar_maria(db, user["username"], filename, txt_content,
+                            len(request.items or []))
 
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(txt_content)
@@ -4517,18 +4951,88 @@ def _es_fila_de_total(texto: str) -> bool:
 
 # Renglones de la factura que no son mercadería: flete, seguro, condiciones de
 # pago, gastos. Sin NCM ni origen no entran como producto (sumarían al FOB) y
-# se cuentan en el aviso de filas sin leer (EXCEL-1).
-_FILA_QUE_NO_ES_MERCADERIA_RE = re.compile(
-    r"^\s*(?:freight|flete|insurance|seguro|payment|pago|bank\s+charges?|gastos"
-    r"|handling|shipping\s+(?:cost|charges?)|incoterm|delivery\s+terms?)\b",
-    re.IGNORECASE,
-)
+# se cuentan en el aviso de filas sin leer (EXCEL-1). El plural y «fee» son
+# el mismo cargo (EXCEL-3f).
+_CARGOS = (r"freights?|fletes?|insurances?|seguros?|payments?|pagos?|bank\s+(?:charges?|fees?)"
+           r"|gastos?|handling|shipping\s+(?:costs?|charges?)|incoterms?|delivery\s+terms?|fees?")
+_FILA_QUE_NO_ES_MERCADERIA_RE = re.compile(rf"^\s*(?:{_CARGOS})\b", re.IGNORECASE)
+
+# EXCEL-3c. Con el origen o la descripción copiados de una combinada no se
+# sabe si la fila es mercadería: es un cargo si su rótulo, además de empezar
+# como uno, dice sólo palabras de cargo, monto o moneda («Seguro de carga»,
+# «Insurance €40», «Payment 30% T/T in advance»). Si dice algo más
+# («Payment terminal POS», «Gastos administrativos») la fila es dudosa: el
+# flete se lee como flete y lo demás entra como producto, las dos con un
+# aviso que nombra la fila (EXCEL-3d). La lista sólo decide si hace falta
+# ese aviso: una palabra que falta no cambia el FOB en silencio.
+_PALABRAS_DE_CARGO = {
+    "freight", "freights", "flete", "fletes", "insurance", "insurances", "seguro", "seguros",
+    "payment", "payments", "pago", "pagos", "bank", "banco", "bancario", "bancaria",
+    "bancarios", "bancarias", "charge", "charges", "gasto", "gastos", "handling", "shipping", "cost", "costs", "costo",
+    "costos", "incoterm", "incoterms", "delivery", "term", "terms", "fee", "fees", "premium",
+    "prima", "commission", "commissions", "comision", "comisión", "comisiones", "policy",
+    "poliza", "póliza", "carga", "cargo", "cargos", "goods", "mercaderia", "mercadería",
+    "mercancia", "mercancía", "merchandise", "shipment", "embarque", "envio", "envío",
+    "transport", "transporte", "maritime", "maritimo", "marítimo", "ocean", "sea", "air",
+    "aereo", "aéreo", "inland", "local", "international", "internacional", "origin", "origen",
+    "destination", "destino", "port", "puerto", "prepaid", "collect", "pagado", "advance",
+    "anticipado", "anticipada", "anticipo", "deposit", "deposito", "depósito", "balance",
+    "saldo", "before", "after", "against", "copy", "tt", "wire", "transfer", "transferencia",
+    "swift", "total", "and", "y", "for", "on", "at", "to", "por", "para", "con", "with",
+    "from", "al", "los", "las", "days", "dias", "días",
+}
+# EXCEL-3f. Un cargo que no viene primero («Ocean freight», «Courier DHL»,
+# «2. Insurance», «THC») se avisa con su fila, sin sacarlo del FOB: todo lo que
+# dice es de cargo y al menos una palabra lo es por sí sola. «Power bank» o
+# «Packing tape» dicen algo más; «Sea» o «Express» solos no son un cargo.
+# Estas palabras sólo suman ese aviso: no sacan del FOB ni del aviso de flete
+# dudoso a «Insurance container» o «Freight express».
+_PALABRAS_DE_CARGO_QUE_NO_VIENE_PRIMERO = _PALABRAS_DE_CARGO | {
+    "packing", "courier", "dhl", "fedex", "ups", "tnt", "thc", "express", "container",
+    "containers", "contenedor", "contenedores", "hq", "hc", "gp", "fcl", "lcl",
+}
+_PALABRAS_QUE_SON_UN_CARGO = {
+    "freight", "freights", "flete", "fletes", "insurance", "insurances", "seguro", "seguros",
+    "payment", "payments", "pago", "pagos", "charge", "charges", "fee", "fees", "gasto",
+    "gastos", "handling", "shipping", "incoterm", "incoterms", "commission", "commissions",
+    "comision", "comisión", "comisiones", "courier", "thc", "transport", "transporte",
+}
+
+
+def _filas_del_aviso(filas) -> str:
+    """«filas 3, 4, 5, 6, 7 y 2 más» o, con su rótulo, «fila 3 («Seguro»),
+    fila 4 («Pago») y 2 más»: hasta cinco por número."""
+    primeras = filas[:5]
+    if primeras and isinstance(primeras[0], tuple):
+        nombradas = ", ".join(f"fila {f} («{r}»)" for f, r in primeras)
+    else:
+        nombradas = f"fila{'s' if len(filas) > 1 else ''} " + ", ".join(str(f) for f in primeras)
+    return nombradas + (f" y {len(filas) - 5} más" if len(filas) > 5 else "")
+
+
+def _palabras_de_cargo(texto: str, de_cargo=_PALABRAS_DE_CARGO) -> list | None:
+    """Las palabras del rótulo, o None si alguna no es de cargo ni de monto."""
+    palabras = [p for p in re.split(r"[\s\d.,:;/()\[\]\-%&+]+", (texto or "").lower()) if p]
+    if all(len(p) == 1 or p in de_cargo or p in _PALABRAS_DE_MONTO for p in palabras):
+        return palabras
+    return None
+
+
+def _es_solo_un_cargo(texto: str) -> bool:
+    return (bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(texto or ""))
+            and _palabras_de_cargo(texto) is not None)
+
+
+def _dice_solo_un_cargo(texto: str) -> bool:
+    palabras = _palabras_de_cargo(texto, _PALABRAS_DE_CARGO_QUE_NO_VIENE_PRIMERO)
+    return any(p in _PALABRAS_QUE_SON_UN_CARGO for p in palabras or ())
+
 
 # EXCEL-3. El flete y el descuento de la factura no son productos: se
 # devuelven leídos para la operación (cómo se usa el descuento lo decide
 # VALOR-1). El seguro y lo demás siguen como filas sin leer.
 _FILA_DE_FLETE_RE = re.compile(
-    r"^\s*(?:freight|flete|shipping\s+(?:cost|charges?))\b", re.IGNORECASE)
+    r"^\s*(?:freights?|fletes?|shipping\s+(?:costs?|charges?))\b", re.IGNORECASE)
 _FILA_DE_DESCUENTO_RE = re.compile(
     r"^\s*(?:discount|descuento|rebate|bonificaci[oó]n)\b", re.IGNORECASE)
 # El rótulo entero es el descuento («Discount», «Descuento USD:», «Discount
@@ -4628,6 +5132,24 @@ def extract_items_from_excel(df: pd.DataFrame, filename: str, descartes: list | 
 
     return items
 
+
+def _es_una_medida(valor, decimal) -> bool:
+    """Una medida escrita: un número mayor que cero o un texto con una cifra
+    que no es cero («48-50», «1,5m», «½»). «/», «-», «0», «-1», «-1 m», «N/A»,
+    «一» o «m²» no lo son."""
+    numero = _monto_de_fila(valor, decimal)
+    if numero is not None:
+        return numero > 0
+    texto = _texto_de_celda(valor).strip()
+    if texto and (unicodedata.category(texto[0]) == "Pd" or texto[0] == "\u2212"):
+        return False  # un negativo con unidad o escrito con otra raya
+    return any((c.isdecimal() and unicodedata.decimal(c) > 0) or _es_una_fraccion(c) for c in texto)
+
+
+def _es_una_fraccion(c: str) -> bool:
+    return unicodedata.name(c, "").startswith("VULGAR FRACTION")  # «½», «¾»
+
+
 def _texto_de_celda(valor) -> str:
     """Texto de una celda: vacío si no hay nada, y un número entero sin «.0»
     (con una fila vacía en el medio pandas lee la NCM 84713000 como 84713000.0)."""
@@ -4680,6 +5202,12 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
     libres = [c for c in df.columns if c not in usadas]
     importe_col = _columna_con_nombre(libres, _NOMBRES_DE_IMPORTE)
     parte_col = _columna_con_nombre(libres, _NOMBRES_DE_CODIGO_DE_PARTE)
+    # «Freight» o «Discount» pueden venir en la columna Item de la proforma o
+    # en una a la izquierda de la descripción («No.», «S/N»); a la derecha
+    # («Remarks») son una nota del renglón (EXCEL-3b).
+    item_col = _columna_con_nombre(libres, {"item"})
+    columnas_del_rotulo = ([item_col] if item_col else []) + [
+        c for c in list(df.columns)[:list(df.columns).index(desc_col)] if c != item_col]
     medidas = [(c, _NOMBRES_DE_MEDIDA[_nombre_sin_unidad(c)],
                 (re.search(r"\(\s*([^()]*?)\s*\)", str(c)) or [None, ""])[1])
                for c in libres if _nombre_sin_unidad(c) in _NOMBRES_DE_MEDIDA]
@@ -4691,11 +5219,19 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
         for v in df[col].tolist() if isinstance(v, str)
     ])
 
-    # (número de fila, ¿trae NCM u origen?, ítem)
+    # (número de fila, ¿es un cargo y no mercadería?, rótulo si es dudosa,
+    # medidas, ítem)
     candidatos = []
-    grupo = None  # (descripción, código de parte) del renglón de arriba
+    grupo = None  # (descripción, código de parte, fila) del renglón de arriba
     agrupada = False  # si algún renglón tomó lo del de arriba
-    flete, descuento, heredadas = [], [], []
+    flete, descuento, heredadas, sin_precio = [], [], [], []
+    # Filas que parecen un cargo y no se sabe si lo son: (fila, rótulo).
+    flete_dudoso, dudosas = [], []
+    # Fila → (¿es un cargo y no mercadería?, rótulo si es dudosa). Una copia de su
+    # descripción combinada sin otro rótulo es la misma cosa (EXCEL-3c), y un
+    # renglón del grupo, lo mismo que su cabecera (EXCEL-3d).
+    no_es_mercaderia_en = {}
+    rellenadas = df.attrs.get("celdas_rellenadas", {})
     for _, row in df.iterrows():
         try:
             if all((not pd.notna(v)) or str(v).strip() == "" for v in row.values):
@@ -4709,13 +5245,23 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
                 return (_numero_factura(row[col], decimal) or 0.0) if col else 0.0
 
             cantidad, valor_unitario = _numero(cant_col), _numero(valor_col)
+            def _propia(col):
+                return _ not in rellenadas.get(col, ())
+
+            # El origen combinado vale para el producto (EXCEL-2), pero no
+            # vuelve mercadería al flete o al seguro de abajo (EXCEL-3b).
             celda_origen = row[origen_col] if origen_col else None
-            sin_ncm_ni_origen = not pieza and not _texto_de_celda(celda_origen)
+            origen_propio = celda_origen if origen_col and _propia(origen_col) else None
+            sin_ncm_ni_origen = not pieza and not _texto_de_celda(origen_propio)
+            descripcion_propia = descripcion if _propia(desc_col) else ""
+            descripcion_copiada = "" if descripcion_propia else descripcion
+            # Sin origen propio, un origen con texto es copiado.
+            copiada = bool(_texto_de_celda(celda_origen) or descripcion_copiada)
 
             # El rótulo de una fila sin descripción puede estar en otra
             # columna («Total» o «Discount» en la columna Item).
-            rotulo = descripcion or next(
-                (t for t in (_texto_de_celda(v) for v in row.values)
+            rotulo = descripcion_propia or next(
+                (t for t in (_texto_de_celda(v) for c, v in row.items() if _propia(c))
                  if t and _numero_factura(t, decimal) is None
                  and _monto_de_fila(t, decimal) is None), "")
 
@@ -4725,25 +5271,52 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             if descripcion.strip().lower() == _FILA_DE_EJEMPLO_PLANTILLA.lower():
                 continue  # la fila de ejemplo de la plantilla
 
+            def _monto_de_la_linea():
+                monto = _monto_de_fila(row[importe_col], decimal) if importe_col else None
+                if monto is None:
+                    # El precio del descuento también viene negativo.
+                    precio = _monto_de_fila(row[valor_col], decimal) or 0.0
+                    monto = precio * cantidad if cantidad else precio
+                return monto
+
             # Un renglón con sus propias medidas es mercadería: una nota
-            # («Freight included») en otra columna no lo saca.
-            con_medidas = any(_texto_de_celda(row[c]) for c, _n, _u in medidas)
-            if sin_ncm_ni_origen and (descripcion or not con_medidas):
-                es_flete = bool(_FILA_DE_FLETE_RE.match(rotulo))
-                if not es_flete and _FILA_DE_DESCUENTO_RE.match(rotulo) and not _DESCUENTO_SOLO_RE.match(rotulo):
-                    if "%" in rotulo:
+            # («Freight included») en otra columna no lo saca. «/», «-» o 0
+            # no son una medida: el flete con la especificación combinada no
+            # pasa por renglón del grupo (EXCEL-3e).
+            con_medidas = any(_es_una_medida(row[c], decimal) for c, _n, _u in medidas)
+            # El rótulo de Item o de una columna a la izquierda de la descripción.
+            rotulo_aparte = next(
+                (t for t in (_texto_de_celda(row[c]) for c in columnas_del_rotulo)
+                 if t and _numero_factura(t, decimal) is None), "")
+            cargo = descripcion_propia or rotulo_aparte
+            es_cargo = False  # flete o descuento: no abre grupo
+            # Una descripción copiada no cuenta: el renglón con medidas y una
+            # nota en Item sigue siendo del grupo, como sin combinadas.
+            if sin_ncm_ni_origen and (descripcion_propia or not con_medidas):
+                # Con algo copiado, «Freight elevator» o «Flete int.» no se
+                # distinguen: se leen como flete, como sin combinadas, y se
+                # avisa la fila (EXCEL-3d).
+                es_flete = bool(_FILA_DE_FLETE_RE.match(cargo))
+                es_descuento = not es_flete and bool(_FILA_DE_DESCUENTO_RE.match(cargo))
+                if es_descuento and not _DESCUENTO_SOLO_RE.match(cargo):
+                    # «Descuento comercial -500» no es un producto de valor 0;
+                    # «Discount tag labels» con su precio, sí es un producto,
+                    # y abre su grupo.
+                    # Sin precio propio es una nota: no abre grupo.
+                    if "%" in cargo or _monto_de_la_linea() < 0 or not valor_unitario:
+                        grupo = None
                         descartes.append(_ + 2)  # un porcentaje no es un monto
                         continue
-                elif es_flete or _FILA_DE_DESCUENTO_RE.match(rotulo):
-                    monto = _monto_de_fila(row[importe_col], decimal) if importe_col else None
-                    if monto is None:
-                        # El precio del descuento también viene negativo.
-                        precio = _monto_de_fila(row[valor_col], decimal) or 0.0
-                        monto = precio * cantidad if cantidad else precio
+                elif es_flete or es_descuento:
+                    grupo = None  # el flete o el descuento cierran el grupo de arriba
+                    es_cargo = True
+                    monto = _monto_de_la_linea()
                     # El descuento resta (su signo da igual); un flete negativo
                     # (un reintegro) no se suma como flete: se avisa.
                     if monto and (monto > 0 or not es_flete):
                         (flete if es_flete else descuento).append((_ + 2, abs(monto)))
+                        if es_flete and copiada and not _es_solo_un_cargo(cargo):
+                            flete_dudoso.append((_ + 2, cargo))
                         continue
                     if es_flete and monto:
                         descartes.append(_ + 2)
@@ -4755,16 +5328,28 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             # medidas (cada renglón es un largo). Sin medidas no se hereda
             # nada: una fila así se avisa como sin leer (EXCEL-1), y un
             # subtotal sin rótulo no pasa a ser un producto.
-            # Con la descripción combinada hacia abajo (.xlsx) el renglón ya la
-            # trae, y hereda sólo el código.
-            if (not pieza and grupo and con_medidas and descripcion in ("", grupo[0])
-                    and (cantidad or valor_unitario)):
+            # Con la descripción combinada hacia abajo el renglón ya la trae, y
+            # hereda sólo el código; si el precio también viene combinado,
+            # alcanza con su cantidad. Sin descripción ni precio propio es un
+            # subtotal con largo, no un renglón; un código nuevo sin
+            # especificación es otro producto: no hereda, y él y su grupo
+            # quedan sin leer (EXCEL-3b). Con la descripción del grupo copiada
+            # y sin rótulo propio, «-» en las medidas no lo saca del grupo:
+            # sólo un cargo con su rótulo deja de ser renglón (EXCEL-3e).
+            del_grupo = False
+            if grupo and grupo[1] and parte and parte != grupo[1] and not descripcion:
+                grupo = None
+            del_grupo_copiado = bool(grupo and descripcion_copiada
+                                     and descripcion == grupo[0] and not cargo)
+            if (not pieza and grupo and (con_medidas or del_grupo_copiado)
+                    and descripcion in ("", grupo[0])
+                    and (valor_unitario or (descripcion and cantidad))):
                 if not descripcion:
                     heredadas.append(_ + 2)
                 descripcion, parte = grupo[0], parte or grupo[1]
-                agrupada = True
-            elif descripcion:
-                grupo = (descripcion, parte)
+                agrupada = del_grupo = True
+            elif descripcion and not es_cargo:
+                grupo = (descripcion, parte, _)
 
             # Sin descripción ni NCM no hay ítem que mostrar: se avisa.
             if not pieza and not descripcion:
@@ -4780,17 +5365,68 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             # planilla agrupa (abajo); en una factura común no se tocan.
             tamaño = []
             for col, nombre, unidad in medidas:
+                if not _es_una_medida(row[col], decimal):
+                    continue  # «-», «/» o 0 no son un ancho (EXCEL-3e)
                 texto = _texto_de_celda(row[col])
-                if not texto:
-                    continue
                 numero = _numero_factura(row[col], decimal)
                 if numero is not None:
                     texto = _medida(numero)
-                tamaño.append(f"{nombre} {texto}" + (f" {unidad}" if unidad else ""))
+                # «1,5m» ya trae su unidad: no sale «1,5m m»; «48-50» no.
+                trae_unidad = (numero is None and re.search(r"[^\W\d_]\s*$", texto)
+                               and not _es_una_fraccion(texto.rstrip()[-1]))  # «½» no es una unidad
+                tamaño.append(f"{nombre} {texto}" + (f" {unidad}" if unidad and not trae_unidad else ""))
+
+            # Seguro o condiciones de pago sin NCM ni origen no son
+            # mercadería: no entran (sumarían al FOB) y se avisan. Lo dice lo
+            # escrito en la fila, no lo copiado de una combinada; con el
+            # origen o la descripción copiados, un rótulo que dice algo más
+            # que el cargo entra con un aviso que nombra la fila (EXCEL-3c,
+            # EXCEL-3d). Un renglón del grupo se decide como su cabecera: una
+            # nota en Item («Freight included») no lo saca.
+            dudosa = ""  # el rótulo que la vuelve dudosa
+            if not sin_ncm_ni_origen:
+                no_es_mercaderia = False
+            elif del_grupo:
+                # Si la cabecera no llegó a decidirse (quedó sin leer), el
+                # renglón tampoco: los dos se nombran como sin leer.
+                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(grupo[2], (True, ""))
+            elif descripcion_copiada:
+                # Lo mismo que la fila de la combinada; si ella no entró
+                # (flete, total), ésta tampoco: se avisa. Un texto propio en
+                # Item («A2», «#3») no la saca de ahí; si ella entró, ese
+                # texto todavía puede ser un cargo.
+                ancla = _ - 1
+                while ancla in rellenadas.get(desc_col, ()):
+                    ancla -= 1
+                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(ancla, (True, ""))
+                if not no_es_mercaderia and cargo:
+                    no_es_mercaderia = _es_solo_un_cargo(cargo)
+                    if not no_es_mercaderia and not dudosa and _FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo):
+                        dudosa = cargo
+            elif copiada:
+                no_es_mercaderia = _es_solo_un_cargo(cargo)
+            else:
+                no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))
+            # Lo que entra sin NCM propia y parece un cargo se avisa con su
+            # fila: con el origen copiado (EXCEL-3d), con su propio origen
+            # («Insurance», «China») o un cargo que no viene primero («Ocean
+            # freight») (EXCEL-3f). Con su NCM es mercadería, como antes.
+            if (not no_es_mercaderia and not dudosa and not pieza and descripcion_propia
+                    and (_FILA_QUE_NO_ES_MERCADERIA_RE.match(descripcion_propia)
+                         or _dice_solo_un_cargo(descripcion_propia))):
+                dudosa = descripcion_propia
+            no_es_mercaderia_en[_] = (no_es_mercaderia, dudosa)
+            # Un cargo en Item con otra descripción escrita o con medidas
+            # («Freight», «LONA DEMO»), también. Es de esta fila: la que copia
+            # la descripción no lo hereda. «Freight included» o «Handling
+            # equipment» en Item son una nota.
+            if (not no_es_mercaderia and not dudosa and not pieza
+                    and (_es_solo_un_cargo(rotulo_aparte) or _dice_solo_un_cargo(rotulo_aparte))):
+                dudosa = rotulo_aparte
 
             # Lo que falta o no se puede leer queda vacío (0 o ""), nunca
             # inventado; el semáforo de la revisión lo marca (MARIA-1a, EXCEL-1).
-            candidatos.append((_ + 2, not sin_ncm_ni_origen, tamaño, Item(
+            candidatos.append((_ + 2, no_es_mercaderia, dudosa, tamaño, Item(
                 pieza=pieza,
                 codigo_parte=parte,
                 descripcion=descripcion,
@@ -4805,23 +5441,32 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             descartes.append(_ + 2)
             continue
 
-    # Seguro o condiciones de pago sin NCM ni origen no son mercadería: no
-    # entran (sumarían al FOB) y se avisan. Cualquier otra fila sin NCM ni
-    # origen sí entra, con lo que falta vacío (EXCEL-1).
-    for fila, trae, tamaño, item in candidatos:
-        if not trae and _FILA_QUE_NO_ES_MERCADERIA_RE.match(item.descripcion or ""):
+    # Cualquier otra fila sin NCM ni origen sí entra, con lo que falta vacío
+    # (EXCEL-1).
+    for fila, no_es_mercaderia, rotulo_dudoso, tamaño, item in candidatos:
+        if no_es_mercaderia:
             descartes.append(fila)
             continue
         if agrupada and tamaño and item.descripcion:
             item.descripcion = f"{item.descripcion}, " + " x ".join(tamaño)
+        if rotulo_dudoso:
+            dudosas.append((fila, rotulo_dudoso))
+        if not item.valor_unitario:
+            sin_precio.append(fila)  # no se inventa: se avisa (EXCEL-3c, EXCEL-3d)
         items.append(item)
     descartes.sort()
+    if flete_dudoso:
+        extras["flete_dudoso"] = flete_dudoso
+    if dudosas:
+        extras["dudosas"] = dudosas
     if flete:
         extras["flete"] = flete
     if descuento:
         extras["descuento"] = descuento
     if heredadas:
         extras["heredadas"] = heredadas
+    if sin_precio:
+        extras["sin_precio"] = sin_precio
 
     return items
 
@@ -4902,8 +5547,52 @@ def _client_to_dict(c: ClientModel) -> dict:
         "preferred_currency": c.preferred_currency or "",
         "auto_ncm_enabled": bool(c.auto_ncm_enabled) if c.auto_ncm_enabled is not None else True,
         "fecha_inic_activ": c.fecha_inic_activ or "",
+        "fecha_inic_activ_sirve": _fecha_inic_activ_sirve(c.fecha_inic_activ),
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
     }
+
+
+_FECHA_INIC_ACTIV_ERROR = (
+    "La fecha de inicio de actividad no es una fecha válida: "
+    "usá AAAA-MM-DD o DD/MM/AAAA, o dejala vacía."
+)
+
+
+def _fecha_inic_activ_de_api(raw) -> str:
+    """CLIENTE-1b. La fecha de inicio de actividad que llega al alta o a la
+    edición, como AAAA-MM-DD; `null` o vacío da "". Pasan AAAA-MM-DD y
+    DD/MM/AAAA (año de cuatro cifras, fecha que existe); lo demás es un 400.
+    Antes se guardaba `str(...)[:10]`: un `null` quedaba «None» y un año de
+    cinco cifras, cortado."""
+    if raw is None:
+        return ""
+    if not isinstance(raw, str):
+        raise HTTPException(status_code=400, detail=_FECHA_INIC_ACTIV_ERROR)
+    fecha = fecha_del_alta(raw)
+    if fecha is None:
+        raise HTTPException(status_code=400, detail=_FECHA_INIC_ACTIV_ERROR)
+    return fecha
+
+
+def _fecha_inic_activ_o_vacia(raw) -> str:
+    """CLIENTE-1c. La misma regla que el alta, para lo que llega por la
+    operación o la importación: la fecha que no sirve queda "" en vez de un 400."""
+    try:
+        return _fecha_inic_activ_de_api(raw)
+    except HTTPException:
+        return ""
+
+
+def _fecha_inic_activ_sirve(guardada) -> bool:
+    """CLIENTE-1c. Si la fecha guardada le sirve al TXT: el criterio es el del
+    generador, así la ficha y el TXT no se contradicen."""
+    if not str(guardada or "").strip():
+        return False
+    try:
+        fecha_inicio_actividad(guardada)
+    except ValueError:
+        return False
+    return True
 
 
 def _digits_only(raw: str | None, maxlen: int = 20) -> str:
@@ -5173,6 +5862,71 @@ async def _next_op_code(db: AsyncSession, owner_username: str) -> str:
             max_num = max(max_num, int(m.group(1)))
             break  # están ordenados desc, el primero que matchea es el mayor
     return f"OP-{max_num + 1:06d}"
+
+
+# Contenidos distintos que admite un mismo MARIA_<id>.TXT.
+MARIA_REGENERACIONES = 10
+# Los dos nombres que arman /generate_maria y /generate_maria_export, con el
+# id recortado a 50 (COBRO-MP-1, g).
+_ARCHIVO_MARIA = re.compile(r"MARIA(?:_|-EXPORT_)[A-Za-z0-9_-]{1,50}\.TXT")
+
+
+async def _operacion_maria(db: AsyncSession, owner_username: str, archivo: str):
+    """La operación del usuario creada al generar ese MARIA_<id>.TXT, o None."""
+    result = await db.execute(
+        sa_select(OperationModel)
+        .where(
+            OperationModel.owner_username == owner_username,
+            OperationModel.generated_file == archivo,
+        )
+        .order_by(OperationModel.created_at.asc(), OperationModel.id.asc())
+        .limit(1)
+    )
+    return result.scalars().first()
+
+
+async def _contar_maria(db: AsyncSession, username: str, archivo: str,
+                        contenido: str, total_items: int) -> None:
+    """Cuenta la operación la primera vez que se genera su MARIA; regenerarla sólo anota
+    la huella. Va antes de escribir el archivo, así un 402 o un 409 no lo pisa."""
+    import hashlib
+
+    huella = hashlib.sha256(contenido.encode("utf-8")).hexdigest()
+    cuenta = await _cuenta_bloqueada(db, username)
+    if cuenta is None:
+        if os.getenv("ENVIRONMENT") == "testing":
+            return
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+
+    operacion = await _operacion_maria(db, username, archivo)
+    if operacion is None:
+        await _contar_en_la_cuenta(db, cuenta[1])
+        db.add(OperationModel(
+            id=str(uuid.uuid4()),
+            owner_username=username,
+            op_code=await _next_op_code(db, username),
+            source="maria",
+            generated_file=archivo,
+            total_items=total_items,
+            extra={"maria_hashes": [huella]},
+        ))
+        await db.commit()
+        return
+
+    huellas = list((operacion.extra or {}).get("maria_hashes") or [])
+    if huella in huellas:
+        await db.commit()  # libera el lock
+        return
+    if len(huellas) >= MARIA_REGENERACIONES:
+        await db.commit()  # libera el lock; no hubo cambios
+        raise HTTPException(status_code=409, detail={
+            "code": "MARIA_REGENERACIONES_AGOTADAS",
+            "message": (f"Esta operación ya se generó {MARIA_REGENERACIONES} veces "
+                        "con datos distintos, el máximo. Si es otra operación, "
+                        "cargala como nueva."),
+        })
+    operacion.extra = {**(operacion.extra or {}), "maria_hashes": huellas + [huella]}
+    await db.commit()
 
 
 async def _get_owned_client(
@@ -5703,6 +6457,9 @@ _UNIDADES_DE_COLUMNA = {
 }
 
 
+_NOMBRE_DE_UNIDAD = {"m2": "metros cuadrados", "m": "metros", "kg": "kilos", "u": "unidades"}
+
+
 def _unidad_de_columna(columna, del_precio: bool) -> str | None:
     """«Unit price (USD/sqm)» → m2 (del precio: lo que va después de «/»,
     «per» o «por»); «SM.TOTAL (sqm)» → m2 (de una cantidad: lo que va entre
@@ -5890,6 +6647,7 @@ async def _get_owned_migration_batch(
 async def analyze_client_migration(
     file: UploadFile = File(...),
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
     db: AsyncSession = Depends(get_db),
 ):
     """Analiza un CSV/Excel sin crear ni modificar clientes."""
@@ -5972,6 +6730,9 @@ def _migration_fill_empty(client: ClientModel, record: dict) -> tuple[dict, dict
     applied: dict[str, str] = {}
     for source_field, model_field in _MIGRATION_CLIENT_FIELDS.items():
         incoming = str(record.get(source_field) or "").strip()
+        if model_field == "fecha_inic_activ":
+            # Un lote viejo puede traer una que no sirve (CLIENTE-1c).
+            incoming = _fecha_inic_activ_o_vacia(incoming)
         current = getattr(client, model_field, None)
         if incoming and not str(current or "").strip():
             before[model_field] = current
@@ -5984,6 +6745,7 @@ def _migration_fill_empty(client: ClientModel, record: dict) -> tuple[dict, dict
 async def confirm_client_migration(
     batch_id: str,
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
     db: AsyncSession = Depends(get_db),
 ):
     """Confirma un preview. Es idempotente y nunca pisa datos existentes."""
@@ -6077,7 +6839,7 @@ async def confirm_client_migration(
                 address=str(record.get("direccion") or "").strip() or None,
                 email=email or None,
                 phone=str(record.get("telefono") or "").strip()[:50] or None,
-                fecha_inic_activ=str(record.get("fecha_inic_activ") or "").strip()[:10] or None,
+                fecha_inic_activ=_fecha_inic_activ_o_vacia(str(record.get("fecha_inic_activ") or "")) or None,
                 is_active=True,
             )
             db.add(new_client)
@@ -6225,6 +6987,7 @@ async def create_cliente(
     email = str(client.get("email", "")).strip()[:100]
     if not nombre:
         raise HTTPException(status_code=400, detail="Nombre requerido")
+    fecha_inic_activ = _fecha_inic_activ_de_api(client.get("fecha_inic_activ"))
 
     # Evitar duplicados por (owner, email) si se provee email.
     if email:
@@ -6246,8 +7009,6 @@ async def create_cliente(
     auto_ncm_enabled = client.get("auto_ncm_enabled")
     if auto_ncm_enabled is None:
         auto_ncm_enabled = True
-
-    fecha_inic_activ = str(client.get("fecha_inic_activ", "")).strip()[:10] or None
 
     new_client = ClientModel(
         id=str(uuid.uuid4()),
@@ -6301,6 +7062,9 @@ async def update_cliente(
     """
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
+    # Antes de tocar el cliente: con la fecha mala no se guarda nada.
+    if "fecha_inic_activ" in client_data:
+        fecha_inic_activ = _fecha_inic_activ_de_api(client_data["fecha_inic_activ"])
 
     if "nombre" in client_data:
         client.name = str(client_data["nombre"]).strip()[:200]
@@ -6325,8 +7089,7 @@ async def update_cliente(
     if "auto_ncm_enabled" in client_data:
         client.auto_ncm_enabled = bool(client_data.get("auto_ncm_enabled"))
     if "fecha_inic_activ" in client_data:
-        val = str(client_data.get("fecha_inic_activ", "") or "").strip()[:10]
-        client.fecha_inic_activ = val or None
+        client.fecha_inic_activ = fecha_inic_activ
     await db.commit()
     await db.refresh(client)
     return {"success": True, "cliente": _client_to_dict(client)}
@@ -6355,6 +7118,114 @@ async def toggle_favorito(
     client.favorite = not bool(client.favorite)
     await db.commit()
     return {"success": True, "favorito": client.favorite}
+
+
+# --- Estudios de la cuenta (ESTUDIO-1) ---
+# Como los clientes: cada usuario ve, borra y usa sólo los suyos; uno ajeno
+# es 404, como uno que no existe.
+
+def _estudio_to_dict(e: Estudio) -> dict:
+    return {
+        "id": e.id,
+        "nombre": e.nombre,
+        "cuit": e.cuit,
+        "ultimo_uso": e.last_used_at.isoformat() if e.last_used_at else None,
+    }
+
+
+def _utc(momento: datetime) -> datetime:
+    """SQLite devuelve la hora sin zona; Postgres, con zona. Se guardan en UTC."""
+    return momento if momento.tzinfo else momento.replace(tzinfo=timezone.utc)
+
+
+class EstudioRequest(BaseModel):
+    # Sin tipos: un número o un null llegan y se rechazan con el mismo texto.
+    nombre: Any = None
+    cuit: Any = None
+
+
+@app.get("/api/estudios")
+async def list_estudios(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Los estudios de la cuenta y el que la operación preselecciona: lo
+    último usado, estudio o CUIT del perfil (ESTUDIO-1b, D23 b; el perfil es
+    None). Si no se usó nada y hay un solo estudio, ése."""
+    result = await db.execute(
+        select(Estudio).where(Estudio.owner_username == user["username"]).order_by(Estudio.nombre, Estudio.id)
+    )
+    estudios = list(result.scalars().all())
+    uso_perfil = await db.get(UsoCuitPerfil, user["username"])
+    usados = [(_utc(e.last_used_at), e.id) for e in estudios if e.last_used_at is not None]
+    # Sin CUIT en el perfil, elegirlo deja la operación sin despachante.
+    if uso_perfil is not None and user.get("cuit"):
+        usados.append((_utc(uso_perfil.last_used_at), None))
+    if usados:
+        # Con la misma hora gana el perfil: lo que pide menos sorpresa.
+        preseleccionado = max(usados, key=lambda u: (u[0], u[1] is None))[1]
+    elif len(estudios) == 1:
+        preseleccionado = estudios[0].id
+    else:
+        preseleccionado = None
+    return {"estudios": [_estudio_to_dict(e) for e in estudios], "preseleccionado": preseleccionado}
+
+
+@app.post("/api/estudios")
+async def create_estudio(
+    payload: EstudioRequest,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    nombre = payload.nombre.strip() if isinstance(payload.nombre, str) else ""
+    # Los caracteres de formato (Cf: espacios de ancho cero, controles de
+    # dirección como U+202E) hacen que el nombre se vea vacío o al revés en
+    # el selector (ESTUDIO-1b).
+    if not nombre or len(nombre) > 200 or any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or 0xd800 <= ord(c) <= 0xdfff
+                                               or c in "\u2028\u2029" or unicodedata.category(c) == "Cf"
+                                               for c in nombre):
+        raise HTTPException(
+            status_code=400,
+            detail="El nombre del estudio no puede quedar vacío, pasar de 200 caracteres ni tener saltos "
+                   "de línea ni caracteres invisibles.",
+        )
+    from proyecto_maria.core.controles_maria import cuit_valido
+    cuit = "".join(payload.cuit.replace("-", "").split()) if isinstance(payload.cuit, str) else ""
+    if not cuit_valido(cuit):
+        raise HTTPException(
+            status_code=400,
+            detail="El CUIT del estudio no es válido: 11 dígitos (0-9), con o sin guiones, y el último es el verificador.",
+        )
+    estudio = Estudio(owner_username=user["username"], nombre=nombre, cuit=cuit)
+    db.add(estudio)
+    try:
+        await db.commit()
+    except IntegrityError:
+        # El mismo CUIT ya está en la cuenta: lo frena el UNIQUE, también con
+        # dos altas a la vez.
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Ya tenés un estudio con ese CUIT.")
+    await db.refresh(estudio)
+    return {"estudio": _estudio_to_dict(estudio)}
+
+
+@app.delete("/api/estudios/{estudio_id}")
+async def delete_estudio(
+    estudio_id: str,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Borra el estudio de la cuenta. Las operaciones no lo guardan: no se
+    toca nada más."""
+    result = await db.execute(
+        select(Estudio).where(Estudio.id == estudio_id, Estudio.owner_username == user["username"])
+    )
+    estudio = result.scalars().first()
+    if estudio is None:
+        raise HTTPException(status_code=404, detail="Estudio no encontrado")
+    await db.delete(estudio)
+    await db.commit()
+    return {"success": True}
 
 
 @app.delete("/api/clientes/{client_id}")
@@ -6674,9 +7545,10 @@ async def save_client_operation(
     request: Request,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    db_user: User = Depends(require_active_billing),
+    _cobro=Depends(require_billing_vigente),
 ):
-    """Guarda una operación en el historial del cliente."""
+    """Guarda una operación en el historial del cliente.
+    La de un MARIA ya generado ya está contada: se completa sin contar otra."""
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
 
@@ -6685,33 +7557,58 @@ async def save_client_operation(
         resumen = data.get("resumen", {}) or {}
         items = data.get("items", []) or []
 
-        op_code = await _next_op_code(db, username)
-
-        operation = OperationModel(
-            id=str(uuid.uuid4()),
-            owner_username=username,
+        archivo = str(data.get("operation_id") or "")
+        if not _ARCHIVO_MARIA.fullmatch(archivo):
+            archivo = None
+        operation = None
+        if archivo:
+            # Con la cuenta bloqueada, como al generar: un guardado y una
+            # generación del mismo id a la vez no crean dos operaciones.
+            await _cuenta_bloqueada(db, username)
+            operation = await _operacion_maria(db, username, archivo)
+        # Lo que viene de afuera se recorta al largo de la columna: en
+        # Postgres un dato más largo tira abajo el guardado (GUARDAR-1).
+        campos = dict(
             client_id=client_id,
-            op_code=op_code,
-            # Lo que viene de afuera se recorta al largo de la columna: en
-            # Postgres un dato más largo tira abajo el guardado (GUARDAR-1).
             source=str(data.get("source") or "manual")[:50],
             total_items=int(resumen.get("items", len(items))),
             total_value=float(resumen.get("valor_total", 0) or 0),
             currency=str(data.get("currency") or "USD")[:3],
-            extra={"resumen": resumen},
         )
-        db.add(operation)
+        if operation is not None:
+            # Ya se contó al generar: se completa y sus ítems se reemplazan.
+            for campo, valor in campos.items():
+                setattr(operation, campo, valor)
+            operation.extra = {**(operation.extra or {}), "resumen": resumen}
+            await db.execute(
+                sa_delete(OperationItemModel).where(
+                    OperationItemModel.operation_id == operation.id
+                )
+            )
+        else:
+            await _contar_operacion_bloqueada(db, username)
+            operation = OperationModel(
+                id=str(uuid.uuid4()),
+                owner_username=username,
+                op_code=await _next_op_code(db, username),
+                generated_file=archivo,
+                extra={"resumen": resumen},
+                **campos,
+            )
+            db.add(operation)
+        op_code = operation.op_code
         await db.flush()  # para tener operation.id
 
         # Fill-if-empty: rellenar ficha del cliente con datos de carátula
         # que estén vacíos. Nunca pisa valores existentes.
         try:
             domicilio_op = str(data.get("comprador_domicilio") or "").strip()
-            fecha_op = str(data.get("comprador_fecha_inic_activ") or "").strip()
+            # Con la regla del alta: la que no sirve no se copia (CLIENTE-1c).
+            fecha_op = _fecha_inic_activ_o_vacia(data.get("comprador_fecha_inic_activ"))
             if domicilio_op and not (client.address or "").strip():
                 client.address = domicilio_op
             if fecha_op and not (client.fecha_inic_activ or "").strip():
-                client.fecha_inic_activ = fecha_op[:10]
+                client.fecha_inic_activ = fecha_op
         except Exception as fill_err:
             logger.warning("[fill-if-empty] No se pudo rellenar ficha: %s", fill_err)
 
@@ -6739,8 +7636,6 @@ async def save_client_operation(
         # guardaba nada (GUARDAR-1).
         # El contador del plan va en el mismo commit que la operación: si
         # falla, no queda una operación guardada sin contar y con un 500.
-        billing_entity, _ = await _get_billing_entity(db, db_user)
-        billing_service.record_operation_created(billing_entity)
         await db.commit()
         operation_id = operation.id
     except HTTPException:
@@ -7235,6 +8130,81 @@ async def get_client_catalogo_productos(
     }
 
 
+_CATALOGO_XLSX_COLUMNAS = (
+    ("Posición", "ncm"),
+    ("Descripción", "descripcion"),
+    ("Origen", "origen"),
+    ("Valor unitario promedio", "valor_unitario_avg"),
+    ("Cantidad promedio", "cantidad_avg"),
+    ("Peso unitario promedio", "peso_unitario_avg"),
+    ("Veces usado", "veces_usado"),
+    ("Última vez", "ultima_vez"),
+)
+
+
+def _catalogo_xlsx(productos: list[dict]) -> bytes:
+    """Arma el Excel del catálogo en memoria, un renglón por producto.
+
+    Las descripciones vienen de facturas de terceros: todo texto se escribe
+    como texto, nunca como fórmula, y el que empieza con =, +, - o @ lleva
+    el apóstrofo invisible para que siga siendo texto si se lo edita."""
+    from openpyxl import Workbook
+    from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Catálogo"
+    ws.append([titulo for titulo, _ in _CATALOGO_XLSX_COLUMNAS])
+    for fila, producto in enumerate(productos, start=2):
+        for col, (_, campo) in enumerate(_CATALOGO_XLSX_COLUMNAS, start=1):
+            valor = producto.get(campo)
+            celda = ws.cell(row=fila, column=col)
+            if campo == "ultima_vez":
+                if valor:
+                    celda.value = datetime.fromisoformat(valor[:10]).date()
+                    celda.number_format = "dd/mm/yyyy"
+            elif isinstance(valor, str):
+                texto = ILLEGAL_CHARACTERS_RE.sub("", valor)
+                celda.value = texto
+                celda.data_type = "s"
+                if texto[:1] in ("=", "+", "-", "@"):
+                    celda.quotePrefix = True
+                if campo == "ncm":
+                    celda.number_format = "@"
+            else:
+                celda.value = valor
+    salida = io.BytesIO()
+    wb.save(salida)
+    return salida.getvalue()
+
+
+@app.get("/api/clientes/{client_id}/catalogo/productos.xlsx")
+async def download_client_catalogo_productos(
+    client_id: str,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """DESPACHO-1a: el catálogo del cliente en Excel, lo mismo que muestra
+    la pantalla y en el mismo orden."""
+    username = user["username"]
+    client = await _get_owned_client(db, client_id, username)
+
+    stmt = sa_select(ClientProductHistoryModel).where(
+        ClientProductHistoryModel.owner_username == username,
+        ClientProductHistoryModel.client_id == client_id,
+    ).order_by(sa_desc(ClientProductHistoryModel.ultima_vez))
+    rows = (await db.execute(stmt)).scalars().all()
+    contenido = _catalogo_xlsx([_product_history_to_dict(r) for r in rows])
+
+    nombre = unicodedata.normalize("NFKD", client.name or "cliente")
+    safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", nombre.encode("ascii", "ignore").decode())[:40]
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="catalogo_{safe_name}.xlsx"'},
+    )
+
+
 @app.post("/api/clientes/{client_id}/catalogo/productos/learn")
 async def learn_client_catalogo_productos(
     client_id: str,
@@ -7453,9 +8423,9 @@ async def upload_excel_v2(
     Review de v2. Si el usuario elige un cliente con `column_mapping`, las
     columnas se renombran a los canónicos antes de extraer.
     """
-    from proyecto_maria.security.file_security import validate_file_upload, sanitize_filename
+    from proyecto_maria.security.file_security import validar_con_carril, sanitize_filename
     max_upload_bytes = _get_max_upload_bytes()
-    contents = await validate_file_upload(file, 'excel', max_size=max_upload_bytes)
+    contents, liviano = await validar_con_carril(file, 'excel', max_size=max_upload_bytes)
 
     # Es una opción de API: omitida conserva True, no un checkbox desmarcado
     # (FastAPI >= 0.147 interpreta los bool Form ausentes como False).
@@ -7482,7 +8452,7 @@ async def upload_excel_v2(
         # En otro hilo y con tiempo máximo: no frena al resto (EXCEL-1).
         df = await _leer_pdf_aparte(
             _leer_excel_ruta, temp_filename, engine, tuple((mapping or {}).items()),
-            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
+            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel_carril(liviano),
         )
 
         # Mirar las otras hojas es sólo un aviso: si no alcanza su presupuesto
@@ -7491,7 +8461,7 @@ async def upload_excel_v2(
         try:
             otras_hojas, hojas_revisadas = await _leer_pdf_aparte(
                 _otras_hojas_con_datos, temp_filename, engine,
-                limite=min(10.0, _excel_read_timeout_s()), que="el Excel", pool=_pool_lectura_excel(),
+                limite=min(10.0, _excel_read_timeout_s()), que="el Excel", pool=_pool_lectura_excel_carril(liviano),
             )
         except Exception as e:
             logging.warning("upload_excel_v2: no se pudieron mirar las otras hojas: %s", e)
@@ -7526,6 +8496,16 @@ async def upload_excel_v2(
                 == [s for s, c in detected_mapping.items() if c == "cantidad"]):
             avisos_de_lo_usado = avisos_unidad
         avisos_mapeo.extend(avisos_de_lo_usado)
+        # La unidad que sale del encabezado del precio («USD/M», con «Qty (M)»)
+        # se avisa: es la que va al TXT (EXCEL-3b). Si se cambió la cantidad,
+        # el aviso de arriba ya la dice.
+        precio_col = next((s for s, c in effective_mapping.items() if c == "valor_unitario"), None)
+        cant_col = next((s for s, c in effective_mapping.items() if c == "cantidad"), None)
+        if unidad and not avisos_de_lo_usado and precio_col and _unidad_de_columna(precio_col, True) == unidad:
+            avisos_mapeo.append(
+                f"La unidad que va al TXT se leyó de los encabezados de la cantidad («{cant_col}») "
+                f"y del precio («{precio_col}»): {_NOMBRE_DE_UNIDAD.get(unidad, unidad)}. "
+                "Revisala en la revisión.")
 
         avisos: list[str] = []
         rename = {src: canon for src, canon in effective_mapping.items() if canon in _CANON_COLUMNS}
@@ -7552,13 +8532,18 @@ async def upload_excel_v2(
             df = df.drop(columns=[c for c in df.columns
                                   if str(c).strip().lower() in campos and c not in rename and c not in pesos])
             df = df.rename(columns=rename)
+            # Las celdas copiadas de una combinada siguen a su columna
+            # renombrada («Origin» pasa a «origen»; EXCEL-3b).
+            if "celdas_rellenadas" in df.attrs:
+                df.attrs["celdas_rellenadas"] = {
+                    rename.get(c, c): f for c, f in df.attrs["celdas_rellenadas"].items()}
             avisos = _peso_por_unidad(df, pesos, columna_de, clases)
 
         descartes: list = []
         extras: dict = {}
         items = await _leer_pdf_aparte(
             extract_items_from_excel, df, file.filename, descartes, extras,
-            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
+            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel_carril(liviano),
         )
         if not items:
             raise HTTPException(
@@ -7615,6 +8600,25 @@ async def upload_excel_v2(
                 f"{len(filas)} renglón(es) sin descripción tomaron la del renglón de arriba "
                 f"(como agrupa la proforma), desde la fila {filas[0]}. Revisalos."
             )
+        if extras.get("sin_precio"):
+            filas = extras["sin_precio"]
+            avisos_mapeo.append(
+                f"{len(filas)} renglón(es) entraron sin precio ({_filas_del_aviso(filas)}). "
+                "Completalos en la revisión."
+            )
+        # EXCEL-3d y EXCEL-3f: lo que parece un cargo y no se sabe si lo es.
+        if extras.get("flete_dudoso"):
+            filas = extras["flete_dudoso"]
+            avisos_mapeo.append(
+                f"{len(filas)} renglón(es) se leyeron como flete y dicen algo más: "
+                f"{_filas_del_aviso(filas)}; si alguno es un producto, cargalo en la revisión."
+            )
+        if extras.get("dudosas"):
+            filas = extras["dudosas"]
+            avisos_mapeo.append(
+                f"{len(filas)} renglón(es) parecen un cargo y entraron como producto: "
+                f"{_filas_del_aviso(filas)}; si alguno es un cargo, sacalo en la revisión."
+            )
 
         # Si hay cliente seleccionado, pre-populamos operacion con sus datos
         operacion: dict = {}
@@ -7638,10 +8642,11 @@ async def upload_excel_v2(
                 monto = round(sum(m for _f, m in extras[campo]), 2)
                 operacion[campo] = monto
                 operacion[f"filas_excel_{campo}"] = [f for f, _m in extras[campo]][:50]
-                filas = ", ".join(str(f) for f, _m in extras[campo][:5])
+                filas = [f for f, _m in extras[campo]]
                 avisos_mapeo.append(
                     f"{nombre}: se leyó {monto:,.2f}".replace(",", "\x00").replace(".", ",").replace("\x00", ".")
-                    + f" de la fila {filas} de la planilla; no entra como producto. Revisalo en la operación."
+                    + f" de la{'s' if len(filas) > 1 else ''} {_filas_del_aviso(filas)} de la planilla;"
+                    " no entra como producto. Revisalo en la operación."
                 )
 
         # Lo que no se leyó del libro queda en la operación: el semáforo lo
@@ -8221,6 +9226,35 @@ def _ncm_suggestion_key(ncm: str) -> str:
     return re.sub(r"\D", "", str(ncm or ""))[:8]
 
 
+def _ncm_del_cliente_o_sim_del_proveedor(ncm_cliente, ncm_proveedor):
+    """El NCM que se sugiere cuando el historial del cliente lo conoce (D32 b).
+
+    El historial guarda 8 dígitos (GUARDAR-1). Si el catálogo del proveedor
+    tiene, para el mismo producto, la posición SIM completa que empieza con
+    esos 8, gana la del proveedor: no se pierde la SIM ya confirmada.
+    """
+    cliente = str(ncm_cliente or "").strip()
+    if not re.fullmatch(r"[\d.]+", cliente) or len(re.sub(r"\D", "", cliente)) != 8:
+        return ncm_cliente
+    from proyecto_maria.core.maria_generator import _sim_position_error
+    proveedor = str(ncm_proveedor or "").strip()
+    if (proveedor and _sim_position_error(proveedor) is None
+            and _ncm_suggestion_key(proveedor) == _ncm_suggestion_key(cliente)):
+        return re.sub(r"[.\s]", "", proveedor).upper()
+    return ncm_cliente
+
+
+def _ncm_recordado_con_sim_del_proveedor(recordado: dict, del_proveedor) -> str:
+    """El NCM del historial del cliente, con la SIM del proveedor si es el
+    mismo producto: la misma descripción guardada, no sólo una parecida a la
+    de la factura (cada memoria busca por parecido por su lado)."""
+    from proyecto_maria.core import catalog_service as catalog_svc
+    if (not del_proveedor or not del_proveedor.get("producto_key")
+            or del_proveedor["producto_key"] != catalog_svc._normalize(recordado.get("descripcion") or "")):
+        return recordado["ncm"]
+    return _ncm_del_cliente_o_sim_del_proveedor(recordado["ncm"], del_proveedor.get("ncm"))
+
+
 def _catalog_suggestion(item: ncm_catalog.NCMItem) -> dict:
     return {
         "ncm": item.codigo,
@@ -8332,10 +9366,51 @@ async def aviso_de_ncm_escrita(codigo: str = "", user=Depends(get_current_user))
             "baja": bool(aviso) and (len(digitos) < 8 or bool(ncm_catalog.ncm_de_baja(digitos)))}
 
 
+SUFIJOS_POR_PEDIDO = 500
+
+
+def _texto_del_pedido(valor, largo: int) -> str:
+    """Un campo del pedido como texto que se puede devolver (sin mitades de
+    caracteres sueltas) y con tope."""
+    return str(valor or "").encode("utf-8", "replace").decode("utf-8").strip()[:largo]
+
+
+@app.post("/api/sufijos/propuesta")
+async def propuesta_de_sufijos(data: dict, user=Depends(get_current_user)):
+    """El sufijo de valor y la unidad estadística que el arancel de ARCA pide
+    para cada producto (SUFIJOS-1): se completa marca, modelo y código de
+    artículo con lo que leyó la IA, y lo demás queda para el despachante.
+    Una posición fuera de la tabla no trae nada. No guarda ni cambia nada."""
+    items = data.get("items")
+    if (not isinstance(items, list) or len(items) > SUFIJOS_POR_PEDIDO
+            or not all(isinstance(it, dict) for it in items)):
+        raise HTTPException(status_code=400,
+                            detail=f"«items» va como una lista de hasta {SUFIJOS_POR_PEDIDO} productos.")
+    tabla = sufijos_arca.cargar()
+    salida = []
+    for it in items:
+        # Como el generador: si vienen las dos, manda la NCM.
+        posicion = _texto_del_pedido(it.get("ncm") or it.get("pieza"), 20)
+        consulta = sufijos_arca.consultar(posicion, tabla)
+        if not consulta:
+            salida.append({"posicion": posicion, "en_la_tabla": False, "sufijo": "", "faltan": [],
+                           "sufijos": [], "opciones": [], "unidad_estadistica": None,
+                           "letra_de_control": sufijos_arca.letra_de_control(posicion, tabla)})
+            continue
+        propuesta = sufijos_arca.proponer(
+            {c: _texto_del_pedido(it.get(c), 200) for c in ("marca", "modelo", "codigo_parte")}, consulta)
+        salida.append({"posicion": posicion, "en_la_tabla": True, "sufijo": propuesta["sufijo"],
+                       "faltan": propuesta["faltan"], "sufijos": consulta["sufijos"],
+                       "opciones": consulta["opciones"],
+                       "unidad_estadistica": consulta["unidad_estadistica"]})
+    return {"fuente": sufijos_arca.fuente(tabla), "sin_tabla": not tabla, "items": salida}
+
+
 @app.post("/api/ncm/sugerir")
 async def sugerir_ncm(
     data: dict,
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
     db: AsyncSession = Depends(get_db),
 ):
     """Sugiere hasta 5 NCM: memoria confirmada, código exacto o IA validada.
@@ -8369,6 +9444,7 @@ async def sugerir_ncm(
         return True
 
     # 1) Memoria confirmada del cliente activo (aislada por despachante).
+    recordado = None
     if client_id:
         try:
             from proyecto_maria.services.client_memory import lookup_client_memory
@@ -8381,10 +9457,12 @@ async def sugerir_ncm(
                     "count": remembered.get("veces_usado", 1),
                     "scope": "cliente",
                 })
+                recordado = remembered
         except Exception as err:
             logging.warning("ncm suggestion client memory unavailable: %s", err)
 
-    # 2) Catálogo confirmado para el proveedor activo.
+    # 2) Catálogo confirmado para el proveedor activo. Va después del cliente:
+    # si su consulta falla, la sugerencia del cliente ya está.
     if vendor_name and len(sugerencias) < 5:
         try:
             from proyecto_maria.core import catalog_service as catalog_svc
@@ -8394,6 +9472,10 @@ async def sugerir_ncm(
             matches = vendor_match.get("items_matched") or []
             vendor_item = matches[0] if matches else None
             if vendor_item and vendor_item.get("ncm") and vendor_item.get("match_type") != "none":
+                # Si tiene la SIM completa del NCM que recuerda el cliente, la
+                # sugerencia del cliente la usa (D32 b).
+                if recordado and sugerencias and sugerencias[0].get("scope") == "cliente":
+                    sugerencias[0]["ncm"] = _ncm_recordado_con_sim_del_proveedor(recordado, vendor_item)
                 add_suggestion({
                     "ncm": vendor_item["ncm"],
                     "desc": descripcion,
@@ -8654,10 +9736,9 @@ async def get_auth_me(authorization: str = Header(None), db: AsyncSession = Depe
 
 # /logout lo llama el frontend; tiene que borrar la cookie de sesión
 @app.post("/logout")
-def logout_root(response: Response):
-    """Cierra sesión eliminando la cookie (alias de /auth/logout)"""
-    response.delete_cookie("access_token")
-    return {"message": "Sesión cerrada"}
+async def logout_root(request: Request, response: Response):
+    """Alias de /auth/logout"""
+    return await logout(request, response)
 
 # ============================================================================
 # ORGANIZACIONES (estudios) — multi-usuario con billing compartido
@@ -8830,6 +9911,12 @@ async def get_my_organization(
     }
 
 
+async def _emails_de_miembros(db: AsyncSession, org_id: str) -> list[str]:
+    """Un email (en minúsculas) por cada usuario del estudio, el dueño incluido."""
+    res = await db.execute(select(User.email).where(User.organization_id == org_id))
+    return [(email or "").strip().lower() for (email,) in res.all()]
+
+
 @app.post("/api/organizations/invite")
 async def invite_to_organization(
     req: InviteRequest,
@@ -8849,7 +9936,10 @@ async def invite_to_organization(
     if not db_user or not db_user.organization_id:
         raise HTTPException(status_code=400, detail="No pertenecés a un estudio")
 
-    org = await db.execute(select(Organization).where(Organization.id == db_user.organization_id))
+    # Bloqueado hasta el commit, como en el registro: el tope se cuenta una vez por vez.
+    org = await db.execute(
+        select(Organization).where(Organization.id == db_user.organization_id).with_for_update()
+    )
     org = org.scalars().first()
     if not org:
         raise HTTPException(status_code=404, detail="Organización no encontrada")
@@ -8867,6 +9957,26 @@ async def invite_to_organization(
     )
     if existing.scalars().first():
         raise HTTPException(status_code=400, detail="Ese email ya es miembro del estudio")
+
+    # Tope del plan: miembros (el dueño también) más los emails con una
+    # invitación pendiente sin vencer. Volver a invitar a un email que ya
+    # tiene una pendiente no ocupa otro lugar.
+    tope = billing_service.get_plan(org.plan or "premium")["users"]
+    emails_miembros = await _emails_de_miembros(db, org.id)
+    ahora = datetime.now(timezone.utc)
+    pendientes = await db.execute(
+        select(Invitation).where(Invitation.org_id == org.id, Invitation.status == "pending")
+    )
+    emails_pendientes = {
+        (inv.email or "").strip().lower()
+        for inv in pendientes.scalars().all()
+        if not inv.expires_at or _utc(inv.expires_at) > ahora
+    } - set(emails_miembros)
+    if clean_email not in emails_pendientes and len(emails_miembros) + len(emails_pendientes) >= tope:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El estudio ya ocupa los {tope} usuarios de su plan, contando las invitaciones pendientes.",
+        )
 
     token = _csrf_secrets.token_urlsafe(32)
     invitation = Invitation(
@@ -8906,7 +10016,7 @@ async def validate_invitation(
     if inv.status == "accepted":
         raise HTTPException(status_code=400, detail="Esta invitación ya fue usada")
 
-    if inv.expires_at and inv.expires_at < datetime.utcnow():
+    if inv.expires_at and _utc(inv.expires_at) < datetime.now(timezone.utc):
         if inv.status != "expired":
             inv.status = "expired"
             await db.commit()
@@ -9003,7 +10113,7 @@ pending_payments = {}
 @app.get("/api/payments/demo-checkout/{preference_id}")
 async def demo_checkout_page(preference_id: str):
     """Página de checkout demo cuando no hay credenciales MP"""
-    if preference_id not in pending_payments:
+    if not _demo_permitida() or preference_id not in pending_payments:
         raise HTTPException(status_code=404, detail="Pago no encontrado")
     
     payment = pending_payments[preference_id]
@@ -9050,8 +10160,8 @@ async def demo_checkout_page(preference_id: str):
 
 @app.post("/api/payments/demo-confirm/{preference_id}")
 async def demo_confirm_payment(preference_id: str):
-    """Confirma un pago demo"""
-    if preference_id not in pending_payments:
+    """Confirma un pago demo: no cobra ni cambia la cuenta."""
+    if not _demo_permitida() or preference_id not in pending_payments:
         raise HTTPException(status_code=404, detail="Pago no encontrado")
     
     pending_payments[preference_id]["status"] = "approved"
@@ -9059,7 +10169,16 @@ async def demo_confirm_payment(preference_id: str):
 
 @app.get("/api/payments/success")
 async def payment_success(preference_id: str = None, payment_id: str = None, demo: bool = False):
-    """Página de éxito después del pago"""
+    """Página de vuelta después del pago. No dice que la cuenta se activó:
+    eso lo hace el aviso de Mercado Pago (COBRO-MP-2, D9)."""
+    if demo:
+        titulo = "Pago de prueba"
+        lineas = ("Esto fue un pago de prueba: no se cobró nada y tu cuenta no cambió.",)
+    else:
+        titulo = "¡Recibimos tu pago!"
+        lineas = ("Tu cuenta se actualiza cuando Mercado Pago confirma el pago.",
+                  "Puede tardar unos minutos.")
+    parrafos = "\n            ".join(f"<p>{l}</p>" for l in lineas)
     html = """
     <!DOCTYPE html>
     <html>
@@ -9077,17 +10196,13 @@ async def payment_success(preference_id: str = None, payment_id: str = None, dem
     <body>
         <div class="success-box">
             <div class="checkmark">✅</div>
-            <h1>¡Pago Exitoso!</h1>
-            <p>Tu cuenta Premium ha sido activada.</p>
-            <p>Ya podés acceder a todas las funcionalidades.</p>
+            <h1>__TITULO__</h1>
+            __PARRAFOS__
             <a href="/dashboard" class="btn">Ir al Dashboard</a>
         </div>
-        <script>
-            localStorage.setItem('user_plan', 'premium');
-        </script>
     </body>
     </html>
-    """
+    """.replace("__TITULO__", titulo).replace("__PARRAFOS__", parrafos)
     return HTMLResponse(content=html)
 
 @app.get("/api/payments/failure")
@@ -9145,6 +10260,316 @@ async def payment_pending():
     </html>
     """
     return HTMLResponse(content=html)
+
+class _MPIlegible(Exception):
+    """Lo de Mercado Pago no se pudo leer o todavía no alcanza para decidir
+    (sin cuenta, sin id, pago pendiente): 503 para que reintente."""
+
+
+def _consultar_mp(llamada, que: str) -> dict:
+    """El objeto que devuelve una lectura del SDK de Mercado Pago. En un 4xx
+    el SDK (mercadopago 2.2.0) no levanta: devuelve el estado. Con el token
+    vencido contesta 401 a todo, y eso no es un pago rechazado."""
+    try:
+        resp = llamada()
+    except Exception as e:
+        raise _MPIlegible(f"{que}: {type(e).__name__}") from e
+    if not isinstance(resp, dict) or resp.get("status") != 200 or not isinstance(resp.get("response"), dict):
+        estado = resp.get("status") if isinstance(resp, dict) else type(resp).__name__
+        raise _MPIlegible(f"{que}: {str(estado)[:40]}")
+    return _guardable_en_pg(resp["response"])
+
+
+_NO_GUARDABLE_EN_PG = re.compile("[\x00\ud800-\udfff]")
+
+
+def _guardable_en_pg(valor):
+    """Lo leído de Mercado Pago, con los caracteres que Postgres no acepta
+    (NUL y surrogates sueltos) cambiados por «\ufffd»: si no, el pago da 500 y
+    Mercado Pago lo reintenta sin fin (COBRO-MP-1, b)."""
+    if isinstance(valor, str):
+        return _NO_GUARDABLE_EN_PG.sub("\ufffd", valor)
+    if isinstance(valor, dict):
+        return {clave: _guardable_en_pg(v) for clave, v in valor.items()}
+    return valor
+
+
+def _monto_mp(valor) -> float | None:
+    try:
+        monto = float(valor)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return monto if math.isfinite(monto) and monto > 0 else None
+
+
+def _suscripcion_del_pago_mp(pay_resp: dict) -> tuple:
+    """(lo que el pago dice de su suscripción, ese id si es un id o None)."""
+    meta = pay_resp.get("metadata") if isinstance(pay_resp.get("metadata"), dict) else {}
+    interaccion = pay_resp.get("point_of_interaction") if isinstance(pay_resp.get("point_of_interaction"), dict) else {}
+    datos = interaccion.get("transaction_data") if isinstance(interaccion.get("transaction_data"), dict) else {}
+    leido = meta.get("preapproval_id") or pay_resp.get("preapproval_id") or datos.get("subscription_id")
+    return leido, _id_mp(leido)
+
+
+def _control_de_monto_mp(sdk, pay_resp: dict, update: dict, external_ref: str) -> tuple:
+    """(monto esperado, motivo del rechazo o None) de un pago aprobado
+    (COBRO-MP-1, D29):
+    - de una suscripción: el monto de la suscripción leída en Mercado Pago,
+      que es el del panel y no el de PLANS;
+    - de un link de pago: el precio guardado cuando se armó el link;
+    - de un link armado antes de guardar el precio: el precio de hoy.
+    """
+    meta = pay_resp.get("metadata") if isinstance(pay_resp.get("metadata"), dict) else {}
+    leido, suscripcion_id = _suscripcion_del_pago_mp(pay_resp)
+
+    if leido and not suscripcion_id:
+        return None, f"id de suscripción inválido: {str(leido)[:40]!r}"
+    if suscripcion_id:
+        suscripcion = _consultar_mp(lambda: sdk.preapproval().get(suscripcion_id),
+                                    f"suscripción {suscripcion_id}")
+        if suscripcion.get("external_reference") != external_ref:
+            return None, f"la suscripción {suscripcion_id} es de otra cuenta"
+        recurrente = suscripcion.get("auto_recurring") if isinstance(suscripcion.get("auto_recurring"), dict) else {}
+        esperado = _monto_mp(recurrente.get("transaction_amount"))
+        if esperado is None:
+            return None, f"la suscripción {suscripcion_id} no tiene monto"
+    else:
+        esperado = _monto_mp(meta.get("precio_esperado"))
+        if esperado is None:
+            if update.get("action") == "topup":
+                esperado = float(billing_service.TOPUP_PRICE_ARS)
+            else:
+                esperado = float(billing_service.PLANS.get(update.get("plan"), {}).get("price") or 0) or None
+            if esperado is None:
+                return None, f"el plan {update.get('plan')!r} no tiene precio"
+
+    moneda = pay_resp.get("currency_id")
+    if moneda != "ARS":
+        return esperado, f"se pagó en {moneda!r}, no en ARS"
+    pagado = _monto_mp(pay_resp.get("transaction_amount"))
+    if pagado is None or pagado + 0.005 < esperado:
+        return esperado, f"se pagaron {pay_resp.get('transaction_amount')} y el precio es {esperado:g}"
+    return esperado, None
+
+
+# Ids de Mercado Pago (cobros, pagos y suscripciones) que llegan en un aviso
+# que puede no venir firmado, o en lo que se lee después: sólo esto, para que
+# no cambien la ruta que se le pide.
+_ID_COBRO_MP = re.compile(r"[0-9A-Za-z_-]{1,64}")
+
+
+def _id_mp(valor) -> str | None:
+    """Un id leído de Mercado Pago como texto, o None si no es un id."""
+    if isinstance(valor, bool) or not isinstance(valor, (str, int)):
+        return None
+    return str(valor) if _ID_COBRO_MP.fullmatch(str(valor)) else None
+
+
+def _leer_cobro_autorizado_mp(cobro_id: str) -> dict:
+    """GET /authorized_payments/{id} de Mercado Pago: el cobro de una
+    renovación de suscripción. El SDK (mercadopago 2.2.0) no lo trae. El
+    id llega en un aviso que puede no venir firmado: sólo letras, números,
+    «-» y «_», para que no cambie la ruta que se pide."""
+    if not isinstance(cobro_id, str) or not _ID_COBRO_MP.fullmatch(cobro_id):
+        raise ValueError(f"id de cobro inválido: {str(cobro_id)[:80]!r}")
+    try:
+        with httpx.Client(timeout=10) as cliente:
+            resp = cliente.get(f"https://api.mercadopago.com/authorized_payments/{cobro_id}",
+                               headers={"Authorization": f"Bearer {MP_ACCESS_TOKEN}"})
+    except httpx.HTTPError as e:
+        raise _MPIlegible(f"cobro {cobro_id}: {type(e).__name__}") from e
+    if resp.status_code != 200:
+        raise _MPIlegible(f"cobro {cobro_id}: HTTP {resp.status_code}")
+    try:
+        return resp.json()
+    except ValueError as e:
+        raise _MPIlegible(f"cobro {cobro_id}: la respuesta no es JSON") from e
+
+
+class _SuscripcionMPError(Exception):
+    """No se pudo leer o cancelar una suscripción en Mercado Pago: no se
+    cambia nada en CDI (COBRO-MP-2)."""
+
+
+_ESTADOS_SUSCRIPCION_MP = {"pending", "authorized", "paused", "cancelled"}
+
+
+def _pedir_suscripcion_mp(metodo: str, sid: str, cuerpo: dict | None = None) -> str:
+    """GET o PUT /preapproval/{id}; devuelve el estado que contesta Mercado
+    Pago. Se usa httpx y no el SDK: en mercadopago 2.2.0 PreApproval.update
+    arma la ruta sin la barra antes del id."""
+    if not isinstance(sid, str) or not _ID_COBRO_MP.fullmatch(sid):
+        raise _SuscripcionMPError(f"id de suscripción inválido: {str(sid)[:80]!r}")
+    try:
+        with httpx.Client(timeout=10) as cliente:
+            resp = cliente.request(metodo, f"https://api.mercadopago.com/preapproval/{sid}",
+                                   headers={"Authorization": f"Bearer {billing_service._access_token()}"},
+                                   json=cuerpo)
+    except httpx.HTTPError as e:
+        raise _SuscripcionMPError(f"{metodo} {sid}: {type(e).__name__}") from e
+    if resp.status_code == 404 and metodo == "GET":
+        # Mercado Pago no la conoce, así que no puede cobrar; tomarlo como
+        # error dejaría el checkout y cancelar en 503 para siempre.
+        return "cancelled"
+    if resp.status_code != 200:
+        raise _SuscripcionMPError(f"{metodo} {sid}: HTTP {resp.status_code}")
+    try:
+        estado = resp.json().get("status")
+    except (ValueError, AttributeError) as e:
+        raise _SuscripcionMPError(f"{metodo} {sid}: respuesta ilegible") from e
+    if estado not in _ESTADOS_SUSCRIPCION_MP:
+        raise _SuscripcionMPError(f"{metodo} {sid}: estado desconocido {str(estado)[:40]!r}")
+    return estado
+
+
+def _leer_suscripcion_mp(sid: str) -> str:
+    return _pedir_suscripcion_mp("GET", sid)
+
+
+def _cancelar_suscripcion_mp(sid: str) -> None:
+    """Cancela la suscripción en Mercado Pago. Si el PUT falla o no contesta
+    «cancelled», se pregunta el estado: si ya estaba cancelada, alcanza."""
+    try:
+        if _pedir_suscripcion_mp("PUT", sid, {"status": "cancelled"}) == "cancelled":
+            return
+    except _SuscripcionMPError:
+        pass
+    if _leer_suscripcion_mp(sid) != "cancelled":
+        raise _SuscripcionMPError(f"{sid}: sigue sin cancelar")
+
+
+def _demo_permitida() -> bool:
+    """El checkout de prueba existe sólo en desarrollo y pruebas; si falta la
+    variable, no hay demo (COBRO-MP-2, D7.4)."""
+    return os.getenv("ENVIRONMENT") in ("development", "test", "testing")
+
+
+def _pago_del_cobro_mp(cobro) -> tuple:
+    """(id del pago, id de la suscripción o None) de un cobro autorizado,
+    según la documentación pública de Mercado Pago (COBRO-MP-1, D30: no se
+    pudo confirmar contra un aviso real). Sin el pago no hay qué registrar:
+    _MPIlegible, y Mercado Pago reintenta hasta que el cobro lo diga. El
+    estado no se toma del cobro: lo decide el pago, que se lee después."""
+    pago = cobro.get("payment") if isinstance(cobro, dict) else None
+    pago_id = _id_mp(pago.get("id")) if isinstance(pago, dict) else None
+    if not pago_id:
+        raise _MPIlegible("el cobro todavía no dice qué pago lo cobró")
+    return pago_id, _id_mp(cobro.get("preapproval_id"))
+
+
+async def _registrar_pago_mp(session, payment_id: str, cuenta: str, update: dict, pay_resp: dict,
+                             control: tuple) -> str | None:
+    """Anota el pago en mp_pagos_aplicados, en la misma transacción que el
+    cambio de la cuenta. Devuelve «aplicado» o «rechazado» (según el control
+    del monto), o None si ya había llegado: antes sólo se miraba el último
+    pago y alternando dos pagos viejos se renovaba gratis (COBRO-MP-1, D8).
+    Lo que garantiza que no se aplique dos veces es la clave primaria, al
+    guardar (_guardar_pago_mp); mirar antes sólo evita el trabajo."""
+    from proyecto_maria.database.models import PagoMercadoPagoAplicado
+    if await session.get(PagoMercadoPagoAplicado, str(payment_id)) is not None:
+        return None
+    esperado, motivo = control
+    estado = "rechazado" if motivo else "aplicado"
+    session.add(PagoMercadoPagoAplicado(
+        payment_id=str(payment_id), cuenta=cuenta[:200],
+        tipo="topup" if update.get("action") == "topup" else str(update.get("plan") or ""),
+        monto=_monto_mp(pay_resp.get("transaction_amount")),
+        moneda=str(pay_resp.get("currency_id") or "")[:10] or None,
+        aprobado_en=str(pay_resp.get("date_approved") or "")[:40] or None,
+        estado=estado, monto_esperado=esperado, motivo=(motivo or None) and motivo[:300],
+    ))
+    return estado
+
+
+async def _control_de_fecha_mp(session, pay_resp: dict, control: tuple) -> tuple:
+    """Un pago aprobado antes de que empezara el registro de pagos no se
+    aplica (COBRO-MP-1, A): el código viejo ya lo aplicó y, si no fue el
+    último de la cuenta, nada más lo recuerda. Sin una fecha legible tampoco:
+    no se sabe de cuándo es. Queda rechazado, a la vista del admin."""
+    from proyecto_maria.database.models import InicioRegistroPagosMP
+    esperado, motivo = control
+    if motivo:
+        return control
+    inicio = await session.get(InicioRegistroPagosMP, 1)
+    if inicio is None:
+        logging.getLogger("mp_webhook").error("Webhook MP: falta el inicio del registro de pagos (init_db)")
+        raise HTTPException(status_code=503, detail="Registro de pagos no inicializado. MP reintentará.")
+    desde = inicio.desde if inicio.desde.tzinfo else inicio.desde.replace(tzinfo=timezone.utc)
+    crudo = pay_resp.get("date_approved")
+    try:
+        aprobado = datetime.fromisoformat(crudo) if isinstance(crudo, str) else None
+    except ValueError:
+        aprobado = None
+    if aprobado is None or aprobado.tzinfo is None:
+        return esperado, "sin fecha de aprobación legible"
+    if aprobado < desde:
+        return esperado, f"aprobado antes de que empezara el registro de pagos ({desde.isoformat()})"
+    return control
+
+
+async def _rechazar_pago_mp(session, payment_id: str, cuenta: str, motivo: str) -> dict:
+    """Guarda el rechazo sin tocar la cuenta. Responde 200 para que Mercado
+    Pago no reintente: el pago no va a alcanzar la próxima vez tampoco."""
+    if await _guardar_pago_mp(session):
+        logging.getLogger("mp_webhook").warning("Webhook MP: pago %s de %s RECHAZADO: %s", payment_id, cuenta, motivo)
+    return {"success": True, "skipped": f"pago rechazado: {motivo}"}
+
+
+async def _rechazar_sin_cuenta_mp(session, payment_id: str, cuenta: str, update: dict, pay_resp: dict,
+                                  motivo: str) -> dict:
+    """Un pago aprobado que no se puede aplicar a ninguna cuenta queda
+    rechazado, a la vista de Emi: reintentar no lo arregla (COBRO-MP-1, b)."""
+    if await _registrar_pago_mp(session, payment_id, cuenta, update, pay_resp, (None, motivo)) is None:
+        return {"success": True, "skipped": "payment_id ya procesado"}
+    return await _rechazar_pago_mp(session, payment_id, cuenta, motivo)
+
+
+def _con_referencia_mp(sdk, pay_resp: dict, suscripcion_del_cobro) -> dict:
+    """Una renovación puede no traer la referencia: se toma de su suscripción."""
+    if suscripcion_del_cobro:
+        pay_resp = {**pay_resp, "preapproval_id": suscripcion_del_cobro}
+    suscripcion = suscripcion_del_cobro or _suscripcion_del_pago_mp(pay_resp)[1]
+    if suscripcion and not pay_resp.get("external_reference"):
+        sus = _consultar_mp(lambda: sdk.preapproval().get(suscripcion), f"suscripción {suscripcion}")
+        pay_resp = {**pay_resp, "external_reference": sus.get("external_reference")}
+    return pay_resp
+
+
+async def _sin_cuenta_todavia_mp(session, payment_id: str) -> dict:
+    """Sin cuenta no se registra: el otro aviso del mismo pago puede traerla.
+    Si ese ya lo registró, no hay nada que reintentar."""
+    from proyecto_maria.database.models import PagoMercadoPagoAplicado
+    if await session.get(PagoMercadoPagoAplicado, str(payment_id)) is not None:
+        return {"success": True, "skipped": "payment_id ya procesado"}
+    raise _MPIlegible(f"el pago {payment_id} todavía no dice de qué cuenta es")
+
+
+async def _guardar_pago_mp(session) -> bool:
+    """Commit del pago y de la cuenta juntos. Si otro aviso del mismo pago
+    llegó a la vez y ganó, la clave repetida lo frena: no se aplica dos veces."""
+    try:
+        await session.commit()
+        return True
+    except IntegrityError:
+        await session.rollback()
+        return False
+
+
+def _extender_periodo(cuenta, update: dict) -> None:
+    """Un pago de plan suma 30 días desde el fin del período si todavía no
+    venció (prueba, activa o cancelada con días por delante), y desde hoy si
+    no: pagar antes de que venza no pierde los días que quedaban (COBRO-MP-1;
+    COBRO-MP-2, D7.1)."""
+    if update.get("action") == "topup" or "trial_ends_at" not in update:
+        return
+    ahora = datetime.now(timezone.utc)
+    fin = getattr(cuenta, "trial_ends_at", None)
+    if fin is not None and fin.tzinfo is None:
+        fin = fin.replace(tzinfo=timezone.utc)
+    vigente = getattr(cuenta, "billing_status", None) in ("trial", "active", "canceled")
+    desde = fin if (vigente and fin and fin > ahora) else ahora
+    update["trial_ends_at"] = desde + timedelta(days=30)
+
 
 def _verify_mp_webhook_signature(request: Request, raw_body: bytes) -> bool:
     """Valida la firma HMAC-SHA256 del webhook MP.
@@ -9208,9 +10633,10 @@ async def mercadopago_webhook(request: Request):
       - user.payment_customer_id = <id del payer MP>
 
     HTTP status:
-      - 200 → procesado OK (MP no reintenta).
-      - 400 → datos inválidos o usuario no existe (MP reintenta, alerta).
+      - 200 → aplicado, o rechazado y anotado en mp_pagos_aplicados (MP no reintenta).
+      - 400 → aviso sin id de pago o sin token (MP reintenta, alerta).
       - 401 → firma inválida (MP no reintenta, ataque).
+      - 503 → no se pudo leer Mercado Pago (MP reintenta).
       - 500 → bug inesperado (MP reintenta).
     """
     import logging
@@ -9247,8 +10673,8 @@ async def mercadopago_webhook(request: Request):
                 logger.warning("Webhook MP: sin firma y sin IPN válida, rechazado")
                 raise HTTPException(status_code=401, detail="Firma o IPN requerida")
             logger.info("Webhook MP (IPN): topic=%s id=%s", topic, payment_id)
-            if topic == "payment":
-                event_type = "payment"
+            if topic in ("payment", "subscription_authorized_payment"):
+                event_type = topic
             elif topic == "merchant_order":
                 return {"success": True, "skipped": "merchant_order, esperando payment"}
             else:
@@ -9256,140 +10682,132 @@ async def mercadopago_webhook(request: Request):
 
         logger.info("Webhook MP recibido: type=%s payment_id=%s", event_type, payment_id)
 
+        # Sin token, un aviso de pago se rechaza para que Mercado Pago lo
+        # reintente; el id va en la ruta que se le pide: sólo la forma esperada.
+        if event_type in ("payment", "subscription_authorized_payment"):
+            if not payment_id or not MP_ACCESS_TOKEN:
+                logger.warning("Webhook MP: falta payment_id o MP_ACCESS_TOKEN")
+                raise HTTPException(status_code=400, detail="Falta payment_id o token")
+            if not _ID_COBRO_MP.fullmatch(payment_id):
+                logger.warning("Webhook MP: payment_id inválido %r", payment_id[:80])
+                raise HTTPException(status_code=400, detail="payment_id inválido")
+
+        # Renovación de una suscripción: el aviso trae el cobro autorizado; de
+        # ahí sale el pago, que se aplica como cualquier otro, controlado
+        # contra el monto de la suscripción (COBRO-MP-1, paso 4).
+        renovacion, suscripcion_del_cobro = False, None
+        if event_type == "subscription_authorized_payment":
+            payment_id, suscripcion_del_cobro = _pago_del_cobro_mp(_leer_cobro_autorizado_mp(payment_id))
+            renovacion, event_type = True, "payment"
+
         if event_type != "payment":
             return {"success": True, "skipped": "not a payment event"}
 
-        if not payment_id or not MP_ACCESS_TOKEN:
-            logger.warning("Webhook MP: falta payment_id o MP_ACCESS_TOKEN")
-            raise HTTPException(status_code=400, detail="Falta payment_id o token")
-
         sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
-        payment_info = sdk.payment().get(payment_id)
-        pay_resp = payment_info.get("response", {}) if isinstance(payment_info, dict) else {}
+        pay_resp = _consultar_mp(lambda: sdk.payment().get(payment_id), f"pago {payment_id}")
 
         if pay_resp.get("status") != "approved":
+            # El aviso del pago puede no decir de qué cuenta es: el cobro
+            # reintenta hasta que el pago se decida.
+            if renovacion and pay_resp.get("status") in ("pending", "in_process", "authorized"):
+                raise _MPIlegible(f"el pago {payment_id} del cobro está {pay_resp.get('status')}")
             return {"success": True, "skipped": f"status={pay_resp.get('status')}"}
 
-        external_ref = pay_resp.get("external_reference", "")
-        logger.info("Webhook MP: pago aprobado payment_id=%s external_ref=%s",
-                    payment_id, external_ref)
+        # El pago se registra con el id que devuelve Mercado Pago: «0123» y
+        # «123» son el mismo pago para su API y no pueden aplicarse dos veces.
+        # Sin ese id no hay con qué registrarlo: que Mercado Pago reintente.
+        canonico = pay_resp.get("id")
+        payment_id = _id_mp(canonico)
+        if not payment_id:
+            raise _MPIlegible(f"pago aprobado sin id reconocible: {str(canonico)[:80]!r}")
 
-        # Soportar formato viejo username|plan y nuevo username:plan / username:topup
+        pay_resp = _con_referencia_mp(sdk, pay_resp, suscripcion_del_cobro)
+
+        external_ref = pay_resp.get("external_reference")
+        logger.info("Webhook MP: pago aprobado payment_id=%s external_ref=%s", payment_id, external_ref)
+        sin_cuenta = not external_ref
+
+        motivo = None
+        update = None if sin_cuenta else billing_service.process_payment(pay_resp)
+        if update is None and not sin_cuenta:
+            if isinstance(external_ref, str) and "|" in external_ref:
+                # Formato viejo «usuario|plan».
+                username, plan = external_ref.split("|", 1)
+                update = {
+                    "username": username,
+                    "action": "subscription",
+                    "plan": plan if plan in billing_service.PLANS else "premium",
+                    "billing_status": "active",
+                    "trial_ends_at": datetime.now(timezone.utc) + timedelta(days=30),
+                    "payment_provider": "mercadopago",
+                    "payment_customer_id": billing_service.cliente_mp(pay_resp),
+                }
+            else:
+                motivo = f"external_reference desconocida: {str(external_ref)[:80]!r}"
+
         async for session in get_async_session():
-            update = billing_service.process_payment(pay_resp)
-            if update is None:
-                if "|" in external_ref:
-                    username, plan = external_ref.split("|", 1)
-                    update = {
-                        "username": username,
-                        "action": "subscription",
-                        "plan": plan if plan in billing_service.PLANS else "premium",
-                        "billing_status": "active",
-                        "trial_ends_at": datetime.now(timezone.utc) + timedelta(days=30),
-                        "payment_provider": "mercadopago",
-                        "payment_customer_id": str(pay_resp.get("payer", {}).get("id", "") or payment_id),
-                    }
-                else:
-                    logger.warning("Webhook MP: external_reference no reconocida: %s", external_ref)
-                    raise HTTPException(status_code=400, detail="external_reference desconocida")
+            if sin_cuenta:
+                return await _sin_cuenta_todavia_mp(session, payment_id)
+            if motivo:
+                return await _rechazar_sin_cuenta_mp(session, payment_id, str(external_ref or ""),
+                                                     update or {}, pay_resp, motivo)
 
-            username = update.get("username")
             org_id = update.get("org_id")
+            cuenta_ref = f"org:{org_id}" if org_id else update["username"]
+            control = _control_de_monto_mp(sdk, pay_resp, update, external_ref)
+            control = await _control_de_fecha_mp(session, pay_resp, control)
 
-            if org_id:
-                # Pago de organización: actualizar la org, no el user
-                result = await session.execute(select(Organization).where(Organization.id == org_id))
-                db_org = result.scalars().first()
-                if not db_org:
-                    logger.warning("Webhook MP: org '%s' no existe en DB", org_id)
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Organización '{org_id}' no existe. MP reintentará."
-                    )
+            # El candado sobre la cuenta pone en fila los pagos distintos que
+            # llegan a la vez: sin él, los dos leen el mismo estado y el
+            # segundo pisa al primero (COBRO-MP-1, a).
+            consulta = (select(Organization).where(Organization.id == org_id) if org_id
+                        else select(User).where(User.username == update["username"]))
+            cuenta = (await session.execute(consulta.with_for_update())).scalars().first()
+            if cuenta is None:
+                return await _rechazar_sin_cuenta_mp(session, payment_id, cuenta_ref, update, pay_resp,
+                                                     f"la cuenta {cuenta_ref} no existe")
 
-                # Deduplicación
-                if db_org.last_payment_id == payment_id:
-                    logger.info("Webhook MP: payment_id=%s ya procesado para org %s", payment_id, org_id)
-                    return {"success": True, "skipped": "payment_id ya procesado"}
-
-                db_org.last_payment_id = payment_id
-                db_org.plan = update.get("plan", db_org.plan)
-                db_org.billing_status = update.get("billing_status", db_org.billing_status)
-                if "trial_ends_at" in update:
-                    db_org.trial_ends_at = update["trial_ends_at"]
-                if "ops_used_this_period" in update:
-                    db_org.ops_used_this_period = update["ops_used_this_period"]
-                if "extra_ops_remaining" in update:
-                    total = (db_org.extra_ops_remaining or 0) + update["extra_ops_remaining"]
-                    db_org.extra_ops_remaining = min(total, billing_service.EXTRA_OPS_MAX)
-                if "billing_period_started_at" in update:
-                    db_org.billing_period_started_at = update["billing_period_started_at"]
-                if "last_topup_at" in update:
-                    db_org.last_topup_at = update["last_topup_at"]
-                if "extra_ops_expires_at" in update:
-                    db_org.extra_ops_expires_at = update["extra_ops_expires_at"]
-                if "payment_provider" in update:
-                    db_org.payment_provider = update["payment_provider"]
-                if "payment_customer_id" in update:
-                    db_org.payment_customer_id = update["payment_customer_id"]
-                if "payment_method_last4" in update and update["payment_method_last4"]:
-                    db_org.payment_method_last4 = update["payment_method_last4"]
-                if "payment_method_brand" in update and update["payment_method_brand"]:
-                    db_org.payment_method_brand = update["payment_method_brand"]
-
-                await session.commit()
-                logger.info("Webhook MP: pago sincronizado org=%s action=%s payment_id=%s",
-                            org_id, update.get("action"), payment_id)
-                break
-
-            # Pago individual: actualizar el user (flujo existente)
-            result = await session.execute(select(User).where(User.username == username))
-            db_user = result.scalars().first()
-
-            if not db_user:
-                logger.warning("Webhook MP: usuario '%s' no existe en DB", username)
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Usuario '{username}' no existe. MP reintentará."
-                )
-
-            # Deduplicación: si ya procesamos este payment_id, saltear.
-            if db_user.last_payment_id == payment_id:
-                logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, username)
+            # Cada pago se aplica una sola vez (COBRO-MP-1). El último pago
+            # de antes del registro sólo quedó en last_payment_id.
+            if cuenta.last_payment_id == payment_id:
+                logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, cuenta_ref)
                 return {"success": True, "skipped": "payment_id ya procesado"}
+            if update.get("action") == "topup" and not control[1]:
+                entra, vigentes = billing_service.recarga_entra(cuenta)
+                if not entra:
+                    control = (control[0], f"la recarga no entra: ya tiene {vigentes} operaciones extra "
+                                           f"y el tope es {billing_service.EXTRA_OPS_MAX}")
+            estado = await _registrar_pago_mp(session, payment_id, cuenta_ref, update, pay_resp, control)
+            if estado is None:
+                logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, cuenta_ref)
+                return {"success": True, "skipped": "payment_id ya procesado"}
+            if estado == "rechazado":
+                return await _rechazar_pago_mp(session, payment_id, cuenta_ref, control[1])
+            _extender_periodo(cuenta, update)
 
-            db_user.last_payment_id = payment_id
-            db_user.plan = update.get("plan", db_user.plan)
-            db_user.billing_status = update.get("billing_status", db_user.billing_status)
-            if "trial_ends_at" in update:
-                db_user.trial_ends_at = update["trial_ends_at"]
-            if "payment_provider" in update:
-                db_user.payment_provider = update["payment_provider"]
-            if "payment_customer_id" in update:
-                db_user.payment_customer_id = update["payment_customer_id"]
-            if "payment_method_last4" in update and update["payment_method_last4"]:
-                db_user.payment_method_last4 = update["payment_method_last4"]
-            if "payment_method_brand" in update and update["payment_method_brand"]:
-                db_user.payment_method_brand = update["payment_method_brand"]
-            if "ops_used_this_period" in update:
-                db_user.ops_used_this_period = update["ops_used_this_period"]
+            cuenta.last_payment_id = payment_id
+            for campo in ("plan", "billing_status", "trial_ends_at", "ops_used_this_period",
+                          "billing_period_started_at", "last_topup_at", "extra_ops_expires_at",
+                          "payment_provider", "payment_customer_id"):
+                if campo in update:
+                    setattr(cuenta, campo, update[campo])
+            for campo in ("payment_method_last4", "payment_method_brand"):
+                if update.get(campo):
+                    setattr(cuenta, campo, update[campo])
             if "extra_ops_remaining" in update:
-                total = (db_user.extra_ops_remaining or 0) + update["extra_ops_remaining"]
-                db_user.extra_ops_remaining = min(total, billing_service.EXTRA_OPS_MAX)
-            if "billing_period_started_at" in update:
-                db_user.billing_period_started_at = update["billing_period_started_at"]
-            if "last_topup_at" in update:
-                db_user.last_topup_at = update["last_topup_at"]
-            if "extra_ops_expires_at" in update:
-                db_user.extra_ops_expires_at = update["extra_ops_expires_at"]
+                cuenta.extra_ops_remaining = (cuenta.extra_ops_remaining or 0) + update["extra_ops_remaining"]
 
-            await session.commit()
-            logger.info("Webhook MP: pago sincronizado user=%s action=%s payment_id=%s",
-                        username, update.get("action"), payment_id)
+            if not await _guardar_pago_mp(session):
+                return {"success": True, "skipped": "payment_id ya procesado"}
+            logger.info("Webhook MP: pago sincronizado %s action=%s payment_id=%s",
+                        cuenta_ref, update.get("action"), payment_id)
             break
 
         return {"success": True}
 
+    except _MPIlegible as e:
+        logger.warning("Webhook MP: no se pudo leer Mercado Pago (%s); reintentará", e)
+        raise HTTPException(status_code=503, detail="No se pudo leer Mercado Pago. MP reintentará.")
     except HTTPException:
         raise
     except Exception as e:
@@ -9415,9 +10833,16 @@ async def billing_topup(
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    org_id = db_user.organization_id or None
+    # Una recarga que no entra en el tope se rechazaría al pagarla: no se
+    # arma el link (COBRO-MP-1, f).
+    entidad, es_org = await _get_billing_entity(db, db_user)
+    entra, vigentes = billing_service.recarga_entra(entidad)
+    if not entra:
+        raise HTTPException(status_code=409, detail=(
+            f"Ya tenés {vigentes} operaciones extra y el tope es {billing_service.EXTRA_OPS_MAX}: "
+            f"una recarga de {billing_service.TOPUP_OPS} no entra. Usá las que tenés y volvé a recargar."))
     try:
-        checkout = billing_service.create_topup_checkout(db_user, org_id=org_id)
+        checkout = billing_service.create_topup_checkout(db_user, org_id=entidad.id if es_org else None)
         return {"success": True, **checkout}
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -9440,15 +10865,19 @@ async def billing_checkout(
     if plan_id not in billing_service.PLANS:
         raise HTTPException(status_code=400, detail=f"Plan invalido: {plan_id}")
 
-    result = await db.execute(select(User).where(User.username == username))
+    # La fila queda bloqueada hasta guardar la suscripción nueva: un segundo
+    # checkout a la vez espera y ve la del primero (COBRO-MP-1 D).
+    result = await db.execute(select(User).where(User.username == username).with_for_update())
     db_user = result.scalars().first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     org_id = db_user.organization_id or None
 
-    # Modo demo cuando no hay credenciales
+    # Modo demo cuando no hay credenciales, sólo en desarrollo y pruebas (D7.4)
     if not billing_service.is_configured():
+        if not _demo_permitida():
+            raise HTTPException(status_code=503, detail="Los pagos no están disponibles en este momento. Probá más tarde.")
         demo_id = f"demo_{uuid.uuid4().hex[:8]}"
         pending_payments[demo_id] = {
             "status": "pending",
@@ -9465,18 +10894,54 @@ async def billing_checkout(
             "message": "Modo demo - MP_ACCESS_TOKEN no configurado",
         }
 
+    # Una sola suscripción. La autorizada no se cancela acá (puede ser un pago
+    # cuyo aviso no llegó); las demás sí. Si no se puede leer o cancelar, nada.
+    sid_viejo = db_user.mp_preapproval_id
+    if sid_viejo:
+        no_disponible = "No pudimos confirmar tu suscripción actual con Mercado Pago. Probá de nuevo en unos minutos."
+        try:
+            estado_mp = await run_in_threadpool(_leer_suscripcion_mp, sid_viejo)
+        except _SuscripcionMPError as e:
+            print(f"⚠️ Checkout de {username}: no se pudo leer la suscripción en MP: {e}")
+            raise HTTPException(status_code=503, detail=no_disponible)
+        if estado_mp == "authorized":
+            entidad, _ = await _get_billing_entity(db, db_user)
+            fin = entidad.trial_ends_at
+            if fin is not None and fin.tzinfo is None:
+                fin = fin.replace(tzinfo=timezone.utc)
+            if entidad.billing_status in ("trial", "active") and fin and fin > datetime.now(timezone.utc):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Ya tenés una suscripción activa en Mercado Pago; se renueva sola al fin del período.",
+                )
+            raise HTTPException(
+                status_code=409,
+                detail="Tu suscripción en Mercado Pago sigue activa. Si acabás de pagar, esperá unos minutos; "
+                       "si querés cambiar la tarjeta, cancelá el plan primero.",
+            )
+        if estado_mp != "cancelled":
+            try:
+                await run_in_threadpool(_cancelar_suscripcion_mp, sid_viejo)
+            except _SuscripcionMPError as e:
+                print(f"⚠️ Checkout de {username}: no se pudo cancelar la suscripción vieja en MP: {e}")
+                raise HTTPException(status_code=503, detail=no_disponible)
+        # Sin commit todavía: soltaría el bloqueo antes de crear la nueva.
+        db_user.mp_preapproval_id = None
+
     try:
         checkout = billing_service.create_checkout(db_user, plan_id, org_id=org_id)
         # Guardamos el preapproval_id temporal hasta que el webhook confirme.
         if checkout.get("preapproval_id"):
             db_user.mp_preapproval_id = checkout["preapproval_id"]
             db_user.mp_plan_id = plan_id
-            await db.commit()
+        await db.commit()
         return {"success": True, **checkout}
     except HTTPException:
         raise
     except Exception as e:
         print(f"Error creando checkout MP: {e}")
+        # La vieja ya quedó cancelada en Mercado Pago: no se deja guardada.
+        await db.commit()
         raise HTTPException(status_code=500, detail=f"Error con MercadoPago: {e}")
 
 # SEGURIDAD: endpoints Bitcoin demo eliminados (eran simulaciones sin auth ni
@@ -9581,14 +11046,19 @@ async def catalog_lookup(
                 "origen": None,
             }
 
-            # 1) memoria del cliente
+            vm = vendor_matches_by_idx.get(idx)
+            if not (vm and vm.get("ncm") and vm.get("match_type") != "none"):
+                vm = None
+
+            # 1) memoria del cliente (con la SIM completa del proveedor, si
+            # la tiene para ese NCM: D32 b)
             if client_id and desc:
                 mem = await lookup_client_memory(db, user["username"], client_id, desc)
                 if mem and mem.get("ncm"):
                     out.update({
                         "source": "cliente",
                         "confidence": mem["confidence"],
-                        "ncm": mem["ncm"],
+                        "ncm": _ncm_recordado_con_sim_del_proveedor(mem, vm),
                         "origen": mem.get("origen") or None,
                         "veces_usado": mem.get("veces_usado"),
                         "valor_unitario_avg": mem.get("valor_unitario_avg"),
@@ -9599,8 +11069,7 @@ async def catalog_lookup(
                     continue
 
             # 2) catalogo del proveedor
-            vm = vendor_matches_by_idx.get(idx)
-            if vm and vm.get("ncm") and vm.get("match_type") != "none":
+            if vm:
                 out.update({
                     "source": "proveedor",
                     "confidence": float(vm.get("match_score") or 0.0),

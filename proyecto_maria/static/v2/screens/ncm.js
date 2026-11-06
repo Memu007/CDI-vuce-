@@ -261,13 +261,27 @@
         initialized = true;
     }
 
+    // Se arrastra una unidad de la tabla: un producto suelto o un grupo entero
+    // (ORDEN-1). Un grupo no se parte: sus productos se mueven juntos.
+    const FILA_ARRASTRABLE = 'tr[data-index], tr.row-grouped, tr.row-sub';
+
+    function claveDeUnidad(r) {
+        return r.type === 'group' ? 'g:' + r.grupo_id : 'i:' + r.index;
+    }
+
+    function claveDeFila(tr) {
+        if (tr.hasAttribute('data-index')) return 'i:' + tr.getAttribute('data-index');
+        const gid = tr.getAttribute('data-grupo-id');
+        return gid == null ? null : 'g:' + gid;
+    }
+
     function setupRowDragAndDrop() {
         if (!tbody) return;
         // Solo habilitar draggable cuando el mousedown arranca en el handle (col-num)
         tbody.addEventListener('mousedown', (e) => {
             const handle = e.target.closest('.col-num');
-            const tr = e.target.closest('tr[data-index]');
-            if (handle && tr) {
+            const tr = e.target.closest('tr[data-index], tr.row-grouped');
+            if (handle && tr && !e.target.closest('.ncm-expand-btn')) {
                 tr.setAttribute('draggable', 'true');
             }
         });
@@ -276,10 +290,11 @@
         });
 
         tbody.addEventListener('dragstart', (e) => {
-            const tr = e.target.closest && e.target.closest('tr[data-index]');
+            const tr = e.target.closest && e.target.closest('tr[data-index], tr.row-grouped');
             if (!tr || tr.getAttribute('draggable') !== 'true') { e.preventDefault(); return; }
-            const idx = tr.getAttribute('data-index');
-            try { e.dataTransfer.setData('text/plain', idx); } catch (_) {}
+            const clave = claveDeFila(tr);
+            if (!clave) { e.preventDefault(); return; }
+            try { e.dataTransfer.setData('text/plain', clave); } catch (_) {}
             try { e.dataTransfer.effectAllowed = 'move'; } catch (_) {}
             tr.classList.add('is-dragging');
             document.body.classList.add('cdi-dragging-row');
@@ -293,7 +308,7 @@
         });
 
         tbody.addEventListener('dragover', (e) => {
-            const tr = e.target.closest && e.target.closest('tr[data-index]');
+            const tr = e.target.closest && e.target.closest(FILA_ARRASTRABLE);
             if (!tr) return;
             e.preventDefault();
             try { e.dataTransfer.dropEffect = 'move'; } catch (_) {}
@@ -302,43 +317,47 @@
         });
 
         tbody.addEventListener('dragleave', (e) => {
-            const tr = e.target.closest && e.target.closest('tr[data-index]');
+            const tr = e.target.closest && e.target.closest(FILA_ARRASTRABLE);
             if (tr) tr.classList.remove('row-dragover');
         });
 
         tbody.addEventListener('drop', (e) => {
             e.preventDefault();
-            const tr = e.target.closest && e.target.closest('tr[data-index]');
+            const tr = e.target.closest && e.target.closest(FILA_ARRASTRABLE);
             if (!tr) return;
-            const toIdx = parseInt(tr.getAttribute('data-index'), 10);
-            let fromIdx = NaN;
-            try { fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10); } catch (_) {}
-            if (!isFinite(fromIdx) || !isFinite(toIdx) || fromIdx === toIdx) return;
-            reorderItems(fromIdx, toIdx);
+            const hacia = claveDeFila(tr);
+            let desde = '';
+            try { desde = e.dataTransfer.getData('text/plain'); } catch (_) {}
+            if (!desde || !hacia || desde === hacia) return;
+            reorderItems(desde, hacia);
         });
     }
 
-    function reorderItems(fromIdx, toIdx) {
+    // Mueve la unidad `desde` al lugar de la unidad `hacia` (claves «i:<índice>»
+    // o «g:<grupo>»). El orden de CDI.state.items es el que se guarda y el que
+    // sale en el TXT.
+    function reorderItems(desde, hacia) {
         const items = (CDI.state && CDI.state.items) || [];
-        if (fromIdx < 0 || fromIdx >= items.length) return;
-        if (toIdx < 0 || toIdx >= items.length) return;
-        const [moved] = items.splice(fromIdx, 1);
-        items.splice(toIdx, 0, moved);
-        // Actualizar set de seleccion: recalcular indices post-movida
-        const wasSelected = new Set();
-        selectedRows.forEach(i => {
-            if (i === fromIdx) { wasSelected.add(toIdx); return; }
-            let newIdx = i;
-            if (fromIdx < toIdx) {
-                if (i > fromIdx && i <= toIdx) newIdx = i - 1;
-            } else {
-                if (i < fromIdx && i >= toIdx) newIdx = i + 1;
-            }
-            wasSelected.add(newIdx);
-        });
+        const unidades = buildRenderRows(items).map(r => ({
+            clave: claveDeUnidad(r),
+            indices: r.type === 'group' ? r.indices : [r.index],
+        }));
+        const from = unidades.findIndex(u => u.clave === desde);
+        const to = unidades.findIndex(u => u.clave === hacia);
+        if (from < 0 || to < 0 || from === to) return;
+        const [movida] = unidades.splice(from, 1);
+        unidades.splice(to, 0, movida);
+        // La selección sigue a los productos, no a los índices.
+        const elegidos = new Set(Array.from(selectedRows).map(i => items[i]));
+        const nuevos = [];
+        unidades.forEach(u => u.indices.forEach(i => nuevos.push(items[i])));
+        items.splice(0, items.length, ...nuevos);
         selectedRows.clear();
-        wasSelected.forEach(i => selectedRows.add(i));
-        try { CDI.track && CDI.track('ncm_row_reordered', { from: fromIdx, to: toIdx }); } catch (_) {}
+        items.forEach((it, i) => { if (elegidos.has(it)) selectedRows.add(i); });
+        // Ctrl+Z deshace la última acción masiva copiando la lista de antes:
+        // después de reordenar, volvería también el orden viejo.
+        lastSnapshot = null;
+        try { CDI.track && CDI.track('ncm_row_reordered', { from: desde, to: hacia }); } catch (_) {}
         render();
     }
 
@@ -533,7 +552,7 @@
             touched++;
         });
         try { CDI.track && CDI.track('ncm_batch_ncm_applied', { count: touched, ncm: formatted }); } catch (_) {}
-        scheduleUndoClear('NCM ' + formatted + ' a ' + touched + (touched === 1 ? ' item' : ' items'));
+        scheduleUndoClear('PA SIM ' + formatted + ' a ' + touched + (touched === 1 ? ' item' : ' items'));
         render();
         updateBatchBar();
     }
@@ -963,7 +982,7 @@
         const inputClass = 'ncm-input ncm-group-input' + (pieza && !isValid ? ' is-error' : '');
         let html = '<tr class="' + rowClass + ' row-grouped" data-grupo-id="' + gid + '">' +
             '<td class="col-check"><input type="checkbox" class="ncm-row-check" data-group-check="' + gid + '"' + checked + ' aria-label="Seleccionar grupo ' + gid + '"></td>' +
-            '<td class="col-num"><button type="button" class="ncm-expand-btn" data-expand-grupo="' + gid + '" aria-label="Expandir grupo">' + expandIcon + '</button></td>' +
+            '<td class="col-num" title="Arrastrar para reordenar"><span class="drag-grip" aria-hidden="true">⋮⋮</span><button type="button" class="ncm-expand-btn" data-expand-grupo="' + gid + '" aria-label="Expandir grupo">' + expandIcon + '</button></td>' +
             '<td class="col-ref">' + ref + '</td>' +
             '<td class="col-desc">' + desc + '</td>' +
             '<td class="col-pais"><input class="ncm-edit ncm-edit-pais input input-sm" type="text" list="ncmCountries" value="' + origen + '" data-testid="ncm-origin-input" data-grupo-id="' + gid + '" data-field="origen" aria-label="Origen grupo ' + gid + '"></td>' +
@@ -1083,7 +1102,7 @@
         }
         lastSnapshot = { state: CDI.state, items: before, ts: Date.now() };
         CDI.track && CDI.track('ncm_agrupar', { grupo_id: result.grupo_id, items: result.count, ncm: result.ncm, batch: true });
-        scheduleUndoClear('NCM ' + result.ncm + ' · ' + result.count + ' ítems → 1 unidad clasificatoria');
+        scheduleUndoClear('PA SIM ' + result.ncm + ' · ' + result.count + ' ítems → 1 unidad clasificatoria');
 
         selectedRows.clear();
         if (batchNcm) batchNcm.value = '';
@@ -2139,7 +2158,7 @@
         const human = ageH < 24
             ? Math.round(ageH) + ' h'
             : Math.round(ageH / 24) + ' día' + (ageH >= 48 ? 's' : '');
-        return '<div class="spotlight-vuce-stale" title="Refrescar desde el asistente NCM">' +
+        return '<div class="spotlight-vuce-stale" title="Refrescar desde el asistente de posición arancelaria">' +
                'Datos con latencia de ' + CDI.escapeHtml(human) +
                '</div>';
     }

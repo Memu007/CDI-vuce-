@@ -3,6 +3,105 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## Veredicto de COBRO-CORTE-1, vuelta (2026-11-05 22:00 UTC): devolución por dos causas
+
+Sobre `0b9ccde`. Evidencia: `docs/pm/REPRODUCCION-COBRO-CORTE-1-v2-2026-11-05.md`.
+Lo de la vuelta anterior está cumplido: identidad por operación, sin 409,
+borrar cliente no recuenta, 402 igual dos veces, `trial` sin 500, sin atajo
+`testing`, D61 b. Los casos (82) y el chequeo-6 (`+131/−149`, 0 avisos) dan
+como dijiste. Lo que vuelve son dos bordes de esa identidad nueva.
+
+**Causa 1: se cobra antes de entregar.** `_contar_maria` confirma el conteo y
+la fila antes de escribir el TXT (`main.py:4776`, `:4928`). Si algo falla
+después, la persona recibe un 500 sin archivo ni `operacion_id`, y el
+reintento cuenta otra. Lo reproduje en Postgres con la escritura fallando en
+el primer pedido: `500 ops 1`, reintento `200 ops 2`, dos filas. En `375edbc`
+el mismo reintento daba `ops 1`.
+Pido: lo que no se entregó no queda cobrado. Familia: falla al escribir el
+TXT, excepción del generador después de contar, y lo mismo en exportación.
+
+**Causa 2: una respuesta tardía escribe el id en la carga que sigue.**
+`finalize.js` asigna `CDI.state.operacionId` cuando vuelve `/generate_maria`
+y cuando vuelve el guardado al cliente, sin mirar si la carga sigue siendo la
+misma. Si la persona empieza otra carga en esa ventana, la nueva hereda el id:
+no se cuenta y pisa la fila y el archivo de la anterior. Lo reprodujeron por
+separado Opus y Sonnet, demorando la respuesta con `page.route`: `ops antes 3
+despues 3`, una sola fila para dos facturas.
+Pido: una respuesta sólo escribe en la carga que la pidió. Familia: respuesta
+de generar, respuesta del guardado, y v1 (`app.js:3390`, `:3751`, mismo
+patrón, no corrido). Esas líneas las agregaste vos: son tuyas; el resto de
+`saveOperationToHistory` y `reSave…` sigue siendo de MARIA.
+
+**Además, chicos (a cero, como pidió Emi para seguridad y datos):**
+3. Un `operacion_id` que la base no acepta (NUL, surrogate suelto) da 500 en
+   Postgres en `/generate_maria`, en exportación con surrogate y en el
+   guardado. No cobra, pero el 500 devuelve `dev_detail` con SQL en test.
+   Pido: un id que no es de una operación propia es operación nueva, nunca
+   500, en las tres rutas. En SQLite no se ve: el caso corre en Postgres.
+4. El aviso de borrar cliente (`clientes.js:1594`) dice que se borra el
+   historial de operaciones, y quedan como «Sin cliente». Que diga lo que pasa.
+5. `delete_cliente` reescribe `extra` sin `_cuenta_bloqueada`. Plausible, no
+   reproducido: una huella pisada es una regeneración gratis. Que tome el
+   mismo candado.
+
+Un caso por causa con la familia como datos, rojo antes en `0b9ccde`, y su
+sabotaje. Uno de cada familia lo pruebo yo con otro ejemplo.
+
+**Quedan como están** (decidido por la PM): el mensaje del tope que le dice a
+Premium «actualizá a Premium» (previo; cola de limpieza); los dos relojes del
+inicio de período, dentro del riesgo de 1 s ya aceptado; pestañas abiertas
+durante una publicación que no mandan el id, mismo riesgo declarado.
+`d528a67` (comentarios sin historia) y `9213536` llegaron después de la
+entrega: entran en la próxima vuelta.
+
+**CSRF-3: aceptada** sobre `9fe55d4` (2026-11-05 19:20 UTC), integrada. Evidencia: `docs/pm/REPRODUCCION-CSRF-3-2026-11-05.md`. Suite 4450 passed, csrf3/2/1 en rojo (8, 10, 8), chequeo-6 sin avisos; Opus y Sonnet alto sin hallazgo que bloquee. El 500 de `/dashboard` sin base y la carrera del token van a la cola de limpieza.
+
+**Tu orden:** la devolución de COBRO-CORTE-1 → COBRO-MP-2 → COBRO-MP-3 →
+AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. Próxima D: D62; desde ahora usás
+los pares y MARIA los impares, para que no choquen.
+
+## Ritmo y calidad (Emi, 2026-10-28)
+
+Vamos tranquilas: no hay fecha de entrega y, si el plan se estira, no pasa
+nada. Lo que no se negocia es la calidad: código que se lea como hecho por
+una persona senior, no generado a las apuradas.
+
+- No te adelantes: una pieza a la vez, cerrada entera antes de la siguiente.
+- No te saltees ningún paso de `/entregar` (autorrevisión, `/code-review`,
+  `/security-review` cuando toca dinero, sesión, permisos o datos, rojo antes
+  del arreglo, sabotajes). Si algo no se corrió, se dice.
+- Preferí el arreglo simple y legible al ingenioso; nombres claros, sin
+  código muerto ni duplicado, y comentarios sólo donde explican un porqué.
+- Mejor una entrega más tarde que una devolución.
+
+## Se retoma el 04/11, con el método nuevo (PM)
+
+Emi levantó la pausa por 3 días, hasta el sábado 07/11 a la tarde. Traé mi
+rama con `merge` y leé lo que cambió: `CLAUDE.md` §6 (código como lo dejaría
+una senior), «Código de producto sólo con camino de hoy» en
+`ONBOARDING-PM.md`, `COLA-LIMPIEZA.md` y `/entregar`. Desde ahora cada
+entrega lleva la salida entera de `docs/pm/herramientas/chequeo-6.py <base>
+<SHA>`, con cada `AVISO` arreglado o explicado en una línea. Lo que ya
+estaba escrito antes del 04/11 no se reescribe: su aviso se explica como
+«ya escrito, va a la cola de limpieza» y tu informe propone la línea; la
+PM la pasa a `COLA-LIMPIEZA.md`. Lo nuevo de la vuelta sí cumple §6.
+
+## Piezas nuevas que aprobó Emi el 04/11 (PM)
+
+Tu cola queda: COBRO-MP-1 vuelta 3 + D13 (c) → ORDEN-1b vuelta 2 →
+**CSRF-1** → CSRF-2 → COBRO-CORTE-1 → COBRO-MP-2 → **COBRO-MP-3** →
+AISLAMIENTO-2/LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. El detalle de cada una te
+lo escribo al activarla; esto es lo que tiene que pasar:
+
+- **CSRF-1 (chica):** con `CSRF_ENFORCE=true`, la telemetría v2 que manda la
+  página llega (hoy `/api/session/state` da 403) y un pedido sin token desde
+  otro origen no; cerrar sesión pide el token (D16 b) y el botón de la
+  página sigue funcionando. Rojo antes en cada uno.
+- **COBRO-MP-3 (plata, revisión fuerte):** las consultas a Mercado Pago no
+  frenan el servidor (D8 a: un hilo con tope, sugerencia); el aviso de pago
+  tiene límite de pedidos; un aviso sin firma verificable no cambia nada.
+  Sin Mercado Pago real.
+
 ## Cómo trabajás
 
 `AGENTS.md`, `CLAUDE.md`, `docs/pm/ONBOARDING-DEV.md` y los comandos
@@ -27,78 +126,341 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
-## Veredicto de CLIENTE-1 (2026-10-24): aceptada
+## Veredictos de COBRO-MP-1 vuelta 2 y de ORDEN-1b (2026-10-29 09:44 UTC): devolución las dos
 
-Sobre `c402bcb` (producto `fbc006a` + `12ff9b6`), integrada por SHA a la rama
-de la PM. Detalle en `REPRODUCCION-CLIENTE-1-2026-10-24.md`. Reproducido en
-`b0c920b`: tus 14 sabotajes en rojo, tu prueba de pantalla OK y cuatro
-negativos míos (domicilio de espacios, editar y borrar el CUIT, fecha que no
-es ISO, CUIT corto), todos como decís salvo un matiz de D3 (abajo).
+**Orden:** primero COBRO-MP-1 vuelta 3 (ya estás en D13 c), después
+ORDEN-1b vuelta 2. Nada se integra en esta vuelta.
 
-**Se cruzaron los mensajes:** EXCEL-3 y D1 ya estaban respondidas en
-`5237aa2` (abajo). No las reabras en `PARA-PM.md`.
+### COBRO-MP-1, vuelta 2: devolución
 
-## Veredicto de EXCEL-3 (2026-10-24): aceptada
+Sobre `999b27a` y `4ef59f4`. Evidencia en
+`REPRODUCCION-COBRO-MP-1-vuelta2-2026-10-29.md`. `cobro_mp1.sh`: 108 ROJO, 5 BASE y ningún sabotaje con falla, y
+`cobro_mp1_postgres.py` «fallas: 0», como tu informe. Aguanta lo
+que pedí en a, d, e y f: dos pagos a la vez en Postgres, el 503 y su
+reintento aplicado una vez, 15 cuerpos raros sin 500, el panel con 403 y
+sin XSS, la atomicidad si `_extender_periodo` falla.
 
-Integrada por SHA (`a173af2`) a la rama de la PM; el producto es idéntico al
-revisado. Detalle en `REPRODUCCION-EXCEL-3-2026-10-24.md`. Reproducido:
-focales 120 passed; 27 sabotajes, 0 sin rojo; sintético sin datos reales; la
-proforma real, en local, da 48 productos en m² y su mercadería, descuento y
-flete cierran con el total de la hoja. Suite completa: un rojo, el de los
-ocho libros de `test_excel2.py`, que falla igual en la base (es de EXCEL-2;
-no lo toques ahora, lo decide Emi).
+**h. Alta, regresión de esta vuelta: una renovación se cobra y no se
+acredita.** Causa: un aviso de pago que todavía no se puede atribuir a una
+cuenta (sin `external_reference`, o un cobro que no dice de qué suscripción
+es) ahora queda `rechazado` para siempre y ocupa su `payment_id`. El otro
+aviso del mismo pago (`payment` y `subscription_authorized_payment` lo
+comparten) llega después y lo encuentra «ya procesado». En `784e793` el
+primero daba 400 y Mercado Pago reintentaba; ahora queda `past_due` sin
+reintento. Reproducido en los dos SHAs, tabla en la reproducción.
 
-**D1: (a).** `operacion.flete`, `operacion.descuento` (positivo: lo que se
-deduce) y `filas_excel_flete` / `filas_excel_descuento` quedan así. Coincide
-con la decisión del 24/10: el sistema ofrece el descuento leído y el usuario
-decide qué se deduce. Se lo paso a la Dev MARIA para VALOR-1.
+Parte es mía: la regla b mandaba a `rechazado` lo que «se leyó y no
+sirve», y no dije de qué lado cae «todavía no sé de quién es». Cae del lado
+del 503: es «no se pudo leer todavía». La regla queda así: lo que no se
+pudo atribuir no es `rechazado` terminal ni bloquea el otro aviso del mismo
+pago; lo que se ve en el panel sigue a la vista. No depende de la forma real
+de los avisos (D30): sea cual sea, el primer aviso que llega no puede
+cerrarle la puerta al segundo.
 
-## Tarea 1 — PA-1, con D3 al lado; después ESTUDIO-1
+Casos, rojo antes: los dos órdenes del par; cobro pendiente y después
+`payment` aprobado (en `784e793` también fallaba, con 400; entra igual,
+es la misma familia); con y sin `metadata.preapproval_id`; usuario y
+organización. Pista, no obligación: resolver la cuenta desde la suscripción
+(`metadata.preapproval_id`, `preapproval_id`, `subscription_id`) antes de
+rendirse. Sabotaje: volver a la regla de esta vuelta da rojo.
 
-PA-1 como está en `ROADMAP.md`, Fase 1b. D3 (abajo) va en commits propios y
-se entrega junto con PA-1, en el mismo informe. ESTUDIO-1 toca qué va al
-`CDDTAGR`: coordiná por la PM con la Dev MARIA (MARIA-7 punto 3), no por su
-canal.
+**i. Huecos de prueba en código de esta vuelta.** Cada uno muere con una
+prueba o el informe dice por qué no importa:
+- el bucle único de `setattr`: sacar `ops_used_this_period`,
+  `billing_period_started_at` o `extra_ops_expires_at` deja todo verde
+  (pagar y seguir bloqueado por cuota);
+- `trial` fuera de lo vigente en `_extender_periodo`; el tope de recargas
+  aplicado a planes; el borde en 91 (hoy se prueba 90 + 10);
+- `_guardable_en_pg` no limpia valores anidados: NUL en `payer.id` o en
+  la tarjeta da 500 en Postgres 16 (reproducido por el adversario). Éste es
+  defecto, no sólo prueba;
+- los cortes de `moneda`, `aprobado_en` y `motivo` sin prueba en Postgres;
+- monto `>= 0`, moneda `None` y fecha sin zona pasan;
+- los últimos 4 al revés o sin guardar la marca (baja).
 
-## Más adelante — EXCEL-3b (lo que dejó el adversario)
+**D13 (c), como te la di:** una suscripción vieja `authorized` en una
+cuenta que ya no es la actual recibe 409 con el texto de salida; el paso
+de más para la tarjeta que no pasa (D7.2) se acepta. Rojo antes, arreglo y
+sabotaje, en commits separados. Va en esta misma vuelta 3.
 
-Después de PA-1, en una sola pieza chica. Cada punto con su sintético y su
-sabotaje; numeración de la tabla de `REPRODUCCION-EXCEL-3-2026-10-24.md`:
+**j. Se suma a D13 (c):** `active` con fin de hace un día, dentro de la
+gracia: si la renovación llegó tarde y el cliente toca «Activar», hoy se
+cancela la que acaba de renovar. Y si Mercado Pago contesta 404 por la
+suscripción vieja, el checkout queda en 503 para siempre.
 
-1. (#2) Una fila sin rótulo y sin precio con largo o total de grupo no es
-   producto: queda sin leer, como en la base.
-2. (#5) Un renglón sin descripción no pasa a ser flete o descuento por un
-   texto en otra columna que no sea la de la descripción.
-3. (#7) Cuando la unidad sale del encabezado del precio («USD/M», «USD/sqm»),
-   se avisa cuál se tomó.
-4. (#4, #3) El grupo se corta en una fila de flete o descuento (con o sin
-   monto) y en un renglón con código nuevo y sin especificación (ese no
-   hereda; se avisa).
-5. (#1, #9) «Descuento …» con importe negativo y sin NCM se avisa (no entra
-   como producto de valor 0); «1,5m» en el largo no repite la unidad.
+**No entra ahora:**
+- En una organización, un segundo miembro crea otra suscripción para la
+  misma org (dos cobros por mes), además de lo de «Cancelar plan» que ya
+  estaba: los dos van en **COBRO-MP-2** antes de entregarla («una sola
+  suscripción» y C2). Rojo antes.
+- «Próximo cobro» con una suscripción que nunca se autorizó: riesgo en el
+  informe, o en COBRO-MP-2 si cae de paso.
+- Lecturas síncronas a Mercado Pago que frenan el servidor, el aviso sin
+  límite de pedidos y el IPN sin firma: se los propongo a Emi; no los
+  toques.
 
-## Más adelante — GUARDAR-2
+Siguen de la vuelta 1, sin cambio: una recarga que revive extras
+vencidos, cancelar mientras llega el primer pago y `_pago_un_plan_mp` con
+una prueba que sólo recargó quedan como riesgos en el informe; D8 (a) y
+D10 (a) como estaban. La devolución de la vuelta 1 está en
+`REPRODUCCION-COBRO-MP-1-2026-10-29.md` y en el historial de este archivo.
 
-Ya hay un candidato aislado: `2d930c5` en la rama vieja
-`claude/dev1-tecnica` (sobre `1cdfe49`). Partí de ahí, no lo rehagas;
-faltaba lo de `CIERRE-RETOMA-2026-10-24.md` («Qué sigue», punto 2).
+Puertas como la vuelta pasada: suite completa, `/code-review` y
+`/security-review` sobre el SHA que entregues.
 
-## Respuestas a tus D
+### ORDEN-1b: devolución de pruebas
 
-- **D3 (CLIENTE-1), 2026-10-24: (a).** Un matiz: la fecha no se borra «sin
-  aviso». Al guardar sale «Faltan para el MARIA: inicio de actividad»; lo
-  que no dice es que había una fecha y se perdió. Igual se arregla:
-  - **Causa:** el campo de fecha sólo muestra AAAA-MM-DD; si lo guardado
-    está en otro formato, el campo queda vacío y el guardado lo manda vacío.
-  - **Qué:** si lo guardado no es AAAA-MM-DD y el campo quedó vacío, la
-    fecha no se manda y se conserva. Si el usuario carga una fecha, la
-    nueva reemplaza a la vieja.
-  - **Prueba, por la familia:** fecha guardada `null`, `""`, `"01/03/2015"`,
-    otro texto no ISO y una ISO; editar sin tocar la fecha y guardar. Las
-    no ISO se conservan; `null` y `""` siguen vacías; la ISO se conserva.
-    Un sabotaje que vuelva a mandar el campo vacío tiene que dar rojo.
-  - **Lo que deja:** una fecha no ISO ya no se puede borrar desde el
-    formulario (sólo reemplazar). Aceptado; anotalo como riesgo.
-  - **Al aviso**, si la fecha vieja se conserva, que no diga que falta.
-  - No toques la API ni el TXT: la conversión al formato del TXT la hace la
-    Dev MARIA (MARIA-7, punto 9).
+Sobre `6c459d2`. Evidencia en `REPRODUCCION-ORDEN-1b-2026-10-29.md`.
+`orden1b.sh`: 14 ROJO y ningún sabotaje sin rojo, como tu informe.
+`orden1.sh`: 76 ROJO, sin rojo 0. El producto aguanta: dos adversarios no hicieron escribir a
+una pestaña como otro usuario, ni perder datos, ni trabarla (PUT, DELETE,
+PATCH, FormData, ráfagas, `ENVIRONMENT=production`). Lo que vuelve es la
+red.
+
+El criterio no cambia: ninguna escritura sale a nombre de otro usuario
+desde una pestaña cuyo dueño ya no es el de la sesión. D15 (c) quedó hecha
+en `3e30db2`. D16 (a): el CSRF en el logout del servidor se lo propongo a
+Emi; no lo hagas sin que esté en `ROADMAP.md`.
+
+**Causa:** las condiciones que sostienen el freno no tienen una prueba
+que falle sin ellas. `retenerUsuario` usa `route.continue()`, y Playwright
+pega las cookies al continuar: la suite nunca produce «la respuesta dice A
+y la cookie ya es de B». Y toda escritura de la suite es POST. Reproducido
+por la PM: sin la comparación de cookie de `confirmarSesion`, la pestaña de
+A guarda un cliente en la cuenta de B (`E7 clientes A: [] B: [ 'E7-escrito' ]`);
+con el freno sólo para POST, z12 y z20–z28 dan 13 OK.
+
+Pido una prueba por condición del freno, cada una con su sabotaje que da
+rojo:
+- la comparación de cookie en `confirmarSesion` (respuesta vieja, cookie
+  nueva);
+- la guarda `sesionAjena` de `confirmarSesion` (primera carga «ajena» y
+  escritura después);
+- PUT, DELETE y PATCH, no sólo POST;
+- la salida del diálogo: «Recargar» recarga y Escape no lo cierra;
+- el aviso «Comprobando la sesión…» se va al recuperar.
+
+Al aceptar pruebo otro mutante distinto de éstos. Producto, bajas: el
+«Comprobando…» que queda fijo si la sesión ya se había cerrado, y la rama
+`else` de `loadCurrentUser` que pisa `currentUser` con el de B tras el
+checkout. Cada una se arregla o el informe dice por qué no.
+
+**Fuera de la pieza, se lo llevo a Emi:** con `CSRF_ENFORCE=true`,
+`/api/session/state` da 403 (no está exento y `track()` no manda el
+header): la telemetría v2 no llega. No la toques.
+
+## BACKUP-1a: lo que encontró el adversario antes de tu `/entregar` (2026-10-28 17:48 UTC)
+
+Sobre `70f6d3d`. Tus sabotajes de `backup1a.sh` dan rojo todos
+(`sabotajes con falla: 0`, corrida del revisor). Va con tu entrega:
+
+1. **Alta, reproducido por la PM:** una base sin tablas sale `copia
+   verificada: 0 tablas, 0 filas`, `rc=0`, con su `.sha256`; con tablas
+   vacías, igual. Una dirección equivocada o una base recién creada dejan
+   el cron en verde con copias vacías. **Decidido por la PM:** `copiar` y
+   `verificar` fallan con 0 tablas o 0 filas en total, y lo dicen. Con
+   prueba y sabotaje.
+2. **Alta, reproducido por la PM:** si `copiar` devuelve 0 aunque
+   `verificar` dé 1 (`await verificar(archivo); return 0`), tus 31 pruebas
+   pasan. El código de salida es lo único que va a mirar el cron: una
+   prueba que lo exija y el mutante a `backup1a.sh`.
+3. **Media, reproducido por la PM:** la copia, la huella y la marca salen
+   `-rw-r--r--` (toda la base, con hashes de claves). Archivos 0600 y
+   carpeta 0700 al crearlos, también en `enviar`. Con prueba.
+4. **Media, del revisor (no lo reproduje):** con `SIGTERM` durante
+   `pg_restore` queda la base `cdi_restauracion_*` llena en el servidor y
+   el hijo vivo; no hay tiempos máximos en `pg_dump` ni `pg_restore`.
+   Manejá la señal o limpiá las `cdi_restauracion_*` viejas al empezar, y
+   poné un tiempo máximo. Si algo de esto no va en esta pieza, decilo en la
+   D8 con el motivo.
+5. **Lo que se promete:** la verificación compara filas y contenido por
+   tabla; no índices, restricciones, secuencias ni objetos grandes. Escribilo
+   así en el informe y en `CHANGELOG.md`, sin «quedó igual» a secas.
+6. **Mutantes que sobreviven:** la huella sólo del esquema `public`;
+   `enviar` sin `leer_huella` (manda una copia con la huella ausente).
+   Prueba roja para cada uno.
+7. **A riesgos:** un `copiar` o un `enviar` cortados a mitad dejan
+   archivos que traban el reintento con el mismo nombre («ya existe»), y la
+   huella no está cubierta por el `.sha256`.
+
+## COBRO: lo que encontró el adversario antes de tu `/entregar` (2026-10-28 17:05 UTC)
+
+No es un veredicto: el informe de COBRO no llegó. El adversario Opus atacó
+`b3ac325..dda9f5b` y la PM reprodujo A–D en SQLite (`/tmp/cdi-pm/wt-cobro-o`)
+y A también sobre la base. Arreglalos **antes** de entregar las tres COBRO,
+en commits aparte encima de `dda9f5b`, rojo antes y un sabotaje por regla.
+Todo decidido por la PM.
+
+- **A. Regresión de COBRO-MP-1 (alta).** Un pago aplicado antes de que
+  existiera `mp_pagos_aplicados` se vuelve a aplicar con cada aviso IPN
+  sin firma (`?topic=payment&id=<id>`): en `dda9f5b` la cuenta past_due
+  queda `active` 30 días más y con el contador en 0; en la base respondía
+  `skipped: payment_id ya procesado`. Ningún pago anterior al despliegue
+  se puede volver a aplicar, sea el último o uno más viejo. Elegí cómo
+  (cargar la tabla desde `last_payment_id` en la migración, no aplicar un
+  pago aprobado antes del período vigente, o las dos) y decilo en el
+  informe. Prueba: un pago aplicado por el código viejo, reenviado.
+- **B. `/generate_maria_export` no cuenta (media).** Con el tope lleno, la
+  importación da 402 y la exportación sale cinco veces con 200. La D4 b es
+  «el MARIA de un operation_id»: la exportación también cuenta, con la
+  misma regla de una vez por operación.
+- **C. past_due no puede cancelar (media).** `/api/billing/cancel` da 409
+  y la suscripción `authorized` sigue cobrando cuando la tarjeta vuelve.
+  Desde past_due se puede cancelar: cancela en Mercado Pago, la cuenta
+  queda `canceled` y no gana acceso.
+- **D. Dos checkouts a la vez (media/alta).** Dos pedidos simultáneos
+  crean dos suscripciones en Mercado Pago y CDI guarda una sola; cancelar
+  deja la otra cobrando. El checkout bloquea la fila de la cuenta (como
+  el conteo), el segundo no crea otra, y el botón de `profile.js`
+  (`openCheckout`) se deshabilita como el de `app_v2.js`. Prueba de la
+  carrera en Postgres 16.
+- **E. Reactivar una prueba con recarga (baja).** Queda `canceled` con
+  `needs_checkout` y el texto «período ya pagado», que es falso. Vuelve a
+  `trial` con sus días, como una prueba sin recarga.
+- **A riesgos, no ahora:** el webhook que no bloquea la fila mientras un
+  pedido la vence (F, base); el aviso `payment` de renovación antes que
+  `subscription_authorized_payment` con monto de panel menor; el aviso sin
+  `external_reference` que da 400 antes de deduplicar; `precio_esperado`
+  sin vencimiento (D29).
+
+El adversario Sonnet de COBRO sigue: si suma algo, va abajo de esto.
+
+## BACKUP-1a — después de LIMPIEZA-1 (2026-10-28 12:00 UTC)
+
+Primero **subí LIMPIEZA-1 a tu rama ya** (commits aparte, encima de
+`7d3a7f8`), para que no se pierda si se recicla el contenedor; se sigue
+entregando después del informe de AISLAMIENTO-2.
+
+Después, la mitad de BACKUP-1 que no espera a Emi (hallazgo D1 de
+`AUDITORIA-2026-10-06.md`: no hay ninguna copia de la base de producción).
+Es de MARIA en `ROADMAP.md`; te la paso yo porque ella no tiene pieza que
+arranque y vos tenés menos entregas en cola. Decidido por la PM.
+
+- **Qué:** un script que saca la copia de una base Postgres
+  (`pg_dump -Fc`), la restaura en una base descartable y comprueba que
+  quedó igual: por tabla, la cantidad de filas, y algo que distinga el
+  contenido (por ejemplo, un resumen de las filas ordenadas). Si la
+  restauración no da igual, sale con error y lo dice.
+- **Lo que espera a Emi, no lo hacés:** adónde va la copia (fuera de
+  Railway) y dónde se programa. Dejá el envío como un paso aparte con un
+  destino de prueba local, y en el informe, la lista de lo que tiene que
+  cargar Emi para activarlo.
+- **Límites:** sólo Postgres 16 local; ninguna dirección ni clave de
+  producción en el repositorio, en las pruebas ni en el informe. La
+  dirección de la base entra por variable, nunca por argumento (queda en el
+  historial del shell).
+- **Pruebas:** copia y restauración de una base con datos sintéticos de
+  todas las tablas; una fila cambiada, una tabla vacía y una copia cortada
+  a la mitad tienen que dar error. Un sabotaje por regla.
+- Commits aparte encima de LIMPIEZA-1, con su propio `/entregar` después
+  del de LIMPIEZA-1. Toca datos: revisión fuerte. Si algo choca, preguntá
+  en la **D8**.
+
+## COBRO-MP-2: subila ya (2026-10-28 10:00 UTC)
+
+Decís que está hecha en `dda9f5b`, pero tu rama remota sigue en `192774f`.
+Como con COBRO-MP-1: subila ya a `claude/dev-tecnica`, sin force push,
+aunque la entrega espere al cupo. Si el contenedor se recicla, se pierde.
+
+## AISLAMIENTO-2 — empezala ya (2026-10-28 10:00 UTC)
+
+Mientras esperás el cupo de las 18:00, la siguiente de la Fase 3. ABUSO-1
+la hace la Dev MARIA (decidido por la PM: es vecina de SESION-1, que ya
+hizo); vos te quedás con **AISLAMIENTO-2** y después **LIMPIEZA-1**. En
+commits aparte encima de `dda9f5b`, con su propio `/entregar` después del
+de COBRO-MP-2. No toca plata ni la cola MARIA.
+
+- **La prueba de aislamiento cubre poco:** `scripts/testing/ataque_aislamiento.sh`
+  ve sólo clientes y descargas (22 casos). Que cubra también operaciones,
+  notas, presupuestos, estudios y admin: otro dueño no ve, no cambia y no
+  borra lo ajeno, y lo de un estudio no se ve desde otro.
+- **Dos puntos ciegos de la prueba de recorrido de admin**
+  (`REPRODUCCION-ADMIN-2-2026-10-07.md`): un WebSocket bajo `/api/admin/`
+  sin control, y una ruta cruda en `/api/admin` o `/dev` exactos, sin barra
+  final. Hoy no existen: la prueba tiene que verlos si alguien los agrega.
+- **Latente:** `roles` guardado como texto en vez de lista haría que
+  «administrador» cuente como admin (también en `require_admin`).
+
+Premisa primero, sobre `dda9f5b`: corré la prueba y decí qué cubre hoy. Si
+aparece una fuga de verdad, frená y avisá con una D8 antes de arreglarla:
+es lo más grave que puede salir. Pruebas: cada caso nuevo en rojo con un
+sabotaje que abra la fuga; los dos puntos ciegos con un sabotaje cada uno.
+Es aislamiento: revisión fuerte.
+
+## COBRO-MP-2 — hecha, sin entregar (encargada 2026-10-28 08:00 UTC)
+
+COBRO-CORTE-1 quedó hecha (`27e4594`). Sigue la última de la Fase 2. En
+commits aparte encima de `27e4594`, con su propio `/entregar` después del
+de COBRO-CORTE-1. Arregla C2, C4 y C8 de `AUDITORIA-2026-10-06.md` y lo que
+de tu D9 del 07/10 quedó para acá (`7f1dd2c`):
+
+- **Cancelar (C2):** cancelar en CDI también cancela la suscripción en
+  Mercado Pago, y la cuenta sigue activa hasta el fin del período pagado,
+  como ya dice la pantalla («activo hasta…»). Si Mercado Pago no contesta
+  o da error, no se cancela en CDI a medias: se dice que no se pudo.
+- **Una sola suscripción (C4):** el checkout mira si ya hay una vigente y
+  no deja pagar dos veces. Un pago nunca hace perder los días que
+  quedaban.
+- **Reactivar pagando (C8 y D9):** cancelar y reactivar desde una prueba
+  gratis no deja la cuenta activa sin pagar. Sin `MP_ACCESS_TOKEN` no se
+  dice «Tu cuenta Premium ha sido activada» ni se cambia nada.
+
+Premisa primero: comprobá cada una sobre `27e4594` (la base cambió con
+COBRO-MP-1 y COBRO-CORTE-1) y cómo se cancela una suscripción en la API de
+Mercado Pago según el código y la documentación que ya esté en el repo (la
+red está cerrada: lo que no puedas ver, como supuesto). Si para «no perder
+días» o «una sola suscripción» hay que elegir entre comportamientos que ve
+el cliente, preguntá en la **D7** antes de hacerlo.
+
+Pruebas, con Mercado Pago simulado (nada contra el real): cancelar llama
+a Mercado Pago y deja la cuenta activa hasta el fin del período; Mercado
+Pago con error no deja nada a medias; el segundo checkout con una vigente
+se frena; un pago no acorta el período; cancelar y reactivar una prueba no
+la activa; sin token no dice «activada» ni cambia el estado. Cada prueba en
+rojo antes del arreglo; un sabotaje por regla. Línea en `CHANGELOG.md`.
+
+Es plata: la reviso con Opus y Sonnet, alto.
+
+### D7 (2026-10-28 08:20 UTC, sobre tu `192774f`): (a) en las cuatro
+
+Decidido por la PM; Emi lo confirma de día y puede cambiarlo antes de
+publicar. La premisa y «Lo que hago sin esperar» van como los escribiste.
+
+- **D7.1 (a):** los días de prueba que quedan se suman al pago.
+- **D7.2:** en modo suscripción, como lo planteaste, con un caso más: el
+  409 vale sólo si la cuenta está vigente en CDI. Si está `past_due` o
+  vencida y en Mercado Pago figura `authorized` (por ejemplo, la tarjeta
+  falla), la vieja se cancela antes de crear la nueva, como con `pending`:
+  si no, el que quiere pagar con otra tarjeta queda trabado. Si cancelar la
+  vieja falla, 503 y no se crea nada. En modo preference, **(a)**: pagar
+  por adelantado suma 30 días desde el fin.
+- **D7.3 (a):** reactivar lleva al checkout de una suscripción nueva. Antes
+  de pagar, la respuesta dice que cobra ahora y suma 30 días desde el fin
+  del período ya pagado. Ningún texto dice «próximo cobro» si no lo hay.
+- **D7.4 (a):** sin token, en producción, el checkout da 503 y no hay botón
+  de simular. Para saber si es producción usá el criterio que ya tenga el
+  código, cerrado por defecto: si falta la variable que lo dice, no hay
+  demo. Si no hay criterio o cerrarlo rompe cómo arrancan las pruebas, D8
+  antes de inventar uno.
+
+**Riesgos aceptados:** el de estudios (quién cancela en un estudio es de
+permisos, Fase 3) y el de las cuentas `active` sin pago de Mercado Pago, que
+vuelven a `trial`. Los dos, al informe. Sumá a riesgos, para publicar, los
+supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
+`cancelled` no vuelve, el cobro inmediato y la ruta `PUT /preapproval/{id}`
+(y por qué no el SDK).
+
+## Orden
+
+1. COBRO-MP-1, vuelta 3: la devolución de arriba, con D13 (c), ahora.
+2. ORDEN-1b, vuelta 2: las pruebas de arriba, apenas entregues la 1.
+3. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
+4. COBRO-MP-2: hecha; suma la cancelación de organizaciones y la segunda
+   suscripción de una org (arriba), y se entrega después de COBRO-CORTE-1.
+5. AISLAMIENTO-2 y LIMPIEZA-1: hechas; se entregan después de COBRO-MP-2.
+6. BACKUP-1a (arriba).
+7. EXCEL-2c (D32 b, decidido por la PM): antes de leer, la fila y columna
+   máximas (`r=` y `<dimension>`), la cuenta de `<xf` en `styles.xml` y de
+   entradas del `sst`; por encima de un tope, el libro va al carril pesado.
+   Rojo primero, un caso por forma y un sabotaje por tope. Hasta entonces,
+   el CHANGELOG y tus riesgos dicen el límite con su número.

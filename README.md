@@ -63,7 +63,7 @@ proyecto_maria/     la aplicación
   main.py           FastAPI, rutas y lógica (un solo módulo, grande)
   core/             generación del archivo MARIA, conectores (VUCE, Tarifar), dólar
   database/         modelos y conexión
-  templates/        landing, dashboard v2 (default) y v1 (cookie ui=v1)
+  templates/        landing, dashboard (v2), panel de desarrollo
   static/v2/        frontend vigente
 tests/              pytest; conftest con base y usuario de prueba
 scripts/testing/    e2e, smokes, sabotajes y capturas de pantalla

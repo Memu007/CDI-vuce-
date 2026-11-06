@@ -271,9 +271,16 @@ class TestWebhook:
         assert resp.json().get("skipped") is not None
 
     def test_pago_aprobado_activa_billing_y_extiende_30_dias(self, client, monkeypatch):
-        """Pago aprobado → billing_status=active, trial_ends_at ~30 días."""
+        """Pago aprobado → billing_status=active y 30 días más desde el fin
+        de la prueba: los días que quedaban no se pierden (COBRO-MP-2, D7.1)."""
         uname = _unique("wh_ok")
         _register(client, uname)
+        antes = _get_user(uname)
+        assert antes["billing_status"] == "trial"
+        fin_prueba = antes["trial_ends_at"]
+        if fin_prueba.tzinfo is None:
+            fin_prueba = fin_prueba.replace(tzinfo=timezone.utc)
+        assert fin_prueba > datetime.now(timezone.utc) + timedelta(days=1)
         payment_id = f"pay-{uuid.uuid4().hex[:8]}"
 
         class FakePayment:
@@ -283,7 +290,9 @@ class TestWebhook:
                     "response": {
                         "id": pid,
                         "status": "approved",
+                        "date_approved": datetime.now(timezone.utc).isoformat(),
                         "external_reference": f"{uname}:premium",
+                        "transaction_amount": 45000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-mp-1"},
                         "card": {"last_four_digits": "4242", "payment_method": {"name": "visa"}},
                     },
@@ -303,8 +312,7 @@ class TestWebhook:
         trial_end = after["trial_ends_at"]
         if trial_end.tzinfo is None:
             trial_end = trial_end.replace(tzinfo=timezone.utc)
-        delta = trial_end - datetime.now(timezone.utc)
-        assert 28 <= delta.days <= 31, f"trial_ends_at delta: {delta.days} días"
+        assert abs(trial_end - (fin_prueba + timedelta(days=30))) < timedelta(minutes=5), (trial_end, fin_prueba)
 
     def test_pago_aprobado_resetea_ops_periodo(self, client, monkeypatch):
         """Al cobrar suscripción, ops_used_this_period se resetea a 0."""
@@ -320,7 +328,9 @@ class TestWebhook:
                     "response": {
                         "id": pid,
                         "status": "approved",
+                        "date_approved": datetime.now(timezone.utc).isoformat(),
                         "external_reference": f"{uname}:premium",
+                        "transaction_amount": 45000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-2"},
                     },
                 }
@@ -349,7 +359,9 @@ class TestWebhook:
                     "response": {
                         "id": pid,
                         "status": "approved",
+                        "date_approved": datetime.now(timezone.utc).isoformat(),
                         "external_reference": f"{uname}:premium",
+                        "transaction_amount": 45000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-3"},
                     },
                 }
@@ -402,8 +414,9 @@ class TestWebhook:
         after = _get_user(uname)
         assert after["billing_status"] == "trial"
 
-    def test_pago_usuario_inexistente_400(self, client, monkeypatch):
-        """Pago de usuario inexistente → 400 (MP reintenta)."""
+    def test_pago_usuario_inexistente_queda_rechazado(self, client, monkeypatch):
+        """Pago de usuario inexistente → 200 con fila «rechazado»: reintentar
+        no lo arregla (COBRO-MP-1 vuelta 2, b)."""
         class FakePayNoUser:
             def get(self, pid):
                 return {
@@ -411,7 +424,9 @@ class TestWebhook:
                     "response": {
                         "id": pid,
                         "status": "approved",
+                        "date_approved": datetime.now(timezone.utc).isoformat(),
                         "external_reference": "usuarioquenoeexiste:premium",
+                        "transaction_amount": 45000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-x"},
                     },
                 }
@@ -423,7 +438,8 @@ class TestWebhook:
         body = {"type": "payment", "data": {"id": f"pay-{uuid.uuid4().hex[:8]}"}}
         resp = self._wh_post(client, body, monkeypatch, secret="", is_prod=False,
                              mp_token="TEST-fake", sdk_cls=FakeSDKNoUser)
-        assert resp.status_code == 400
+        assert resp.status_code == 200, resp.text
+        assert "rechazado" in resp.json().get("skipped", ""), resp.json()
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -558,7 +574,9 @@ class TestTopup:
                     "response": {
                         "id": pid,
                         "status": "approved",
+                        "date_approved": datetime.now(timezone.utc).isoformat(),
                         "external_reference": f"{uname}:topup",
+                        "transaction_amount": 10000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-tu"},
                     },
                 }
@@ -587,7 +605,8 @@ class TestTopup:
         assert 28 <= delta.days <= 31
 
     def test_topup_no_supera_max_100(self, client, monkeypatch):
-        """Top-up no puede llevar extra_ops_remaining por encima de 100."""
+        """Una recarga que pasaría de 100 no se acredita a medias: queda
+        rechazada y no suma (COBRO-MP-1 vuelta 2, f)."""
         uname = _unique("tu_cap")
         _register(client, uname)
         _set_user(uname, billing_status="active", extra_ops_remaining=95)
@@ -600,7 +619,9 @@ class TestTopup:
                     "response": {
                         "id": pid,
                         "status": "approved",
+                        "date_approved": datetime.now(timezone.utc).isoformat(),
                         "external_reference": f"{uname}:topup",
+                        "transaction_amount": 10000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-cap"},
                     },
                 }
@@ -616,17 +637,19 @@ class TestTopup:
         monkeypatch.setattr(main_mod.mercadopago, "SDK", FakeSDKCap)
 
         body = {"type": "payment", "data": {"id": payment_id}}
-        client.post("/api/payments/webhook", content=json.dumps(body),
-                    headers={"content-type": "application/json"})
+        r = client.post("/api/payments/webhook", content=json.dumps(body),
+                        headers={"content-type": "application/json"})
+        assert r.status_code == 200 and "rechazado" in r.json().get("skipped", ""), r.text
 
         after = _get_user(uname)
-        assert after["extra_ops_remaining"] == 100  # cap: min(95+10, 100)
+        assert after["extra_ops_remaining"] == 95
 
     def test_topup_creditos_expiran_30_dias(self):
         """process_payment para topup setea expiry a now+30d."""
         payment = {
             "id": "pay-exp-1",
             "status": "approved",
+            "date_approved": datetime.now(timezone.utc).isoformat(),
             "external_reference": "alice:topup",
             "payer": {"id": "payer-1"},
         }
@@ -742,6 +765,7 @@ class TestPlanesPublicos:
         pay = {
             "id": "pay-sub-1",
             "status": "approved",
+            "date_approved": datetime.now(timezone.utc).isoformat(),
             "external_reference": "alice:premium",
             "payer": {"id": "payer-alice"},
         }

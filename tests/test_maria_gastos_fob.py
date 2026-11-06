@@ -45,6 +45,7 @@ BASE = dict(
     seguro=75.47,
     sbt_sufijo_valor="AA(Demo)-CA00-",
     fecha_emision="22/06/2026",
+    cuit_agr="20111111112",  # sin CUIT del despachante no se genera (MARIA-7)
 )
 
 

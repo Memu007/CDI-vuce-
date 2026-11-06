@@ -33,10 +33,10 @@ jobs:
       - name: Sintaxis Python
         run: python -m compileall -q proyecto_maria tests
 
-      # La suite entera, sin exclusiones. Hasta 2026-07-26 se colgaba en los
-      # tests de billing/trial y CI miraba solo 9 archivos elegidos a mano;
-      # despues quedaron 10 tests deseleccionados por fallas viejas, que ya
-      # estaban arregladas el 2026-11-05 (suite completa verde sin excluirlos).
+      # La suite entera, sin sacar ninguna prueba. Hasta 2026-07-26 se colgaba
+      # en los tests de billing/trial; despues 10 pruebas quedaron excluidas a
+      # mano hasta LIMPIEZA-1 (2026-10-28). tests/test_limpieza1.py falla si
+      # este paso vuelve a sacar pruebas.
       - name: Suite completa
         env:
           ENVIRONMENT: testing

@@ -11,6 +11,8 @@ from fractions import Fraction
 from functools import lru_cache
 from pathlib import Path
 
+from proyecto_maria.core import sufijos_arca
+
 # Condiciones de venta de los grupos C y D de Incoterms. En estas, la
 # informacion complementaria del SIM pide `GTOS-POS-FOB` (diferencia entre la
 # condicion pactada y el FOB declarado). En EXW pide `GTOS-ANT-FOB` (gastos
@@ -197,7 +199,9 @@ UNIDADES_MARIA = {
     "kg": "01", "kgs": "01", "kilo": "01", "kilos": "01",
     "kilogramo": "01", "kilogramos": "01",
     "m": "02", "mt": "02", "mts": "02", "metro": "02", "metros": "02",
-    "m2": "03", "metro cuadrado": "03",
+    "m2": "03", "m²": "03", "metro cuadrado": "03", "metros cuadrados": "03",
+    "sqm": "03", "㎡": "03", "m^2": "03", "mtk": "03", "sq m": "03",
+    "square meter": "03", "square meters": "03", "square metre": "03", "square metres": "03",
     "m3": "04", "metro cubico": "04",
     "l": "05", "lt": "05", "lts": "05", "litro": "05", "litros": "05",
     "u": "07", "un": "07", "und": "07", "unid": "07",
@@ -219,10 +223,242 @@ def get_unidad_codigo(unidad: str) -> str:
     """
     if not unidad:
         return "07"
-    clave = str(unidad).strip().lower()
+    clave = _clave_de_unidad(unidad)
     if clave.isdigit():  # ya vino el codigo numerico
         return clave.zfill(2)
     return UNIDADES_MARIA.get(clave, "07")
+
+
+def _clave_de_unidad(unidad) -> str:
+    """La unidad en minúsculas, sin puntos y con un solo espacio: «Sq.M.»,
+    «M2.» y «sq  m» se buscan como «sq m», «m2» y «sq m» (MARIA-7)."""
+    clave = re.sub(r"\.", " ", str(unidad or "").lower())
+    return re.sub(r"\s+", " ", clave).strip()
+
+
+UNIDAD_KILOGRAMO = "01"
+
+
+def unidad_estadistica_de(item: dict, unidad_declarada: str, idx) -> str:
+    """El código de la unidad estadística (CARTUNTEST) del ítem (MARIA-7).
+
+    Sin elegir, la misma que la declarada (como antes). Elegida, sólo la
+    declarada o kilos: con otra no se sabe la cantidad estadística. La que
+    pide la posición no se pone sola: si es otra, se avisa (SUFIJOS-1)."""
+    crudo = str(item.get("unidad_estadistica") or "").strip()
+    if not crudo:
+        return unidad_declarada
+    codigo = get_unidad_codigo(crudo)
+    if codigo not in (unidad_declarada, UNIDAD_KILOGRAMO) or (
+            not crudo.isdigit() and _clave_de_unidad(crudo) not in UNIDADES_MARIA):
+        raise ValueError(
+            f"Ítem {idx}: unidad estadística «{crudo[:20]}» no válida: va la misma "
+            f"que la declarada o kilogramo (01)."
+        )
+    return codigo
+
+
+def kilos_al_centesimo(peso_kg: float) -> Decimal:
+    """El kilo neto como sale en QARTKGRNET, llevado al centésimo con la
+    mitad hacia arriba: QARTUNTEST en kilos tiene que coincidir con él
+    (error 2122 del MARIA, 24/10)."""
+    return Decimal(f"{peso_kg:.3f}").quantize(Decimal("0.01"), ROUND_HALF_UP)
+
+
+# --- Lo que el MARIA rechazó el 2026-10-24 (MARIA-7) ---------------------
+# IDSO, IDDT y la raíz de IARTESPAPU: con 19 caracteres el MARIA rechazó el
+# archivo; con 8 lo aceptó. El largo máximo no está escrito en ningún lado
+# (D para el despachante): se usa 8. El número completo sigue en
+# NRO.REF.INTERNA.
+LARGO_ID_MARIA = 8
+FALTA_CUIT_DEL_DESPACHANTE = (
+    "Falta el CUIT del despachante (CDDTAGR): cargalo en «Mi perfil», campo «Mi CUIT "
+    "(despachante)». Sin él no se genera el TXT."
+)
+# LDVDREFDOC: el número de la factura, con el ancho fijo de siempre.
+LARGO_REF_FACTURA = 28
+
+
+def fecha_inicio_actividad(guardada) -> str:
+    """La fecha de inicio de actividad del cliente en DD/MM/AAAA, como en los
+    golden. El alta y la revisión la guardan AAAA-MM-DD (campo de fecha del
+    navegador); si ya viene DD/MM/AAAA sale igual. Lo que no es una fecha no
+    se adivina: no se genera y se dice dónde corregirla (MARIA-7)."""
+    texto = str(guardada or "").strip()
+    if not texto:
+        return ""
+    for patron, formato in ((r"\d{4}-\d{2}-\d{2}", "%Y-%m-%d"), (r"\d{2}/\d{2}/\d{4}", "%d/%m/%Y")):
+        if re.fullmatch(patron, texto):
+            try:
+                fecha = datetime.strptime(texto, formato)
+                return f"{fecha.day:02d}/{fecha.month:02d}/{fecha.year:04d}"  # %Y no rellena
+            except ValueError:
+                break  # «2015-02-30»: tiene la forma pero no es una fecha
+    raise ValueError(
+        f"La fecha de inicio de actividad del cliente «{texto[:30]}» no es una fecha "
+        "(DD/MM/AAAA): corregila en «Clientes», campo «Inicio de actividad», o en la "
+        "revisión, campo «Fecha inicio de actividades». Así no se genera el TXT."
+    )
+
+
+def id_corto_maria(operation_id: str) -> str:
+    """Los últimos 8 letras o números del identificador de la operación (lo
+    que distingue una factura de otra; el principio suele repetirse)."""
+    alfanumerico = re.sub(r"[^A-Za-z0-9]", "", str(operation_id or ""))
+    if not alfanumerico:
+        raise ValueError(
+            f"El identificador de la operación «{str(operation_id)[:20]}» no tiene letras ni números."
+        )
+    return alfanumerico[-LARGO_ID_MARIA:]
+
+
+def ref_de_la_factura(numero_factura: str) -> str:
+    """LDVDREFDOC: el número real de la factura, ancho fijo. Sin número no
+    se inventa (antes salía «E» + el final del identificador): va vacío y
+    se avisa en los supuestos."""
+    numero = str(numero_factura or "").strip()
+    if len(numero) > LARGO_REF_FACTURA:
+        raise ValueError(
+            f"El número de factura «{numero[:40]}» tiene {len(numero)} caracteres; "
+            f"en el TXT entran {LARGO_REF_FACTURA}."
+        )
+    return f"{numero:<{LARGO_REF_FACTURA}}"
+
+
+# Un sufijo es una serie de «CC(valor)-» y «CCNN-». Dentro del valor el
+# MARIA sólo acepta letras, números y espacios (24/10: rechazó guiones y
+# puntos). Entre un sufijo y otro va «-», como en el archivo aceptado; un
+# espacio, una coma o nada entre dos sufijos se toma como separación
+# (devolución de MARIA-7: antes «AA(ROJO) AB(AZUL)» salía «AA(ROJO  AB AZUL)»).
+_UN_SUFIJO = re.compile(r"([A-Za-z]{2})(?:\(([^()]*)\)|([0-9]{2}))")
+_ENTRE_SUFIJOS = re.compile(r"[\s,;\-]*")
+SUFIJO_MAXIMO = 120  # el mismo tope que valida /generate_maria
+
+
+def limpiar_sufijo(sufijo: str, donde: str = "") -> tuple[str, bool]:
+    """El sufijo partido en sus códigos, cada uno con su valor reducido a
+    letras, números y espacios (lo demás, espacio; una letra con tilde, sin
+    tilde) y separados con «-»; el «-» final, si vino. Devuelve también si
+    cambió algo, para avisarlo. Lo que no se puede partir en códigos (un
+    paréntesis sin cerrar, un «(» dentro del valor) no se adivina: error
+    con `donde` (qué producto y qué sufijo)."""
+    sufijo = str(sufijo or "")
+    partes, pos = [], _ENTRE_SUFIJOS.match(sufijo).end()
+    while pos < len(sufijo):
+        uno = _UN_SUFIJO.match(sufijo, pos)
+        if not uno:
+            raise ValueError(
+                f"Sufijo de valor{donde}: «{sufijo[:80]}» no se puede separar en códigos "
+                f"(cerca de «{sufijo[pos:pos + 20]}»). Cada uno va como AA(valor) o CA00, "
+                f"separados con un guion, y dentro del paréntesis van sólo letras, números "
+                f"y espacios. Así no se genera el TXT."
+            )
+        codigo, valor, numero = uno.groups()
+        partes.append(codigo + (f"({sufijos_arca.solo_letras_numeros_espacios(valor)})" if numero is None else numero))
+        pos = _ENTRE_SUFIJOS.match(sufijo, uno.end()).end()
+    final = "-" if partes and _ENTRE_SUFIJOS.fullmatch(sufijo[-1]) else ""
+    limpio = "-".join(partes) + final
+    # El endpoint mide el sufijo como vino; con los guiones puede crecer.
+    if len(limpio) > SUFIJO_MAXIMO:
+        raise ValueError(
+            f"Sufijo de valor{donde}: separado con guiones queda de {len(limpio)} caracteres "
+            f"y no puede superar los {SUFIJO_MAXIMO}. Así no se genera el TXT."
+        )
+    return limpio, limpio != sufijo
+
+
+def _aviso_de_sufijo(donde: str, sufijo) -> list:
+    """El aviso de lo que se cambió en un sufijo. Si no se puede separar no
+    se avisa: el generador da el error."""
+    try:
+        limpio, cambio = limpiar_sufijo(str(sufijo or "").strip())
+    except ValueError:
+        return []
+    if not cambio:
+        return []
+    return [f"Sufijo de valor{donde}: entre un código y otro va un guion y dentro de los "
+            f"paréntesis van sólo letras, números y espacios; sale «{limpio[:80]}»."]
+
+
+def usa_el_sufijo_de_la_operacion(items) -> bool:
+    """Si algún producto lleva el sufijo de la operación (MARIA-9): uno que
+    sale entero, un renglón o un sub-ítem, sin sufijo propio (SUFIJOS-1: el
+    que sale entero también lleva el suyo). Sólo entonces se valida. Un
+    propio que no se puede separar no lo usa: el error es el suyo. Si no se
+    sabe, se valida."""
+    if not isinstance(items, list) or not all(isinstance(it, dict) for it in items):
+        return True
+
+    def sin_propio(sufijo):
+        try:
+            return not limpiar_sufijo(str(sufijo or "").strip())[0]
+        except ValueError:
+            return False
+
+    for item in items:
+        subs = item.get("subitems")
+        if subs:
+            if not isinstance(subs, list) or any(
+                    not isinstance(sub, dict) or sin_propio(sub.get("sufijo")) for sub in subs):
+                return True
+        elif sin_propio(item.get("sufijo")):
+            return True
+    return False
+
+
+# IDTRIB-PROVEEDOR es la identificación tributaria del proveedor. El 24/10
+# salió un número de cuenta del banco: eso no se declara. Las palabras van
+# sin una letra adelante: «ARABIC» o «VAT ARBANK-…» no son cuentas, pero
+# «ICBC_ACCOUNT» o «1_BANK» sí (un dígito o «_» no tapan la palabra).
+_PALABRAS_DE_CUENTA = re.compile(
+    r"(?<![A-Z])(?:IBAN|SWIFT|BIC\b|ACCOUNT|ACCT|CUENTA|CTA\b|BANK|BANCO|A/C)", re.I
+)
+
+
+def parece_cuenta_bancaria(identificador: str) -> bool:
+    """Una cuenta y no una identificación tributaria: lo dice («account»,
+    «IBAN», «cuenta»…), es un IBAN (forma y dígitos de control) o son 16
+    dígitos o más (las cuentas chinas tienen de 16 a 19; el CNPJ 14 y el
+    número japonés 13). El código chino de crédito social (18, a veces
+    todos dígitos) se reconoce por su dígito verificador y no es cuenta."""
+    texto = str(identificador or "").strip()
+    if _PALABRAS_DE_CUENTA.search(texto):
+        return True
+    compacto = re.sub(r"[\s\-.]", "", texto).upper()
+    if es_codigo_chino_de_credito_social(compacto):
+        return False
+    if re.fullmatch(r"[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}", compacto) and _iban_valido(compacto):
+        return True
+    return compacto.isdigit() and len(compacto) >= 16
+
+
+def _iban_valido(iban: str) -> bool:
+    """Los dígitos de control del IBAN (ISO 13616, módulo 97). Sin esto un
+    CNPJ escrito con el país adelante («BR» + 14 dígitos) parecía cuenta."""
+    reordenado = iban[4:] + iban[:4]
+    return int("".join(str(int(c, 36)) for c in reordenado)) % 97 == 1
+
+
+_ALFABETO_USCC = "0123456789ABCDEFGHJKLMNPQRTUWXY"
+_PESOS_USCC = (1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28)
+
+
+def es_codigo_chino_de_credito_social(codigo: str) -> bool:
+    """El código unificado de crédito social de China (GB 32100-2015): 18
+    caracteres y el último es el verificador de los 17 anteriores."""
+    if len(codigo) != 18 or any(c not in _ALFABETO_USCC for c in codigo):
+        return False
+    suma = sum(_ALFABETO_USCC.index(c) * w for c, w in zip(codigo[:17], _PESOS_USCC))
+    return _ALFABETO_USCC[(31 - suma % 31) % 31] == codigo[17]
+
+
+def idtrib_del_proveedor(vendedor_id: str) -> str | None:
+    """Lo que va en IDTRIB-PROVEEDOR, o None si no hay o parece una cuenta
+    (no se inventa: los supuestos lo avisan)."""
+    texto = str(vendedor_id or "").strip()
+    if not texto or parece_cuenta_bancaria(texto):
+        return None
+    return texto
 
 
 PAIS_DEFAULT_IMPORT = 310  # China (codigo oficial MARIA) cuando no se reconoce
@@ -247,10 +483,18 @@ ESTADO_POR_DEFECTO_IMPORTADO = 2
 ESTADOS_ARGENTINOS = {1, 3, 5}
 ESTADOS_IMPORTADOS = {2, 4, 6}
 
-# IVA adicional (IVAADICIONAL1): reventa o uso particular (respuesta 2,
-# 21:34; archivo de 2026). La reducción o exclusión es una «ventaja» que se
-# elige en el Kit (22:12): no va en el TXT.
-IVA_ADICIONAL = {"NO_VALIDA": "Reventa", "IVAAD1": "Uso particular"}
+# Destino de la mercadería (DESTINO-1): el MARIA hace dos preguntas por ítem
+# y las respuestas van de a pares (PREGUNTAS-DESPACHANTE.md, «Respuestas del
+# 2026-10-28»). Se elige y se guarda el código de IVAADICIONAL1; el de
+# GANANCIASOP3 sale de esta tabla, así no puede salir un par que no está.
+# La reducción o exclusión del IVA es una «ventaja» que se elige en el Kit
+# (22:12): no va en el TXT.
+IVA_ADICIONAL = {
+    "NO_VALIDA": "Comercialización o reventa",
+    "IVAAD2": "Bien de uso de la empresa",
+    "IVAAD1": "Bien de uso de una persona",
+}
+GANANCIAS_POR_IVA_ADICIONAL = {"NO_VALIDA": "COMERC", "IVAAD2": "BDEUSO", "IVAAD1": "USOPAR"}
 IVA_ADICIONAL_POR_DEFECTO = "NO_VALIDA"
 
 # Empresa de digitalización (ARDIG-CUIT-PSAD), por operación (respuesta 5,
@@ -273,9 +517,28 @@ INCOTERMS_GASTOS_ANTERIORES = {"EXW", "FCA", "FAS"}
 IMPORTE_MAXIMO = 1_000_000_000_000
 
 
+# SEPARADORES-1b (D19). Un importe escrito se toma sólo si no deja dudas:
+# cifras y, si hay, un punto con uno o dos decimales («3221.66», «150»). Lo
+# demás («3.480», «1,500», «1e3», «1_000») Python lo leería a su manera, o la
+# pantalla no lo pudo leer y lo manda tal cual: no es un importe.
+_IMPORTE_ESCRITO = re.compile(r"-?[0-9]+(?:\.[0-9]{1,2})?")
+# SEPARADORES-1c. Un importe en blanco es 0. «En blanco» es sólo lo que
+# también es blanco para trim() de la pantalla: Python saca además \x1c a
+# \x1f y \x85, que la pantalla no lee y manda tal cual. Si el servidor los
+# tomara por blanco, lo que la pantalla no leyó saldría 0 en el TXT.
+ESPACIOS = "\t\n\x0b\x0c\r \xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
+
+
 def importe_valido(valor, nombre: str):
-    """El importe como número, o None si no vino. Un importe no finito,
-    negativo o absurdo es un error con mensaje propio (400)."""
+    """El importe como número, o None si no vino (o vino en blanco). Un
+    importe escrito con dudas, no finito, negativo o absurdo es un error con
+    mensaje propio (400)."""
+    if isinstance(valor, str):
+        valor = valor.strip(ESPACIOS)
+        if not valor:
+            return None
+        if not _IMPORTE_ESCRITO.fullmatch(valor):
+            raise ValueError(f"{nombre}: «{valor[:20]}» no es un importe.")
     if valor is None:
         return None
     try:
@@ -398,7 +661,8 @@ def _estado_item(item: dict, idx, pais_codigo: int) -> int:
 def _iva_adicional(valor, donde: str) -> str:
     codigo = str(valor or "").strip().upper()
     if codigo not in IVA_ADICIONAL:
-        raise ValueError(f"{donde}: IVA adicional «{valor}» no válido (NO_VALIDA o IVAAD1).")
+        raise ValueError(f"{donde}: destino de la mercadería «{valor}» no válido "
+                         f"(NO_VALIDA, IVAAD2 o IVAAD1).")
     return codigo
 
 
@@ -548,6 +812,60 @@ def peso_valido(peso, donde) -> float:
     return kilos
 
 
+def _enumerar(numeros: list) -> str:
+    """«1, 2 y 3»."""
+    textos = [str(n) for n in numeros]
+    return textos[0] if len(textos) == 1 else ", ".join(textos[:-1]) + " y " + textos[-1]
+
+
+def clave_de_posicion(item: dict, donde, iva_por_defecto: str | None) -> tuple:
+    """Lo que tienen que compartir dos renglones para ir en un solo ítem
+    (MARIA-8): posición SIM, origen, procedencia y estado, y además lo que el
+    ítem declara una sola vez (unidad, unidad estadística, IVA adicional)."""
+    pais = item.get('pais_origen') or item.get('origen', 'CN')
+    pais_codigo = get_pais_codigo(pais)
+    unidad = get_unidad_codigo(item.get('unidad') or item.get('unidad_medida') or item.get('um'))
+    iva = (_iva_adicional(item.get('iva_adicional'), f"Ítem {donde}")
+           if item.get('iva_adicional') else iva_por_defecto)
+    return (
+        re.sub(r"[.\s]", "", str(item.get('ncm') or item.get('pieza') or '')).upper(),
+        pais_codigo,
+        get_pais_codigo(procedencia_de(item) or pais),
+        _estado_item(item, donde, pais_codigo),
+        unidad,
+        unidad_estadistica_de(item, unidad, donde),
+        iva,
+    )
+
+
+def renglones_por_posicion(items: list, iva_por_defecto: str | None = None) -> list:
+    """Los números (desde 0) de los renglones que van juntos en un ítem, en el
+    orden de su primer renglón (MARIA-8). Sólo los que tienen más de uno. Un
+    grupo armado a mano, un producto con sub-ítems a mano y uno sin posición
+    no entran."""
+    juntos: dict = {}
+    for n, item in enumerate(items):
+        if item.get('grupo_id') is not None or item.get('subitems'):
+            continue
+        clave = clave_de_posicion(item, n + 1, iva_por_defecto)
+        # Sin posición (la completa el despachante) no hay con qué comparar.
+        if clave[0]:
+            juntos.setdefault(clave, []).append(n)
+    return [ns for ns in juntos.values() if len(ns) > 1]
+
+
+def al_centesimo_cerrando(valores: list) -> tuple[list, Decimal]:
+    """Cada valor y su suma al centésimo, con la mitad hacia arriba; lo que
+    falta o sobra para que las partes sumen el total va a la parte más grande
+    (la primera, si empatan). MARIA-8: las sumas del ítem cierran exactas."""
+    centesimo = Decimal("0.01")
+    total = sum(valores, Decimal(0)).quantize(centesimo, ROUND_HALF_UP)
+    partes = [v.quantize(centesimo, ROUND_HALF_UP) for v in valores]
+    mayor = max(range(len(valores)), key=lambda i: (valores[i], -i))
+    partes[mayor] += total - sum(partes, Decimal(0))
+    return partes, total
+
+
 def fob_total_del_txt(items: list, grupos: list | None = None) -> Decimal:
     """El MDDTFOB que va a salir en el TXT: los productos de un grupo suman su
     valor y la línea se redondea una vez; el resto, cada uno al centavo. La
@@ -558,6 +876,105 @@ def fob_total_del_txt(items: list, grupos: list | None = None) -> Decimal:
         clave = ('grupo', gid) if gid is not None else ('item', n)
         lineas[clave] = lineas.get(clave, Decimal(0)) + valor_de_la_linea(item)
     return sum((centavos(v) for v in lineas.values()), Decimal('0.00'))
+
+
+TASA_SEGURO_SUGERIDO = Decimal("0.01")
+# El 1 % va sobre el FOB de la factura (D13 de VALOR-1b, decidido por la PM).
+# Para cambiarlo alcanza con esta línea: "fob_casillero".
+BASE_SEGURO_SUGERIDO = "fob_factura"
+NOMBRE_DEL_FOB = {"fob_casillero": "FOB casillero", "fob_factura": "FOB de la factura"}
+
+
+def importe_escrito(valor) -> str:
+    """Un importe como se escribe acá: 1.234,56."""
+    return f"{valor:,.2f}".replace(",", "@").replace(".", ",").replace("@", ".")
+
+
+def _ajuste(valor, nombre: str):
+    """Un ajuste como lo manda la pantalla: número, texto con un número o
+    nada. Verdadero o falso no es un importe (float(True) daría 1); una lista
+    o un objeto tampoco, y no se muestra como lo escribe Python."""
+    if isinstance(valor, bool) or not isinstance(valor, (str, int, float, Decimal, type(None))):
+        raise ValueError(f"{nombre}: no es un importe.")
+    return importe_valido(valor, nombre)
+
+
+def _numeros_de_los_renglones(items: list):
+    """Que cada cantidad y cada valor de los renglones se pueda leer como
+    número, con un mensaje que lo nombre en vez del texto de Python.
+    Verdadero o falso no es un número, como en _ajuste."""
+    campos = (("cantidad", "la cantidad"), ("valor_unitario", "el valor unitario"),
+              ("valor_total", "el valor total"))
+    for n, item in enumerate(items, 1):
+        for campo, nombre in campos:
+            valor = item.get(campo)
+            if not isinstance(valor, bool):
+                if not valor or isinstance(valor, (int, float, Decimal)):
+                    continue
+                try:
+                    float(valor)
+                    continue
+                except (TypeError, ValueError):
+                    pass
+            escrito = f" «{valor[:20]}»" if isinstance(valor, str) else ""
+            raise ValueError(f"Renglón {n}: {nombre}{escrito} no es un número; "
+                             f"no se pueden hacer las cuentas.")
+
+
+def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajustes_deducir=None) -> dict:
+    """Las cuentas del valor que se muestran antes de generar (VALOR-1).
+
+    FOB casillero = FOB de la factura (el MDDTFOB del TXT) + ajustes a incluir
+    − ajustes a deducir. Los ajustes los carga la persona: el sistema no
+    decide qué se descuenta. El seguro sugerido es el 1 % de (el FOB de
+    BASE_SEGURO_SUGERIDO + flete), al centavo. Nada de esto cambia el TXT (D12 de VALOR-1). Un
+    importe inválido o un FOB casillero negativo es un ValueError."""
+    _numeros_de_los_renglones(items)
+    fob_factura = fob_total_del_txt(items)
+    incluir = centavos(_ajuste(ajustes_incluir, "Ajustes a incluir") or 0)
+    deducir = centavos(_ajuste(ajustes_deducir, "Ajustes a deducir") or 0)
+    flete_c = centavos(importe_valido(flete, "Flete") or 0)
+    seguro_c = centavos(importe_valido(seguro, "Seguro") or 0)
+    fob_casillero = fob_factura + incluir - deducir
+    if fob_casillero < 0:
+        raise ValueError(
+            f"Los ajustes a deducir ({importe_escrito(deducir)}) superan el FOB de la "
+            f"factura más los ajustes a incluir ({importe_escrito(fob_factura + incluir)})."
+        )
+    fob_base = {"fob_casillero": fob_casillero, "fob_factura": fob_factura}[BASE_SEGURO_SUGERIDO]
+    return {
+        "fob_factura": float(fob_factura),
+        "ajustes_incluir": float(incluir),
+        "ajustes_deducir": float(deducir),
+        "fob_casillero": float(fob_casillero),
+        "flete": float(flete_c),
+        "seguro": float(seguro_c),
+        "seguro_sugerido": float(centavos(TASA_SEGURO_SUGERIDO * (fob_base + flete_c))),
+        "base_seguro": NOMBRE_DEL_FOB[BASE_SEGURO_SUGERIDO],
+    }
+
+
+def _item_de_los_renglones(renglones: list, renglones_de: dict, lugar: dict) -> dict:
+    """El ítem que junta renglones de la misma posición (MARIA-8): el FOB es
+    la suma de los de cada renglón al centavo (así MDDTFOB no cambia) y los
+    kilos, la de cada uno al gramo. Cada renglón se valida con su número en
+    la pantalla."""
+    kilos = [Decimal(f"{peso_valido(peso_de_la_linea(r), lugar[id(r)]):.3f}") for r in renglones]
+    for r in renglones:
+        # Como en los sub-ítems a mano: QSBTUNTDCL va al centésimo y no puede
+        # salir 0,00 con FOB.
+        if _exacto(r.get('cantidad', 1)).quantize(Decimal("0.01"), ROUND_HALF_UP) <= 0:
+            raise ValueError(
+                f"Item {lugar[id(r)]}: la cantidad «{str(r.get('cantidad'))[:20]}» tiene que ser "
+                f"un número mayor que 0 (al centésimo) para ir como sub-ítem."
+            )
+    item = dict(renglones[0])
+    item['cantidad'] = float(sum((_exacto(r.get('cantidad', 1)) for r in renglones), Decimal(0)))
+    item['valor_total'] = sum((_fob_de(r) for r in renglones), Decimal('0.00'))
+    item['peso_kg'] = float(sum(kilos, Decimal(0)))
+    item['valor_unitario'] = (float(item['valor_total']) / item['cantidad']) if item['cantidad'] > 0 else 0
+    renglones_de[id(item)] = (renglones, kilos)
+    return item
 
 
 def generate_maria_txt(operation_id: str, items: list, 
@@ -595,7 +1012,9 @@ def generate_maria_txt(operation_id: str, items: list,
                        # Lo que decide el despachante (MARIA-4)
                        banco_bcra: str = "",
                        empresa_digitalizacion: str = EMPRESA_DIGITALIZACION_POR_DEFECTO,
-                       iva_adicional: str = IVA_ADICIONAL_POR_DEFECTO) -> str:
+                       iva_adicional: str = IVA_ADICIONAL_POR_DEFECTO,
+                       # El número real de la factura, para LDVDREFDOC (MARIA-7).
+                       numero_factura: str = "") -> str:
     """
     Genera archivo TXT en formato MARIA.
     
@@ -610,7 +1029,7 @@ def generate_maria_txt(operation_id: str, items: list,
             - pais_origen/origen: País de origen
         moneda: Código de moneda (DOL, EUR)
         incoterm: Término comercial (FOB, DDP, CIF, EXW)
-        cuit_agr: CUIT del despachante (opcional)
+        cuit_agr: CUIT del despachante (obligatorio: CDDTAGR, MARIA-7)
         vendedor_nombre: Nombre del proveedor/vendedor
         vendedor_id: ID/CUIT del vendedor
         comprador_nombre: Nombre del importador
@@ -622,6 +1041,10 @@ def generate_maria_txt(operation_id: str, items: list,
         String con contenido del archivo TXT (CRLF line endings)
     """
     lines = []
+
+    cuit_agr = str(cuit_agr or "").strip()
+    id_maria = id_corto_maria(operation_id)
+    ref_factura = ref_de_la_factura(numero_factura)
 
     # MARIA-4: validar lo que decide el despachante antes de armar nada.
     banco_bcra = str(banco_bcra or "").strip()
@@ -647,12 +1070,11 @@ def generate_maria_txt(operation_id: str, items: list,
 
     lines.append("[DDT]")
     lines.append(f"ISTA={tipo_destinacion}")
-    lines.append(f"IDSO={operation_id}")
+    lines.append(f"IDSO={id_maria}")
     lines.append("CDDTEXE=01")
     lines.append(f"CDDTBUR={aduana_codigo}")
     lines.append(f"CDDTTYPDEC={tipo_destinacion}")
-    if cuit_agr:
-        lines.append(f"CDDTAGR={cuit_agr}")
+    lines.append(f"CDDTAGR={cuit_agr}")
     lines.append("CDDTIMPEXP=I")
     if vendedor_nombre:
         # Extraer solo el nombre si viene con ID entre parentesis (hack para sample)
@@ -788,20 +1210,22 @@ def generate_maria_txt(operation_id: str, items: list,
     lines.append(f"MCPL={empresa_digitalizacion:<40}")
     lines.append("")
     
-    # 5. Proveedor
-    if vendedor_id:
+    # 5. Proveedor. Una cuenta del banco no es su identificación tributaria
+    # (MARIA-7): si no hay o lo parece, no sale y se avisa.
+    idtrib = idtrib_del_proveedor(vendedor_id)
+    if idtrib:
         lines.append("[CPL]")
         lines.append("NART=0000")
         lines.append("ICPLDIF=D")
         lines.append("CCPL=IDTRIB-PROVEEDOR")
-        lines.append(f"MCPL={vendedor_id:<40}")
+        lines.append(f"MCPL={idtrib:<40}")
         lines.append("")
     
     # 6. Fecha Inicio Actividad (del cliente). Si no viene, NO se emite el bloque.
     # Antes caia el default "13/07/2016" (dato de OTRO cliente del sample) en
     # CUALQUIER declaracion. Mejor omitir y que el despachante lo complete a mano
     # que meter datos falsos de otra empresa en la declaracion aduanera.
-    fecha_ini_act = str(comprador_fecha_inic_activ or "").strip()
+    fecha_ini_act = fecha_inicio_actividad(comprador_fecha_inic_activ)
     if fecha_ini_act:
         lines.append("[CPL]")
         lines.append("NART=0000")
@@ -827,9 +1251,9 @@ def generate_maria_txt(operation_id: str, items: list,
     lines.append("NART=0000")
     lines.append("CDVDDOC=FACTURACOMERCIAL")
     lines.append("CDVDPRSDOC=S")
-    # Referencia factura
-    ref_factura = f"E{operation_id[-3:]}-1" if len(operation_id) > 3 else "E001-1"
-    lines.append(f"LDVDREFDOC={ref_factura:<28}")
+    # El número real de la factura (MARIA-7). Antes, «E» + el final del
+    # identificador: un pedazo («E7L1-1»).
+    lines.append(f"LDVDREFDOC={ref_factura}")
     lines.append("")
     
     # === [ART] Por cada item (con agrupación por grupo_id) ===
@@ -849,10 +1273,19 @@ def generate_maria_txt(operation_id: str, items: list,
     # grupos antes, no es el de su línea del TXT. Los errores de los
     # sub-ítems lo usan para caer bajo el sub-ítem que falla (SUBITEMS-1).
     lugar_en_el_pedido = {id(it): k for k, it in enumerate(items, 1)}
+    # Los renglones de la misma posición van en un ítem, uno por sub-ítem
+    # (MARIA-8); el ítem sale donde estaba su primer renglón.
+    juntos_de = {n: ns for ns in renglones_por_posicion(items, iva_adicional) for n in ns}
+    renglones_de = {}
     items_export = []
     grupos_emitidos = set()
-    for item in items:
+    for n_renglon, item in enumerate(items):
         gid = item.get('grupo_id')
+        if n_renglon in juntos_de:
+            if juntos_de[n_renglon][0] == n_renglon:
+                items_export.append(_item_de_los_renglones(
+                    [items[k] for k in juntos_de[n_renglon]], renglones_de, lugar_en_el_pedido))
+            continue
         if gid is None:
             items_export.append(item)
             continue
@@ -865,7 +1298,8 @@ def generate_maria_txt(operation_id: str, items: list,
         # generación también puede llamarse directamente.
         ncms = {str(it.get('ncm') or it.get('pieza') or '').replace('.', '').replace(' ', '').upper() for it in grupo_items}
         origenes = {str(it.get('pais_origen') or it.get('origen') or '').strip().upper() for it in grupo_items}
-        unidades = {str(it.get('unidad') or it.get('unidad_medida') or it.get('um') or '').strip().upper() for it in grupo_items}
+        # Las unidades, por su código: «kg» y «KGS», o «1» y «01», son la misma.
+        unidades = {get_unidad_codigo(it.get('unidad') or it.get('unidad_medida') or it.get('um')) for it in grupo_items}
         if any(it.get('subitems') for it in grupo_items):
             raise ValueError(f"Grupo {gid}: un producto agrupado no lleva sub-ítems; "
                              f"desagrupalo para cargarlos.")
@@ -875,6 +1309,11 @@ def generate_maria_txt(operation_id: str, items: list,
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo origen")
         if len(unidades) != 1:
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener la misma unidad de medida")
+        # La unidad estadística, por su código: «1», «01» y «kg» son la misma.
+        if len({unidad_estadistica_de(it, get_unidad_codigo(it.get('unidad') or it.get('unidad_medida')
+                                                            or it.get('um')), f"del grupo {gid}")
+                for it in grupo_items}) != 1:
+            raise ValueError(f"Grupo {gid}: todos los ítems deben tener la misma unidad estadística")
         # Se comparan los valores que salen en el TXT, no cómo se escribieron.
         pais_grupo = get_pais_codigo(next(iter(origenes)))
         estados = {_estado_item(it, f"del grupo {gid}", pais_grupo) for it in grupo_items}
@@ -885,11 +1324,19 @@ def generate_maria_txt(operation_id: str, items: list,
         if len(estados) != 1:
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo estado de la mercadería")
         if len(ivas) != 1:
-            raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo IVA adicional")
+            raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo destino de la mercadería")
+        # Un grupo sale en un solo [SBT]: un solo sufijo (SUFIJOS-1). El «-»
+        # final no los hace distintos; sale el del primero.
+        sufijos = [limpiar_sufijo(str(it.get('sufijo') or '').strip(), f" del grupo {gid}")[0]
+                   for it in grupo_items]
+        if len({s.rstrip('-') for s in sufijos}) != 1:
+            raise ValueError(f"Grupo {gid}: todos los ítems deben llevar el mismo sufijo de valor; "
+                             f"si cada producto lleva el suyo, desagrupalos.")
 
         # Combinar los items del grupo en uno solo
         primero = grupo_items[0]
         combined = dict(primero)
+        combined['sufijo'] = sufijos[0]
         combined['descripcion'] = ' + '.join(
             str(it.get('descripcion', '')).strip() for it in grupo_items
         )
@@ -907,6 +1354,11 @@ def generate_maria_txt(operation_id: str, items: list,
     fletes = repartir(flete, fobs)
     seguros = repartir(seguro, fobs)
     lines[linea_fob_total] = f"MDDTFOB={sum(fobs, Decimal('0.00')):.2f}"
+
+    def sufijo_de_la_operacion():
+        # Se analiza donde se usa: si todos traen el suyo, un texto libre
+        # acá no frena el TXT (MARIA-9).
+        return limpiar_sufijo((sbt_sufijo_valor or "").strip(), " de la operación")[0]
 
     for idx, item in enumerate(items_export, 1):
         # Obtener valores
@@ -945,7 +1397,68 @@ def generate_maria_txt(operation_id: str, items: list,
         # Unidad de medida del item (con fallback a 07=UNIDAD si no viene).
         unidad_codigo = get_unidad_codigo(
             item.get('unidad') or item.get('unidad_medida') or item.get('um'))
-        
+        unidad_est = unidad_estadistica_de(item, unidad_codigo, idx)
+        peso_neto = peso_valido(peso_kg, lugar_en_el_pedido.get(id(item), idx))
+        subitems = item.get("subitems") or []
+        # En kilos, la cantidad estadística es el kilo neto al centésimo
+        # (error 2122 del MARIA). Con sub-ítems hacen falta los kilos de cada
+        # uno, que llegan con MARIA-8.
+        # Sus QSBTUNTEST son las cantidades: cierran sólo si la declarada
+        # también es en kilos y suma lo mismo que el kilo neto.
+        if unidad_est == UNIDAD_KILOGRAMO:
+            cantidad_est = kilos_al_centesimo(peso_neto)
+            if cantidad_est <= 0:
+                # D2 (b): el kilo neto sale al centésimo; 0,00 kg no se declara.
+                raise ValueError(
+                    f"Item {lugar_en_el_pedido.get(id(item), idx)}: con unidad estadística en kilos, "
+                    f"el kilo neto ({peso_neto:g} kg) al centésimo da 0.00; tiene que ser de al "
+                    f"menos 0.005 kg (revisá el peso y la cantidad)."
+                )
+            if subitems and (unidad_codigo != UNIDAD_KILOGRAMO
+                             or cantidad_est != Decimal(f"{cantidad:.2f}")):
+                raise ValueError(
+                    f"Item {lugar_en_el_pedido.get(id(item), idx)}: con unidad estadística en kilos "
+                    f"y sub-ítems faltan los kilos de cada sub-ítem; por ahora declaralo sin "
+                    f"sub-ítems, con la unidad estadística igual a la declarada, o en kilos con "
+                    f"la cantidad igual al kilo neto al centésimo ({cantidad_est:.2f})."
+                )
+        else:
+            cantidad_est = Decimal(f"{cantidad:.2f}")
+        cantidad_dcl = Decimal(f"{cantidad:.2f}")
+        # Renglones juntos (MARIA-8): la cantidad y la cantidad estadística de
+        # cada sub-ítem son las de su renglón, y suman exacto las del ítem.
+        renglones, kilos_renglones = renglones_de.get(id(item), (None, None))
+        if renglones:
+            cantidades_renglones = [_exacto(r.get('cantidad', 1)) for r in renglones]
+            cantidades_sub, cantidad_dcl = al_centesimo_cerrando(cantidades_renglones)
+            if unidad_est == UNIDAD_KILOGRAMO:
+                estadisticas_sub, cantidad_est = al_centesimo_cerrando(kilos_renglones)
+            else:
+                estadisticas_sub, cantidad_est = cantidades_sub, cantidad_dcl
+            if min(cantidades_sub + estadisticas_sub) <= 0:
+                # Se nombran los que dan cero solos, no todos los del ítem.
+                # Si el cero sale del ajuste (que cae en el más grande), o
+                # queda en cero uno que solo no daba cero, los que dan cero
+                # solos no lo explican, y se nombran todos (VALOR-1c).
+                propios = [cantidades_renglones] + (
+                    [kilos_renglones] if unidad_est == UNIDAD_KILOGRAMO else [])
+                solos = {i for i, valores in enumerate(zip(*propios))
+                         if min(valores).quantize(Decimal("0.01"), ROUND_HALF_UP) <= 0}
+                en_cero = {i for i, valores in enumerate(zip(cantidades_sub, estadisticas_sub))
+                           if min(valores) <= 0}
+                chicos = [lugar_en_el_pedido[id(r)] for i, r in enumerate(renglones)
+                          if i in solos or not en_cero <= solos]
+                raise ValueError(
+                    f"Item {lugar_en_el_pedido[id(renglones[0])]}: "
+                    + (f"el renglón {chicos[0]} es tan chico que al llevar su cantidad o sus "
+                       f"kilos al centésimo no cierra" if len(chicos) == 1 else
+                       f"los renglones {_enumerar(chicos)} son tan chicos que al llevar sus "
+                       f"cantidades o kilos al centésimo no cierran")
+                    + " con el total; revisá las cantidades y los kilos."
+                )
+            # El unitario del ítem, sobre la cantidad que se declara.
+            valor_unit = float(valor_total) / float(cantidad_dcl)
+
         flete_item = fletes[idx - 1]
         seguro_item = seguros[idx - 1]
         base_imponible = valor_total + flete_item + seguro_item
@@ -955,20 +1468,24 @@ def generate_maria_txt(operation_id: str, items: list,
         lines.append(f"NARTEXT={idx:04d}")
         lines.append("CARTTYP=N")
         lines.append(f"IESPNCE={ncm}")
-        lines.append(f"IDDT={operation_id}")
-        lines.append(f"IARTESPAPU={operation_id}{idx:04d}")
+        lines.append(f"IDDT={id_maria}")
+        lines.append(f"IARTESPAPU={id_maria}{idx:04d}")
         # S cuando el ítem se declara partido en sub-ítems, N cuando va entero.
         # Los dos archivos de referencia lo confirman: el que tiene un solo
         # [SBT] dice N, el que tiene dos dice S.
-        lines.append("CARTSBITEM=S" if item.get("subitems") else "CARTSBITEM=N")
+        lines.append("CARTSBITEM=S" if item.get("subitems") or renglones else "CARTSBITEM=N")
         lines.append(f"CARTUSO={_estado_item(item, idx, pais_codigo)}")
-        lines.append(f"QARTKGRNET={peso_valido(peso_kg, idx):.3f}")
+        # D2 (b): con la estadística en kilos, el kilo neto es la cantidad
+        # estadística (al centésimo, con el tercer decimal en 0), como en el
+        # archivo que el MARIA aceptó el 24/10.
+        kilo_neto = cantidad_est if unidad_est == UNIDAD_KILOGRAMO else peso_neto
+        lines.append(f"QARTKGRNET={kilo_neto:.3f}")
         lines.append(f"CARTPAYORI={pais_codigo}")
         lines.append(f"CARTPAYPRC={pais_proc_codigo}") # Procedencia (default = origen)
         lines.append(f"CARTUNTDCL={unidad_codigo}") # Unidad declarada (oficial MARIA)
-        lines.append(f"QARTUNTDCL={cantidad:.2f}")
-        lines.append(f"CARTUNTEST={unidad_codigo}")
-        lines.append(f"QARTUNTEST={cantidad:.2f}")
+        lines.append(f"QARTUNTDCL={cantidad_dcl:.2f}")
+        lines.append(f"CARTUNTEST={unidad_est}")
+        lines.append(f"QARTUNTEST={cantidad_est:.2f}")
         lines.append(f"MARTFOB={valor_total:.2f}")
         lines.append(f"MARTASS={seguro_item:.2f}")
         lines.append(f"MARTFLE={flete_item:.2f}")
@@ -983,21 +1500,22 @@ def generate_maria_txt(operation_id: str, items: list,
         lines.append("")
         
         # [CPL] Items
+        # Los dos del destino salen juntos, de la misma tabla (DESTINO-1).
+        iva_item = (
+            _iva_adicional(item.get("iva_adicional"), f"Ítem {idx}")
+            if item.get("iva_adicional") else iva_adicional
+        )
         lines.append("[CPL]")
         lines.append(f"NART={idx:04d}")
         lines.append("ICPLDIF=S")
         lines.append("CCPL=GANANCIASOP3    ")
-        lines.append(f"MCPL={'COMERC':<40}")
+        lines.append(f"MCPL={GANANCIAS_POR_IVA_ADICIONAL[iva_item]:<40}")
         lines.append("")
         
         lines.append("[CPL]")
         lines.append(f"NART={idx:04d}")
         lines.append("ICPLDIF=S")
         lines.append("CCPL=IVAADICIONAL1   ")
-        iva_item = (
-            _iva_adicional(item.get("iva_adicional"), f"Ítem {idx}")
-            if item.get("iva_adicional") else iva_adicional
-        )
         lines.append(f"MCPL={iva_item:<40}")
         lines.append("")
         
@@ -1010,20 +1528,48 @@ def generate_maria_txt(operation_id: str, items: list,
         #
         # Referencia real con dos sub-ítems:
         # `tests/fixtures/maria_golden_subitems_anon.TXT`.
-        sufijo_sbt = (sbt_sufijo_valor or "").strip()
-        subitems = item.get("subitems") or []
-
-        if not subitems and not sufijo_sbt:
-            raise ValueError(
-                "Falta el sufijo de valor SBT (CSBTSVL). "
-                "Este dato es obligatorio y depende del importador. "
-                "Contactá al despachante para obtenerlo."
-            )
-
-        if not subitems:
-            # Ítem entero: un solo bloque, sin montos (numeración desde 0000).
+        # Dentro de los valores, sólo letras, números y espacios (MARIA-7;
+        # los supuestos avisan lo que se cambió).
+        if renglones:
+            # Un sub-ítem por renglón (MARIA-8), con lo de su renglón: el FOB
+            # al centavo, el unitario y el sufijo propio o el de la operación.
+            for n, (renglon, cant_sub, est_sub) in enumerate(
+                    zip(renglones, cantidades_sub, estadisticas_sub), start=1):
+                sufijo = limpiar_sufijo(str(renglon.get("sufijo") or "").strip(),
+                                        f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0] or sufijo_de_la_operacion()
+                if not sufijo:
+                    raise ValueError(
+                        f"Item {lugar_en_el_pedido[id(renglon)]}: falta el sufijo de valor (CSBTSVL)."
+                    )
+                fob_sub = _fob_de(renglon)
+                unitario = (float(renglon["valor_unitario"]) if renglon.get("valor_unitario") not in (None, "")
+                            else float(valor_de_la_linea(renglon)) / float(renglon.get("cantidad", 1) or 1))
+                lines.append("[SBT]")
+                lines.append(f"IDDT={id_maria}")
+                lines.append(f"NART={idx:04d}")
+                lines.append(f"ISBT={n:04d}")
+                lines.append(f"MSBTFOB={fob_sub:.2f}")
+                lines.append(f"QSBTUNTDCL={cant_sub:.2f}")
+                lines.append(f"MSBTUNITAR={unitario:.4f}")
+                lines.append(f"IEXT={idx}-{n}")
+                lines.append(f"CSBTSVL={sufijo}")
+                lines.append(f"QSBTUNTEST={est_sub:.2f}")
+                lines.append("")
+        elif not subitems:
+            # Ítem entero: un solo bloque, sin montos (numeración desde 0000),
+            # con su sufijo propio o el de la operación (SUFIJOS-1).
+            donde = (f" del grupo {item['grupo_id']}" if item.get("grupo_id") is not None
+                     else f" del ítem {lugar_en_el_pedido.get(id(item), idx)}")
+            sufijo_sbt = (limpiar_sufijo(str(item.get("sufijo") or "").strip(), donde)[0]
+                          or sufijo_de_la_operacion())
+            if not sufijo_sbt:
+                raise ValueError(
+                    "Falta el sufijo de valor SBT (CSBTSVL). "
+                    "Este dato es obligatorio y depende del importador. "
+                    "Contactá al despachante para obtenerlo."
+                )
             lines.append("[SBT]")
-            lines.append(f"IDDT={operation_id}")
+            lines.append(f"IDDT={id_maria}")
             lines.append(f"NART={idx:04d}")
             lines.append("ISBT=0000")
             lines.append(f"IEXT={idx}-1")
@@ -1087,7 +1633,8 @@ def generate_maria_txt(operation_id: str, items: list,
                 )
 
             for n, sub in enumerate(subitems, start=1):
-                sufijo = (sub.get("sufijo") or sufijo_sbt or "").strip()
+                sufijo = limpiar_sufijo((sub.get("sufijo") or "").strip(),
+                                        f" del ítem {n_item}, sub-ítem {n}")[0] or sufijo_de_la_operacion()
                 if not sufijo:
                     raise ValueError(
                         f"Item {n_item}, sub-ítem {n}: falta el sufijo de valor (CSBTSVL)."
@@ -1095,7 +1642,7 @@ def generate_maria_txt(operation_id: str, items: list,
                 sub_cant = float(sub.get("cantidad", 0) or 0)
                 sub_unit = float(sub.get("valor_unitario", valor_unit) or 0)
                 lines.append("[SBT]")
-                lines.append(f"IDDT={operation_id}")
+                lines.append(f"IDDT={id_maria}")
                 lines.append(f"NART={idx:04d}")
                 lines.append(f"ISBT={n:04d}")
                 lines.append(f"MSBTFOB={fobs_sub[n - 1]:.2f}")
@@ -1106,7 +1653,22 @@ def generate_maria_txt(operation_id: str, items: list,
                 lines.append(f"QSBTUNTEST={sub_cant:.2f}")
                 lines.append("")
 
-    return "\r\n".join(lines)
+    # Todas las líneas terminan en CRLF (MARIA-7: «falta carácter de fin
+    # (crlf)»), la última también. Cada bloque cierra con una línea vacía; la
+    # del último no se escribe (el archivo termina en el CRLF del último
+    # dato, como el real). Un CR o LF suelto dentro de una línea la partiría:
+    # no se genera.
+    # MARIA-7: sin CDDTAGR el MARIA rechaza el archivo («No existe el campo
+    # CDDTAGR», 24/10). Antes la línea se omitía en silencio. Se controla al
+    # final: los demás errores del pedido se ven primero.
+    if not cuit_agr:
+        raise ValueError(FALTA_CUIT_DEL_DESPACHANTE)
+    while lines and lines[-1] == "":
+        lines.pop()
+    for n, linea in enumerate(lines, 1):
+        if "\r" in linea or "\n" in linea:
+            raise ValueError(f"La línea {n} del TXT tiene un salto de línea adentro: revisá los textos.")
+    return "".join(linea + "\r\n" for linea in lines)
 
 
 def _sim_position_error(ncm_raw: str) -> str | None:
@@ -1187,6 +1749,162 @@ def _dos_decimales(valor):
             return 0.0
 
 
+def _cuales(lugares: list) -> str:
+    """«el ítem 1», «los ítems 1 y 2» o «el grupo g1 y el ítem 3»: `lugares`
+    son números de ítem o textos («grupo g1», «ítem 1, sub-ítem 2»)."""
+    if all(isinstance(n, int) for n in lugares):
+        return f"el ítem {lugares[0]}" if len(lugares) == 1 else f"los ítems {_enumerar(lugares)}"
+    return _enumerar([f"el ítem {n}" if isinstance(n, int) else f"el {n}" for n in lugares])
+
+
+def _de(cuales: str) -> str:
+    return "del " + cuales[3:] if cuales.startswith("el ") else "de " + cuales
+
+
+def _codigos_del_sufijo(sufijo: str) -> list:
+    """[(código, valor)] de un sufijo ya limpio: («AI», «620G GRIS»), («PB02», "")."""
+    return [(codigo + (numero or ""), valor or "") for codigo, valor, numero in _UN_SUFIJO.findall(sufijo)]
+
+
+def _avisos_del_arancel(items: list, sbt_sufijo_valor, juntos: list) -> list:
+    """Lo que el arancel de ARCA dice de cada posición y no se cumple
+    (SUFIJOS-1): la posición que no está, lo que pide y el sufijo no trae, la
+    unidad estadística que no es la suya y el código de artículo (`AI`)
+    repetido. No cambia nada del TXT; el error de un sufijo que no se puede
+    separar lo da el generador."""
+    tabla = sufijos_arca.cargar()
+    fuente = sufijos_arca.fuente(tabla)
+    if not tabla:
+        return [f"Sufijos de valor: falta la tabla del {fuente}; no se completan ni se "
+                f"controlan. Cargalos a mano con el despachante."]
+
+    def posicion_de(item):
+        return str(item.get("ncm") or item.get("pieza") or "").strip()
+
+    def limpio(sufijo):
+        return limpiar_sufijo(str(sufijo or "").strip())[0]
+
+    try:
+        general = limpio(sbt_sufijo_valor)
+    except ValueError:
+        general = ""
+    en_renglones = {n for ns in juntos for n in ns}
+
+    # Cada [SBT] que sale: dónde está, su posición y su sufijo. Un renglón
+    # junto con otros se nombra como su ítem.
+    sbts, grupos = [], set()
+    for n, item in enumerate(items):
+        try:
+            if item.get("subitems"):
+                for m, sub in enumerate(item["subitems"], start=1):
+                    sbts.append((f"ítem {n + 1}, sub-ítem {m}", posicion_de(item),
+                                 limpio(sub.get("sufijo")) or general))
+            elif item.get("grupo_id") is not None and n not in en_renglones:
+                if item["grupo_id"] not in grupos:
+                    grupos.add(item["grupo_id"])
+                    sbts.append((f"grupo {item['grupo_id']}", posicion_de(item),
+                                 limpio(item.get("sufijo")) or general))
+            else:
+                sbts.append((n + 1, posicion_de(item), limpio(item.get("sufijo")) or general))
+        except (ValueError, TypeError, AttributeError):
+            continue  # lo dice el generador
+
+    avisos = []
+    consultas = {}
+    fuera = {}
+    for n, item in enumerate(items, start=1):
+        posicion = posicion_de(item)
+        if not posicion:
+            continue
+        consultas.setdefault(posicion, sufijos_arca.consultar(posicion, tabla))
+        if consultas[posicion] is None:
+            fuera.setdefault(posicion, []).append(n)
+    for posicion, ns in fuera.items():
+        donde = f"Posición {sufijos_arca.escrita(posicion)} ({'ítem ' + str(ns[0]) if len(ns) == 1 else 'ítems ' + _enumerar(ns)})"
+        if not sufijos_arca.es_sim(posicion):
+            avisos.append(
+                f"{donde}: no es una posición SIM completa (11 dígitos y la letra de control). "
+                f"Los sufijos de valor y la unidad estadística no se completan ni se controlan: "
+                f"cargalos a mano con el despachante."
+            )
+            continue
+        letra = sufijos_arca.letra_de_control(posicion, tabla)
+        if letra:
+            escrita = sufijos_arca.escrita(posicion)
+            avisos.append(
+                f"{donde}: en el {fuente} la letra de control de {escrita[:-1]} es {letra}, "
+                f"no {escrita[-1]}. Revisá la posición; los sufijos de valor y la unidad "
+                f"estadística no se completan ni se controlan."
+            )
+            continue
+        avisos.append(
+            f"{donde}: no está en el {fuente}. Los sufijos de valor y la unidad estadística no se "
+            f"completan ni se controlan: cargalos a mano con el despachante."
+        )
+
+    for lugar, posicion, sufijo in sbts:
+        consulta = consultas.get(posicion)
+        if not consulta or not sufijo:
+            continue  # fuera de la tabla, o sin sufijo: lo dice el generador
+        # Un código con el valor vacío («AA( )») es uno que falta.
+        falta = sufijos_arca.faltan(consulta, [c for c, v in _codigos_del_sufijo(sufijo)
+                                               if v.strip() or len(c) == 4])
+        if falta:
+            avisos.append(
+                f"Sufijo de valor {_de(_cuales([lugar]))}: según el {fuente}, la posición "
+                f"{sufijos_arca.escrita(posicion)} pide {_enumerar(falta)}, "
+                f"y no {'está' if len(falta) == 1 else 'están'}."
+            )
+
+    # La unidad estadística que sale contra la de la posición, por posición.
+    distintas = {}
+    for n, item in enumerate(items, start=1):
+        consulta = consultas.get(posicion_de(item))
+        if not consulta:
+            continue
+        try:
+            declarada = get_unidad_codigo(item.get("unidad") or item.get("unidad_medida") or item.get("um"))
+            sale = unidad_estadistica_de(item, declarada, n)
+        except (ValueError, TypeError):
+            continue  # lo dice el generador
+        if sale != consulta["unidad_estadistica"]:
+            clave = (posicion_de(item), consulta["unidad_estadistica"], sale, declarada,
+                     bool(item.get("subitems")))
+            distintas.setdefault(clave, []).append(n)
+    for (posicion, pide, sale, declarada, con_subitems), ns in distintas.items():
+        cuales = _cuales(ns)
+        if pide == UNIDAD_KILOGRAMO and con_subitems:
+            # En kilos, cada QSBTUNTEST es la cantidad del sub-ítem: cierra
+            # sólo si la declarada también es en kilos (ver arriba, MARIA-8).
+            como = ("Con sub-ítems sale en kilos sólo si la unidad de la factura también es "
+                    "kilogramo y la cantidad es el kilo neto: declaralo así, o sin sub-ítems, "
+                    "o confirmalo con el despachante.")
+        elif pide == UNIDAD_KILOGRAMO:
+            como = "Elegí «Kilogramo (01)» en «Lo que decide el despachante»."
+        elif pide == declarada:
+            como = "Elegí «Igual que la de la factura» en «Lo que decide el despachante»."
+        else:
+            como = ("La pantalla deja elegir sólo la de la factura o kilogramo: "
+                    "cambiá la unidad del producto o corregilo en el Kit.")
+        avisos.append(
+            f"Unidad estadística: según el {fuente}, la posición {sufijos_arca.escrita(posicion)} "
+            f"va en {pide}{' (kilogramo)' if pide == UNIDAD_KILOGRAMO else ''}; {cuales} "
+            f"sale{'n' if len(ns) > 1 else ''} en {sale}. {como}"
+        )
+
+    # El código de artículo es de cada producto: repetido, es el de otro.
+    por_codigo = {}
+    for lugar, _posicion, sufijo in sbts:
+        for codigo, valor in _codigos_del_sufijo(sufijo):
+            if codigo == "AI" and valor:
+                por_codigo.setdefault(valor, []).append(lugar)
+    for valor, lugares in por_codigo.items():
+        if len(lugares) > 1:
+            avisos.append(f"Código de artículo (AI): «{valor[:40]}» se repite en "
+                          f"{_cuales(lugares)}; cada producto lleva el suyo.")
+    return avisos
+
+
 def supuestos_declarados(
     items: list,
     incoterm: str = "FOB",
@@ -1202,6 +1920,9 @@ def supuestos_declarados(
     comprador_nombre: str | None = None,
     comprador_cuit: str | None = None,
     moneda: str | None = None,
+    vendedor_id: str | None = None,
+    numero_factura: str | None = None,
+    sbt_sufijo_valor: str | None = None,
 ) -> list:
     """Lista los campos que el sistema declaró SIN preguntarle al despachante.
 
@@ -1268,6 +1989,104 @@ def supuestos_declarados(
                 "vacías o no salen; cargalos en la revisión antes de pegar el archivo en el Kit."
             )
 
+    # --- Lo que el MARIA rechazó el 24/10 (MARIA-7) -------------------------
+    # Sólo si quien llama pasa estos datos (el endpoint): None = no evaluar.
+    if items and numero_factura is not None and not str(numero_factura).strip():
+        avisos.append(
+            "Número de factura: no se leyó; la referencia de la factura (LDVDREFDOC) sale "
+            "vacía. Cargalo en la revisión."
+        )
+    elif items and numero_factura is not None and len(str(numero_factura).strip()) > LARGO_REF_FACTURA:
+        avisos.append(
+            f"Número de factura: «{str(numero_factura).strip()[:40]}» tiene "
+            f"{len(str(numero_factura).strip())} caracteres y en LDVDREFDOC entran "
+            f"{LARGO_REF_FACTURA}; así no se genera el TXT. Acortalo en la revisión."
+        )
+    if items and vendedor_id is not None:
+        leido = str(vendedor_id).strip()
+        if not leido:
+            avisos.append(
+                "Identificación tributaria del proveedor: no se leyó; IDTRIB-PROVEEDOR no sale. "
+                "Cargala en la revisión si la factura la trae."
+            )
+        elif parece_cuenta_bancaria(leido):
+            avisos.append(
+                f"Identificación tributaria del proveedor: «{leido[:40]}» parece una cuenta del "
+                f"banco; IDTRIB-PROVEEDOR no sale. Cargá la del proveedor en la revisión."
+            )
+    # Si un renglón tiene un error, el generador lo dice: acá no se avisa.
+    juntos = []
+    if items and all(isinstance(it, dict) for it in items):
+        try:
+            juntos = renglones_por_posicion(items, _iva_adicional(
+                iva_adicional or IVA_ADICIONAL_POR_DEFECTO, "Operación"))
+        except (ValueError, TypeError):
+            juntos = []
+    en_renglones = {n for ns in juntos for n in ns}
+    if sbt_sufijo_valor is not None:
+        # El general, sólo si alguno lo usa: si no, no va al TXT (D18).
+        usa_el_general = usa_el_sufijo_de_la_operacion(items)
+        sufijos = [("", sbt_sufijo_valor)] if usa_el_general else []
+        grupos = set()
+        for idx, item in enumerate(items or [], start=1):
+            subs = item.get("subitems") if isinstance(item, dict) else None
+            for n, sub in enumerate(subs if isinstance(subs, list) else [], start=1):
+                if isinstance(sub, dict) and isinstance(sub.get("sufijo"), str):
+                    sufijos.append((f" del ítem {idx}, sub-ítem {n}", sub["sufijo"]))
+            # El propio de uno que sale entero (SUFIJOS-1); el de un renglón
+            # se avisa con los renglones, y el de un grupo, una vez.
+            if (isinstance(item, dict) and not subs and idx - 1 not in en_renglones
+                    and isinstance(item.get("sufijo"), str)):
+                gid = item.get("grupo_id")
+                if gid is None:
+                    sufijos.append((f" del ítem {idx}", item["sufijo"]))
+                else:
+                    try:
+                        nuevo = gid not in grupos
+                    except TypeError:
+                        continue  # lo dice el generador
+                    if nuevo:
+                        grupos.add(gid)
+                        sufijos.append((f" del grupo {gid}", item["sufijo"]))
+        for donde, sufijo in sufijos:
+            avisos.extend(_aviso_de_sufijo(donde, sufijo))
+        # Si alguno lo usa y no se puede separar, el generador frena: se dice
+        # antes, con el mismo texto (MARIA-9).
+        if usa_el_general:
+            try:
+                limpiar_sufijo(str(sbt_sufijo_valor or "").strip(), " de la operación")
+            except ValueError as error:
+                avisos.append(str(error))
+
+    # --- Renglones de la misma posición (MARIA-8) ---------------------------
+    for ns in juntos:
+        cuales = _enumerar([n + 1 for n in ns])
+        avisos.append(
+            f"Sub-ítems: los renglones {cuales} van en un solo ítem con {len(ns)} sub-ítems "
+            f"(misma posición SIM, origen, procedencia y estado)."
+        )
+        for n in ns:
+            avisos.extend(_aviso_de_sufijo(f" del renglón {n + 1}", items[n].get("sufijo")))
+        try:
+            de_cada_uno = {
+                limpiar_sufijo(str(items[n].get("sufijo") or "").strip())[0]
+                or limpiar_sufijo(str(sbt_sufijo_valor or "").strip())[0]
+                for n in ns
+            }
+        except ValueError:
+            de_cada_uno = set()  # el sufijo no se puede separar: lo dice el generador
+        if len(de_cada_uno) == 1 and "" not in de_cada_uno:
+            avisos.append(
+                f"Sufijo de valor: en el ítem de los renglones {cuales} los {len(ns)} sub-ítems "
+                f"llevan el mismo sufijo («{next(iter(de_cada_uno))[:80]}»). Si cada renglón lleva "
+                f"el suyo (marca, modelo, color), cargalo en «Sufijo de valor» de cada producto, "
+                f"en «Lo que decide el despachante»."
+            )
+
+    # --- Arancel de ARCA (SUFIJOS-1) ----------------------------------------
+    if items and all(isinstance(it, dict) for it in items):
+        avisos.extend(_avisos_del_arancel(items, sbt_sufijo_valor, juntos))
+
     # --- Fecha de emisión (MARIA-3) ----------------------------------------
     fecha_ok = fecha_de_la_factura(fecha_emision)
     if not fecha_ok:
@@ -1289,7 +2108,7 @@ def supuestos_declarados(
 
     # --- Defaults a nivel ítem -------------------------------------------
     sin_procedencia = []
-    sin_unidad = []
+    sin_unidad, no_reconocida = [], []
     for idx, item in enumerate(items or [], start=1):
         if not isinstance(item, dict):
             continue
@@ -1298,8 +2117,11 @@ def supuestos_declarados(
         proc = procedencia_de(item)
         if origen and not proc:
             sin_procedencia.append(str(idx))
-        if not (item.get("unidad") or item.get("unidad_medida") or item.get("um")):
+        unidad = item.get("unidad") or item.get("unidad_medida") or item.get("um")
+        if not unidad:
             sin_unidad.append(str(idx))
+        elif not (clave := _clave_de_unidad(unidad)).isdigit() and clave not in UNIDADES_MARIA:
+            no_reconocida.append(f"{idx} («{str(unidad)[:20]}»)")
 
     if sin_procedencia:
         avisos.append(
@@ -1311,6 +2133,12 @@ def supuestos_declarados(
         avisos.append(
             f"Unidad de medida: en el/los ítem(s) {', '.join(sin_unidad)} se declaró "
             f"07 (unidad) por defecto."
+        )
+    # D6: la unidad leída que no está en la tabla también sale 07; se avisa.
+    if no_reconocida:
+        avisos.append(
+            f"Unidad de medida: en el/los ítem(s) {', '.join(no_reconocida)} la unidad "
+            f"no se reconoce y se declaró 07 (unidad). Si es otra, elegila en el panel."
         )
 
     # --- Lo que decide el despachante (MARIA-4) ---------------------------
@@ -1327,8 +2155,8 @@ def supuestos_declarados(
         )
     if items and not iva_adicional:
         avisos.append(
-            "IVA adicional: se declaró reventa (NO_VALIDA) por defecto. Si la mercadería "
-            "es para uso particular, cambialo."
+            "Destino de la mercadería: se declaró comercialización o reventa (COMERC + "
+            "NO_VALIDA) por defecto. Si la mercadería es un bien de uso, cambialo."
         )
     if items:
         avisos.append(

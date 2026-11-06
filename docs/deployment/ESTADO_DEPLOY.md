@@ -72,7 +72,7 @@ leerlos), pero conviene rotarlo también si es fácil.
 | Destino | Archivos | Estado |
 |---|---|---|
 | **Railway** | `railway.json`, `Dockerfile` | **El camino oficial.** Guía: `RAILWAY_SETUP.md`. |
-| Google Cloud Run | `cloudbuild.yaml`, `scripts/deployment/deploy-cloud-run.sh` | Se deja como alternativa, arreglada y con un solo script. No es el camino actual. |
+| ~~Google Cloud Run~~ | ~~`cloudbuild.yaml`, `scripts/deployment/deploy-cloud-run.sh`, `setup_gcp.sh`~~ | **Borrado** en LIMPIEZA-1 (2026-10-28), con sus guías: CDI no usa Google Cloud. Está en el historial de git. |
 | ~~Firebase Hosting~~ | ~~`firebase.json`~~ | **Borrado.** Apuntaba a una función `api` que no existe en este repo. Si algún día hace falta, está en el historial de git. |
 
 También se borró `deploy_cloudrun.sh` de la raíz, que deployaba un servicio

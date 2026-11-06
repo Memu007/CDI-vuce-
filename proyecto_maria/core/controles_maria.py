@@ -9,7 +9,7 @@ import math
 import re
 
 from proyecto_maria.core.maria_generator import (
-    _INCOTERMS_GRUPO_C_D, IMPORTE_MAXIMO, INCOTERMS_VALIDOS, importe_valido,
+    _INCOTERMS_GRUPO_C_D, ESPACIOS, IMPORTE_MAXIMO, INCOTERMS_VALIDOS, importe_valido,
 )
 
 # Los que acepta el generador, más FAS (la pantalla lo ofrece) y los de 2000
@@ -25,11 +25,12 @@ CAMPOS_DE_TEXTO = (
     "operation_id", "vendedor_nombre", "vendedor_id", "comprador_nombre",
     "comprador_domicilio", "comprador_fecha_inic_activ", "cuit_agr",
     "comprador_cuit", "moneda", "incoterm", "fecha_embarque", "fecha_emision",
-    "aduana_codigo", "tipo_destinacion",
+    "aduana_codigo", "tipo_destinacion", "numero_factura",
 )
 CAMPOS_DE_TEXTO_DEL_ITEM = (
     "descripcion", "pieza", "ncm", "origen", "pais_origen", "procedencia",
     "pais_procedencia", "unidad", "unidad_medida", "um", "codigo_parte",
+    "unidad_estadistica",
 )
 
 # Controles C0 y C1 (\x85 es «nueva línea»), y los separadores de línea y de
@@ -135,7 +136,7 @@ def montos_fuera_de_rango(items, cabecera: dict) -> list:
                 errores.append(f"Item {n}, sub-ítem {m}: Valor inválido")
     for campo, nombre in _IMPORTES_DE_LA_CABECERA:
         valor = cabecera.get(campo)
-        if valor is None or (isinstance(valor, str) and not valor.strip()):
+        if valor is None or (isinstance(valor, str) and not valor.strip(ESPACIOS)):
             continue
         try:
             importe_valido(valor, nombre)

@@ -31,12 +31,20 @@ if s.count(viejo) != 1:
 open(p, "w").write(s.replace(viejo, nuevo))
 PYEOF
   then echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return; fi
-  local salida codigo
-  salida="$("$PY" -m pytest -q --no-cov -p no:cacheprovider tests/test_excel2.py 2>&1)"; codigo=$?
+  # Sólo la prueba que el sabotaje nombra: el archivo entero tarda medio
+  # minuto, casi todo en las dos pruebas de los ocho libros (PRUEBAS-1).
+  local prueba="${esperado#FAILED }"; prueba="${prueba%%\[*}"
+  # Con un límite: el sabotaje de la combinada falla a los 15 s, pero el hilo
+  # de la lectura saboteada sigue siete minutos y pytest no sale hasta que
+  # termina. El resumen ya está impreso (sin búfer), así que se lee igual.
+  local salida codigo inicio=$SECONDS corte=""
+  salida="$(PYTHONUNBUFFERED=1 timeout "${LIMITE:-90}" "$PY" -m pytest -q --no-cov -p no:cacheprovider "$prueba" 2>&1)"; codigo=$?
+  local tardo=$((SECONDS-inicio))
+  [ "$codigo" -eq 124 ] && corte=", cortado a los ${LIMITE:-90} s"
   if [ "$codigo" -eq 0 ]; then
     echo "VERDE | $nombre: la prueba no lo vio"; FALLAS=$((FALLAS+1))
   elif grep -qF -- "$esperado" <<<"$salida"; then
-    echo "ROJO  | $nombre: dice «$esperado»"
+    echo "ROJO  | $nombre: dice «$esperado» (${tardo} s$corte)"
   else
     echo "ROJO? | $nombre: rojo (salida $codigo), pero sin «$esperado»"; grep -E "^E " <<<"$salida" | head -5; FALLAS=$((FALLAS+1))
   fi
@@ -89,8 +97,8 @@ sabotaje $F "una primera hoja enorme vuelve a pasar" \
   '        if False:' \
   "FAILED $T::test_una_primera_hoja_enorme_se_rechaza_antes_de_abrir"
 sabotaje $M "leer la factura vuelve a abrir el libro entero" \
-  $'        contenido, combinadas = _xlsx_solo_primera_hoja(ruta)\n        origen = _io.BytesIO(contenido)' \
-  $'        contenido, combinadas = _xlsx_solo_primera_hoja(ruta)\n        origen = ruta' \
+  $'        contenido, combinadas = _xlsx_solo_primera_hoja(ruta, max_filas=_MAX_FILAS_EXCEL)\n        origen = _io.BytesIO(contenido)' \
+  $'        contenido, combinadas = _xlsx_solo_primera_hoja(ruta, max_filas=_MAX_FILAS_EXCEL)\n        origen = ruta' \
   "FAILED $T::test_leer_la_factura_abre_un_libro_con_una_sola_hoja"
 sabotaje $M "el historial vuelve a abrir el libro entero" \
   '        contenido, _ = _xlsx_solo_primera_hoja(content)' \
@@ -102,8 +110,8 @@ sabotaje $M "el encabezado vuelve a buscarse sólo en la fila 1" \
   '    if True:' \
   "FAILED $T::test_el_encabezado_no_tiene_que_estar_en_la_fila_1"
 sabotaje $M "la columna de origen vuelve a ser obligatoria" \
-  '    if not all([pieza_col, desc_col, cant_col, valor_col]):' \
-  '    if not all([pieza_col, desc_col, origen_col, cant_col, valor_col]):' \
+  '    if not all([desc_col, cant_col, valor_col]):' \
+  '    if not all([desc_col, origen_col, cant_col, valor_col]):' \
   "FAILED $T::test_sin_columna_de_origen_entra_con_el_origen_vacio_y_avisa"
 sabotaje $M "sin columna de origen deja de avisarse" \
   '        if not find_column(df.columns, ["origen", "Origen", "pais", "País", "country", "Country"]):' \
@@ -160,10 +168,12 @@ sabotaje $M "el CUIT del despachante vuelve a aceptar cualquier cosa" \
   '            if not _re_cuit.fullmatch(r"[0-9]{11}", effective_cuit_agr):' \
   '            if False:' \
   "FAILED $T::test_el_cuit_del_despachante_va_solo_con_11_digitos"
+# El control de los sub-ítems de ese mismo bucle no tiene sabotaje propio:
+# sin él, el de más abajo (KIT Maria) da el mismo 400 (PRUEBAS-1).
 sabotaje $M "un producto mal formado vuelve a dar 500" \
-  '            if not isinstance(_it, dict) or (' \
-  '            if False and (' \
-  "FAILED $T::test_productos_mal_formados_dan_400"
+  '            if not isinstance(_it, dict):' \
+  '            if False:' \
+  "FAILED $T::test_productos_mal_formados_dan_400[cambio0]"
 
 # Devolución (veredicto 2034b85)
 sabotaje $M "una combinada vuelve a recorrerse hasta su última fila (la función de 3e6e63e)" \

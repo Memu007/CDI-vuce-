@@ -44,6 +44,7 @@ PYEOF
 
 M=proyecto_maria/main.py
 C=proyecto_maria/core/controles_maria.py
+F=proyecto_maria/security/file_security.py
 T=tests/test_maria1b_controles.py
 D=tests/test_maria1b_devolucion.py
 
@@ -146,8 +147,8 @@ sabotaje $M "una hoja vacía se avisa como hoja con datos" \
   "FAILED $T::test_el_excel_deja_en_la_operacion_lo_que_no_se_leyo"
 # Devolución de MARIA-1b
 sabotaje $C "NaN e inf vuelven a pasar en la cantidad" \
-  '        if _fuera_de_rango(cantidad):' \
-  '        if False:' \
+  '        cantidad_mala = _fuera_de_rango(cantidad)' \
+  '        cantidad_mala = False' \
   "FAILED $D::test_nan_o_inf_en_un_producto_no_dejan_generar[cantidad-"
 sabotaje $C "los subítems dejan de controlarse" \
   '        for m, sub in enumerate(subitems if isinstance(subitems, list) else [], start=1):' \
@@ -169,7 +170,7 @@ sabotaje $M "una fórmula sin valor guardado deja de ser un dato" \
   '            if formula is not None and (formula.text or "").strip():' \
   '            if False:' \
   "FAILED $D::test_una_hoja_con_formulas_sin_valor_guardado_se_avisa"
-sabotaje $M "una hoja de gráfico vuelve a contar como hoja" \
+sabotaje $F "una hoja de gráfico vuelve a contar como hoja" \
   '        destinos[r.get("Id")] = (destino, "chartsheet" in (r.get("Type") or ""))' \
   '        destinos[r.get("Id")] = (destino, False)' \
   "FAILED $D::test_una_hoja_de_grafico_primero_no_corre_las_hojas"

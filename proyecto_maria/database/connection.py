@@ -7,6 +7,8 @@ import os
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
+from datetime import datetime, timezone
 import logging
 from typing import AsyncGenerator
 
@@ -113,6 +115,28 @@ async def init_db() -> None:
     """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all, checkfirst=True)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(sembrar_inicio_registro_mp)
+    except IntegrityError:
+        pass  # otro proceso que arrancaba a la vez ya la sembró
+
+
+def sembrar_inicio_registro_mp(conn) -> None:
+    """Anota desde cuándo se registra cada pago de Mercado Pago, una sola vez.
+
+    Es el primer pago registrado, si ya había (COBRO-MP-1 estuvo desplegado
+    sin esta tabla), o ahora. Los pagos aprobados antes los aplicó el código
+    que sólo recordaba el último: el webhook no los vuelve a aplicar.
+    """
+    from sqlalchemy import func, select
+    from proyecto_maria.database.models import InicioRegistroPagosMP, PagoMercadoPagoAplicado
+    inicio = InicioRegistroPagosMP.__table__
+    if conn.execute(select(inicio.c.id).where(inicio.c.id == 1)).first() is not None:
+        return
+    pagos = PagoMercadoPagoAplicado.__table__
+    desde = conn.execute(select(func.min(pagos.c.aplicado_en))).scalar()
+    conn.execute(inicio.insert().values(id=1, desde=desde or datetime.now(timezone.utc)))
 
 
 async def test_connection() -> bool:
