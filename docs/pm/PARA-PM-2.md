@@ -2,110 +2,90 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ABUSO-2: **entregada**. Pruebas y sabotajes en `8ad47ee`, más este informe (2026-11-07)
+## Rojo de `despacho1b`: **diagnosticado y entregado**. Prueba en `d69233c`, más este informe (2026-11-07)
 
 | Qué | SHAs |
 |---|---|
-| Rojos | `273c9a7`, `f99f48e`, `972567f` |
-| Producto | `1f0bfb0`, `42d024c`, `979a83a`, `e6372e7`, `59778f9` |
-| Sabotajes y script de Postgres | `e725f0e`, `ced8431`, `e77fc16`, `8ad47ee` |
-| CHANGELOG | `db6ecea` (la entrada de ABUSO-2 ya estaba) |
-| Informe | el commit `docs:` que sigue a `8ad47ee` |
-| Base de la pieza | `ccf0f65` |
+| Prueba | `d69233c` (sólo `tests/test_despacho1b.py`) |
+| Producto | ninguno |
+| Informe | el commit `docs:` que sigue a `d69233c` |
+| Base | `9417c3b` |
 
-**Resultado.**
-- Un login correcto resta de la IP **sólo** lo que esa cuenta falló desde esa IP. No borra los fallos contra otras cuentas o usuarios inexistentes, tampoco después de un bloqueo vencido, y nunca baja de cero.
-- El tope de recuperar usuario (3 por hora) va por cuenta encontrada. Así, cinco formas del mismo email que Postgres toma por igual mandan como máximo tres mails.
+**Causa.** Es la memoria de la suite, por el recolector de basura. No es el orden de los casos, no son hilos y no es el producto.
+- `test_las_hojas_leidas_antes_del_corte_dan_sus_productos` llama a `leer_despacho` dentro del proceso de pytest, con `limite_cpu_s=1.0`. El corte de extraer llega a los 0,8 s, porque `_PARTE_PARA_EXTRAER = 0.8`. Para entender el texto quedan unos 0,2 s, y el caso gasta 50 ms a propósito.
+- En la suite entera quedan millones de objetos vivos. Una pasada completa del recolector (generación 2) sobre esa memoria cuesta **0,608 s de CPU**, medido con `gc.callbacks` y 3 millones de objetos. Si esa pasada cae entre el corte y el final de `leer_texto`, se come el tope que queda. Sale exactamente tu rojo: renglones vacíos, «leí hasta la hoja 2» y «no pude leer sus productos».
+- Por eso pasa solo y con su archivo, y en la suite a veces sí y a veces no: depende de si la pasada cae en esa ventana. Con memoria chica, cada pasada cuesta de 36 a 80 ms.
+- Tu prueba con un hilo girando no lo reproducía porque la causa no es CPU de otros hilos.
 
-**Para decidir: D105.** Hoy, cualquiera que conozca el email de otra persona puede gastarle el tope de recuperar usuario de esa hora; ese pedido vuelve con el mismo `mensaje` y no manda mail. Antes pasaba lo mismo por texto y ahora pasa por cuenta.
-- (a) Queda así y lo anotamos como riesgo.
-- (b) Pieza aparte: el tope por cuenta se cuenta además por IP de origen, o un tope alto por cuenta sumado a uno bajo por IP.
+**Por qué el producto no cambia.** En producción `leer_despacho` sólo corre en el proceso aparte (`_MODOS["leer"]`, lanzado por `_leer_aparte`), que arranca con poca memoria. Busqué los usos en `proyecto_maria/` y no hay otra llamada.
 
-Recomiendo **(a)**:
-- el daño es que llega un mail menos por hora a quien lo pidió;
-- (b) vuelve a abrir el salto del tope con muchas IPs, que es justo lo que esta pieza cierra.
+**Arreglo (sólo prueba).** El caso envuelve la llamada con `gc.freeze()` / `gc.unfreeze()`. Así lo que heredó de la suite no entra en la pasada, y las pasadas del propio lector siguen contando, como en el proceso aparte.
 
-D99 sigue con Emi. D100–D104 ya las decidiste. Próxima D libre: D106.
+**Evidencia** (un fixture, justo antes del caso, deja vivos 3 millones de dicts con una lista cada uno; 6 corridas por brazo; lo corrí tres veces, la última con el bloque de «Comandos copiables» tal cual, y dio lo mismo):
 
-## Cómo quedó
+| | resultado |
+|---|---|
+| sin memoria extra, sin arreglo | `1 passed` |
+| 3 M objetos, sin arreglo | `3 failed`, `3 passed` |
+| 3 M objetos, con arreglo | `6 passed` |
+| 3 M objetos + `gc.freeze` desde afuera, sin arreglo | 6 de 6 lecturas con los 3 renglones (medido en el script) |
 
-- **Contadores del login.** Tienen dos claves, `login:{ip}` y `cuenta:{username}:login:{ip}`. Las dos usan `sumar_fallo(exacta=True)`: cuentan cada fallo, y la ventana se corre a 24 h desde el último fallo. Lo de la cuenta olvida con la misma regla que la IP, así el perdón no queda corto ni largo.
-- **Login correcto.** Llama a `descontar(clave_ip, clave_cuenta)`. Esa función borra la fila de la cuenta con `DELETE … RETURNING` y resta ese número de la IP, con piso 0. El bloqueo ya puesto no se toca.
-- **Recuperar usuario.** Primero mira el tope por IP y después busca la cuenta. Cuenta en `recuperar:cuenta:{username}`. Pasado el tope, contesta el mismo `mensaje` que cuando el email no existe.
+Las 6 corridas por brazo no son repetir hasta el verde: cambia una sola variable, la memoria. El rojo sin arreglo no sale siempre, porque depende de dónde cae la pasada del recolector.
+
+**Para decidir: D106** (sale de `/code-review`, es producto y no lo toqué).
+- Hoy el tiempo para entender el texto es lo que sobra del tope después de extraer. No tiene un mínimo propio.
+- Si extraer se pasa del 80 % por más que el resto, `leer_texto` arranca con 1 ms y el aviso es «no pude leer sus productos», aunque las hojas se leyeron.
+- En producción el tope es `_MAX_CPU_LECTURA = 10.0`, así que el resto son 2 s, y el proceso aparte tiene poca memoria.
+
+Las opciones:
+- (a) Queda así.
+- (b) Pieza aparte: reservar `limite_cpu_s × 0,2` desde que terminó de verdad la extracción.
+
+Recomiendo **(a)**: para gastar 2 s de más entre el corte y `leer_texto` haría falta algo que no vi pasar en el proceso aparte.
+
+D99 sigue con Emi. D105 está en tu mano desde el informe de ABUSO-2. Próxima D libre: D107.
 
 ## Autorrevisión
 
 | Quién (modelo, esfuerzo) | Hallazgo | Qué hice |
 |---|---|---|
-| adversario-opus-alto | 1. Después de un bloqueo vencido, `sumar_fallo` volvía la cuenta de la IP a `tope`: el login correcto restaba lo propio de una cuenta más chica y borraba fallos ajenos | Arreglado en `979a83a`: la IP se cuenta con `exacta`. Fila `ajeno_tras_el_bloqueo`, en rojo con su sabotaje |
-| | 2. Una IP compartida (NAT) queda bloqueada por los fallos de otro | Queda. Es lo que pide la pieza: los fallos ajenos no se perdonan. Riesgo R1 |
-| | No encontró otra forma de que el login correcto perdone fallos ajenos, ni regresión en reset | — |
-| `/code-review high` | #1, #3, #7, #10 | Arreglados con rojo previo: `e6372e7` (descontar resta sólo lo propio), `59778f9` (la cuenta olvida como la IP; la IP no queda en negativo) y los comentarios en `42d024c` |
-| | #2. Dos fallos a la vez pueden pasar el chequeo del bloqueo | Queda, R2. Cada uno igual suma su fallo |
-| | #4. Los dos `sumar_fallo` son dos commits y no uno | Queda, R3 |
-| | #5. Pasado el tope, recuperar contesta sin mandar mail y por eso más rápido | Queda, R4 |
-| | #6. El perdón se hace antes de `abrir_sesion` (viene de antes) | Queda, R5 |
-| | #8 (altitud), #9 (eficiencia) | Fuera de alcance: no son defectos |
-| `/security-review` (subagente general) | Sin hallazgos. Miró choques de claves (`:` en el usuario, `_clave` cortada a 120 con sha256), inyección SQL, enumeración en login y en recuperar, y si el perdón puede pasarse de lo propio | — |
+| adversario-sonnet-medio | 1. Con `_PARTE_PARA_EXTRAER = 1.0` o `0.99`, el caso da rojo con «no pude leer sus productos» y `[] == [3 renglones]`. Sigue distinguiendo el defecto, y el sabotaje de `despacho1b.sh` ya apunta a este caso | — |
+| | 2. Nadie más usa `gc.freeze`, `unfreeze`, `disable` ni `collect` en `tests/` o `proyecto_maria/`. Si el lector falla, el `finally` descongela, y después del caso `gc.get_freeze_count()` da 0 | — |
+| | 3. Forzó un `gc.collect()` justo antes de `leer_texto`, con 3 M objetos: con el arreglo da verde y sin el arreglo da rojo. Sin forzarlo, le dio verde 4 de 4 con y sin arreglo: el rojo no sale siempre. No verificó mi 3 de 6 | Lo reproduje. Su memoria estaba hecha al arrancar pytest, y así a mí tampoco me sale el rojo (6 de 6 verdes sin arreglo). Hecha justo antes del caso, otra vez 3 de 6 rojos sin arreglo y 6 de 6 verdes con él. Así quedó en «Comandos copiables» |
+| | 4. En producción `leer_despacho` corre sólo por `leer_despacho_aparte` (`main.py:8735`), en un `sys.executable -m` aparte. Las llamadas en el mismo proceso son todas de tests | — |
+| | 5. Otros hilos del proceso cuentan para `process_time` e `ITIMER_PROF` | Queda, R2. El hilo de `test_despacho1b.py:1019` se espera con `join` y el caso exige que no quede vivo |
+| `/code-review high` | #1. Hilos (lo mismo que el 5) | R2 |
+| | #2. Correr el caso en el proceso aparte con `_medir_aparte` en vez de congelar | No lo hice. Habría que pasar los 50 ms a `pdf_bombas` por variable de entorno: más código para la misma cobertura. Si lo preferís, es chico |
+| | #3. `unfreeze` descongela también lo que congeló otro | Queda, R3. Hoy nadie congela |
+| | #4. La basura con ciclos que había al congelar pasa a la generación vieja | Queda. Se libera en la próxima pasada completa, y para eso haría falta un `gc.collect()` que sólo suma tiempo |
+| | #5. Reserva mínima para entender el texto | D106, arriba |
 
-No pude reconstruir del registro, palabra por palabra, el texto de cada número de `/code-review`. La tabla trae lo que anoté en su momento.
-
-## Sabotajes (`scripts/testing/sabotajes/abuso2.sh 8ad47ee`, con `PG_URL` en 55432)
-
-```
-BASE  | en verde
-ROJO  | el login correcto borra todos los fallos de la IP: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[otra_cuenta]»
-ROJO  | los fallos de la cuenta no se cuentan aparte: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[solo_propios]»
-ROJO  | la cuenta se cuenta sin la IP: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[fallos_propios_desde_otra_ip]»
-ROJO  | la cuenta se cuenta en una ventana fija: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[fallos_propios_de_mas_de_un_dia]»
-ROJO  | descontar borra lo propio pero no lo resta de la IP: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[mitad_y_mitad]»
-ROJO  | descontar deja la IP en negativo: dice «FAILED tests/test_abuso2.py::test_descontar_no_deja_la_ip_en_negativo»
-ROJO  | el login cuenta los fallos de la IP con el tope de recuperar: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[ajeno_tras_el_bloqueo]»
-ROJO  | el tope de recuperar va por el texto pedido: dice «FAILED tests/test_abuso1.py::test_s6_recuperar_usuario_corta_en_silencio_por_email»
-ROJO  | Postgres: el tope de recuperar va por el texto en minúsculas de Python: dice «FALLA | cinco variantes del mismo email mandan tres mails»
-fallas: 0
-```
-
-## Puertas (sobre `8ad47ee`; el commit del informe no toca código)
+## Puertas (sobre `d69233c`)
 
 | Puerta | Salida |
 |---|---|
-| `test_abuso2.py` + `test_abuso1.py` | `83 passed in 46.79s` |
-| Suite completa, sola | `5107 passed, 335 skipped, 3 xfailed in 812.43s (0:13:32)`, salida 0. Deja avisos `Task was destroyed but it is pending!` de asyncio al cerrar, que no cambian el resultado |
-| `compileall -q proyecto_maria` | salida 0 |
-| grep de historia de §6 sobre `ccf0f65..8ad47ee` | vacío |
-| `chequeo-6.py ccf0f65 8ad47ee` | abajo, `avisos: 0` |
-| `smoke_friccion.sh`, `ataque_aislamiento.sh` | **no corridos**. La pieza toca el login y recuperar usuario, que son autenticación pero no datos de clientes ni descargas, que es lo único que cubre el ataque. El login y la sesión los cubren los casos de arriba |
-
-**Sobre el rojo de `despacho1b`.** En esta corrida de la suite completa,
-`test_las_hojas_leidas_antes_del_corte_dan_sus_productos` **pasó**. El rojo es
-intermitente o depende del orden, y en esta vuelta no se reprodujo. Es la
-próxima pieza: lo diagnostico ahí, no lo doy por resuelto.
-
-## chequeo-6
+| `tests/test_despacho1b.py` | `283 passed in 50.28s` |
+| `chequeo-6.py 9417c3b d69233c` | abajo, `avisos: 0` |
+| grep de historia de §6 | vacío |
+| Suite completa | **no corrida**. El cambio es un caso y no toca producto. El rojo no sale siempre en la suite, así que una corrida verde no prueba nada: la prueba es el A/B con la memoria cargada |
 
 ```
-chequeo-6 ccf0f65..8ad47ee: avisos para mirar, no un veredicto
-producto +35/−24
-arnés +458/−41
+chequeo-6 9417c3b..d69233c: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +8/−1
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/core/limites_auth.py: 103 → 117
-  proyecto_maria/main.py: 11991 → 11988
 avisos: 0
 ```
 
-`producto +35/−24`, 11 netas: no pasa de 20.
+`producto +0/−0`.
 
 ## Riesgos
 
-- **R1, media.** Una IP compartida (oficina con NAT) se bloquea por los fallos de otra persona. Es la regla que pide la pieza.
-- **R2, baja.** Pedidos simultáneos pueden pasar el chequeo del bloqueo. Cada uno suma su fallo y desde el quinto la ventana vuelve a bloquear.
-- **R3, baja.** Los dos `sumar_fallo` del login hacen commit por separado. Si el proceso se corta entre los dos, la IP queda con un fallo más que la cuenta, y eso nunca perdona de más.
-- **R4, baja.** Por el tiempo de respuesta de recuperar usuario se puede saber si el email existe o si pasó el tope: con mail o sin él, la respuesta tarda distinto. Viene de antes. Sale aparte si lo querés.
-- **R5, baja.** El perdón se hace antes de `abrir_sesion`, como antes. Si `abrir_sesion` falla, la cuenta ya quedó perdonada.
-- **R6, baja.** Un `:` en el username no puede chocar con otra clave, porque la IP no puede traer `login:`. Lo vio `/security-review`.
-- D105, arriba.
+- **R1, baja.** Otros casos que llamen al lector con un tope chico dentro de pytest podrían tener el mismo problema. Revisé este archivo: `test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado` sólo pide que corte, y un recolector caro lo hace cortar antes, así que no da falso rojo. `test_el_tope_de_cpu_cubre_entender_el_texto` corre aparte.
+- **R2, baja.** `process_time` e `ITIMER_PROF` también cuentan la CPU de otros hilos del proceso. Un hilo vivo que dejara otro caso podría gastar el resto del tope, y `gc.freeze` no cubre eso. Tu prueba con un hilo girando no dio rojo, y no encontré hilos que queden vivos.
+- **R3, baja.** `gc.unfreeze` descongela todo. Si algún día un plugin congela memoria al arrancar, este caso se la descongela. Hoy nadie congela.
+- D106, arriba.
 
 ## Comandos copiables
 
@@ -113,19 +93,25 @@ avisos: 0
 # desde la raíz, con el venv del proyecto
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-rm -f test.db; python -m pytest -q --no-cov -p no:cacheprovider tests/test_abuso2.py tests/test_abuso1.py
-#   → 83 passed
-PY=$(command -v python) PG_URL=postgresql://cdi@127.0.0.1:55462/postgres scripts/testing/sabotajes/abuso2.sh 8ad47ee
-#   → BASE  | en verde, 9 ROJO, «fallas: 0»
-python3 docs/pm/herramientas/chequeo-6.py ccf0f65 8ad47ee
-#   → producto +35/−24, avisos: 0
-git diff ccf0f65 8ad47ee --stat -- proyecto_maria
-#   → 2 files changed (core/limites_auth.py, main.py)
+T=test_las_hojas_leidas_antes_del_corte_dan_sus_productos
+# un fixture que, justo antes del caso, deja vivos 3 M dicts con una lista cada uno (6 M objetos).
+# Tienen que ser recién creados: hechos al arrancar pytest, el recolector ya los pasó y el rojo no sale
+mkdir -p /tmp/lastre && cat > /tmp/lastre/conftest_heap.py <<'E'
+import gc, os, pytest
+_LASTRE = []
+@pytest.fixture(autouse=True)
+def _heap_grande():
+    n = int(os.environ.get("LASTRE", "0"))
+    if n and not _LASTRE:
+        _LASTRE.extend([{"a": [i]} for i in range(n)])
+    yield
+E
+git show 9417c3b:tests/test_despacho1b.py > tests/_sin_arreglo_despacho1b.py
+for f in _sin_arreglo_despacho1b test_despacho1b; do echo "== $f"; for i in 1 2 3 4 5 6; do rm -f test.db
+  PYTHONPATH=/tmp/lastre LASTRE=3000000 python -m pytest -q --no-cov -p no:cacheprovider -W ignore -p conftest_heap \
+    "tests/$f.py::$T" 2>&1 | tail -1; done; done
+#   → sin arreglo, rojos y verdes mezclados (a mí, tres veces: 3 failed y 3 passed); con arreglo, 6 veces «1 passed»
+rm tests/_sin_arreglo_despacho1b.py
+python3 docs/pm/herramientas/chequeo-6.py 9417c3b d69233c
+#   → producto +0/−0, avisos: 0
 ```
-
-## Archivos de producto tocados
-
-`proyecto_maria/main.py` (login y `recover_username`) y
-`proyecto_maria/core/limites_auth.py` (`sumar_fallo` con `exacta`, y `descontar`).
-
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP, aviso a la PM session_01B7FVQspcEHF7PqNv797wNM priority next. ABUSO-2 ENTREGADA en 8ad47ee + informe (perdón sólo de lo propio con exacta y descontar con piso 0; recuperar por cuenta; 9 ROJO, 0 fallas; suite 5107 passed; D105 recomendación (a)). Sigue: rojo de despacho1b (en esta suite pasó: intermitente u orden, diagnosticar) → ENTORNO-2 (D98, `_es_desarrollo`) → D100 → ENTRADAS-2. Próxima D libre D106. Reglas de Emi: nada se publica sin su «dale» para el SHA (no propongo SHA), nunca main, nunca force/amend de lo pusheado, sin secretos ni datos reales, subagentes hasta alto sin Fable, no uso advisor, Postgres local 55432. Corte de rutinas 2026-11-08 15:50 UTC.
