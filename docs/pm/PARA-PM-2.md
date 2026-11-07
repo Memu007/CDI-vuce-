@@ -2,208 +2,236 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-> **RESET-2** ya la aceptaste (99d3f69, D93 a); gracias. D91/D92 quedan como
-> ENTORNO-1, que arranco ahora. ABUSO-1 va encima, sobre la devolución de
-> `43916a7`.
+## ENTORNO-1: **entregada**. Base `9f996a4`. SHA entregado `83085e4` más el informe (2026-11-07)
 
-## ABUSO-1: **entregada**. Producto `1880c98`, `9ef6c73`, `55bf408`; pruebas `1119901`, `3f0eeab`, `cf45cd4`, `8a363eb`, `1b48774`; informe `74c218c` y el commit siguiente. SHA entregado `55bf408` (2026-11-07)
+| Qué | SHAs |
+|---|---|
+| Producto | `118447a` (puertas), `dcc9bd5` (clave JWT) |
+| Pruebas y negativos | `d74a5df`, `66df521`, `e358942`, `86b9240`, `a767154`, `8082c99`, `d985df1`, `b907e96`, `83085e4` |
+| Suite completa | sobre `83085e4` |
+| Informe | el commit `docs:` que sigue a `83085e4` |
 
-**Resultado.** Los cuatro puntos de la devolución tienen prueba que distingue
-el defecto y sabotaje con rojo:
+**Resultado.** Hay un solo lugar que dice «esto es desarrollo»:
+`_es_desarrollo()` en `proyecto_maria/main.py`, y es
+`os.getenv("ENVIRONMENT") in ("development", "test", "testing")`. Exige el
+valor tal cual: no recorta espacios, no ignora mayúsculas y no tiene un valor
+por defecto. Reemplaza a `_demo_permitida`, que se borró. Seis puertas
+dependen de él, y con `ENVIRONMENT` ausente, vacío, `production`, `prod`,
+`staging`, `Development`, ` development` o `TESTING` ninguna abre:
 
-- **D44 (una sola conexión en el login).** Ya lo había arreglado `ce7cd9d`
-  (SESION-1 v2), que está entre `43916a7` y mi base `1f48bb5`. No toqué
-  producto para esto: sumé la prueba en PG que pediste. En
-  `abuso1_motores.py`, 120 logins malos y 120 buenos a la vez contra PG
-  local (55432) con `/health` consultado en paralelo:
+1. el login con la contraseña guardada tal cual (el hash como contraseña);
+2. los usuarios demo `demo`, `premium` y `basico`;
+3. el webhook de MP sin `MP_WEBHOOK_SECRET`, que acepta cualquier firma;
+4. el link de reset que se imprimía por consola sin SMTP;
+5. `simulate-charge`, demo-checkout, demo-confirm y la demo de
+   billing_checkout (supuesto S1);
+6. la clave JWT por defecto o débil: fuera de desarrollo, la app no arranca
+   (D97).
 
-  | Código | 120 malos | 120 buenos | `/health` |
-  |---|---|---|---|
-  | `55bf408` | `[401]` (500: 0) | `[200]` (500: 0) | 200 en 4.116 s y 5.896 s |
-  | `ce7cd9d^` (2ª conexión) | `[401, 500]` (500: 93) | — | 200 en 0.06 s |
-  | mutante: `limpiar` con conexión propia | `[401]` (500: 0) | `[200, 500]` (500: 96) | `HTTP Error 503` a 31.46 s |
+Las seis siguen abiertas con `development`, `test` y `testing`. Ese es el
+contrapunto, y muestra que la prueba distingue.
 
-  El mutante muestra por qué hacen falta los dos casos: el login malo pasa
-  por `registrar`, el bueno por `limpiar`.
-- **Punto 1 (duración).** Casos «a los 14 min sigue 429, a los 16 pasa» para
-  el bloqueo por IP del login, el corte por IP de recuperar usuario y la
-  ventana por email de recuperar (3600 s, «a los 59 min sigue, a los 61
-  no»). Los mutantes «el bloqueo dura un minuto», «recuperar usuario: el
-  corte por IP dura un minuto» y «la ventana por email es de un minuto» dan
-  rojo.
-- **Punto 2 (claves de 121 a 300 en PG).** Una IP de 100, 200, 287 y 332
-  caracteres no rompe ninguna ruta con contador y se bloquea al quinto fallo
-  en PG («una IP de N caracteres también se bloquea al quinto fallo», todas
-  OK). En SQLite, `test_tabla_una_ip_larga_entra_en_la_clave`. El mutante
-  «una clave de hasta 300 entra tal cual» (el `len(clave) <= 300`) da rojo.
-- **Punto 3 (surrogate).** Un surrogate suelto o un NUL ya no dan 500 en
-  `/auth/recover-username`, `/auth/request-password-reset`, `/auth/login`
-  ni `/auth/reset-password`. Tampoco en el 422, que antes repetía lo que
-  llegó y se caía al codificarlo. Lo cubre `test_un_surrogate_suelto_no_da_500`,
-  con 12 entradas como datos de un solo caso.
+**Prueba.** `tests/test_entorno1.py`, un caso por causa: puerta cerrada fuera
+de desarrollo y puerta abierta en desarrollo, parametrizados por puerta. La
+familia de valores de `ENVIRONMENT` va como datos en `CERRADOS` y `ABIERTOS`.
 
-**Producto +35/−20**, sólo en `main.py`:
-
-- `TextoCodificable` valida con el `_guardable_en_pg` que ya existía, que
-  subí de lugar en el archivo. Lo usan `LoginRequest.username`,
-  `PasswordResetRequest.email`, `PasswordResetConfirm.token` y
-  `RecoverUsernameRequest.email`.
-- Un manejador de `RequestValidationError` arma el 422 en JSON ASCII.
-
-Suma +15 netas, así que no hace falta la línea de §6 por pasar de 20.
-
-### Supuestos (reversibles; rechazalos si no van)
-
-1. **Más allá del correo.** La devolución nombraba el correo de recuperar
-   usuario. Extendí lo mismo al usuario del login, al correo de reset y al
-   token de reset-password, porque los cuatro daban el mismo 500 (rojo en
-   `1119901` y `8a363eb`).
-2. **El NUL también.** Se trata como el surrogate, porque PG lo rechaza
-   igual.
-3. **El 422 ASCII vale para todas las rutas**, no sólo las de auth. El JSON
-   es equivalente, pero un carácter no ASCII sale como `\uXXXX`. Ninguna
-   prueba de la suite dependía de eso (la suite pasa entera, ver Puertas).
+Cada valor corre en un proceso aparte (`tests/entorno_sonda.py`), porque las
+banderas se leen al importar la app y un monkeypatch de `IS_PRODUCTION` no
+prueba lo que pasa al arrancar sin la variable. La sonda sella `dotenv`: un
+`.env` local con `ENVIRONMENT=development` no puede completar la variable que
+la prueba deja afuera. La evidencia está más abajo.
 
 ## Decisiones
 
-- **D94 (seguridad media, fuera de ABUSO-1, te lo propongo como pieza).**
-  Una contraseña de más de 72 bytes da **500** en reset (`main.py:1874`),
-  cambio (`2458`), registro (`3414`) y `10515`. La causa: `hash_password`
-  (`3151`) llama a `bcrypt.hashpw`, y bcrypt 5.0.0 levanta `ValueError:
-  password cannot be longer than 72 bytes`. Esas validaciones tienen mínimo
-  de 8 pero no máximo. Opciones:
-  - (a) Tope de 72 bytes en UTF-8 en un solo validador que usen las cuatro
-    rutas, con 400 y un mensaje claro.
-  - (b) Prehash (sha256 → base64) antes de bcrypt. Cambia el formato y pide
-    migración.
-  - (c) Dejarlo.
+- **D97. Sin `ENVIRONMENT` y con la clave JWT por defecto o débil, ¿la app
+  no arranca?** Hoy, en `dcc9bd5`, no arranca: levanta `ValueError`
+  «insecure JWT_SECRET_KEY». Antes ese freno existía sólo con
+  `ENVIRONMENT=production`.
+  - (a) Dejarlo así. Es reversible y cierra que alguien firme sesiones con la
+    clave que está en el repositorio.
+  - (b) Ir más amplio: `IS_PRODUCTION = not _es_desarrollo()`. Eso afecta
+    también el CSRF, las cookies Secure y /docs, que hoy miran
+    `IS_PRODUCTION`. Es lo de D98.
+  - (c) Volver al freno sólo con `production`.
 
-  **Recomiendo (a)**: resta una rama a cada ruta y no toca los hashes ya
-  guardados.
-- **D95 (entorno de prueba, baja).** En SQLite, 120 logins a la vez dan
-  «database is locked»: 12 de 120 malos y 7 de 120 buenos. En PG no pasa
-  (cuadro de arriba), y producción es PG. Opciones:
-  - (a) Dejarlo y anotarlo.
-  - (b) Darle un `busy_timeout` al motor de prueba.
+  **Recomiendo (a).** Cierra la puerta sin cambiar otro comportamiento.
+  **Antes de publicar**, mirá en Railway que `ENVIRONMENT=production` y que
+  `JWT_SECRET_KEY` sea fuerte: si falta la variable y la clave es la de
+  desarrollo, el deploy no levanta (riesgo R1).
+- **D98. Otros controles siguen mirando `== "production"`.** Lo encontró
+  `/code-review`.
+  - `IS_PRODUCTION` decide el CSRF en report-only, las cookies sin `Secure`
+    y si /docs queda expuesto.
+  - `connection.py:26` cae a SQLite sin `ENVIRONMENT`.
+  - `vuce_connector.py:67` aborta el modo fake sólo en `production`.
+  - `gunicorn_conf.py:18,47` deja auto-reload si falta `ENVIRONMENT`.
+    Railway usa el Dockerfile, así que es bajo.
 
-  **Recomiendo (a).**
-- **D96 (robustez, baja).** El mismo surrogate en otros campos JSON
-  (registro, `new_password`, otros formularios) todavía puede dar 500 al
-  guardarlo, aunque el 422 ya no se cae. Opciones:
-  - (a) Pieza chica que aplique `TextoCodificable` a los modelos de entrada
-    que guardan texto.
-  - (b) Dejarlo.
+  Ninguno es una puerta de desarrollo de las cuatro de la tarea. Opciones:
+  (a) una pieza aparte que pase esos usos a `not _es_desarrollo()`, con su
+  prueba; (b) dejarlo. **Recomiendo (a), después de D99.**
+- **D99. Usuarios demo que ya existan en producción.** Severidad **alta**,
+  decide Emi.
+  - Si producción arrancó alguna vez sin `ENVIRONMENT`, el lifespan viejo creó
+    `demo/demo123` con rol admin, más `premium` y `basico`.
+  - Esta pieza impide que se creen de nuevo, pero no borra los que ya estén.
+  - No lo puedo ver: no toco producción.
+  - Opciones: (a) que la PM o Emi revise la tabla `users` de producción y
+    desactive las cuentas si están; (b) una migración que las desactive por
+    nombre y por hash conocido; (c) dejarlo.
+  - **Recomiendo (a) ya**, y (b) sólo si aparecen.
 
-  **Recomiendo (a)**, después de ENTORNO-1.
+## Supuestos (reversibles)
 
-Próxima D libre: D97.
+- **S1.** Sumé `simulate-charge` como puerta, aunque la tarea no la nombra. Ya
+  tenía su propio freno, `ENABLE_SIMULATE_CHARGE`, pero abría con
+  `ENVIRONMENT` ausente. El checkout demo usa el mismo `_es_desarrollo`.
+- **S2.** `test` cuenta como desarrollo, igual que `testing` y `development`:
+  la suite y los scripts usan `ENVIRONMENT=test`. D93 (a) se respeta: el script
+  manual sigue con `testing` y no lo toqué.
+- **S3.** Sin `ENVIRONMENT`, la app arranca igual, con las puertas cerradas,
+  salvo que la clave JWT sea la por defecto o débil (D97).
+- **S4.** `.env.example:9` sigue diciendo «Options: development, staging,
+  production». No lo toqué: `staging` es válido, sólo que no es desarrollo.
 
 ## Rojo antes del arreglo
 
-| Commit | Sobre | Salida |
-|---|---|---|
-| `1119901` (pruebas) | base `1f48bb5` | «6 failed, 60 passed»; los 6 son 500 con `UnicodeEncodeError` |
-| `8a363eb` (pruebas) | `1880c98` | «6 failed, 6 passed, 60 deselected, 3 warnings in 1.13s», en el token de reset-password y en el 422 |
-| `9ef6c73` (arreglo) | — | «72 passed, 3 warnings in 21.59s» |
+Sobre `d74a5df` (pruebas sin producto), `$S/entorno1_rojo.txt`:
 
-Último rojo copiado de `rojo_cr.log`:
-`FAILED tests/test_abuso1.py::test_un_surrogate_suelto_no_da_500[False-/auth/login-{"username": "a\ud800"}-422]`.
+```
+E   AssertionError: demo abre con ENVIRONMENT en [None, '', 'prod', 'staging', 'Development', ' development', 'TESTING']
+5 failed, 5 passed, 3 warnings in 34.97s
+```
 
-Los casos de duración (punto 1) y la clave larga (punto 2) no tenían rojo en
-la base: el producto ya era correcto, y lo que faltaba era una prueba que
-distinguiera el defecto. Sus rojos son los de los sabotajes.
+Dio el mismo texto para `login_con_lo_guardado`, `webhook_sin_secreto`,
+`link_de_reset_en_stdout` y `cobro_simulado`. `production` no aparece en la
+lista porque ya estaba cerrada.
+
+El caso de la JWT, sobre `a767154`, `$S/entorno1_rojo_jwt.txt`:
+
+```
+AssertionError: clave_jwt_de_desarrollo no queda cerrada: {None: 'abierta', '': 'abierta', 'prod': 'abierta', 'staging': 'abierta', 'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}
+1 failed, 11 passed
+```
+
+El sello de `.env`, en `$S/entorno1_sello_env.txt`: con un `.env` que trae
+`ENVIRONMENT=development`, la sonda sin sello da
+`5 failed, 5 passed, 3 warnings in 8.87s` con `{None: 'abierta'}`, y con el
+sello da `10 passed, 3 warnings in 7.73s`. Sin el sello, la prueba habría
+quedado verde en una máquina con `.env` aunque el producto estuviera roto.
+
+## Negativos
+
+`scripts/testing/sabotajes/entorno1.sh` da **10 ROJO**, «sabotajes sin rojo:
+0» (`$S/entorno1_sabotajes.txt`):
+
+- Cada una de las seis puertas, vuelta a la condición vieja («abierta salvo
+  con `production`»), da su propio FAILED con los siete valores abiertos.
+- El lugar único, aflojado de tres formas:
+  - sin mirar mayúsculas ni espacios:
+    `cobro_simulado no queda cerrada: {'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}`;
+  - con `staging` como desarrollo:
+    `webhook_sin_secreto no queda cerrada: {'staging': 'abierta'}`;
+  - con la variable ausente como desarrollo:
+    `login_con_lo_guardado no queda cerrada: {None: 'abierta'}`.
+- El contrapunto: con `return False`, nada abre ni en desarrollo, y da
+  `demo no queda abierta: {'development': 'cerrada', 'test': 'cerrada', 'testing': 'cerrada'}`.
+
+Al sacar `_demo_permitida`, los patrones de `cobro_mp2.sh` quedaron rotos.
+`83085e4` los apunta a `_es_desarrollo`. Resultado: BASE en verde, **23
+ROJO**, «sabotajes con falla: 0» (`$S/cobro_mp2_sabotajes.txt`).
+
+`email1.sh` da `ROTO  | la invitación busca al miembro tal cual: el sabotaje
+no encontró su patrón` y «sabotajes sin rojo: 1». Da lo mismo sobre la base
+`9f996a4` (`$S/email1_sabotajes_base.txt`), así que es anterior a esta pieza.
+EMAIL-1 no se toca: queda como riesgo R3.
 
 ## Autorrevisión
 
 | Revisor | Modelo y esfuerzo | Hallazgo | Qué hice |
 |---|---|---|---|
-| Adversario | Sonnet, alto | #1 el token de reset-password con surrogate da 500 | Arreglado (`8a363eb` → `9ef6c73`) |
-| | | #2 el 422 repite la entrada y se cae | Arreglado (handler ASCII) |
-| | | #3 otros campos JSON con surrogate | Va como D96 |
-| | | #4 el mutante de `limpiar` sobrevive en SQLite | Muerto en PG (120 logins buenos) |
-| | | #5 XFF y `TRUSTED_PROXY_HOPS`, #6 IPv6 | A riesgos, como pediste |
-| `/code-review high` | — | #5 movida de un comentario de Mercado Pago | Comentario devuelto a su lugar (`55bf408`) |
-| | | #6 largo de la IP de prueba | Uso 100 caracteres, que sí cruza el corte de 120 en la clave compuesta |
-| | | #7 el hilo de `/health` usaba una espera fija | Ahora un `Event` |
-| | | #9 la fórmula de la IP | Queda: la clave es `ruta:IP` y el corte se calcula sobre el total |
-| `/security-review` | — | Ninguno de confianza alta | — |
+| `/code-review high` | el de la sesión, alto | clave JWT por defecto aceptada sin `ENVIRONMENT` | arreglado, `a767154`→`dcc9bd5` (D97) |
+| ídem | ídem | `.env` local se colaba en la sonda | arreglado: sello de `dotenv` |
+| ídem | ídem | once arranques seguidos podían pasar el tope de tiempo | arreglado: sondas en paralelo, de a 4 |
+| ídem | ídem | predicados flojos: una respuesta rara contaba como cerrada | arreglado: «sin medir» no cuenta como cerrada |
+| ídem | ídem | `cd` sin control en el script | arreglado: `cd "$WT" \|\| exit 2` |
+| ídem | ídem | CSRF report-only, cookies sin Secure, /docs sin `ENVIRONMENT` | D98 |
+| ídem | ídem | usuarios demo ya creados en producción | D99, alta |
+| ídem | ídem | rate limiter con bypass de localhost | no montado; riesgo bajo, R4 |
+| ídem | ídem | pruebas que parchean `IS_PRODUCTION` dan falsa seguridad | riesgo R2 |
+| adversario-sonnet-alto | Sonnet, alto | `connection.py:26` y `vuce_connector.py:67` | bajos, van en D98 |
+| `/security-review` (adversario-sonnet-alto) | Sonnet, alto | ninguno por encima del 80% | — |
 
-En el diff completo `1f48bb5..55bf408` no hay nada fuera de la tarea, aparte
-de los supuestos 1–3. El grep de historia de §6 da vacío.
+La revisión de seguridad comprobó tres cosas:
 
-## Riesgos / límites (sin tocar producto, como pediste)
+- `_es_desarrollo` se define antes del chequeo de la JWT al importar; los
+  demás usos son en tiempo de llamada.
+- Las lecturas `== "testing"` que quedan son un subconjunto de desarrollo.
+- El camino IPN del webhook no cambió: vuelve a consultar el pago a MP y exige
+  `approved`.
 
-- **XFF y `TRUSTED_PROXY_HOPS`.** El conteo por IP depende de que
-  `TRUSTED_PROXY_HOPS` coincida con los saltos reales de Railway. Mal puesto,
-  o todos comparten una IP o cada uno elige la suya.
-- **IPv6 y puerto sin normalizar.** Un mismo cliente IPv6 rota dentro de su
-  /64 y saca contadores nuevos.
-- **Bordes de la duración.** Las pruebas miran los minutos 14 y 16 (y 59 y
-  61), así que un mutante con un bloqueo de 14.5 min sobrevive. Tampoco hay
-  caso para el rebloqueo después de que vence un bloqueo viejo.
-- **Deadlock en PG con ventanas cortas.** 38 de 400 pedidos, con las
-  ventanas achicadas a propósito. Con las ventanas de producción no lo medí.
-- **Filas sin tope.** `limites_auth` crece con cada IP o email distinto
-  hasta que vence; no hay purga con tope.
-- **Telemetría.** Un token revocado todavía escribe un evento de telemetría.
-- **Tiempo del login.** Un usuario existente tarda 0.673 s y uno inexistente
-  0.010 s, por bcrypt, así que se puede enumerar usuarios por tiempo.
-- **Truncado a 200.** El `StringDataRightTruncationError` con 200 sólo lo
-  vi con el mutante. Con el producto, las IPs de 200, 287 y 332 dan OK.
-- **`/health` lento bajo carga.** Tarda 4–6 s con 120 logins a la vez en PG
-  (bcrypt ocupa los hilos). Está por debajo del tope de 15 s, pero no es
-  instantáneo.
-- **Choque con la Dev 1.** Subí `_guardable_en_pg` de lugar en `main.py`; si
-  COBRO-MP toca esas líneas puede haber conflicto de merge. No cambié su
-  cuerpo.
-- **Sin prueba de duración ni de concurrencia** para la ventana
-  `registro:h` ni para `verificar_clave_actual`.
+**Flake propio, ya diagnosticado.** Una corrida dio rojo intermitente:
+`tmp_path_factory.mktemp` llamado desde los hilos del pool chocaba al crear la
+carpeta. `b907e96` crea las carpetas antes del pool. No es de entorno, era de
+mi prueba.
 
-## chequeo-6 (`1f48bb5` → `55bf408`)
+## Puertas
+
+| Puerta | Sobre | Resultado |
+|---|---|---|
+| `pytest` completo | `83085e4`, worktree limpio | corriendo: el resultado va en el commit siguiente |
+| `tests/test_entorno1.py` | `83085e4` | se corre solo después de la suite |
+| `compileall -q proyecto_maria` | `83085e4` | salida 0 |
+| sabotajes `entorno1.sh` | `83085e4` | 10 ROJO, 0 sin rojo |
+| sabotajes `cobro_mp2.sh` | `83085e4` | 23 ROJO, 0 con falla |
+| `smoke_friccion.sh`, `ataque_aislamiento.sh` | — | **no corridos** |
+
+Los dos últimos no los corrí. Esta pieza no toca rutas ni aislamiento de
+datos; cambia la condición de seis puertas, y la sonda las ejercita con la app
+arrancada de verdad en cada valor.
+
+## chequeo-6
 
 ```
-chequeo-6 1f48bb5..55bf408: avisos para mirar, no un veredicto
-producto +35/−20
-arnés +182/−38
+chequeo-6 9f996a4..HEAD: avisos para mirar, no un veredicto
+producto +23/−24
+arnés +291/−7
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/main.py: 11950 → 11965
+  proyecto_maria/main.py: 11965 → 11964
 avisos: 0
 ```
 
-La base es `1f48bb5`, el merge de tu rama sobre el que arranqué. Con
-`43916a7` como base entrarían 69 archivos (+3742/−24065) de otras piezas.
+## Riesgos
 
-## Puertas (SHA entregado `55bf408`)
-
-| Puerta | Resultado |
-|---|---|
-| `compileall -q proyecto_maria` | salida=0 |
-| `pytest tests/test_abuso1.py` | 72 passed, 3 warnings in 21.59s |
-| Motores PG (`abuso1_motores.py pg`, 55432) | «pg: todo OK» |
-| Sabotajes (`abuso1.sh`) | 35 ROJO, «sabotajes sin rojo: 0» |
-| Suite completa, worktree limpio en `55bf408` | «5005 passed, 335 skipped, 3 xfailed, 92 warnings in 769.56s (0:12:49)», salida=0. Al final avisa «Task was destroyed but it is pending!» (el cierre de asyncio de la suite), que no es un fallo |
-| `smoke_friccion.sh`, `ataque_aislamiento.sh` | No corridos: el cambio es de validación de entrada en auth, sin datos ni permisos entre clientes |
+- **R1 (alto si se cumple).** Si Railway corre sin `ENVIRONMENT=production` y
+  con la clave JWT por defecto o débil, la app ahora no arranca. Hay que
+  verificarlo antes de publicar (D97).
+- **R2.** `test_email1.py:158`, de EMAIL-1 y fuera de alcance, y
+  `TestProduccionDemoUsers` de block3 parchean `IS_PRODUCTION`: no prueban el
+  arranque real. La de block3 es tautológica. La prueba que vale para esto es
+  `test_entorno1.py`.
+- **R3.** El sabotaje de la invitación en `email1.sh` está roto desde antes de
+  esta pieza.
+- **R4 (bajo).** El rate limiter tiene bypass de localhost, pero el middleware
+  no está montado.
+- **R5 (funcional).** Sin `ENVIRONMENT` ni `FRONTEND_URL`, el link de reset
+  apunta a `127.0.0.1:8010`. No es de seguridad.
 
 ## Comandos copiables
 
 ```bash
-# Desde la raíz, con el entorno de prueba exportado
-python -m pytest -q --no-cov tests/test_abuso1.py
-#   → 72 passed
-python scripts/testing/abuso1_motores.py pg postgresql://cdi@127.0.0.1:<puerto>/postgres
-#   → última línea «pg: todo OK»; 120 malos [401] y 120 buenos [200], 500: 0
-PY=python bash scripts/testing/sabotajes/abuso1.sh 55bf408
-#   → 35 líneas ROJO y «sabotajes sin rojo: 0»
-python docs/pm/herramientas/chequeo-6.py 1f48bb5 55bf408
-#   → producto +35/−20, historia vacío, avisos: 0
+cd <worktree en 83085e4 o el SHA del informe>
+export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
+       VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
+python -m pytest -q --no-cov tests/test_entorno1.py          # 12 passed (6 puertas × cerrada y abierta)
+PY=$(which python) scripts/testing/sabotajes/entorno1.sh      # 10 «ROJO  |», última línea «sabotajes sin rojo: 0»
+PY=$(which python) scripts/testing/sabotajes/cobro_mp2.sh     # «BASE  | en verde», 23 «ROJO  |», «sabotajes con falla: 0»
+git diff 9f996a4 83085e4 -- proyecto_maria/ | grep '^+' | grep -E '[A-Z]{4,}(-[A-Z]{2,})*-[0-9]|caso [0-9]'   # vacío
 ```
 
 ## Archivos de producto tocados
 
 - `proyecto_maria/main.py`
 
-Arnés: `tests/test_abuso1.py`, `scripts/testing/abuso1_motores.py` y
-`scripts/testing/sabotajes/abuso1.sh`.
-
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP, aviso a la PM session_01B7FVQspcEHF7PqNv797WNM priority next. ABUSO-1 ENTREGADA en 55bf408 (producto 1880c98/9ef6c73/55bf408: TextoCodificable con _guardable_en_pg en login/reset/token/recover y 422 ASCII; D44 ya arreglado por ce7cd9d, probado en PG con 120 logins malos y buenos). D abiertas: D94 (bcrypt >72 bytes da 500 en reset/cambio/registro; recomiendo tope de 400), D95 (SQLite locked, dejar), D96 (surrogate en otros campos JSON). Próxima D libre D97. Sigue: ENTORNO-1 (D91/D92: login con ENVIRONMENT ausente, demo admin, hash como contraseña, webhook MP y link de reset en stdout). Corte el 2026-11-08 15:50 UTC. Reglas de Emi: nada se publica sin su «dale» para el SHA (no propongo SHA), nunca main, nunca force/amend de lo pusheado, sin secretos ni datos reales, subagentes hasta alto sin Fable, no uso advisor, Postgres local 55432.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP, aviso a la PM session_01B7FVQspcEHF7PqNv797WNM priority next. ENTORNO-1 ENTREGADA sobre 83085e4 (producto 118447a/dcc9bd5: _es_desarrollo() único en main.py, seis puertas cerradas sin ENVIRONMENT explícito, JWT débil frena el arranque fuera de desarrollo). D abiertas: D94 (bcrypt >72 bytes), D95 (SQLite locked), D96 (surrogate en JSON), D97 (freno JWT sin ENVIRONMENT, recomiendo a; verificar Railway), D98 (IS_PRODUCTION en CSRF/cookies/docs/connection/vuce), D99 (usuarios demo ya creados en producción, alta, decide Emi). Próxima D libre D100. Sigue: SUFIJOS-2+SEGURO-1. Reglas de Emi: nada se publica sin su «dale» para el SHA (no propongo SHA), nunca main, nunca force/amend de lo pusheado, sin secretos ni datos reales, subagentes hasta alto sin Fable, no uso advisor, Postgres local 55432.
