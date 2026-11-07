@@ -9,6 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-07 · fix: un carácter que no se puede guardar no da 500 en login ni en recuperar (ABUSO-1)
 
 - Un surrogate suelto o un NUL en el usuario o el email de login, recuperar contraseña y recuperar usuario se cambia por «�» y la respuesta es la de un dato que no existe, en vez de 500.
+- Lo mismo para el token de restablecer contraseña, y un pedido mal armado con uno de esos caracteres da 422 en cualquier ruta.
 
 ## 2026-11-06 · fix: el token de reset vuelve en la respuesta sólo en el entorno de prueba (RESET-2)
 

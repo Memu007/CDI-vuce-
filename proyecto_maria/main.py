@@ -426,6 +426,8 @@ app.add_exception_handler(RateLimitExceeded, _limite_por_minuto_excedido)
 # registrar el detalle tecnico en logs para Railway. Errores 4xx
 # (validaciones, auth, conflictos) se devuelven tal cual.
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 
 _FRIENDLY_5XX = (
     "No pudimos procesar tu solicitud. "
@@ -454,6 +456,16 @@ async def _http_exception_friendly(request: Request, exc: StarletteHTTPException
         status_code=exc.status_code, 
         content={"detail": detail},
         headers=getattr(exc, "headers", None) or {}
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _pedido_mal_armado(request: Request, exc: RequestValidationError):
+    # Como el de FastAPI, que repite lo que llegó, pero en ASCII: así también
+    # se puede responder un surrogate suelto.
+    return Response(
+        json.dumps({"detail": jsonable_encoder(exc.errors())}, ensure_ascii=True),
+        status_code=422, media_type="application/json",
     )
 
 
@@ -1724,7 +1736,7 @@ async def _cuenta_por_email(db: AsyncSession, email: str):
     return cuentas[0] if cuentas else None
 
 class PasswordResetConfirm(BaseModel):
-    token: str
+    token: TextoCodificable
     new_password: str
 
 
