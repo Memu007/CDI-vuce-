@@ -31,7 +31,7 @@ const HABILITADO = async page => {
 const GENERA = async page => {
   const mal = await HABILITADO(page);
   if (mal) return mal;
-  const pedido = page.waitForRequest(r => r.method() === 'POST' && r.url().includes('/generate_maria'), { timeout: 15000 });
+  const pedido = page.waitForRequest(r => r.method() === 'POST' && new URL(r.url()).pathname === '/generate_maria', { timeout: 15000 });
   await page.fill('#sbtSufijoValor', 'AA(1)-CA00-');
   await page.click('#validatingGenerate');
   if (!await pedido.catch(() => null)) return 'el botón está habilitado pero el clic no genera';
@@ -70,15 +70,15 @@ async function validar(page, item, espera = true) {
     return 'no mostró la validación de la que se ve';
 }
 
-// El validador simulado, sólo en su caso: «tarda» retiene la primera validación hasta que la suelta el caso;
-// «falla» contesta 500 a la segunda.
-async function simular(page, modo) {
-  const sim = { pedidos: 0 };
+// El validador simulado, sólo en su caso, elige el pedido por su carga: «tarda» retiene la de la anterior
+// hasta que la suelta el caso; «falla» contesta 500 a la que se ve.
+async function simular(page, modo, anterior) {
+  const sim = {};
   sim.retenida = new Promise(ok => { sim.soltarla = ok; });
   await page.route('**/api/validate/smart', async route => {
-    const n = ++sim.pedidos;
-    if (modo === 'tarda' && n === 1) { await sim.retenida; return route.fulfill({ response: await route.fetch() }); }
-    if (modo === 'falla' && n === 2) return route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"validador caído"}' });
+    const deLaAnterior = (route.request().postDataJSON().items || [])[0].pieza === anterior.pieza;
+    if (modo === 'tarda' && deLaAnterior) { await sim.retenida; return route.fulfill({ response: await route.fetch() }); }
+    if (modo === 'falla' && !deLaAnterior) return route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"validador caído"}' });
     return route.continue();
   });
   return sim;
@@ -101,7 +101,7 @@ async function simular(page, modo) {
     const page = await ctx.newPage();
     await page.goto(base + '/dashboard');
     await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.api && document.querySelector('.screen.is-active'));
-    const sim = c.validador ? await simular(page, c.validador) : null;
+    const sim = c.validador ? await simular(page, c.validador, c.a) : null;
     const tarda = c.validador === 'tarda';
     const pidioA = tarda && page.waitForRequest('**/api/validate/smart');
     await validar(page, c.a, !tarda);
