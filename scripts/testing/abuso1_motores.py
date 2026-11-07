@@ -16,8 +16,13 @@ el código de antes del arreglo da FALLA, y esa FALLA es la reproducción.
    mismo email, venga de la IP que venga;
 7. los eventos tienen 120 por minuto por ruta, y sin sesión se guardan los de
    la lista;
-8. una IP de más de 120 caracteres (la clave de la tabla) no rompe ninguna de
-   las cuatro rutas con contador y sigue contando.
+8. una IP de 115 a 332 caracteres (la clave de la tabla tiene 120) no rompe
+   ninguna de las cuatro rutas con contador y sigue contando;
+9. 120 logins malos a la vez no dan 500 ni agotan el pool: /health contesta
+   mientras tanto (el login cuenta con la conexión del pedido, no con otra).
+   Los 500 se exigen sólo en PG: en SQLite se informan;
+10. un surrogate suelto o un NUL en el JSON de login, reset o recuperar no da
+   500.
 
 El servidor corre con --no-proxy-headers: así request.client.host es la
 dirección del que conecta, como en Railway, donde el que conecta es su proxy
@@ -167,6 +172,15 @@ def pedir(ruta, cuerpo=None, ip=None, inventada=None, token=None, crudo=None):
         # cliente puede ver el corte en vez de la respuesta: lo que contestó
         # sale de su log (codigo_en_el_servidor).
         return 0, {"corte": str(e)}
+
+
+def health():
+    t = time.monotonic()
+    try:
+        s = urllib.request.urlopen(f"http://127.0.0.1:{PUERTO}/health", timeout=120).status
+    except (urllib.error.URLError, ConnectionError) as e:
+        s = str(e)
+    return s, time.monotonic() - t
 
 
 def codigo_en_el_servidor(ruta):
@@ -371,17 +385,47 @@ def eventos():
 def ip_larga():
     # La última entrada de X-Forwarded-For la escribe el cliente si no hay
     # proxy delante, o si el de Railway no agrega la suya.
-    ip = "x" * 300 + uuid.uuid4().hex
-    rutas = [("/auth/login", {"username": "nadie", "password": "x"}),
-             ("/auth/request-password-reset", {"email": "nadie@example.com"}),
-             ("/auth/recover-username", {"email": "nadie@example.com"}),
-             ("/auth/register", {"username": "ab1_larga", "password": CLAVE,
-                                 "email": "ab1_larga@example.com", "name": "Ab"})]
-    codigos = [pedir(r, c, ip=ip)[0] for r, c in rutas]
-    login = [pedir("/auth/login", {"username": "nadie", "password": "x"}, ip=ip)[0] for _ in range(5)]
-    print(f"INFO  | IP de 332 caracteres: login, reset, recuperar, registro → {codigos}; 5 logins más → {login}")
-    chequear(codigos == [401, 200, 200, 200], "una IP larga no rompe las rutas con contador")
-    chequear(login == [401] * 4 + [429], "una IP larga también se bloquea al quinto fallo")
+    # Con su prefijo, las claves quedan por debajo de 120, entre 121 y 300 y
+    # por encima.
+    for largo in (115, 200, 287, 332):
+        ip = ("x" * largo + uuid.uuid4().hex)[-largo:]
+        rutas = [("/auth/login", {"username": "nadie", "password": "x"}),
+                 ("/auth/request-password-reset", {"email": "nadie@example.com"}),
+                 ("/auth/recover-username", {"email": "nadie@example.com"}),
+                 ("/auth/register", {"username": f"ab1_larga{largo}", "password": CLAVE,
+                                     "email": f"ab1_larga{largo}@example.com", "name": "Ab"})]
+        codigos = [pedir(r, c, ip=ip)[0] for r, c in rutas]
+        login = [pedir("/auth/login", {"username": "nadie", "password": "x"}, ip=ip)[0] for _ in range(5)]
+        print(f"INFO  | IP de {largo} caracteres: login, reset, recuperar, registro → {codigos}; 5 logins más → {login}")
+        chequear(codigos == [401, 200, 200, 200], f"una IP de {largo} caracteres no rompe las rutas con contador")
+        chequear(login == [401] * 4 + [429], f"una IP de {largo} caracteres también se bloquea al quinto fallo")
+
+
+def login_concurrente():
+    s, b = registrar("ab1_pool", "203.0.113.30")
+    assert s == 200, (s, b)
+    salud = []
+    hilo = threading.Thread(target=lambda: salud.append(health()))
+    def uno(i):
+        if i == 60:
+            hilo.start()
+        return pedir("/auth/login", {"username": "ab1_pool", "password": "otra-cosa-1!"}, ip=f"10.77.{i // 250}.{i % 250}")
+    codigos = simultaneos(120, uno)
+    hilo.join(120)
+    print(f"INFO  | 120 logins malos a la vez → {sorted(set(codigos))} (500: {codigos.count(500)}); /health {salud}")
+    # SQLite tiene un solo escritor y también da «database is locked» con el código
+    # anterior: ahí la cuenta se muestra y no falla; la condición es la de PG.
+    if MOTOR == "pg":
+        chequear(not set(codigos) & {500, 0, None}, "120 logins malos a la vez no dan 500")
+    chequear(salud and salud[0][0] == 200 and salud[0][1] < 15, "/health contesta en menos de 15 s durante los logins")
+
+
+def surrogate():
+    for ruta, crudo, pasa in (("/auth/recover-username", b'{"email": "a\\ud800@example.com"}', 200),
+                              ("/auth/request-password-reset", b'{"email": "a\\udfff\\u0000@example.com"}', 200),
+                              ("/auth/login", b'{"username": "a\\ud800\\u0000", "password": "x"}', 401)):
+        s, _ = pedir(ruta, crudo=crudo, ip=f"203.0.113.{40 + pasa % 7}")
+        chequear(s == pasa, f"surrogate o NUL en {ruta}: {s}, esperado {pasa}")
 
 
 proc = None
@@ -396,6 +440,8 @@ try:
     s6_por_email()
     eventos()
     ip_larga()
+    login_concurrente()
+    surrogate()
     s4_login()
     s5_eventos()
     s6_recuperar()

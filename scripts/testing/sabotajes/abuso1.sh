@@ -13,7 +13,10 @@
 # Tabla: las vencidas se borran al escribir y al arrancar; contar es atómico.
 # IP larga: una IP de más de 120 caracteres entra en la clave (comienzo y
 # sha256), se bloquea, no pisa a otra con el mismo comienzo y el login correcto
-# la limpia.
+# la limpia; una de hasta 300 también.
+# Duración: el bloqueo y el corte por IP de recuperar duran 15 minutos; la
+# ventana por email de recuperar, una hora.
+# Un surrogate suelto o un NUL en login, reset o recuperar no da 500.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/abuso1.sh [SHA]
 # Trabaja en un worktree descartable con su propia SQLite y sin terceros: no
@@ -194,6 +197,37 @@ sabotaje $L "limpiar no acorta la clave" \
   '    await db.execute(delete(_T).where(_T.c.clave == _clave(clave)))' \
   '    await db.execute(delete(_T).where(_T.c.clave == clave))' \
   "FAILED $T::test_s4_el_login_correcto_borra_los_fallos[True]" "[401, 429, 429, 429]"
+sabotaje $L "una clave de hasta 300 entra tal cual" \
+  '    if len(clave) <= 120:' '    if len(clave) <= 300:' \
+  "FAILED $T::test_tabla_una_ip_larga_entra_en_la_clave[/auth/login]" \
+  "FAILED $T::test_tabla_una_ip_larga_entra_en_la_clave[/auth/register]"
+
+# --- cuánto dura cada corte
+sabotaje $L "el bloqueo dura un minuto" \
+  'bloqueo: float = 15 * 60,' 'bloqueo: float = 60,' \
+  "FAILED $T::test_los_limites_por_ip_duran_quince_minutos[/auth/login-cuerpo0-401]" \
+  "FAILED $T::test_los_limites_por_ip_duran_quince_minutos[/auth/request-password-reset-cuerpo1-200]"
+sabotaje $M "recuperar usuario: el corte por IP dura un minuto" \
+  '15 * 60) > 5:' '60) > 5:' \
+  "FAILED $T::test_los_limites_por_ip_duran_quince_minutos[/auth/recover-username-cuerpo2-200]"
+sabotaje $M "recuperar usuario: la ventana por email es de un minuto" \
+  '3600) > 3:' '60) > 3:' \
+  "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email"
+
+# --- un surrogate suelto o un NUL no da 500
+for campo in "    username: TextoCodificable@/auth/login" \
+             "class PasswordResetRequest(BaseModel):
+    email: TextoCodificable@/auth/request-password-reset" \
+             "class RecoverUsernameRequest(BaseModel):
+    email: TextoCodificable@/auth/recover-username"; do
+  viejo="${campo%@*}"; ruta="${campo##*@}"
+  sabotaje $M "$ruta acepta un texto que no se puede guardar" \
+    "$viejo" "${viejo/TextoCodificable/str}" \
+    "FAILED $T::test_un_surrogate_suelto_no_da_500[True-$ruta-" \
+    "FAILED $T::test_un_surrogate_suelto_no_da_500[False-$ruta-"
+done
+# Que el login cuente con la conexión del pedido y no con una segunda sólo se
+# ve con el pool de Postgres: lo mide scripts/testing/abuso1_motores.py pg.
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
