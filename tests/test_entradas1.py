@@ -4,21 +4,25 @@ repetirse en la respuesta de un pedido mal armado.
 El NUL sólo rompe en Postgres: ese lado está en
 `scripts/testing/entradas1_postgres.py`.
 """
+import asyncio
 import json
 import uuid
 
 import pytest
 from fastapi.testclient import TestClient
 
+from fastapi.exceptions import RequestValidationError
+from sqlalchemy import select
+
 from tests.test_sesion1 import (  # noqa: F401  (las dos fixtures se usan solas)
-    CLAVE, CLAVE2, _bearer, _fila, _login, _sin_limites, _tablas, _usuario,
+    CLAVE, CLAVE2, _bearer, _consulta, _fila, _login, _sin_limites, _tablas, _usuario,
 )
 from tests.test_reset1 import _pedir_link, _usar_link
-from proyecto_maria.main import app
+from proyecto_maria.database.models import Organization, User
+from proyecto_maria.main import _pedido_mal_armado, app
 
 SURROGATE = "Clave-1!\ud800"
 NUL = "Clave-1!\x00x"
-LARGA = "Clave-1!" + "ñ" * 33  # 74 bytes en UTF-8: bcrypt no la acepta
 JUSTA = "Clave-1!" + "ñ" * 32  # 72 bytes: la más larga que entra
 
 
@@ -72,7 +76,10 @@ def _por_estudio(clave):
 
 
 VIAS = {"reset": _por_reset, "cambio": _por_cambio, "registro": _por_registro, "estudio": _por_estudio}
-CLAVES_MALAS = {"surrogate": SURROGATE, "nul": NUL, "73_bytes_o_mas": LARGA}
+# Las dos de 73 bytes: una en caracteres de un byte y otra con la «ñ» que
+# cruza el byte 72 (72 caracteres).
+CLAVES_MALAS = {"surrogate": SURROGATE, "nul": NUL, "73_bytes": "Clave-1!" + "x" * 65,
+                "multibyte_en_el_borde": "Clave-1!" + "x" * 63 + "ñ"}
 
 
 @pytest.mark.parametrize("clave", CLAVES_MALAS, ids=list(CLAVES_MALAS))
@@ -81,6 +88,7 @@ def test_clave_nueva_que_no_se_puede_hashear_da_422_y_no_cambia_nada(via, clave)
     r, nada_cambio = VIAS[via](CLAVES_MALAS[clave])
     assert r.status_code == 422, r.text
     assert "contraseña" in str(r.json()["detail"]), r.text
+    assert "Clave-1!" not in r.text, r.text
     # El link de reset sigue sirviendo, la clave vieja sigue y no se creó ninguna cuenta.
     assert nada_cambio()
 
@@ -98,37 +106,61 @@ TEXTOS_MALOS = {"surrogate": "Ent\ud800", "nul": "Ent\x00x"}
 def _registro_con(campo, valor):
     u = _nuevo()
     cuerpo = {"username": u, "password": CLAVE, "email": f"{u}@example.com", "name": "Ent", campo: valor}
-    return _post("/auth/register", cuerpo)
+    return _post("/auth/register", cuerpo), u
 
 
 def _estudio_con(campo, valor):
     u = _nuevo()
     cuerpo = {"name": "Estudio", "username": u, "password": CLAVE, "email": f"{u}@example.com", campo: valor}
-    return _post("/api/organizations/create", cuerpo)
+    return _post("/api/organizations/create", cuerpo), u
 
 
 def _perfil_con(campo, valor):
     u, _ = _usuario()
     return _post("/api/user/profile", {campo: valor, "current_password": CLAVE},
-                 _bearer(_login(u)), metodo="PUT")
+                 _bearer(_login(u)), metodo="PUT"), u
+
+
+def _guardado(columna, u):
+    dueno = User.username if columna is User.name else Organization.owner_username
+    return _consulta(lambda s: _escalar(s, select(columna).where(dueno == u)))
+
+
+async def _escalar(s, consulta):
+    return (await s.execute(consulta)).scalar_one()
+
+
+# Los nombres se guardan con «�» en lugar de lo que no se puede guardar.
+GUARDADOS = {"surrogate": "Ent\ufffd", "nul": "Ent\ufffdx"}
+NOMBRES = {
+    "registro_nombre": (_registro_con, User.name), "estudio_nombre": (_estudio_con, Organization.name),
+    "perfil_nombre": (_perfil_con, User.name),
+}
+
+
+@pytest.mark.parametrize("texto", TEXTOS_MALOS, ids=list(TEXTOS_MALOS))
+@pytest.mark.parametrize("campo", NOMBRES)
+def test_nombre_que_no_se_puede_guardar_queda_con_reemplazo(campo, texto):
+    alta, columna = NOMBRES[campo]
+    r, u = alta("name", TEXTOS_MALOS[texto])
+    assert r.status_code == 200, r.text
+    assert _guardado(columna, u) == GUARDADOS[texto]
 
 
 CAMPOS = {
-    "registro_nombre": (_registro_con, "name"), "registro_invitacion": (_registro_con, "invite_token"),
-    "registro_usuario": (_registro_con, "username"), "registro_email": (_registro_con, "email"),
-    "registro_plan": (_registro_con, "plan"),
-    "estudio_nombre": (_estudio_con, "name"), "estudio_usuario": (_estudio_con, "username"),
-    "estudio_email": (_estudio_con, "email"),
-    "perfil_nombre": (_perfil_con, "name"), "perfil_email": (_perfil_con, "email"),
+    "registro_invitacion": (_registro_con, "invite_token"), "registro_usuario": (_registro_con, "username"),
+    "registro_email": (_registro_con, "email"), "registro_plan": (_registro_con, "plan"),
+    "estudio_usuario": (_estudio_con, "username"), "estudio_email": (_estudio_con, "email"),
+    "perfil_email": (_perfil_con, "email"),
 }
 
 
 @pytest.mark.parametrize("texto", TEXTOS_MALOS, ids=list(TEXTOS_MALOS))
 @pytest.mark.parametrize("campo", CAMPOS)
-def test_texto_del_alta_que_no_se_puede_guardar_no_da_500(campo, texto):
+def test_texto_del_alta_que_no_se_puede_guardar_da_400(campo, texto):
     alta, nombre = CAMPOS[campo]
-    r = alta(nombre, TEXTOS_MALOS[texto])
-    assert r.status_code < 500, r.text
+    r, _ = alta(nombre, TEXTOS_MALOS[texto])
+    assert r.status_code == 400, r.text
 
 
 def _mail_de(largo):
@@ -149,9 +181,9 @@ LARGOS = {
 @pytest.mark.parametrize("campo", LARGOS)
 def test_texto_mas_largo_que_su_columna_da_4xx_y_el_justo_entra(campo):
     alta, nombre, texto, tope = LARGOS[campo]
-    r = alta(nombre, texto(tope + 1))
+    r, _ = alta(nombre, texto(tope + 1))
     assert r.status_code in (400, 422), r.text
-    r = alta(nombre, texto(tope))
+    r, _ = alta(nombre, texto(tope))
     assert r.status_code == 200, r.text
 
 
@@ -200,3 +232,22 @@ def test_el_400_que_repite_texto_ajeno_en_una_lista_es_json_valido():
               _bearer(_login(u)))
     assert r.status_code == 400, r.text
     assert "Xx" in json.dumps(_json_valido(r)["detail"]), r.text
+
+
+# Por HTTP el 422 nunca trae estos valores (se saca `input` y FastAPI arma
+# `msg` y `ctx` fijos): el caso mira la respuesta del manejador directamente.
+ERRORES_RAROS = {
+    "surrogate_en_msg": {"type": "value_error", "loc": ("body", "x"), "msg": "Xx\ud800", "input": "y"},
+    "nan_en_ctx": {"type": "value_error", "loc": ("body", "x"), "msg": "Xx", "ctx": {"tope": float("nan")}},
+}
+
+
+@pytest.mark.parametrize("error", ERRORES_RAROS)
+def test_el_manejador_del_422_nunca_responde_json_invalido(error):
+    try:
+        r = asyncio.run(_pedido_mal_armado(None, RequestValidationError([ERRORES_RAROS[error]])))
+    except ValueError:
+        return  # Un NaN que no se puede escribir corta antes de responder: no sale JSON inválido.
+    assert r.status_code == 422
+    datos = json.loads(r.body.decode("utf-8"), parse_constant=_sin_constantes)
+    assert "Xx" in json.dumps(datos), datos

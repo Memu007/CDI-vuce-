@@ -4,8 +4,8 @@
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/entradas1.sh [SHA]
 # Trabaja en un worktree descartable con SQLite propia: no toca tu copia ni
-# datos compartidos. El NUL sólo rompe en Postgres, así que acá cada regla se
-# mide con el surrogate; el lado del NUL está en scripts/testing/entradas1_postgres.py.
+# datos compartidos. En SQLite el NUL se guarda: los nombres se miden por lo
+# que quedó guardado; el 500 del NUL en Postgres está en scripts/testing/entradas1_postgres.py.
 # Sale con error si un sabotaje no encuentra su patrón o no pone rojo.
 set -uo pipefail
 REPO="$(git rev-parse --show-toplevel)"
@@ -47,7 +47,9 @@ PYEOF
 
 T=tests/test_entradas1.py
 C="FAILED $T::test_clave_nueva_que_no_se_puede_hashear_da_422_y_no_cambia_nada"
-X="FAILED $T::test_texto_del_alta_que_no_se_puede_guardar_no_da_500"
+X="FAILED $T::test_texto_del_alta_que_no_se_puede_guardar_da_400"
+N="FAILED $T::test_nombre_que_no_se_puede_guardar_queda_con_reemplazo"
+H="FAILED $T::test_el_manejador_del_422_nunca_responde_json_invalido"
 M=proyecto_maria/main.py
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
@@ -80,19 +82,27 @@ sabotaje $M "el alta de estudio acepta cualquier clave" "$C[estudio-surrogate]" 
     email: str"
 
 # --- Qué rechaza el validador
-sabotaje $M "sin el tope de 72 bytes" "$C[reset-73_bytes_o_mas]" \
+sabotaje $M "sin el tope de 72 bytes" "$C[reset-73_bytes]" \
   ' or len(clave.encode("utf-8")) > 72:' ':'
 sabotaje $M "el tope corta antes del byte 73" "FAILED $T::test_clave_de_72_bytes_entra[reset]" \
   'len(clave.encode("utf-8")) > 72' 'len(clave.encode("utf-8")) > 71'
+sabotaje $M "el tope deja pasar 73 bytes" "$C[reset-73_bytes]" \
+  'len(clave.encode("utf-8")) > 72' 'len(clave.encode("utf-8")) > 73'
+sabotaje $M "el tope cuenta caracteres y no bytes" "$C[reset-multibyte_en_el_borde]" \
+  'len(clave.encode("utf-8")) > 72' 'len(clave) > 72'
 sabotaje $M "sin mirar caracteres que no se guardan" "$C[reset-surrogate]" \
   '    if _NO_GUARDABLE_EN_PG.search(clave) or len(' '    if len('
+sabotaje $M "el NUL no cuenta como no guardable" "$N[registro_nombre-nul]" \
+  're.compile("[\x00\ud800-\udfff]")' 're.compile("[\ud800-\udfff]")'
+sabotaje $M "el rechazo de la clave la repite" "$C[reset-surrogate]" \
+  'raise ValueError("La contraseña puede' 'raise ValueError(clave + "La contraseña puede'
 
 # --- Textos del alta
-sabotaje $M "el nombre del registro sin validar" "$X[registro_nombre-surrogate]" \
+sabotaje $M "el nombre del registro sin validar" "$N[registro_nombre-surrogate]" \
   "    name: Annotated[TextoCodificable, Field(max_length=100)] = None" "    name: str = None"
 sabotaje $M "la invitación sin validar" "$X[registro_invitacion-surrogate]" \
   "    invite_token: TextoCodificable | None = None" "    invite_token: str | None = None"
-sabotaje $M "el nombre del estudio sin validar" "$X[estudio_nombre-surrogate]" \
+sabotaje $M "el nombre del estudio sin validar" "$N[estudio_nombre-surrogate]" \
   "    name: Annotated[TextoCodificable, Field(max_length=200)]" "    name: str"
 sabotaje $M "el alta de estudio sin la regla de email" "$X[estudio_email-surrogate]" \
   "    # Validar email duplicado
@@ -112,7 +122,7 @@ sabotaje $M "el email sin tope de largo" "$L[registro_email]" \
   " or len(limpio) > 100:" ":"
 sabotaje $M "el perfil sin la regla de email" "$L[perfil_email]" \
   "            _email_valido(raw_email)" "            pass"
-sabotaje $M "el nombre del perfil sin validar" "$X[perfil_nombre-surrogate]" \
+sabotaje $M "el nombre del perfil sin validar" "$N[perfil_nombre-surrogate]" \
   "u.name = _guardable_en_pg(str(raw_name).strip()[:100]) or None" "u.name = str(raw_name).strip()[:100] or None"
 G="FAILED $T::test_agrupar_con_cuerpo_raro_da_4xx_en_json"
 sabotaje $M "agrupar sin modelo" "$G[agrupar_no_json]" \
@@ -131,6 +141,12 @@ sabotaje $M "el 400 sale con la respuesta común" "$R" \
         status_code=exc.status_code,"
 sabotaje $M "el 422 repite lo que llegó" "FAILED $T::test_el_422_de_un_cuerpo_raro_es_json_valido[nan]" \
   'if k != "input"' 'if True'
+sabotaje $M "el 422 repite la clave que llegó" "$C[reset-surrogate]" \
+  'if k != "input"' 'if True'
+sabotaje $M "el 422 sale con la respuesta común" "$H[surrogate_en_msg]" \
+  'return _JSONConTextoAjeno({"detail"' 'return JSONResponse({"detail"'
+sabotaje $M "el 422 escribe NaN" "$H[nan_en_ctx]" \
+  'allow_nan=False' 'allow_nan=True'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"
