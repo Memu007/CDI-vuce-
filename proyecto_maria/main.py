@@ -1841,21 +1841,18 @@ class RecoverUsernameRequest(BaseModel):
 async def recover_username(request: RecoverUsernameRequest, req: Request, db: AsyncSession = Depends(get_db)):
     """Envía el username al email del usuario"""
     mensaje = {"message": "Si el email está registrado, te enviamos tu nombre de usuario."}
-    # 0. Límites (ABUSO-1, S6): 5 pedidos cada 15 minutos por IP; por email,
-    # 3 por hora y después se contesta lo mismo sin buscar ni mandar nada.
-    if limiter.enabled:
-        if await limites_auth.contar(db, f"recuperar:ip:{get_client_ip(req)}", 15 * 60) > 5:
-            log_429(req, "recuperar usuario")
-            raise HTTPException(status_code=429, detail="Demasiados intentos. Intente en 15 minutos.")
-        email_hash = hashlib.sha256(request.email.strip().lower().encode()).hexdigest()[:32]
-        if await limites_auth.contar(db, f"recuperar:email:{email_hash}", 3600) > 3:
-            return mensaje
+    # 5 pedidos cada 15 minutos por IP; 3 mails por hora por cuenta, y después
+    # se contesta lo mismo sin mandar. Se cuenta la cuenta y no el texto
+    # pedido: dos textos que la base toma por el mismo email son una sola.
+    if limiter.enabled and await limites_auth.contar(db, f"recuperar:ip:{get_client_ip(req)}", 15 * 60) > 5:
+        log_429(req, "recuperar usuario")
+        raise HTTPException(status_code=429, detail="Demasiados intentos. Intente en 15 minutos.")
 
-    # 1. Buscar usuario por email
     user = await _cuenta_por_email(db, request.email)
-    
+    # Por seguridad, no revelar si el email existe
     if not user:
-        # Por seguridad, no revelar si el email existe
+        return mensaje
+    if limiter.enabled and await limites_auth.contar(db, f"recuperar:cuenta:{user.username}", 3600) > 3:
         return mensaje
     
     # 2. Enviar email con username
@@ -3215,10 +3212,16 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
     if not user and "@" in (username or ""):
         user = await _cuenta_por_email(db, username)
     
-    # Función auxiliar para manejar fallo y rate limit
-    # (desde el quinto fallo de la IP, bloqueo de 15 minutos)
+    # Desde el quinto fallo de la IP, bloqueo de 15 minutos. Los fallos con
+    # una cuenta existente se cuentan también aparte, para que su login
+    # correcto perdone sólo esos y no los que la IP probó con otras. El
+    # prefijo propio evita que una IP escrita por el cliente pise esta clave.
+    clave_cuenta = f"cuenta:{user.username}:{clave_intentos}" if user else None
+
     async def handle_failed_login():
         await limites_auth.sumar_fallo(db, clave_intentos)
+        if clave_cuenta:
+            await limites_auth.contar(db, clave_cuenta, 24 * 3600)
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
     if not user:
@@ -3267,8 +3270,7 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
             },
         )
 
-    # Login exitoso: limpiar intentos fallidos
-    await limites_auth.limpiar(db, clave_intentos)
+    await limites_auth.descontar(db, clave_intentos, clave_cuenta)
     
     token = await abrir_sesion(response, db, user, stored_password)
     if token is None:

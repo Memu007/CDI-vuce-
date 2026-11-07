@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-07 · fix: un login correcto no perdona los fallos que la IP hizo con otras cuentas (ABUSO-2)
+
+- Entrar bien a la propia cuenta descuenta sólo los fallos con esa cuenta: los intentos de la misma IP contra otras cuentas o usuarios inexistentes siguen contando para el bloqueo.
+- El tope de 3 mails por hora de recuperar usuario se cuenta por cuenta encontrada, así dos formas de escribir el mismo email que la base toma por igual no lo saltean.
+
 ## 2026-11-07 · fix: una clave o un texto que no se puede guardar da 422 o 400, no 500 (ENTRADAS-1)
 
 - Una clave nueva (reset, cambio, registro, alta de estudio) de más de 72 bytes o con un carácter nulo o inválido da 422 y no cambia nada: el link de reset sigue sirviendo.

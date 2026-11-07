@@ -11,7 +11,7 @@ se borran las filas vencidas.
 import hashlib
 import time
 
-from sqlalchemy import and_, case, delete, select
+from sqlalchemy import and_, case, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from proyecto_maria.database import connection as _conn
@@ -100,4 +100,22 @@ async def contar(db: AsyncSession, clave: str, ventana: float) -> int:
 
 async def limpiar(db: AsyncSession, clave: str) -> None:
     await db.execute(delete(_T).where(_T.c.clave == _clave(clave)))
+    await db.commit()
+
+
+async def descontar(db: AsyncSession, clave: str, propia: str) -> None:
+    """Borra el contador `propia` y resta lo que contaba del de `clave`: los
+    fallos que se contaron en los dos se perdonan y los demás de `clave`
+    quedan. El DELETE ... RETURNING hace que dos llamadas a la vez no resten
+    dos veces. Un bloqueo ya vencido se olvida, así lo que queda vuelve a
+    sumar hasta el tope."""
+    clave, propia = _clave(clave), _clave(propia)
+    ahora = _ahora()
+    await db.execute(delete(_T).where(_T.c.vence <= ahora))
+    n = (await db.execute(delete(_T).where(_T.c.clave == propia).returning(_T.c.cuenta))).scalar() or 0
+    if n:
+        await db.execute(update(_T).where(_T.c.clave == clave).values(
+            cuenta=_T.c.cuenta - n,
+            bloqueado_hasta=case((_T.c.bloqueado_hasta <= ahora, 0.0), else_=_T.c.bloqueado_hasta)))
+        await db.execute(delete(_T).where(_T.c.clave == clave, _T.c.cuenta <= 0))
     await db.commit()
