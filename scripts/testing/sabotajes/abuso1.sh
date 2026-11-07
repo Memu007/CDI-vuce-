@@ -131,7 +131,7 @@ sabotaje $M "el login correcto no borra los fallos" \
 # --- S6: recuperar usuario
 sabotaje $M "recuperar usuario sin límite por IP" \
   '15 * 60) > 5:' '15 * 60) > 10**6:' \
-  "FAILED $T::test_s6_recuperar_usuario_tiene_limite_por_ip" "[200, 200, 200, 200, 200, 200]"
+  "FAILED $T::test_los_limites_por_ip_duran_quince_minutos[/auth/recover-username-cuerpo2-200]" "[200, 200, 200, 200, 200, 200]"
 sabotaje $M "recuperar usuario: 4 por hora por email" \
   '3600) > 3:' '3600) > 4:' \
   "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email" "el cuarto pedido de la hora mandó el mail"
@@ -173,7 +173,7 @@ sabotaje $M "eventos: hero_cta_clicked sale de la lista" \
 sabotaje $L "contar y sumar no borran las vencidas" \
   $'    await db.execute(delete(_T).where(_T.c.vence <= ahora))\n    cuenta =' $'    cuenta =' \
   "FAILED $T::test_tabla_las_vencidas_se_borran_al_escribir[/auth/recover-username]" \
-  "FAILED $T::test_s6_recuperar_usuario_tiene_limite_por_ip" \
+  "FAILED $T::test_los_limites_por_ip_duran_quince_minutos[/auth/recover-username-cuerpo2-200]" \
   "FAILED $T::test_tabla_las_vencidas_se_borran_al_escribir[/auth/request-password-reset]"
 sabotaje $M "al arrancar no se borran las vencidas" \
   '    await _migrate_limites_auth()' '    pass' \
@@ -186,7 +186,7 @@ sabotaje $L "contar lee y después escribe" \
 # --- una IP más larga que la clave de la tabla (120)
 sabotaje $L "la clave larga entra tal cual" \
   '    if len(clave) <= 120:' '    if True:' \
-  "FAILED $T::test_tabla_una_ip_larga_entra_en_la_clave[/auth/login-cuerpo0]"
+  "FAILED $T::test_tabla_una_ip_larga_entra_en_la_clave[/auth/login]"
 sabotaje $L "la clave larga se corta sin hash" \
   '    return clave[:50] + ":" + hashlib.sha256(clave.encode()).hexdigest()' '    return clave[:120]' \
   "FAILED $T::test_s4_dos_ips_largas_con_el_mismo_comienzo_no_se_pisan" "(429, "
