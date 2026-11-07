@@ -39,9 +39,10 @@ PYEOF
   then echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return; fi
   local salida codigo
   salida="$(correr)"; codigo=$?
-  # Un caso trabado no es el rojo del sabotaje aunque el esperado también falle.
-  if grep -q "Failed: Timeout" <<<"$salida"; then
-    echo "TRABA | $nombre: un caso pasó el tope de 120 s"; FALLAS=$((FALLAS+1)); return
+  # Un caso trabado no es el rojo del sabotaje aunque el esperado también falle:
+  # pytest-timeout en modo hilo imprime «+++ Timeout +++» y `timeout` sale con 124.
+  if [ "$codigo" -eq 124 ] || grep -qE '^\++ Timeout \++$' <<<"$salida"; then
+    echo "TRABA | $nombre: un caso pasó su tope de tiempo"; FALLAS=$((FALLAS+1)); return
   fi
   if [ "$codigo" -eq 0 ]; then
     echo "VERDE | $nombre: la prueba no lo vio"; FALLAS=$((FALLAS+1))
@@ -58,7 +59,7 @@ M=proyecto_maria/main.py
 B=proyecto_maria/services/billing_service.py
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-correr() { "$PY" -m pytest -q --no-cov --timeout=120 -p no:cacheprovider -W ignore "$T" \
+correr() { "$PY" -m pytest -q --no-cov -p no:cacheprovider -W ignore "$T" \
              "$T2::test_la_cancelada_genera_hasta_el_fin_del_periodo" 2>&1; }
 
 rm -f test.db
@@ -338,6 +339,14 @@ else
     $'        raise HTTPException(status_code=404, detail="Ese usuario no es miembro del estudio")\n' \
     $'        raise HTTPException(status_code=403, detail="Solo el administrador puede remover miembros")\n' \
     $'        raise HTTPException(status_code=403, detail="Solo el administrador puede remover miembros")\n    plazo = anyio.current_time() + _TOPE_MP\n'
+  sabotaje $M "reactivar cuenta el tope desde antes del candado" \
+    "FALLA | con el candado tomado más que el tope, Mercado Pago sano contesta (reactivate): 503" \
+    $'    db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])\n    plazo = anyio.current_time() + _TOPE_MP\n    await _quien_toca_el_plan(db_user, org, con_sid, "reactivar el plan"' \
+    $'    plazo = anyio.current_time() + _TOPE_MP\n    db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])\n    await _quien_toca_el_plan(db_user, org, con_sid, "reactivar el plan"'
+  sabotaje $M "el checkout cuenta el tope desde antes del candado" \
+    "FALLA | con el candado tomado más que el tope, Mercado Pago sano contesta (checkout): 503" \
+    $'    db_user, org, con_sid = await _cuenta_con_suscripciones(db, username)\n    plazo = anyio.current_time() + _TOPE_MP\n' \
+    $'    plazo = anyio.current_time() + _TOPE_MP\n    db_user, org, con_sid = await _cuenta_con_suscripciones(db, username)\n'
 fi
 
 git checkout -q -- proyecto_maria/
