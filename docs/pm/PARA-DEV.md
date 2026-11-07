@@ -3,60 +3,52 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Veredicto de COBRO-MP-2 (2026-11-06 PM): devolución
+## Veredicto de COBRO-MP-2 vuelta + COBRO-MP-3 (2026-11-07 PM): devolución de pruebas
 
-Sobre `4f1822f`. Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-2-2026-11-06.md`.
-Lo de una sola cuenta aguanta: Opus y Sonnet alto, por separado, no lograron
-cobro doble, servicio sin cobro ni días perdidos; tus casos dan `55 passed` y
-el guion de Postgres, 0 fallas. Vuelve por el estudio.
+Sobre `cb740f3` (producto `6ecfe06`, informe `a06c0c8`). Evidencia:
+`docs/pm/REPRODUCCION-COBRO-MP-2-3-2026-11-07.md`. Lo que dice el informe se
+reproduce: chequeo-6 igual, `420 passed` en cobro, Postgres `fallas: 0`,
+`cobro_mp3.sh` 13 ROJO sin falla. Los riesgos de Opus ya estaban en tu
+informe, bien escritos. Vuelve sólo por pruebas, más un texto falso.
 
-**Causa 1: quién puede tocar la suscripción que paga se decide distinto en
-cada ruta.** Cancelar dice «la dueña o quien abrió la que paga (autorizada o
-pausada)», pero:
-- reactivar no pide nada: un miembro deshace la cancelación de la dueña
-  (`200 trial`, lo reproduje);
-- el checkout de un miembro cancela la pausada que paga, que cancelar le
-  niega (D62);
-- sacar del estudio a quien sólo dejó una pendiente, o una ya cancelada en
-  MP, da 409 y la única salida es cancelar el plan que sí paga;
-- el 409 del checkout dice que sólo la cancela quien la abrió, y con el
-  estudio en `past_due` dice «Se renueva sola».
-Pido: una sola regla de qué suscripción paga y quién la toca, usada por
-cancelar, reactivar, checkout y sacar miembros. Sacar a alguien sólo se frena
-por la que paga; una pendiente suya se cancela en MP al sacarlo (503 sin
-sacarlo si MP no contesta). Familia como datos, un caso: dueña, quien abrió la
-que paga, otro miembro; contra cancelar, reactivar, checkout con pausada de
-otro y sacar con pendiente, cancelada o la que paga. Reactivar toma el mismo
-candado que cancelar (sugerencia: cierra también el pago que llega en medio).
+**Causa: las pruebas de lo que esta pieza protege no distinguen un cambio
+que lo rompe.** Cada uno de estos cambios, de a uno, deja verde
+mp1+mp2+mp3+org1+g7+firma+ipn (lo corrí yo):
 
-**Causa 2: lo que se muestra sale de quien mira, no de la cuenta que paga.**
-En un estudio con la de otro miembro autorizada, la dueña ve `renueva False,
-suscripcion_abierta False` («Activo hasta» y sin «Cancelar plan»). Pido:
-`billing_me` calcula «Próximo cobro» y «Cancelar plan» con la suscripción que
-paga el estudio, igual para todos los miembros. Caso con dueña, quien abrió y
-otro miembro.
+| | cambio | qué deja pasar |
+|---|---|---|
+| a | borrar `if not MP_WEBHOOK_SECRET: return False` | sin secreto, un aviso firmado con clave vacía |
+| b | comparar sólo los 8 primeros de la firma | una firma casi buena |
+| c | sacar `organization_id == org.id` al buscar a quién sacar | la dueña de A saca a alguien de B y le cancela su pendiente en MP |
+| d | `fail_after(_TOPE_MP)` por llamada en vez del plazo único | cancelar con varias llamadas lentas pasa el tope con el candado tomado |
+| e | reactivar con `con_sid` vacío | quien abrió la que paga no puede reactivar con su suscripción anotada |
 
-**Causa 3: el estudio entero espera mientras se habla con MP, sin tope.** La
-creación por el SDK no tiene el `timeout=10` de las otras llamadas: con MP
-caído la espera pasa los 20 s que declaraste, y en ese tiempo no generan los
-miembros ni entra el aviso de pago. Pido: con MP sin contestar, el checkout y
-cancelar terminan en 503 dentro de un tope que digas, y nadie del estudio
-espera más que eso. Un caso con MP que no contesta.
+Pido, un caso por causa con la familia como datos:
+1. **Firma:** aviso firmado con clave vacía y sin secreto; firma con los
+   primeros caracteres reales y el resto cambiado; con un carácter final
+   cambiado; más corta y más larga. Todas 401 y sin consultar MP.
+2. **Quién toca a quién:** sumar a la tabla «la dueña de otro estudio» contra
+   sacar (404, el usuario sigue en su estudio y su suscripción en MP intacta),
+   y «quien abrió la que paga» contra reactivar con el sid anotado (200).
+3. **Plazo único:** una operación con dos o más llamadas a MP, cada una por
+   debajo del tope y la suma por encima: 503 dentro del tope.
 
-**D62: (a), decidido por la PM.** Una pausada de otro miembro frena el
-checkout con 409, igual que una autorizada: cancelar ya la trata como la que
-paga, y con (b) un miembro sin permiso la cancela por el checkout (Opus lo
-reprodujo). Un estudio con una pausada abandonada no queda trabado: la dueña
-puede cancelarla. La lista de estados que «pagan» va una sola vez, en esta
-vuelta (§6: el chequeo que quedaría en dos lugares se pone una vez).
+**Texto falso, con camino de hoy:** si el PUT a MP pasa el tope, cancelar
+dice «tu plan sigue igual» (`main.py:2100`; igual al sacar, `10085`, y en el
+checkout) y MP puede cancelar igual: el perfil muestra «Próximo cobro» y no
+lo habrá. Que diga que no se pudo confirmar y que vuelva a mirar en unos
+minutos, sin afirmar que sigue igual.
 
-**A la cola o al riesgo ya aceptado** (no los toques): estado de MP
-desconocido (`expired`) en 503 para siempre; «Próximo cobro» con una
-cancelada desde MP; los textos de antes (`SUBSCRIPTION_PAST_DUE`, «Tu prueba
-gratis terminó», «Cancelaste tu suscripción» al miembro).
+Cada punto lleva su rojo con el arreglo revertido (o la mutación de arriba).
+El resto de las mutaciones verdes de Sonnet (`_TOPE_MP` alto, `60/hour`,
+`CapacityLimiter(39)`, `.match`, clave global, `cancelar_corta_acceso` del
+usuario) y la «pendiente de otro miembro da Próximo cobro» (`main.py:3236`)
+quedan como riesgos: no los pido.
 
-Rojo antes en `4f1822f`, sabotajes, suite y chequeo-6 sobre la vuelta. Uno de
-cada familia lo pruebo yo con otro ejemplo.
+**D64:** (a). Lo hace Emi antes de publicar: le aviso yo.
+**D66:** (a). Un cambio de `core/rate_limit.py` sería pieza aparte.
+
+Esta devolución va primero. Después: AISLAMIENTO-2 / LIMPIEZA-1.
 
 ## Veredicto de COBRO-CORTE-1, vuelta 4 (2026-11-06 PM): aceptada, sin integrar
 
@@ -75,19 +67,18 @@ Enter doble en «Reintentar» o «Generar» (dos generaciones, sin cobro extra),
 `.anterior`, y `PUERTO` de `con_pg16.sh` que pisa el de tus sabotajes
 (renombrar a `PG_PUERTO`; si tocás `backup1a.sh` en BACKUP-1a, hacelo ahí).
 
-**VALIDACION-1 (sí de Emi, 06/11), después de COBRO-MP-2:** la validación
-de una carga nunca muestra ni guarda lo de otra. Hoy `runValidation`
-(`finalize.js:103-108`) reusa `lastValidation` 60 s sin mirar de qué carga
-es: el panel de B muestra totales, errores y avisos de A, el historial de B
-se guarda con los totales de A y «Generar» se habilita por los errores de A.
-Pido: lo que se muestra, lo que se guarda y lo que habilita «Generar» salen
-siempre de la carga que se ve. Un caso con clics en la pantalla real, dos
-cargas distintas en menos de 60 s; familia como datos: panel, historial y
-botón. Rojo en la base y `/entregar` entero.
+**VALIDACION-1: aceptada** sobre `c24a266` (producto `0bd4b6c`, informe
+`9bc75e9`; 2026-11-07 PM), sin integrar: tu rama lleva debajo COBRO-MP-2+3 en
+devolución. Evidencia: `docs/pm/REPRODUCCION-VALIDACION-1-2026-11-07.md`.
+`validacion1.sh` da 7 ROJO y `FALLAS=0`; chequeo-6 con tus 2 avisos
+explicados; Sonnet alto no encontró camino con datos de otra carga. Quedan
+como riesgos, no los pido: sacar `!force` o el vencimiento de 60 s no lo ve
+ninguna prueba; «Calcular seguro» cambia la cabecera sin revalidar; tu riesgo
+1 (historial 0 con el validador caído) va a la cola como pieza aparte.
 
 **CSRF-3: aceptada** sobre `9fe55d4` (2026-11-05 19:20 UTC), integrada. Evidencia: `docs/pm/REPRODUCCION-CSRF-3-2026-11-05.md`. Suite 4450 passed, csrf3/2/1 en rojo (8, 10, 8), chequeo-6 sin avisos; Opus y Sonnet alto sin hallazgo que bloquee. El 500 de `/dashboard` sin base y la carrera del token van a la cola de limpieza.
 
-**Tu orden:** la devolución de COBRO-MP-2 → VALIDACION-1 → COBRO-MP-3 →
+**Tu orden:** la devolución de COBRO-MP-2+3 →
 AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. Próxima D: D62; desde ahora usás
 los pares y MARIA los impares, para que no choquen.
 
