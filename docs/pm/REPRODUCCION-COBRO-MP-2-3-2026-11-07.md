@@ -16,7 +16,7 @@ quién toca a quién o el plazo único dejan todas las pruebas en verde.
 | pruebas de cobro (mp1, mp1_cde, mp1_h, mp1_i, mp1_vuelta2, mp2, mp3, corte1, g7) | `420 passed, 3 warnings in 233.68s` |
 | `cobro_mp2_postgres.py`, base propia `pm_mp3_esc` | salida 0, 16 OK, `fallas: 0` |
 | `cobro_mp3.sh cb740f3` | 13 ROJO, `sabotajes con falla: 0`, `salida 0` |
-| `cobro_mp2.sh cb740f3` | en curso al escribir esto (21 ROJO de 66, ninguna falla hasta ahí) |
+| `cobro_mp2.sh cb740f3` | 66 ROJO, `sabotajes con falla: 0`, `salida 0` |
 
 Negativos propios, con MP simulado:
 
@@ -76,4 +76,3 @@ límite y `cancelar_corta_acceso(db_user)` quedan como riesgos.
 
 - Suite completa sobre `cb740f3`: no hace falta para una devolución; se corre
   sobre la vuelta.
-- `cobro_mp2.sh` todavía corriendo al escribir esto.
