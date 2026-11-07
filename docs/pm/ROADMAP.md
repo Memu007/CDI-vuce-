@@ -147,9 +147,14 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | ✅ SESION-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ RESET-1 | Dev MARIA | Sumada por la PM el 06/11 («arreglos chicos de seguridad a cero», Emi): un link de reset deja de servir después de un cambio de clave o email y después de usarse una vez, también con dos usos a la vez |
 | ✅ RESET-2 | Dev MARIA | Sumada por la PM el 06/11 («arreglos chicos de seguridad a cero», Emi): el pedido de reset devuelve el link en la respuesta sólo en el entorno de prueba; un `ENVIRONMENT` que falta o es otro no lo devuelve |
-| 🔵 ENTORNO-1 | Dev MARIA | Sumada por la PM el 06/11 («arreglos chicos de seguridad a cero», Emi; D91/D92): con `ENVIRONMENT` ausente o desconocido no se abre ninguna puerta de desarrollo (login con la contraseña guardada, usuarios demo, webhook de MP sin firma, link de reset por stdout) |
+| ✅ ENTORNO-1 | Dev MARIA | Sumada por la PM el 06/11 («arreglos chicos de seguridad a cero», Emi; D91/D92): con `ENVIRONMENT` ausente o desconocido no se abre ninguna puerta de desarrollo (login con la contraseña guardada, usuarios demo, webhook de MP sin firma, link de reset por stdout) |
+| 🔵 ENTRADAS-1 | Dev MARIA | Sumada por la PM el 07/11 («arreglos chicos de seguridad a cero», Emi; D94/D96): ningún texto que llegue de afuera da 500 (surrogate o NUL en claves y registro, claves de más de 72 bytes, cuerpo no UTF-8, `NaN` en el 422) |
+| 🔵 ABUSO-2 | Dev MARIA | Sumada por la PM el 07/11 («arreglos chicos de seguridad a cero», Emi): un login bueno en otra cuenta no borra el contador de intentos de la IP, y el tope de recuperar usuario cuenta igual un correo que en PG es el mismo |
+| 🔵 ENTORNO-2 | Dev MARIA | Sumada por la PM el 07/11 («arreglos chicos de seguridad a cero», Emi; D98): con `ENVIRONMENT` ausente o desconocido, CSRF, cookies, `/docs`, la base, VUCE simulado y el cobro simulado se portan como en producción |
+| 🔵 FRONT-422 | Dev MARIA | Sumada por la PM el 07/11 (D100): un 422 con `detail` en lista muestra su mensaje en español en todas las pantallas, no «[object Object]» |
+| 🔵 ENTRADAS-2 | Dev MARIA | Sumada por la PM el 07/11 («arreglos chicos de seguridad a cero», Emi; D104, D101): ningún texto o número de afuera da 500 en Postgres en la operación manual, clientes, parámetros de ruta y agrupar; la misma política de clave en registro y alta de estudio |
 | ✅ PYPDF-1 | Dev MARIA | Sumada por la PM el 06/11 (D73 de MARIA): ver qué cambió en pypdf 6.21.4, que rompe 5 pruebas, y fijar la versión o adaptar las pruebas según eso |
-| 🔵 ABUSO-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
+| ✅ ABUSO-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ EMAIL-1 | Dev MARIA | Sumada por Emi el 28/10 (D36 de MARIA): recuperar usuario y contraseña encuentran el email con otras mayúsculas; ningún alta ni cambio crea un email repetido con otras mayúsculas; los pares que ya existan no se tocan hasta que Emi los cuente |
 | 🔵 CONEXIONES-1 | Dev MARIA | Sumada por Emi el 28/10 (D37 de MARIA): medir si el cierre de la sesión de base cancelado deja conexiones tomadas, con Postgres 16; arreglar sólo si las deja |
 | 🔵 AISLAMIENTO-2 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
