@@ -76,3 +76,20 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `con_pg16.sh` guarda su puerto en `PUERTO`, que pisa el exportado por
   `cobro_corte1.sh`, `cobro_mp1.sh`, `cobro_mp2.sh` y `backup1a.sh`:
   renombrar a `PG_PUERTO`.
+- `_migrate_catalogo_claves`: con choque, la fila que se mueve sale sin
+  `ORDER BY` y la otra queda con su clave latina; el log «quedan por un
+  choque» se repite en cada arranque.
+- `_migrate_product_history_clave` (`main.py:1464`): el índice único se crea
+  sin `lock_timeout`; un `guardar-uso` abierto traba el arranque.
+- `save_products` y `update_product` buscan y después insertan: lotes o `PUT`
+  iguales a la vez dan 500 y pierden el lote.
+- `/api/catalog/lookup`: 500 con medio par o campos que no son texto, y no
+  limpia el NUL como el guardado.
+- `_precio` acepta `True`, negativos y `"1_0"`.
+- Mensajes del NCM: con más de 2000 dice «pasa de 2000» aunque el tope es 20;
+  `guardar-uso` dice «La NCM» y el lote «El NCM».
+- Comentarios que dicen «más que lineal» para la extracción de texto
+  (`despacho_lector.py:43`, `test_rendimiento1b.py:151`,
+  `test_rendimiento1d.py:6`): con pypdf 6.21.4 es lineal.
+- `_leer_hojas` toma el tope propio de pypdf como «No pude abrir el PDF» y
+  `validar_pdf` como «demasiado pesado»: unificar el trato.

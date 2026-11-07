@@ -1,7 +1,7 @@
 # Vulnerabilidades de dependencias pendientes
 
 > Última actualización: 2026-06-14
-> Detectadas por auditoría automática (`reports/audit_proyecto.json`, `reports/audit_main.json`).
+> Detectadas por auditoría automática (`docs/archive/audit_proyecto.json`, `docs/archive/audit_main.json`).
 > NO son vulnerabilidades propias del negocio; son actualizaciones de librerías de terceros.
 > Prioridad: media. Se sugiere atacar en una ventana de mantenimiento tranquila, separada de olas de producto.
 
@@ -68,6 +68,6 @@
 ## Referencias
 
 - `requirements.txt`
-- `reports/audit_proyecto.json`
-- `reports/audit_main.json`
+- `docs/archive/audit_proyecto.json`
+- `docs/archive/audit_main.json`
 - Archivo generado por auditoría de dependencias del entorno.

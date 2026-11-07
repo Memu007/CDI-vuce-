@@ -1,4 +1,4 @@
-/* SEPARADORES-1: montos escritos a mano (flete, seguro, gastos, ajustes).
+/* Montos escritos a mano (flete, seguro, gastos, ajustes).
    Convención argentina: «3.480» y «3.480,00» son tres mil cuatrocientos
    ochenta, «3,48» es tres con cuarenta y ocho. Un monto no lleva tres
    decimales, así que «1,500» puede ser mil quinientos o uno con cinco: no se
@@ -11,7 +11,7 @@
     const NO_CIERRAN = 'Los puntos y comas no cierran: escribí, por ejemplo, 3.480,50.';
 
     // Grupos de miles bien armados: «3», «480»; «1», «234», «567». Sin cero
-    // adelante (SEPARADORES-1c): «01.500.000» no cierra.
+    // adelante: «01.500.000» no cierra.
     function sonMiles(grupos) {
         return /^[1-9]\d{0,2}$/.test(grupos[0]) && grupos.slice(1).every(g => /^\d{3}$/.test(g));
     }
@@ -56,7 +56,7 @@
                 }
                 entero = partes.join('');  // 3.480: punto de miles
             } else if (/^\d{4,}$/.test(partes[0]) && !/^0+$/.test(partes[0]) && partes[1].length === 3) {
-                // SEPARADORES-1b. «2500.125» (o «01234.500», SEPARADORES-1c):
+                // «2500.125» (o «01234.500»):
                 // ni miles bien escritos ni decimales sin dudas. Las dos
                 // lecturas como las escribe escribir(), que leer() lee igual:
                 // ¿2500125 o 2500,1250?

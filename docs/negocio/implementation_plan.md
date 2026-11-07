@@ -33,7 +33,7 @@ Antes de escribir una línea de código del Pilar B, necesitamos validar el "Pro
 - **Acción:** Si falla Tarifar o VUCE oficial, verificamos el caché (`ncm_cache`). Si hay caché, devolvemos **HTTP 200 con `meta.stale=true` y `meta.stale_reason="tarifar_unreachable"`** y se renderiza un banner explícito en UI. **Si no hay caché (NCM nunca visto), se devuelve HTTP 503 sin body de datos, deteniendo la operación.** Se prohíbe terminantemente el uso de datos `fake` en el entorno de producción.
 
 ### 1.4. Transferencia de Conocimiento de Dominio
-- **Acción:** Crear la estructura y template base de `docs/DOMINIO_ADUANERO.md`. 
+- **Acción:** Crear la estructura y template base de `docs/archive/DOMINIO_ADUANERO.md`. 
 - **Nota Importante:** La IA solo estructurará el documento basándose en el historial. El usuario (Owner/Especialista de Dominio) deberá completarlo manualmente, ya que inventar reglas aduaneras destruiría la credibilidad en Due Diligence.
 
 ---

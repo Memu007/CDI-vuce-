@@ -497,7 +497,7 @@ def test_una_hoja_que_falta_en_el_archivo_da_400():
     assert "dev_detail" not in r.json()
 
 
-def test_leer_la_factura_abre_un_libro_con_una_sola_hoja(monkeypatch):
+def test_leer_la_factura_abre_un_libro_con_una_sola_hoja(monkeypatch, tmp_path):
     """Lo que recibe pandas es la copia con sólo la primera hoja: openpyxl no
     recorre las demás (las sin <dimension> costaban segundos cada una)."""
     import openpyxl
@@ -509,7 +509,7 @@ def test_leer_la_factura_abre_un_libro_con_una_sola_hoja(monkeypatch):
             vistos.append(openpyxl.load_workbook(io.BytesIO(origen.getvalue()), read_only=True).sheetnames)
         return original(origen, *a, **k)
     monkeypatch.setattr(main.pd, "read_excel", _espia)
-    ruta = "/tmp/_excel2_tres_hojas.xlsx"
+    ruta = str(tmp_path / "tres_hojas.xlsx")
     with open(ruta, "wb") as f:
         f.write(_libro_normal({"Factura": FILAS, "B": [["x"]], "C": [["y"]]}))
     main._leer_excel_ruta(ruta, "openpyxl")

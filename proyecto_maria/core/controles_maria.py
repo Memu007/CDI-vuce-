@@ -1,4 +1,4 @@
-"""Controles antes de generar el TXT de MARIA (MARIA-1b).
+"""Controles antes de generar el TXT de MARIA.
 
 Lo que impide un TXT válido es un error y no deja generar; lo dudoso es una
 advertencia. No cambian lo que sale en el TXT: sólo cuándo se puede generar.
@@ -17,7 +17,7 @@ from proyecto_maria.core.maria_generator import (
 INCOTERMS_ACEPTADOS = INCOTERMS_VALIDOS | _INCOTERMS_GRUPO_C_D | {"FAS"}
 
 # La única moneda confirmada con un archivo real es DOL: las demás avisan
-# hasta que el despachante confirme sus códigos (devolución de MARIA-1b).
+# hasta que el despachante confirme sus códigos.
 MONEDAS_CONFIRMADAS = {"DOL"}
 
 # Campos de texto de la cabecera que van tal cual a una línea «CLAVE=valor».
@@ -54,7 +54,7 @@ def cuit_valido(cuit) -> bool:
     review.js validateCuitAR)."""
     norm = re.sub(r"[-\s]", "", str(cuit or ""))
     # Sólo 0-9: «\d» acepta dígitos de ancho completo o arábigos, y el TXT
-    # los escribiría tal cual (devolución de MARIA-1b).
+    # los escribiría tal cual.
     if not re.fullmatch(r"[0-9]{11}", norm):
         return False
     pesos = (5, 4, 3, 2, 7, 6, 5, 4, 3, 2)
@@ -66,7 +66,7 @@ def cuit_valido(cuit) -> bool:
 def _numero_o_none(valor):
     """El número, o None si falta o es un texto que no es número (eso lo marca
     el control de siempre). Un entero enorme (10**400) es infinito y una lista
-    u objeto no es un número: los dos son un monto inválido (EXCEL-2)."""
+    u objeto no es un número: los dos son un monto inválido."""
     if valor is None or isinstance(valor, bool) or (isinstance(valor, str) and not valor.strip()):
         return None
     if isinstance(valor, (list, dict)):
@@ -81,14 +81,14 @@ def _numero_o_none(valor):
 
 def digitos_raros(valor) -> bool:
     """Si el texto tiene dígitos que no son 0-9 (de ancho completo, arábigos):
-    el TXT los escribiría tal cual (EXCEL-2, de paso)."""
+    el TXT los escribiría tal cual."""
     return any(c.isdigit() and not ("0" <= c <= "9") for c in str(valor or ""))
 
 
 def _fuera_de_rango(*valores) -> bool:
     """NaN, infinito o más que un billón, solo o multiplicado por la cantidad:
     un número así, aunque sea finito, llega al TXT como «inf» o «nan» al
-    hacer las cuentas (revisión de la devolución de MARIA-1b)."""
+    hacer las cuentas."""
     numeros = [v for v in valores if v is not None]
     if any(not math.isfinite(v) or abs(v) > IMPORTE_MAXIMO for v in numeros):
         return True
@@ -112,7 +112,7 @@ def montos_fuera_de_rango(items, cabecera: dict) -> list:
         peso_kg = _numero_o_none(item.get("peso_kg"))
         peso_unitario = _numero_o_none(item.get("peso_unitario"))
         # Con la cantidad mala, valor y peso se miran solos: si no, el error
-        # nombraba también los que estaban bien (devolución de EXCEL-2).
+        # nombraría también los que están bien.
         cantidad_mala = _fuera_de_rango(cantidad)
         por = None if cantidad_mala else cantidad
         if cantidad_mala:
@@ -122,7 +122,7 @@ def montos_fuera_de_rango(items, cabecera: dict) -> list:
         if _fuera_de_rango(peso_kg) or _fuera_de_rango(por, peso_unitario):
             errores.append(f"Item {n}: Peso inválido")
         # Con otra forma que una lista, el control de forma de /generate_maria
-        # da el 400 con su mensaje; acá no se revienta (SUBITEMS-1).
+        # da el 400 con su mensaje; acá no se revienta.
         subitems = item.get("subitems")
         for m, sub in enumerate(subitems if isinstance(subitems, list) else [], start=1):
             if not isinstance(sub, dict):
@@ -178,8 +178,8 @@ AVISO_SIN_CATALOGO = ("No está el catálogo de NCM: no se pudo revisar que las 
 def _control_ncm(pieza, n: int, errores: list, advertencias: list) -> None:
     """Si la NCM perdió el 0 inicial (Excel guarda 01012100 como 1012100), es
     un error y se propone con el 0. Si no está en el nomenclador vigente de
-    ARCA (dada de baja o desconocida), se avisa con el texto del catálogo
-    (CATALOGO-NCM-1); no frena. Sin el catálogo no se adivina nada: un aviso
+    ARCA (dada de baja o desconocida), se avisa con el texto del catálogo y
+    no frena. Sin el catálogo no se adivina nada: un aviso
     para toda la operación."""
     texto = re.sub(r"[\s.]", "", str(pieza or "")).upper()
     if not texto:

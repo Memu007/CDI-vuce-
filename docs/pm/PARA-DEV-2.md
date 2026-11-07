@@ -69,6 +69,46 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## RESET-2: aceptada sobre `99d3f69`, sin integrar (2026-11-06 PM)
+
+Reproducido: `test_email1` + `test_reset1` `32 passed`, rojo con la puerta
+vieja `2 failed`, y un negativo propio con `ENVIRONMENT` ausente,
+`development`, `test` y `Testing`: ninguno da la pista. Acta:
+`REPRODUCCION-RESET-2-2026-11-06.md`.
+
+- **D91 y D92: decidido por la PM, pieza nueva ENTORNO-1** (seguridad chica,
+  Emi: «a cero»). Va **después de ABUSO-1**, sin cortarla. Comportamiento
+  pedido: con `ENVIRONMENT` ausente o con un valor que no sea uno conocido,
+  no se abre ninguna puerta de desarrollo: el login no acepta la contraseña
+  guardada tal cual, no se crean usuarios demo, el webhook de MP sin secreto
+  no acepta firmas cualquiera y el link de reset no sale por stdout. Prueba:
+  un caso por causa, con la familia de valores de `ENVIRONMENT` como datos,
+  y el rojo con cada puerta vieja. Sugerencia (no es criterio): un solo
+  lugar que diga «esto es desarrollo» y que exija el valor explícito.
+  Revisión más fuerte: toca autenticación y dinero.
+- **D93: (a).** El script manual usa `ENVIRONMENT=testing`; no se toca.
+
+Tu orden: ABUSO-1 → ENTORNO-1 → el resto de la cola. Próxima D: D94.
+
+## PYPDF-1: aceptada sobre `974263e`, sin integrar (2026-11-06 PM)
+
+Acta: `REPRODUCCION-PYPDF-1-2026-11-06.md`. Coincide con tu informe: las
+cuatro suites de PDF dan `324 passed`, `rendimiento1c.sh` 18 en rojo sin
+falla y el sabotaje de D87 da los 2 rojos que nombrás. Probé seis PDF
+distintos de los tuyos: uno cortado, uno basura y uno con `/Pages` en ciclo
+siguen dando «PDF inválido» sin colgarse; uno de 600 bytes con `xref 0 999999`
+da «demasiado pesado». Es justo D90. Bien que no se fijara una versión vieja.
+
+- **D89: (a)**, el tope de memoria del hijo queda como respaldo, sin bomba
+  más grande. Decidido por la PM.
+- **D90: (a)**, toda `LimitReachedError` es «demasiado pesado». Decidido por
+  la PM.
+- Los comentarios «más que lineal» y el trato distinto del tope en
+  `_leer_hojas` los paso yo a `COLA-LIMPIEZA.md`.
+- `despacho1b.sh` entero queda como puerta mía antes de publicar.
+
+**Tu orden:** RESET-2 → ABUSO-1. Tus próximas D siguen en D91.
+
 ## RESET-1: aceptada sobre `02a21e7`, sin integrar (2026-11-06 PM)
 
 Acta: `REPRODUCCION-RESET-1-2026-11-06.md`. Coincide con tu informe:
@@ -84,74 +124,42 @@ dueño. Bien también que avisaras el orden y por qué.
 - **D83:** (a), queda así: sólo corre con la variable prendida y con emails
   de la lista de prueba. Decidido por la PM.
 
-**Sigue igual:** primero esta devolución de CATALOGO-LARGO-2, después
-PYPDF-1 y después RESET-2 (en `ROADMAP.md`): el link vuelve en la respuesta
-sólo en el entorno de prueba, nunca por un `ENVIRONMENT` que falta.
+RESET-2 (en `ROADMAP.md`): el link vuelve en la respuesta sólo en el entorno
+de prueba, nunca por un `ENVIRONMENT` que falta.
 
-## CATALOGO-LARGO-2: devolución, sobre `ccfe640` (2026-11-06 PM)
+## CATALOGO-LARGO-2: aceptada sobre `d5bc7c1` (pruebas `b0bbd8c`), sin integrar (2026-11-06 PM)
 
-Lo central está bien. TAIWAN y CHILE llegan enteros al TXT (antes, «TAI» y
-«CHI» daban país mal o rechazo). Un texto de más de 2000 da 400 sin guardar
-nada. La migración de 200 000 filas no reescribe la tabla. Con HTML en origen
-o proveedor no hay XSS en v2. Vuelve por tres causas, las tres nuevas de la
-pieza. Acta: `REPRODUCCION-CATALOGO-LARGO-2-2026-11-06.md`.
+Acta: `REPRODUCCION-CATALOGO-LARGO-2-v2-2026-11-06.md`. Coincide con tu
+informe: `test_catalogo_largo2.py` 40 passed, Postgres 21 OK y `fallas: 0`,
+37 sabotajes en rojo sin falla, chequeo-6 `+153/−75` con el aviso de 78 netas que explicaste.
+La suite da `5 failed, 4984 passed`: los 5 de D73. Probé ejemplos distintos de
+los de la devolución (medio par bajo dentro del texto, objeto y decimal en
+origen, entero en NCM y en proveedor, NCM entero por `guardar-uso`): los siete
+dan 400 sin guardar nada; en la base, cuatro daban 500. Opus y Sonnet alto,
+en PG 16, no encontraron 500 nuevos, escrituras a medias ni filas perdidas.
+Sin integrar, por lo mismo que `ca87d82`.
 
-1. **Un texto que Postgres no puede guardar ahora rompe el lote entero.**
-   Antes, una descripción sin letras latinas se salteaba. Ahora entra a
-   insertar, así que un NUL o un medio par sustituto (`\ud800`) da 500 y se
-   pierde todo el lote, también los productos buenos.
-   - Lo reproduje en PG 16 con `POST /api/catalog/{id}/productos`, un ítem
-     latino más «🔩\ud800»: en `ccfe640` da 500 y el catálogo queda vacío; en
-     la base, 200 y se guarda el latino.
-   - Ese texto da hoy 400 con el mensaje del codec de Python
-     (`'utf-8' codec can't encode…`), y `vendor_name` en `null` o `false` da
-     500 (TypeError).
-   - **Pedido:** ninguna entrada mala da 500 ni pierde lo bueno del lote. Da
-     400 con un motivo para el usuario, o se limpia como ya hace
-     `_sin_nul`; elegí una regla y que valga en todos los campos.
-   - El caso lleva como datos NUL, medio par y `null` en descripción, origen
-     y proveedor, por el lote, `guardar-uso` y `PUT`, **en Postgres**.
-   - Es tu D79: (a), dentro de esta vuelta.
-2. **Una fila vieja cuya clave guardada no es la que calcula
-   `clave_de_producto` queda duplicada y sin poder editarse.**
-   - Ejemplo: clave latina con descripción CJK, que la base dejaba armar con
-     `PUT`. Guardar otra vez esa descripción crea una segunda fila `~…`.
-   - Después, cualquier `PUT` a la fila vieja da 404, porque `update_product`
-     recalcula la clave y choca con la nueva (`catalog_service.py:495-505`).
-     Quedan dos productos con la misma descripción y distinto NCM.
-   - **Pedido:** un producto tiene una sola fila, también con datos de antes
-     de la pieza, y la fila vieja sigue editable.
-   - El caso arma la fila con el camino de la base y lleva como datos CJK,
-     emoji y mezcla.
-3. **El arranque puede trabarse con un `guardar-uso` en curso, y el log
-   miente.**
-   - La migración toma `vendor_catalog_products` y después
-     `client_product_history` en una transacción; `guardar-uso` las toma al
-     revés. Eso da deadlock, se vuelve atrás todo y el arranque falla.
-   - El «✅ Migracion» se imprime antes del commit (`main.py:1244-1256`).
-   - **Pedido:** el arranque no se traba con escrituras en curso, y el log
-     dice «migrado» sólo si quedó guardado.
-   - La prueba va en PG. Si un caso con dos conexiones sale caro, alcanza con
-     mostrar el orden en el código y el rojo del log.
+Una corrección al informe: en D84 decís que el usuario ve qué fila corregir.
+No es así: el 400 no nombra el ítem, `saveCatalogLearn` sólo mira `res.ok`, y
+la pantalla dice «Algunos productos no quedaron» cuando no quedó ninguno
+(`finalize.js:764-768`). No empeora la base, pero una premisa así tiene que
+estar probada antes de ofrecerla para decidir.
 
-Cada una con su rojo en la base o con el arreglo revertido, y `/entregar`
-entero.
+- **D84: (a)**, el lote entero se rechaza. Que el 400 nombre el ítem y que la
+  pantalla diga la verdad va a CATALOGO-3. Decidido por la PM.
+- **D85: (a)**, a CATALOGO-3 con D76; suma el proveedor `"\x00"`, que hoy
+  guarda bajo `vendor_id ""`.
+- **D86: (a)**, a CATALOGO-3 con D78.
+- **D87: (a)**, el patrón de `despacho1b.sh:325` en un commit de pruebas
+  aparte, con su rojo, en tu próxima entrega (PYPDF-1).
+- **A la cola de limpieza** (decidido por la PM): la fila que choca en
+  `_migrate_catalogo_claves` (sin `ORDER BY`, log repetido en cada
+  arranque); el índice de `_migrate_product_history_clave` sin
+  `lock_timeout` (`main.py:1464`); lotes o `PUT` a la vez dan 500;
+  `/api/catalog/lookup` con 500 y sin limpiar el NUL; precios raros; los
+  mensajes del NCM («pasa de 2000» con tope 20, «La NCM» y «El NCM»).
 
-- **D76 y D77: anteriores a la pieza, no entran en esta vuelta.** Las dos
-  mezclan datos de verdad en facturas chinas: un proveedor sólo CJK comparte
-  catálogo con todos los demás, y «电线 2mm» con «钢管 2mm» se pisan el NCM sin
-  aviso. Se las propongo a Emi, recomendadas, como pieza **CATALOGO-3**,
-  junto con D78 y D80. No las empezás sin su sí.
-- **D78: (a)**, en CATALOGO-3. Hoy `historial_guardado: true` guarda una
-  fila que nunca se vuelve a encontrar.
-- **D79: (a)**, en esta vuelta (causa 1).
-- **D80:** en CATALOGO-3; el recorte a 3 de `pdf_extractor.py:574` va ahí.
-- **D81: queda.** No es XSS real, según los dos adversarios: `item.origen`
-  viene del archivo o de la tabla, y `updateField` corta en 3. Escapar ese
-  `value` va a `COLA-LIMPIEZA.md`. Decidido por la PM.
-- El tope de 2000 queda así.
-- **Tu orden: esta devolución primero**, después RESET-1. Tus próximas D
-  siguen en D82.
+CATALOGO-3 sigue esperando el sí de Emi.
 
 ## SESION-1: aceptada sobre `2e62761`, sin integrar (2026-11-06 PM)
 

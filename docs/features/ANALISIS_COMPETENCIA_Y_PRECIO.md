@@ -32,7 +32,7 @@ incluye:
 Es decir: **leer el PDF de la factura y armar ítems con subítems ya lo hace
 una empresa desde hace décadas.** Incluso los sub-ítems que implementamos hoy.
 
-`docs/IDEAS_PREMIUM_FEATURES.md` afirma que la extracción de PDF con IA es
+`docs/archive/IDEAS_PREMIUM_FEATURES.md` afirma que la extracción de PDF con IA es
 algo que *"nadie más tiene bien"*. La palabra clave puede ser **"bien"** —
 pero como diferenciador de venta, "leemos el PDF" **no alcanza**. El
 comprador ya escuchó eso.

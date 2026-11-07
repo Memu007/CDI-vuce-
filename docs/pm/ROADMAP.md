@@ -130,6 +130,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | ✅ COBRO-MP-1 | Dev técnica | Aviso de pago verificado, aplicado una vez, con el monto controlado; las renovaciones extienden el período (C3, D8) |
 | ✅ COBRO-CORTE-1 | Dev técnica | Quien no paga no genera ni gasta Gemini; contar una vez por operación sin pasarse del tope (también con guardados a la vez); el aviso dice la razón real (C1, C5, C6; D4 b N = 10, D5 a, D6 a) |
 | 🔵 COBRO-MP-2 | Dev técnica | Cancelar también en Mercado Pago sin perder días pagados, una sola suscripción, reactivar pagando (C2, C4, C8, D9) |
+| ⚪ VALIDACION-1 | Dev técnica | Sí de Emi el 06/11: la validación de una carga nunca muestra ni guarda los totales, errores o avisos de otra (hoy se reusa 60 s sin mirar de qué carga es, `finalize.js:103-108`); «Generar» se habilita por los errores de la carga que se ve |
 | ⚪ COBRO-MP-3 | Dev técnica | Sumada por Emi el 04/11: las consultas a Mercado Pago no frenan el servidor (D8 a); el aviso de pago tiene límite de pedidos; un aviso sin firma verificable no cambia nada |
 | ⏳ PRORRATEO-1 | Dev MARIA | El reparto ítem por ítem de ajustes, seguro y flete hasta el FOB casillero, con las sumas exactas al centavo (segunda etapa acordada el 24/10) |
 | ✅ ORG-1 | Dev MARIA | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
@@ -145,8 +146,9 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 |---|---|---|
 | ✅ SESION-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ RESET-1 | Dev MARIA | Sumada por la PM el 06/11 («arreglos chicos de seguridad a cero», Emi): un link de reset deja de servir después de un cambio de clave o email y después de usarse una vez, también con dos usos a la vez |
-| 🔵 RESET-2 | Dev MARIA | Sumada por la PM el 06/11 («arreglos chicos de seguridad a cero», Emi): el pedido de reset devuelve el link en la respuesta sólo en el entorno de prueba; un `ENVIRONMENT` que falta o es otro no lo devuelve |
-| 🔵 PYPDF-1 | Dev MARIA | Sumada por la PM el 06/11 (D73 de MARIA): ver qué cambió en pypdf 6.21.4, que rompe 5 pruebas, y fijar la versión o adaptar las pruebas según eso |
+| ✅ RESET-2 | Dev MARIA | Sumada por la PM el 06/11 («arreglos chicos de seguridad a cero», Emi): el pedido de reset devuelve el link en la respuesta sólo en el entorno de prueba; un `ENVIRONMENT` que falta o es otro no lo devuelve |
+| 🔵 ENTORNO-1 | Dev MARIA | Sumada por la PM el 06/11 («arreglos chicos de seguridad a cero», Emi; D91/D92): con `ENVIRONMENT` ausente o desconocido no se abre ninguna puerta de desarrollo (login con la contraseña guardada, usuarios demo, webhook de MP sin firma, link de reset por stdout) |
+| ✅ PYPDF-1 | Dev MARIA | Sumada por la PM el 06/11 (D73 de MARIA): ver qué cambió en pypdf 6.21.4, que rompe 5 pruebas, y fijar la versión o adaptar las pruebas según eso |
 | 🔵 ABUSO-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ EMAIL-1 | Dev MARIA | Sumada por Emi el 28/10 (D36 de MARIA): recuperar usuario y contraseña encuentran el email con otras mayúsculas; ningún alta ni cambio crea un email repetido con otras mayúsculas; los pares que ya existan no se tocan hasta que Emi los cuente |
 | 🔵 CONEXIONES-1 | Dev MARIA | Sumada por Emi el 28/10 (D37 de MARIA): medir si el cierre de la sesión de base cancelado deja conexiones tomadas, con Postgres 16; arreglar sólo si las deja |
@@ -154,7 +156,7 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | 🔵 LIMPIEZA-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | 🔵 OBSERVABILIDAD-1 | Dev MARIA | La columna `api_logs.owner_username` que falta en producción, con migración probada en Postgres descartable |
 | ✅ CATALOGO-LARGO-1 | Dev MARIA | Sumada por Emi el 04/11: una descripción larga (301 a 2000 caracteres) no se pierde en silencio en la memoria del cliente ni en el catálogo (`product_key` de 300); con migración probada en Postgres descartable si hace falta |
-| ⚪ CATALOGO-LARGO-2 | Dev MARIA | Sí de Emi el 05/11 21:41: un origen de más de 5 caracteres o un proveedor de más de 200 no se pierden en silencio (hoy dan 200 sin guardar o 500), y una descripción que normaliza a vacío no contesta «guardado» |
+| ✅ CATALOGO-LARGO-2 | Dev MARIA | Sí de Emi el 05/11 21:41: un origen de más de 5 caracteres o un proveedor de más de 200 no se pierden en silencio (hoy dan 200 sin guardar o 500), y una descripción que normaliza a vacío no contesta «guardado» |
 | ✅ CSRF-1 | Dev técnica | Sumada por Emi el 04/11: con el control CSRF prendido, la telemetría de la página llega y cerrar sesión pide el token (D16 b) |
 | ✅ CSRF-2 | Dev técnica | Con el control CSRF prendido, la landing, la pantalla vieja y la recuperación de cuenta siguen andando, y `webhook` en la ruta no saltea el control (D56 b de CSRF-1; decidido por la PM el 05/11 con el sí de Emi del 04/11 a los arreglos chicos de seguridad) |
 | ✅ CSRF-3 | Dev técnica | Una sesión abierta sin la cookie `csrf_token` la recibe sola y puede seguir escribiendo sin volver a entrar (D59 a de CSRF-2; decidido por la PM el 05/11 con el sí de Emi del 04/11 a los arreglos chicos de seguridad) |
