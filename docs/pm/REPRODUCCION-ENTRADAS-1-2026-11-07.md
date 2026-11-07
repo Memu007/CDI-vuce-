@@ -63,3 +63,19 @@ pieza da `54 passed`:
 
 `smoke_friccion.sh`, `ataque_aislamiento.sh` (la pieza no toca permisos),
 gunicorn.
+
+## Vuelta: aceptada sobre `c839197`, sin integrar (2026-11-07 23:15 UTC)
+
+Sólo pruebas (`30b8b78`, `c839197`); el producto de ENTRADAS-1 no cambió
+desde `589fd0b`.
+
+| Qué | Salida |
+|---|---|
+| `test_entradas1.py` + `test_user_profile_coverage.py`, pruebas nuevas sobre `589fd0b` y en `c839197` | `93 passed` las dos |
+| `sabotajes/entradas1.sh c839197` | 32 `ROJO` (antes 22), `sabotajes con falla: 0`, `salida 0`; los cuatro puntos de la devolución, cada uno en rojo |
+| ejemplo distinto del pedido: email con tope 101 en vez de 100 | `3 failed, 76 passed` (registro, estudio y perfil) |
+
+Sin integrar: la rama lleva debajo piezas en devolución (ABUSO-2 entre ellas).
+No corrido por la PM: la suite completa sobre `c839197` (sólo cambiaron
+pruebas; la de la entrega fue `1 failed, 5070 passed`, el rojo de
+`despacho1b`, ya resuelto en `d69233c`).
