@@ -77,9 +77,12 @@ sabotaje "el caché no mira de qué carga es" \
 sabotaje "la respuesta de la anterior pinta la que se ve" \
   "FALLA: panel, la anterior contesta después: muestra" \
   $'        if (turno !== turnoValidacion) return;\n' ''
-sabotaje "el resultado de la anterior queda mientras se valida" \
+sabotaje "con el validador caído queda el resultado de la anterior" \
   "FALLA: botón, falla el validador: el botón está habilitado pero el clic no genera" \
-  $'        lastValidation = null;\n        const startedAt' '        const startedAt'
+  $'            lastValidation = null;\n            // Mostrar' '            // Mostrar'
+sabotaje "volver a validar la misma con el validador caído borra su resultado" \
+  "FALLA: botón, falla al volver a validar la misma: deja generar con el peso en cero" \
+  $'            if (lastValidation && pedido === lastValidationPedido) {\n                renderValidation(lastValidation);\n                return;\n            }\n' ''
 sabotaje "con una validación en curso, la que se ve no valida" \
   "FALLA: panel, la anterior contesta después: no mostró la validación de la que se ve" \
   '        const turno = ++turnoValidacion;' \

@@ -45,6 +45,9 @@ const CASOS = [
     } },
   { que: 'botón, error sólo en la anterior', a: SIN_PESO(A), b: B, mira: HABILITADO },
   { que: 'botón, falla el validador', a: SIN_PESO(A), b: B, validador: 'falla', mira: GENERA },
+  { que: 'botón, falla al volver a validar la misma', a: SIN_PESO(A), validador: 'falla', mira: async page => {
+      if (!await page.$eval('#validatingGenerate', b => b.disabled)) return 'deja generar con el peso en cero';
+    } },
   { que: 'historial', a: A, b: B, cliente: true, mira: async (page, clienteId) => {
       const guardado = page.waitForRequest(r => r.method() === 'POST' &&
         r.url().endsWith('/api/clientes/' + clienteId + '/operaciones'), { timeout: 15000 });
@@ -70,13 +73,35 @@ async function validar(page, item, espera = true) {
     return 'no mostró la validación de la que se ve';
 }
 
-// El validador simulado, sólo en su caso, elige el pedido por su carga: «tarda» retiene la de la anterior
-// hasta que la suelta el caso; «falla» contesta 500 a la que se ve.
-async function simular(page, modo, anterior) {
+// «Volver a validar» sobre la carga que se ve. Devuelve qué faltó, o nada.
+async function revalidar(page) {
+  const pidio = page.waitForRequest('**/api/validate/smart', { timeout: 15000 });
+  await page.click('#validatingRerun');
+  if (!await pidio.catch(() => null)) return 'volver a validar no pidió validación';
+  if (!await page.waitForFunction(() => !document.getElementById('validatingResults').hidden, null, { timeout: 15000 }).catch(() => null))
+    return 'no mostró la validación al volver a validar';
+}
+
+// El validador simulado, sólo en su caso: el primer pedido es el de la anterior. «tarda» lo retiene
+// hasta que lo suelta el caso; «falla» contesta 500 a los que siguen. Cuenta las respuestas que la página leyó.
+async function simular(page, modo) {
   const sim = {};
+  let pedidos = 0;
   sim.retenida = new Promise(ok => { sim.soltarla = ok; });
+  await page.evaluate(() => {
+    const pedir = window.fetch;
+    window.__leidas = 0;
+    window.fetch = async (...args) => {
+      const res = await pedir(...args);
+      if (String(args[0]).endsWith('/api/validate/smart')) {
+        const leer = res.json.bind(res);
+        res.json = async () => { const d = await leer(); window.__leidas++; return d; };
+      }
+      return res;
+    };
+  });
   await page.route('**/api/validate/smart', async route => {
-    const deLaAnterior = (route.request().postDataJSON().items || [])[0].pieza === anterior.pieza;
+    const deLaAnterior = ++pedidos === 1;
     if (modo === 'tarda' && deLaAnterior) { await sim.retenida; return route.fulfill({ response: await route.fetch() }); }
     if (modo === 'falla' && !deLaAnterior) return route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"validador caído"}' });
     return route.continue();
@@ -101,21 +126,22 @@ async function simular(page, modo, anterior) {
     const page = await ctx.newPage();
     await page.goto(base + '/dashboard');
     await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.api && document.querySelector('.screen.is-active'));
-    const sim = c.validador ? await simular(page, c.validador, c.a) : null;
+    const sim = c.validador ? await simular(page, c.validador) : null;
     const tarda = c.validador === 'tarda';
     const pidioA = tarda && page.waitForRequest('**/api/validate/smart');
-    await validar(page, c.a, !tarda);
+    // La anterior tiene que haberse validado, y con su error si lo trae: si no, el caso no prueba nada.
+    let mal = await validar(page, c.a, !tarda) && 'la anterior no mostró su validación';
+    if (!mal && !tarda && c.a.peso_unitario === 0 && !await page.$eval('#validatingGenerate', b => b.disabled))
+      mal = 'la anterior, con el peso en cero, deja generar';
     const pedidoA = tarda && await pidioA;
     const desde = Date.now();
     const pidioB = tarda && page.waitForRequest(r => r.url().endsWith('/api/validate/smart') && r !== pedidoA, { timeout: 15000 });
-    let mal = await validar(page, c.b);
+    mal = mal || (c.b ? await validar(page, c.b) : await revalidar(page));
     if (tarda) {
       if (!await pidioB.catch(() => null)) mal = mal || 'la que se ve no pidió validación mientras la anterior esperaba';
-      const terminoA = page.waitForEvent('requestfinished', r => r === pedidoA);
       sim.soltarla();
-      await terminoA;
-      // La respuesta de A ya llegó; se cede un turno a la página para que la procese antes de mirar.
-      await page.evaluate(() => new Promise(ok => setTimeout(ok, 0)));
+      // La página ya leyó las dos respuestas: la de la anterior se procesó antes de mirar.
+      await page.waitForFunction(() => window.__leidas === 2, null, { timeout: 15000 });
     }
     if (c.cliente) await page.evaluate(cl => CDI.setClienteActivo(cl), cliente);
     if (Date.now() - desde > 50000) throw new Error(c.que + ': entre las dos cargas pasaron más de 50 s');
