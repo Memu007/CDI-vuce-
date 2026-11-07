@@ -83,7 +83,7 @@ sabotaje $M "la bandera abre el cobro simulado fuera de desarrollo" \
   "$C[cobro_simulado_con_bandera]"
 sabotaje $M "CSRF sólo avisa salvo en producción" \
   'default = "false" if _es_desarrollo() else "true"' 'default = "true" if IS_PRODUCTION else "false"' \
-  "$C[csrf_que_sólo_avisa]" "csrf_que_sólo_avisa $VIEJO"
+  "$C[csrf_que_solo_avisa]" "csrf_que_solo_avisa $VIEJO"
 sabotaje $M "cookie de sesión sin Secure salvo en producción" \
   'secure=not _es_desarrollo(), samesite="strict",' 'secure=IS_PRODUCTION, samesite="strict",' \
   "$C[cookies_sin_secure]"

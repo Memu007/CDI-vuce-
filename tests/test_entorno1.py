@@ -86,7 +86,7 @@ PUERTAS = {
     # El segundo cobro pasa la puerta y da 409 si el primero ya activó la cuenta.
     "cobro_simulado_con_bandera": lambda d: _estado(d["cobro_con_bandera"] in (200, 409),
                                                     d["cobro_con_bandera"] == 404),
-    "csrf_que_sólo_avisa": lambda d: _estado(d["csrf"] == 404, d["csrf"] == 403),
+    "csrf_que_solo_avisa": lambda d: _estado(d["csrf"] == 404, d["csrf"] == 403),
     "cookies_sin_secure": lambda d: _estado(d["cookies"] == {"access_token": False, "csrf_token": False},
                                             d["cookies"] == {"access_token": True, "csrf_token": True}),
     "docs_y_openapi": lambda d: _estado(d["docs"] == [200, 200, 200], d["docs"] == [404, 404, 404]),
