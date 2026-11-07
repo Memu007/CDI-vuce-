@@ -76,13 +76,7 @@ sabotaje $M "los fallos de la cuenta no se cuentan aparte" "$P[solo_propios]" \
   $'        if clave_cuenta:\n            await limites_auth.contar' \
   $'        if False:\n            await limites_auth.contar'
 sabotaje $L "descontar borra lo propio pero no lo resta de la IP" "$P[mitad_y_mitad]" \
-  '            cuenta=_T.c.cuenta - n,' '            cuenta=_T.c.cuenta,'
-sabotaje $L "descontar no olvida un bloqueo vencido" "$P[bloqueo_vencido]" \
-  '            bloqueado_hasta=case((_T.c.bloqueado_hasta <= ahora, 0.0), else_=_T.c.bloqueado_hasta)))' \
-  '            bloqueado_hasta=_T.c.bloqueado_hasta))'
-sabotaje $L "descontar deja la fila de la IP en cero o menos" "$P[mas_propios_que_la_ip]" \
-  '        await db.execute(delete(_T).where(_T.c.clave == clave, _T.c.cuenta <= 0))' \
-  '        pass'
+  'values(cuenta=_T.c.cuenta - n)' 'values(cuenta=_T.c.cuenta)'
 sabotaje $M "el login cuenta los fallos de la IP con el tope de recuperar" "$P[ajeno_tras_el_bloqueo]" \
   'sumar_fallo(db, clave_intentos, exacta=True)' 'sumar_fallo(db, clave_intentos)'
 
