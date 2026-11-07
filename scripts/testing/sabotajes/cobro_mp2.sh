@@ -263,8 +263,28 @@ sabotaje $M "el checkout da 500 cuando el SDK corta solo antes del tope" \
   "    except (_SuscripcionMPError, requests.RequestException) as e:" "    except _SuscripcionMPError as e:"
 
 sabotaje $M "cada pedido a Mercado Pago tiene su propio tope" \
-  "FAILED $T::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[cancelar]" \
+  "FAILED $T::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[cancelar_lee]" \
   "    with anyio.fail_after(max(hasta - anyio.current_time(), 0)):" "    with anyio.fail_after(_TOPE_MP):"
+# Un pedido con su propio plazo, aunque cada uno quede bajo el tope, suma más que el tope.
+for fila in cancelar_lee cancelar_cancela checkout_relee checkout_cancela checkout_crea sacar_cancela; do
+  case $fila in
+    cancelar_lee) viejo="        paga = {cuenta: await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)" ;;
+    cancelar_cancela) viejo="            await _en_hilo_mp(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)
+        except" ;;
+    checkout_relee) viejo="        estado_mp = await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)" ;;
+    checkout_cancela) viejo="                await _en_hilo_mp(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)" ;;
+    checkout_crea) viejo="org_id=org_id, hasta=plazo)" ;;
+    sacar_cancela) viejo="_cancelar_suscripcion_mp, member.mp_preapproval_id, hasta=plazo)" ;;
+  esac
+  sabotaje $M "un pedido a Mercado Pago con su propio plazo ($fila)" \
+    "FAILED $T::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[$fila]" \
+    "$viejo" "${viejo/hasta=plazo/hasta=anyio.current_time() + _TOPE_MP}"
+done
+sabotaje $M "reactivar no tiene tope" \
+  "FAILED $T::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[reactivar_lee]" \
+  "    plazo = anyio.current_time() + _TOPE_MP
+    await _quien_toca_el_plan(db_user, org, con_sid, \"reactivar el plan\"" "    plazo = anyio.current_time() + 1e9
+    await _quien_toca_el_plan(db_user, org, con_sid, \"reactivar el plan\""
 sabotaje $M "si Mercado Pago no contesta, cancelar dice que el plan sigue igual" \
   "FAILED $T::test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope[cancelar_lee]" \
   "No se pudo confirmar la cancelación en Mercado Pago. Probá" "No se pudo cancelar en Mercado Pago; tu plan sigue igual. Probá"
