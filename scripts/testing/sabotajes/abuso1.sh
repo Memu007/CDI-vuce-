@@ -16,7 +16,8 @@
 # la limpia; una de hasta 300 también.
 # Duración: el bloqueo y el corte por IP de recuperar duran 15 minutos; la
 # ventana por email de recuperar, una hora.
-# Un surrogate suelto o un NUL en login, reset o recuperar no da 500.
+# Un surrogate suelto o un NUL en login, reset, recuperar o el token de
+# restablecer no da 500, tampoco en el 422.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/abuso1.sh [SHA]
 # Trabaja en un worktree descartable con su propia SQLite y sin terceros: no
@@ -226,8 +227,18 @@ for campo in "    username: TextoCodificable@/auth/login" \
     "FAILED $T::test_un_surrogate_suelto_no_da_500[True-$ruta-" \
     "FAILED $T::test_un_surrogate_suelto_no_da_500[False-$ruta-"
 done
-# Que el login cuente con la conexión del pedido y no con una segunda sólo se
-# ve con el pool de Postgres: lo mide scripts/testing/abuso1_motores.py pg.
+sabotaje $M "/auth/reset-password acepta un token que no se puede guardar" \
+  $'class PasswordResetConfirm(BaseModel):\n    token: TextoCodificable' \
+  $'class PasswordResetConfirm(BaseModel):\n    token: str' \
+  "FAILED $T::test_un_surrogate_suelto_no_da_500[True-/auth/reset-password-" \
+  "FAILED $T::test_un_surrogate_suelto_no_da_500[False-/auth/reset-password-"
+sabotaje $M "el 422 repite lo que llegó con el de FastAPI" \
+  '@app.exception_handler(RequestValidationError)' '' \
+  "FAILED $T::test_un_surrogate_suelto_no_da_500[True-/auth/recover-username-" \
+  "FAILED $T::test_un_surrogate_suelto_no_da_500[False-/auth/login-"
+# Que el login, malo o bueno, cuente con la conexión del pedido y no con una
+# segunda sólo se ve con el pool de Postgres: lo mide
+# scripts/testing/abuso1_motores.py pg.
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

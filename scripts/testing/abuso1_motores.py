@@ -16,13 +16,13 @@ el código de antes del arreglo da FALLA, y esa FALLA es la reproducción.
    mismo email, venga de la IP que venga;
 7. los eventos tienen 120 por minuto por ruta, y sin sesión se guardan los de
    la lista;
-8. una IP de 115 a 332 caracteres (la clave de la tabla tiene 120) no rompe
+8. una IP de 100 a 332 caracteres (la clave de la tabla tiene 120) no rompe
    ninguna de las cuatro rutas con contador y sigue contando;
-9. 120 logins malos a la vez no dan 500 ni agotan el pool: /health contesta
+9. 120 logins malos, y después 120 buenos, a la vez no dan 500 ni agotan el pool: /health contesta
    mientras tanto (el login cuenta con la conexión del pedido, no con otra).
    Los 500 se exigen sólo en PG: en SQLite se informan;
-10. un surrogate suelto o un NUL en el JSON de login, reset o recuperar no da
-   500.
+10. un surrogate suelto o un NUL en el JSON de login, reset, recuperar o el
+   token de restablecer no da 500, tampoco en el 422.
 
 El servidor corre con --no-proxy-headers: así request.client.host es la
 dirección del que conecta, como en Railway, donde el que conecta es su proxy
@@ -385,9 +385,9 @@ def eventos():
 def ip_larga():
     # La última entrada de X-Forwarded-For la escribe el cliente si no hay
     # proxy delante, o si el de Railway no agrega la suya.
-    # Con su prefijo, las claves quedan por debajo de 120, entre 121 y 300 y
-    # por encima.
-    for largo in (115, 200, 287, 332):
+    # Con su prefijo, la primera clave queda en 120 o menos, dos entre 121 y
+    # 300 y la última por encima.
+    for largo in (100, 200, 287, 332):
         ip = ("x" * largo + uuid.uuid4().hex)[-largo:]
         rutas = [("/auth/login", {"username": "nadie", "password": "x"}),
                  ("/auth/request-password-reset", {"email": "nadie@example.com"}),
@@ -402,28 +402,39 @@ def ip_larga():
 
 
 def login_concurrente():
-    s, b = registrar("ab1_pool", "203.0.113.30")
-    assert s == 200, (s, b)
-    salud = []
-    hilo = threading.Thread(target=lambda: salud.append(health()))
-    def uno(i):
-        if i == 60:
-            hilo.start()
-        return pedir("/auth/login", {"username": "ab1_pool", "password": "otra-cosa-1!"}, ip=f"10.77.{i // 250}.{i % 250}")
-    codigos = simultaneos(120, uno)
-    hilo.join(120)
-    print(f"INFO  | 120 logins malos a la vez → {sorted(set(codigos))} (500: {codigos.count(500)}); /health {salud}")
-    # SQLite tiene un solo escritor y también da «database is locked» con el código
-    # anterior: ahí la cuenta se muestra y no falla; la condición es la de PG.
-    if MOTOR == "pg":
-        chequear(not set(codigos) & {500, 0, None}, "120 logins malos a la vez no dan 500")
-    chequear(salud and salud[0][0] == 200 and salud[0][1] < 15, "/health contesta en menos de 15 s durante los logins")
+    """Logins malos (suman fallo) y buenos (limpian el contador) a la vez: los
+    dos caminos usan la conexión del pedido y no agotan el pool."""
+    for usuario, clave, que in (("ab1_pool", "otra-cosa-1!", "malos"), ("ab1_pool_ok", CLAVE, "buenos")):
+        s, b = registrar(usuario, "203.0.113.30")
+        assert s == 200, (s, b)
+        salud, en_carga = [], threading.Event()
+        def medir():
+            en_carga.wait(120)
+            salud.append(health())
+        hilo = threading.Thread(target=medir)
+        hilo.start()
+        def uno(i):
+            if i == 60:
+                en_carga.set()
+            return pedir("/auth/login", {"username": usuario, "password": clave}, ip=f"10.77.{i // 250}.{i % 250}")
+        codigos = simultaneos(120, uno)
+        en_carga.set()
+        hilo.join(120)
+        print(f"INFO  | 120 logins {que} a la vez → {sorted(set(codigos))} (500: {codigos.count(500)}); /health {salud}")
+        # SQLite tiene un solo escritor y también da «database is locked» con el código
+        # anterior: ahí la cuenta se muestra y no falla; la condición es la de PG.
+        if MOTOR == "pg":
+            chequear(not set(codigos) & {500, 0, None}, f"120 logins {que} a la vez no dan 500")
+        chequear(salud and salud[0][0] == 200 and salud[0][1] < 15,
+                 f"/health contesta en menos de 15 s durante los logins {que}")
 
 
 def surrogate():
     for ruta, crudo, pasa in (("/auth/recover-username", b'{"email": "a\\ud800@example.com"}', 200),
                               ("/auth/request-password-reset", b'{"email": "a\\udfff\\u0000@example.com"}', 200),
-                              ("/auth/login", b'{"username": "a\\ud800\\u0000", "password": "x"}', 401)):
+                              ("/auth/login", b'{"username": "a\\ud800\\u0000", "password": "x"}', 401),
+                              ("/auth/reset-password", b'{"token": "a\\ud800\\u0000", "new_password": "Abcdef12!"}', 400),
+                              ("/auth/login", b'{"password": "x\\ud800"}', 422)):
         s, _ = pedir(ruta, crudo=crudo, ip=f"203.0.113.{40 + pasa % 7}")
         chequear(s == pasa, f"surrogate o NUL en {ruta}: {s}, esperado {pasa}")
 
