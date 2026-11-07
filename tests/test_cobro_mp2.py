@@ -636,10 +636,14 @@ def _abrio_otra(nombres, sid, org_id):
     return SUS[sid] == "cancelled" and [t for t, _ in CREADAS] == ["preapproval"]
 
 
-def _salio_sin_suscripcion(nombres, sid, org_id):
-    sale = _leer(nombres["miembro"])
-    return SUS[f"sus-{nombres['miembro']}"] == "cancelled" and sale["organization_id"] is None \
-        and sale["mp_preapproval_id"] is None
+def _salio_sin_suscripcion(cancelaciones):
+    # El simulado acepta cancelar dos veces: se cuenta cuántas se le pidieron.
+    def hecho(nombres, sid, org_id):
+        suya, sale = f"sus-{nombres['miembro']}", _leer(nombres["miembro"])
+        puts = [p for p in PEDIDOS if p.method == "PUT" and _RUTA_SUS.fullmatch(str(p.url)).group(1) == suya]
+        return SUS[suya] == "cancelled" and sale["organization_id"] is None \
+            and sale["mp_preapproval_id"] is None and len(puts) == cancelaciones
+    return hecho
 
 
 _SACAR_MIEMBRO = ("delete", "/api/organizations/members/{miembro}")
@@ -650,8 +654,10 @@ _QUIEN_TOCA = {
     "reactivar": (_cancelada_por_la_duena, ("post", "/api/billing/reactivate"), _volvio_a_la_prueba,
                   (200, 403, 403)),
     "checkout_con_pausada": (_pausada_y_vencida, ("post", "/api/billing/checkout"), _abrio_otra, (409, 200, 409)),
-    "sacar_con_pendiente": (_del_miembro("pending"), _SACAR_MIEMBRO, _salio_sin_suscripcion, (200, 403, 403)),
-    "sacar_con_cancelada": (_del_miembro("cancelled"), _SACAR_MIEMBRO, _salio_sin_suscripcion, (200, 403, 403)),
+    "sacar_con_pendiente": (_del_miembro("pending"), _SACAR_MIEMBRO, _salio_sin_suscripcion(1),
+                            (200, 403, 403)),
+    "sacar_con_cancelada": (_del_miembro("cancelled"), _SACAR_MIEMBRO, _salio_sin_suscripcion(0),
+                            (200, 403, 403)),
     "sacar_sin_mp": (_del_miembro("pending", _contesta_500), _SACAR_MIEMBRO, None, (503, 403, 403)),
     "sacar_a_la_que_paga": (_la_que_paga("authorized"), _SACAR_ABRIO, None, (409, 403, 403)),
     "sacar_a_la_pausada": (_la_que_paga("paused"), _SACAR_ABRIO, None, (409, 403, 403)),
