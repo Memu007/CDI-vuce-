@@ -1377,8 +1377,6 @@
         onLeave() {
             // Si el usuario va a 'upload' (nueva operacion), limpiamos cache
             lastMaria = null;
-            lastValidation = null;
-            lastValidationTs = 0;
             // Fuera de «Listo», la carga que esperaba no genera sola.
             pedidaMientrasOtra = false;
         }
