@@ -213,7 +213,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-07 20:45 UTC: **ENTRADAS-1 devolución sólo de pruebas** (`589fd0b`, MARIA): producto bien (68 passed, PG OK, 22 sabotajes en rojo, Opus sin 500 nuevo); Sonnet: 4 mutaciones pasan en verde. D100-D104 (a); nuevas FRONT-422 y ENTRADAS-2.
+2026-11-07 20:45 UTC: **ENTRADAS-1 devolución sólo de pruebas** (`589fd0b`, MARIA): producto bien (68 passed, PG OK, 22 sabotajes rojos, Opus OK); Sonnet: 4 mutaciones pasan en verde. D100-D104 (a); nuevas FRONT-422 y ENTRADAS-2.
 2026-11-07 19:20 UTC: **ENTORNO-1 aceptada** (`83085e4`, MARIA, sin integrar): 82 passed, 33 sabotajes en rojo, suite `5017 passed`; Opus y Sonnet alto con uvicorn real, nada abierto sin `production`. D97/D98 (a), pieza ENTORNO-2; D99 a Emi.
 2026-11-07 18:15 UTC: **ABUSO-1 aceptada** (`55bf408`, MARIA, sin integrar por `e0b8626`): 72 passed, PG OK, 35 sabotajes en rojo, Opus y Sonnet alto sin nada serio introducido; suite `1 failed, 5004 passed`, el rojo es de `despacho1b` (pasa solo y con su archivo; a la cola). D94-96 (a); piezas nuevas ENTRADAS-1 y ABUSO-2 tras ENTORNO-1.
 2026-11-07 15:52 UTC: **RETOMADO por 24 h** (Emi, sabiendo que pasó el 50 %): tres rutinas prendidas, Devs despertadas (MARIA ABUSO-1; técnica devolución de COBRO-MP-2 y VALIDACION-1). Corte el 08/11 15:50 UTC por `trig_01QwEeyuXBFBx6LErxqapwRh`: lo en curso se termina.
