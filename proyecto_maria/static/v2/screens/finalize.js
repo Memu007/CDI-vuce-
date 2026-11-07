@@ -104,18 +104,17 @@
         init();
         show(vLoading);
         hide(vResults);
-        const items = buildItemsForValidation();
-        const pedido = JSON.stringify({ items, operacion: cabeceraParaValidar() });
         const turno = ++turnoValidacion;
-        // Se reusa sólo el resultado de este mismo pedido, de hace menos de 60 s.
-        if (!force && lastValidation && pedido === lastValidationPedido && (Date.now() - lastValidationTs) < 60000) {
-            renderValidation(lastValidation);
-            return;
-        }
-        lastValidation = null;
+        const items = buildItemsForValidation();
         const startedAt = Date.now();
-        let data = null, err = null;
+        let pedido = '', data = null, err = null;
         try {
+            pedido = JSON.stringify({ items, operacion: cabeceraParaValidar() });
+            // Se reusa sólo el resultado de este mismo pedido, de hace menos de 60 s.
+            if (!force && lastValidation && pedido === lastValidationPedido && (Date.now() - lastValidationTs) < 60000) {
+                renderValidation(lastValidation);
+                return;
+            }
             const res = await CDI.api('/api/validate/smart', { method: 'POST', body: pedido });
             data = await res.json();
             if (!res.ok || !data || data.success === false) {
@@ -130,6 +129,12 @@
             console.error('[validating]', err);
             CDI.track('validation_error', { message: String(err && err.message || err) });
             CDI.toast('Error al validar', String(err && err.message || err), 'error');
+            // Volver a validar la misma carga: su resultado anterior sigue valiendo.
+            if (lastValidation && pedido === lastValidationPedido) {
+                renderValidation(lastValidation);
+                return;
+            }
+            lastValidation = null;
             // Mostrar resultados "vacios" para no bloquear: permitimos seguir
             renderValidation({
                 errores: [],
