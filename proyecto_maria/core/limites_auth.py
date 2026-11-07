@@ -66,17 +66,17 @@ async def segundos_bloqueado(db: AsyncSession, clave: str) -> int:
 
 
 async def sumar_fallo(db: AsyncSession, clave: str, tope: int = 5, bloqueo: float = 15 * 60,
-                      olvido: float = 24 * 3600) -> int:
+                      olvido: float = 24 * 3600, exacta: bool = False) -> int:
     """Suma un fallo y devuelve la cuenta. Desde el fallo número `tope` cada
     fallo bloquea por `bloqueo` segundos; la cuenta se olvida tras `olvido`
     segundos sin fallos. Vencido un bloqueo, la cuenta vuelve a `tope`: pasa
     uno y bloquea de nuevo. Así, más de `tope` quiere decir que el fallo llegó
     con el bloqueo puesto, aunque haya pasado el chequeo previo a la vez que
-    otros."""
+    otros. Con `exacta` cuenta cada fallo, para que `descontar` reste justo."""
     clave = _clave(clave)
     ahora = _ahora()
     vencido = and_(_T.c.bloqueado_hasta > 0, _T.c.bloqueado_hasta <= ahora)
-    nueva = case((vencido, tope), else_=_T.c.cuenta + 1)
+    nueva = _T.c.cuenta + 1 if exacta else case((vencido, tope), else_=_T.c.cuenta + 1)
     ins = _insert().values(clave=clave, cuenta=1, bloqueado_hasta=0.0, vence=ahora + olvido)
     ins = ins.on_conflict_do_update(index_elements=[_T.c.clave], set_={
         "cuenta": nueva,

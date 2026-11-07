@@ -3216,7 +3216,7 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
     clave_cuenta = f"cuenta:{user.username}:{clave_intentos}" if user else None
 
     async def handle_failed_login():
-        await limites_auth.sumar_fallo(db, clave_intentos)
+        await limites_auth.sumar_fallo(db, clave_intentos, exacta=True)
         if clave_cuenta:
             await limites_auth.contar(db, clave_cuenta, 24 * 3600)
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
