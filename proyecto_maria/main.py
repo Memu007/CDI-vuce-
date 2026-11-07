@@ -5,9 +5,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, field_validator
+from pydantic import AfterValidator, BaseModel, field_validator
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Annotated, Any
 import glob
 import hashlib
 import json
@@ -311,8 +311,24 @@ def send_verification_email(username: str, email: str, display_name: str | None 
         return False
 
 
+_NO_GUARDABLE_EN_PG = re.compile("[\x00\ud800-\udfff]")
+
+
+def _guardable_en_pg(valor):
+    """Con los caracteres que Postgres no acepta y JSON sí (NUL y surrogates
+    sueltos) cambiados por «\ufffd»: si no, la ruta que los guarda o responde da 500."""
+    if isinstance(valor, str):
+        return _NO_GUARDABLE_EN_PG.sub("\ufffd", valor)
+    if isinstance(valor, dict):
+        return {clave: _guardable_en_pg(v) for clave, v in valor.items()}
+    return valor
+
+
+TextoCodificable = Annotated[str, AfterValidator(_guardable_en_pg)]
+
+
 class LoginRequest(BaseModel):
-    username: str
+    username: TextoCodificable
     password: str
 
 class CardInput(BaseModel):
@@ -1682,7 +1698,7 @@ app.router.lifespan_context = lifespan
 
 # Modelos para password reset
 class PasswordResetRequest(BaseModel):
-    email: str
+    email: TextoCodificable
 
 
 async def _cuenta_por_email(db: AsyncSession, email: str):
@@ -1776,7 +1792,7 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
     return response
 
 class RecoverUsernameRequest(BaseModel):
-    email: str
+    email: TextoCodificable
 
 @app.post("/auth/recover-username")
 async def recover_username(request: RecoverUsernameRequest, req: Request, db: AsyncSession = Depends(get_db)):
@@ -10984,20 +11000,6 @@ def _consultar_mp(llamada, que: str) -> dict:
         estado = resp.get("status") if isinstance(resp, dict) else type(resp).__name__
         raise _MPIlegible(f"{que}: {str(estado)[:40]}")
     return _guardable_en_pg(resp["response"])
-
-
-_NO_GUARDABLE_EN_PG = re.compile("[\x00\ud800-\udfff]")
-
-
-def _guardable_en_pg(valor):
-    """Lo leído de Mercado Pago, con los caracteres que Postgres no acepta
-    (NUL y surrogates sueltos) cambiados por «\ufffd»: si no, el pago da 500 y
-    Mercado Pago lo reintenta sin fin (COBRO-MP-1, b)."""
-    if isinstance(valor, str):
-        return _NO_GUARDABLE_EN_PG.sub("\ufffd", valor)
-    if isinstance(valor, dict):
-        return {clave: _guardable_en_pg(v) for clave, v in valor.items()}
-    return valor
 
 
 def _monto_mp(valor) -> float | None:

@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-07 · fix: un carácter que no se puede guardar no da 500 en login ni en recuperar (ABUSO-1)
+
+- Un surrogate suelto o un NUL en el usuario o el email de login, recuperar contraseña y recuperar usuario se cambia por «�» y la respuesta es la de un dato que no existe, en vez de 500.
+
 ## 2026-11-06 · fix: el token de reset vuelve en la respuesta sólo en el entorno de prueba (RESET-2)
 
 - El token de reset y el nombre de usuario sólo vuelven en la respuesta (como comodidad sin SMTP) en el entorno de prueba. Antes salían siempre que `ENVIRONMENT` no fuera «production», así que un despliegue con `ENVIRONMENT` sin poner podía filtrar el token de reset en la respuesta.
