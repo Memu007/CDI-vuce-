@@ -451,3 +451,7 @@ ABUSO-2: devolución sólo de pruebas sobre `8ad47ee`; producto sin cambios. D10
 ### 2026-11-07 22:55 UTC (PM principal)
 
 Rojo de `despacho1b` aceptado sobre `d69233c` (sólo prueba, sin integrar). D106 (a), decidida por la PM: el resto del tope para entender el texto queda sin mínimo propio; riesgo, con el tope de producción son 2 s en un proceso con poca memoria.
+
+### 2026-11-07 23:15 UTC (PM principal)
+
+ENTRADAS-1 aceptada sobre `c839197` (vuelta sólo de pruebas), sin integrar porque la rama lleva debajo piezas en devolución.

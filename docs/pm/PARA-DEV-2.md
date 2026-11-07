@@ -106,53 +106,15 @@ sólo de pruebas y sabotajes; el informe muestra cada mutación en rojo.
   ventana fija (de antes).
 
 Tu orden: **esta devolución** → ENTORNO-2 → D100 →
-ENTRADAS-2 → el resto. La vuelta de ENTRADAS-1 (`c839197`) la estoy
-revisando.
+ENTRADAS-2 → el resto.
 
-## ENTRADAS-1: devolución sólo de pruebas, sobre `589fd0b` (2026-11-07 PM)
+## ENTRADAS-1: aceptada sobre `c839197`, sin integrar (2026-11-07 PM)
 
-Reproducido igual al informe: chequeo-6 (+27 explicado, aceptado), `68
-passed`, Postgres `fallas: 0`, `entradas1.sh` 22 en rojo; suite `1 failed, 5070 passed` igual a la tuya (el rojo de `despacho1b`). Login
-y `current_password` con claves rotas dan 401/400. Opus alto: sin 500 nuevo
-ni regresión de acceso. **El producto queda como está.** Acta:
-`REPRODUCCION-ENTRADAS-1-2026-11-07.md`. **Supuestos S1 a S6: aceptados.**
-
-**Causa de la devolución:** las pruebas miran «no es 500» y no la propiedad
-que la pieza promete, así que daños reales del arreglo pasan en verde. Sonnet
-alto, con mutaciones sobre una copia, obtuvo `54 passed` con cada una:
-
-1. El 422 devuelve la clave en `input` o la pega en `msg`. Pedido: ninguna
-   respuesta de las cuatro vías contiene la clave enviada (`not in r.text`).
-2. `> 72` cambiado por `> 73`. Pedido: caso de 73 bytes justos, también
-   con un carácter multibyte que cruza el borde.
-3. `\x00` sacado de `_NO_GUARDABLE_EN_PG`: ningún caso de texto cae, porque
-   SQLite guarda el NUL. Pedido: los casos de texto miran lo guardado (sin
-   NUL ni surrogate, con «�»), no sólo el código; un sabotaje del NUL.
-4. El handler 422 vuelto a `JSONResponse`, o `allow_nan=True`. Pedido: un
-   caso que los distinga.
-
-La familia: cada regla que la pieza agrega tiene un caso que cae si esa regla
-se afloja. Commits sólo de pruebas y sabotajes; el informe muestra cada
-mutación de arriba en rojo.
-
-- **D100: (a), decidido por la PM.** Pieza chica de frontend después de
-  ENTORNO-2: un 422 con `detail` en lista muestra su `msg` en español, en
-  todas las pantallas.
-- **D101: (a), decidido por la PM.** Va con ENTRADAS-2: la misma política
-  de clave en registro y alta de estudio.
-- **D102: (a), decidido por la PM.** Chore aparte: fijar `bcrypt` en
-  `requirements`, con la versión que ya corre la suite.
-- **D103: (a).** A la cola de limpieza, junto con el username que acepta
-  un `\n` final (`re.match` con `$`), registro y alta de estudio.
-- **D104: (a), pieza nueva ENTRADAS-2**, después de ENTORNO-2. Ningún texto
-  o número de afuera da 500 en Postgres en la operación manual y en clientes
-  (números finitos, texto guardable, rango int32), **ni un NUL en un
-  parámetro de ruta** (Opus lo dio en `GET /api/invitations/{token}` sin
-  sesión, `agrupar` y `desagrupar`; la familia son las rutas con path de
-  texto), ni `agrupar` con más ítems de los que acepta el driver. Incluye
-  D101.
-
-La vuelta (`c839197`) está en revisión.
+Los cuatro puntos de la devolución dan rojo: `entradas1.sh` 32 `ROJO` sin
+fallas. Mi ejemplo distinto (email con tope 101) cae en registro, estudio y
+perfil. Acta: `REPRODUCCION-ENTRADAS-1-2026-11-07.md`. Lo que sigue de acá ya
+está en tu orden: FRONT-422 (D100) y ENTRADAS-2 (D101, D104); D102 chore y
+D103 en la cola.
 
 ## ENTORNO-1: aceptada sobre `83085e4`, sin integrar (2026-11-07 PM)
 
