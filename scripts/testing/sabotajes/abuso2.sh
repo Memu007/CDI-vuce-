@@ -73,10 +73,16 @@ sabotaje $M "el login correcto borra todos los fallos de la IP" "$P[otra_cuenta]
   '    await limites_auth.descontar(db, clave_intentos, clave_cuenta)' \
   '    await limites_auth.limpiar(db, clave_intentos)'
 sabotaje $M "los fallos de la cuenta no se cuentan aparte" "$P[solo_propios]" \
-  $'        if clave_cuenta:\n            await limites_auth.contar' \
-  $'        if False:\n            await limites_auth.contar'
+  $'        if clave_cuenta:\n            await limites_auth.sumar_fallo' \
+  $'        if False:\n            await limites_auth.sumar_fallo'
+sabotaje $M "la cuenta se cuenta sin la IP" "$P[fallos_propios_desde_otra_ip]" \
+  'f"cuenta:{user.username}:{clave_intentos}"' 'f"cuenta:{user.username}"'
+sabotaje $M "la cuenta se cuenta en una ventana fija" "$P[fallos_propios_de_mas_de_un_dia]" \
+  'sumar_fallo(db, clave_cuenta, exacta=True)' 'contar(db, clave_cuenta, 24 * 3600)'
 sabotaje $L "descontar borra lo propio pero no lo resta de la IP" "$P[mitad_y_mitad]" \
-  'values(cuenta=_T.c.cuenta - n)' 'values(cuenta=_T.c.cuenta)'
+  'case((_T.c.cuenta > n, _T.c.cuenta - n), else_=0)' '_T.c.cuenta'
+sabotaje $L "descontar deja la IP en negativo" "FAILED $T::test_descontar_no_deja_la_ip_en_negativo" \
+  'case((_T.c.cuenta > n, _T.c.cuenta - n), else_=0)' '_T.c.cuenta - n'
 sabotaje $M "el login cuenta los fallos de la IP con el tope de recuperar" "$P[ajeno_tras_el_bloqueo]" \
   'sumar_fallo(db, clave_intentos, exacta=True)' 'sumar_fallo(db, clave_intentos)'
 
