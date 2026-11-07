@@ -3,7 +3,6 @@ y escribe en la última línea, como JSON, qué puertas de desarrollo abre."""
 
 import asyncio
 import json
-import os
 import sys
 
 import dotenv
