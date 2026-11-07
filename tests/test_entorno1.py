@@ -35,6 +35,8 @@ def _sondear(valor, carpeta: Path) -> dict:
         "ALLOWED_ORIGINS": "http://cdi.example.com", "FRONTEND_URL": "http://cdi.example.com",
         "GEMINI_API_KEY": "test-key", "VUCE_MODE": "fake", "TARIFAR_MODE": "fake", "AFIP_MODE": "fake",
         "DOLARAPI_BASE": "http://127.0.0.1:9/v1/dolares",
+        # Desde el arranque, para que una lectura de la bandera al importar también cuente.
+        "ENABLE_SIMULATE_CHARGE": "true",
     }
     if valor is not AUSENTE:
         env["ENVIRONMENT"] = valor
@@ -51,11 +53,12 @@ def _sondear(valor, carpeta: Path) -> dict:
                               cwd=str(carpeta), env=env, timeout=120)
     datos["arranca_sin_clave"] = arranque.returncode == 0
     datos["rechaza_sin_clave"] = "insecure JWT_SECRET_KEY" in arranque.stderr
-    env["JWT_SECRET_KEY"], _ = "clave-larga-de-cuarenta-y-dos-caracteres-para-prueba-xx", env.pop("DATABASE_URL")
+    env["JWT_SECRET_KEY"] = "clave-larga-de-cuarenta-y-dos-caracteres-para-prueba-xx"
+    del env["DATABASE_URL"]
     base = subprocess.run([sys.executable, "-c", IMPORTAR_SIN_BASE], capture_output=True, text=True,
                           cwd=str(carpeta), env=env, timeout=120)
     datos["arranca_sin_base"] = base.returncode == 0
-    datos["rechaza_sin_base"] = "DATABASE_URL no está definida" in base.stderr
+    datos["rechaza_sin_base"] = "ENVIRONMENT no es de desarrollo" in base.stderr
     return datos
 
 
@@ -81,11 +84,9 @@ PUERTAS = {
     "webhook_sin_secreto": lambda d: _estado(d["firma"] is True, d["firma"] is False),
     "link_de_reset_en_stdout": lambda d: _estado(bool(d["token"]) and d["link_en_salida"],
                                                  bool(d["token"]) and not d["link_en_salida"]),
+    # Con ENABLE_SIMULATE_CHARGE puesta: la bandera no abre el cobro fuera de desarrollo.
     "cobro_simulado": lambda d: _estado(d["cobro"] == 200, d["cobro"] == 404),
     "clave_jwt_de_desarrollo": lambda d: _estado(d["arranca_sin_clave"], d["rechaza_sin_clave"]),
-    # El segundo cobro pasa la puerta y da 409 si el primero ya activó la cuenta.
-    "cobro_simulado_con_bandera": lambda d: _estado(d["cobro_con_bandera"] in (200, 409),
-                                                    d["cobro_con_bandera"] == 404),
     "csrf_que_solo_avisa": lambda d: _estado(d["csrf"] == 404, d["csrf"] == 403),
     "cookies_sin_secure": lambda d: _estado(d["cookies"] == {"access_token": False, "csrf_token": False},
                                             d["cookies"] == {"access_token": True, "csrf_token": True}),

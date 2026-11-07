@@ -54,8 +54,6 @@ def main():
         cookies = {h.split("=", 1)[0]: "; secure" in h.lower() for h in entrada.headers.get_list("set-cookie")}
         bearer = {"Authorization": f"Bearer {sesion['access_token']}"}
         cobro = c.post("/api/billing/simulate-charge", headers=bearer).status_code
-        os.environ["ENABLE_SIMULATE_CHARGE"] = "true"
-        cobro_con_bandera = c.post("/api/billing/simulate-charge", headers=bearer).status_code
         c.cookies.clear()
         csrf = c.post("/api/ruta-que-no-existe", headers={"Cookie": "access_token=x"}).status_code
         docs = [c.get(p).status_code for p in ("/docs", "/redoc", "/openapi.json")]
@@ -69,7 +67,7 @@ def main():
     sys.stdout.flush()
     print("\nSONDA " + json.dumps({"demo": sorted(demo), "login_hash": login_hash,
                                    "token": token[0] if token else None, "firma": firma,
-                                   "cobro": cobro, "cobro_con_bandera": cobro_con_bandera,
+                                   "cobro": cobro,
                                    "cookies": cookies, "csrf": csrf, "docs": docs,
                                    "vuce": _vuce_simulado()}))
 
