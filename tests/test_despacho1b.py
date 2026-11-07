@@ -13,6 +13,7 @@
 El despacho es sintético, armado acá con la forma de
 `docs/pm/DESPACHOS-FORMA.md` y valores inventados."""
 import asyncio
+import gc
 import io
 import json
 import os
@@ -2006,7 +2007,13 @@ def test_las_hojas_leidas_antes_del_corte_dan_sus_productos(monkeypatch):
             pdf.add_page(hoja)
     salida = io.BytesIO()
     pdf.write(salida)
-    r = leer_despacho(salida.getvalue(), limite_cpu_s=1.0)
+    # El lector corre en un proceso aparte. Acá comparte la memoria de la suite,
+    # y una pasada completa del recolector sobre esa memoria gasta el tope que queda.
+    gc.freeze()
+    try:
+        r = leer_despacho(salida.getvalue(), limite_cpu_s=1.0)
+    finally:
+        gc.unfreeze()
     assert r["renglones"] == _leer()["renglones"], r["avisos"]
     assert r["avisos"][0] == "El PDF da demasiado trabajo: leí hasta la hoja 2.", r["avisos"]
 
