@@ -48,7 +48,7 @@ quedan como riesgos: no los pido.
 **D64:** (a). Lo hace Emi antes de publicar: le aviso yo.
 **D66:** (a). Un cambio de `core/rate_limit.py` sería pieza aparte.
 
-Después: VALIDACION-1, en su propio informe.
+Esta devolución va primero. Después: AISLAMIENTO-2 / LIMPIEZA-1.
 
 ## Veredicto de COBRO-CORTE-1, vuelta 4 (2026-11-06 PM): aceptada, sin integrar
 
@@ -67,19 +67,18 @@ Enter doble en «Reintentar» o «Generar» (dos generaciones, sin cobro extra),
 `.anterior`, y `PUERTO` de `con_pg16.sh` que pisa el de tus sabotajes
 (renombrar a `PG_PUERTO`; si tocás `backup1a.sh` en BACKUP-1a, hacelo ahí).
 
-**VALIDACION-1 (sí de Emi, 06/11), después de COBRO-MP-2:** la validación
-de una carga nunca muestra ni guarda lo de otra. Hoy `runValidation`
-(`finalize.js:103-108`) reusa `lastValidation` 60 s sin mirar de qué carga
-es: el panel de B muestra totales, errores y avisos de A, el historial de B
-se guarda con los totales de A y «Generar» se habilita por los errores de A.
-Pido: lo que se muestra, lo que se guarda y lo que habilita «Generar» salen
-siempre de la carga que se ve. Un caso con clics en la pantalla real, dos
-cargas distintas en menos de 60 s; familia como datos: panel, historial y
-botón. Rojo en la base y `/entregar` entero.
+**VALIDACION-1: aceptada** sobre `c24a266` (producto `0bd4b6c`, informe
+`9bc75e9`; 2026-11-07 PM), sin integrar: tu rama lleva debajo COBRO-MP-2+3 en
+devolución. Evidencia: `docs/pm/REPRODUCCION-VALIDACION-1-2026-11-07.md`.
+`validacion1.sh` da 7 ROJO y `FALLAS=0`; chequeo-6 con tus 2 avisos
+explicados; Sonnet alto no encontró camino con datos de otra carga. Quedan
+como riesgos, no los pido: sacar `!force` o el vencimiento de 60 s no lo ve
+ninguna prueba; «Calcular seguro» cambia la cabecera sin revalidar; tu riesgo
+1 (historial 0 con el validador caído) va a la cola como pieza aparte.
 
 **CSRF-3: aceptada** sobre `9fe55d4` (2026-11-05 19:20 UTC), integrada. Evidencia: `docs/pm/REPRODUCCION-CSRF-3-2026-11-05.md`. Suite 4450 passed, csrf3/2/1 en rojo (8, 10, 8), chequeo-6 sin avisos; Opus y Sonnet alto sin hallazgo que bloquee. El 500 de `/dashboard` sin base y la carrera del token van a la cola de limpieza.
 
-**Tu orden:** la devolución de COBRO-MP-2 → VALIDACION-1 → COBRO-MP-3 →
+**Tu orden:** la devolución de COBRO-MP-2+3 →
 AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. Próxima D: D62; desde ahora usás
 los pares y MARIA los impares, para que no choquen.
 

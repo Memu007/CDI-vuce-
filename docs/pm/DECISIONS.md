@@ -443,3 +443,7 @@ ENTRADAS-1: devolución sólo de pruebas sobre `589fd0b`; producto sin cambios, 
 ### 2026-11-07 22:10 UTC (PM principal)
 
 COBRO-MP-2 vuelta + COBRO-MP-3: devolución de pruebas sobre `cb740f3` (firma, quién toca a quién, plazo único) y un texto falso al cancelar con el PUT abandonado. D64 (a): antes de publicar, Emi configura Webhooks con secreto en MP y carga `MP_WEBHOOK_SECRET` en Railway, y prueba en sandbox. D66 (a): el límite de avisos queda por `get_client_ip`; cambiar `core/rate_limit.py` sería pieza aparte. Acta: `REPRODUCCION-COBRO-MP-2-3-2026-11-07.md`.
+
+### 2026-11-07 22:40 UTC (PM principal)
+
+ABUSO-2: devolución sólo de pruebas sobre `8ad47ee`; producto sin cambios. D105 (a), decidida por la PM: el tope de recuperar por cuenta queda así y va como riesgo (un mail menos por hora para quien pidió; contar también por IP reabre el salto con muchas IPs).
