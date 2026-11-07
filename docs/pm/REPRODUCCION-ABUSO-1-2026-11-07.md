@@ -14,7 +14,7 @@ Entorno de la PM: worktree limpio, venv, sin red, `GEMINI_API_KEY` vacía,
 | `compileall` | OK | OK |
 | motores (`abuso1_motores.py pg`) | todo OK | `pg: todo OK`, rc=0 |
 | sabotajes (`abuso1.sh 55bf408`) | 35 en rojo | 35 `ROJO`, `sabotajes sin rojo: 0`, rc=0 |
-| suite completa | `5005 passed, 335 skipped, 3 xfailed` | en curso (worktree limpio) |
+| suite completa | `5005 passed, 335 skipped, 3 xfailed` | `1 failed, 5004 passed, 335 skipped, 3 xfailed`, rc=1 |
 
 Los cuatro puntos de la devolución están: D44 (1) probado en PG con 120
 logins malos y 120 buenos a la vez; duraciones de 14 y 16 min y de la
@@ -40,3 +40,13 @@ De antes, no de la pieza (a piezas nuevas):
   correo);
 - un login bueno en otra cuenta borra el contador `login:<ip>`: queda sólo
   el 5/min de slowapi, sin el bloqueo de 15 min.
+
+## El rojo de la suite
+
+`tests/test_despacho1b.py::test_las_hojas_leidas_antes_del_corte_dan_sus_productos`:
+avisos `leí hasta la hoja 2` y `no pude leer sus productos`, renglones vacíos.
+No es de la pieza: el diff sólo toca `main.py` (auth y el 422) y el caso
+llama a `leer_despacho` directo. Solo: `1 passed` tres veces; el archivo
+entero: `283 passed in 51.13s`; con un hilo girando a la par: `1 passed`
+(la hipótesis de CPU de otros hilos no queda probada). Causa sin cerrar: a
+la cola de MARIA, sin repetir la suite para tapar el rojo.

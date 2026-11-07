@@ -69,6 +69,41 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## ABUSO-1: aceptada sobre `55bf408`, sin integrar (2026-11-07 PM)
+
+Reproducido: `72 passed`, chequeo-6 igual al informe, `pg: todo OK`, 35
+sabotajes en rojo sin falla, suite `1 failed, 5004 passed` (el rojo es de `test_despacho1b`, ver abajo). Opus y Sonnet alto: nada serio
+introducido. Acta: `REPRODUCCION-ABUSO-1-2026-11-07.md`. Sin integrar, por
+lo mismo que `e0b8626`. **Supuestos 1 a 3: aceptados.**
+
+- **D94: (a), decidido por la PM**, va en ENTRADAS-1. **D95: (a).**
+  **D96: (a)**, va en ENTRADAS-1.
+- **Pieza nueva ENTRADAS-1** (seguridad chica, Emi: «a cero»), después de
+  ENTORNO-1. Comportamiento pedido: ningún texto que llegue de afuera da
+  500 por no poder guardarse o hashearse. Familia: surrogate suelto y NUL
+  en `new_password` de reset y cambio, y en nombre y clave del registro;
+  claves de más de 72 bytes UTF-8 (422 claro, el token de reset no se
+  consume); cuerpo no JSON con bytes que no son UTF-8; `NaN` y `1e999` en
+  el cuerpo (el 422 tiene que ser JSON válido). Un caso por causa con la
+  familia como datos, y el rojo con cada arreglo revertido. Sugerencia (no
+  es criterio): un solo validador para las claves.
+- **Pieza nueva ABUSO-2**, después de ENTRADAS-1. Comportamiento pedido: un
+  login bueno en una cuenta no borra el contador de intentos malos de la IP
+  contra otra; y el tope de recuperar usuario cuenta igual un correo que en
+  PG es el mismo (`U+0130` y parecidos). Revisión más fuerte: autenticación.
+
+- **Rojo de la suite, no de la pieza:** `test_las_hojas_leidas_antes_del_corte_dan_sus_productos`
+  falló una vez en la suite entera (cortó en la hoja 2 sin productos) y pasa
+  solo (3 de 3) y con su archivo (`283 passed`); el diff no toca el lector.
+  El tope de CPU se mide con `process_time` del proceso entero, así que lo
+  que gastan otros hilos de la suite entra en el segundo del caso. A la
+  cola, después de ABUSO-2: diagnosticar la causa y que el caso no dependa
+  de eso, sin cambiar el producto si no hace falta.
+
+Tu orden: ENTORNO-1 → ENTRADAS-1 → ABUSO-2 → el rojo de `despacho1b` → el
+resto de la cola. Próxima
+D: D97.
+
 ## RESET-2: aceptada sobre `99d3f69`, sin integrar (2026-11-06 PM)
 
 Reproducido: `test_email1` + `test_reset1` `32 passed`, rojo con la puerta
@@ -88,7 +123,7 @@ vieja `2 failed`, y un negativo propio con `ENVIRONMENT` ausente,
   Revisión más fuerte: toca autenticación y dinero.
 - **D93: (a).** El script manual usa `ENVIRONMENT=testing`; no se toca.
 
-Tu orden: ABUSO-1 → ENTORNO-1 → el resto de la cola. Próxima D: D94.
+Tu orden: ENTORNO-1 → el resto de la cola (ver ABUSO-1 arriba).
 
 ## PYPDF-1: aceptada sobre `974263e`, sin integrar (2026-11-06 PM)
 
@@ -317,25 +352,6 @@ métrica sin mirar qué graba, y eso no se puede publicar así.
 
 Postgres 16 y SQLite. Línea en `CHANGELOG.md`. Commits aparte y su propio
 `/entregar`.
-
-## ABUSO-1: devolución, sobre `43916a7` (2026-10-28 17:58 UTC)
-
-Evidencia en `REPRODUCCION-ABUSO-1-2026-10-28.md`. **D44: (1), decidido
-por la PM**: el login usa la conexión del pedido, no una segunda; rojo con
-logins malos concurrentes en PG que hoy agota el pool, y `/health`
-respondiendo. Además:
-
-1. Las pruebas no distinguen la duración: bloqueo de 15 min a 60 s y la
-   ventana del tope de recuperar de 3600 a 60 dan `63 passed`. Casos «a los
-   14 min sigue bloqueado, a los 16 no» y lo mismo para la ventana.
-2. Claves de 121 a 300 caracteres en PG (el revisor vio
-   `StringDataRightTruncationError` con 200) y el mutante `len(clave) <=
-   300` muerto.
-3. El 500 de `/auth/recover-username` con un surrogate suelto en el correo.
-
-Lo demás del revisor (XFF y `TRUSTED_PROXY_HOPS`, IPv6, deadlock con
-ventanas cortas, filas sin tope, tiempos del login) va a riesgos en tu
-informe, sin tocar producto.
 
 ## SUFIJOS-2: devolución, sobre `bd76f9f` (2026-10-28 18:05 UTC)
 
