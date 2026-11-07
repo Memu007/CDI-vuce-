@@ -56,21 +56,46 @@ def _limites_limpios(monkeypatch):
     (["otra"] * 3 + ["propia"] * 2 + [16], 2),
     (["propia"] * 5 + [16, "propia", 16], 5),
     (["propia"] * 5 + [16, "otra", 16], 4),
+    (["propia"] * 3 + [23 * 60, "propia", "propia", 61], 5),
+    (["propia@otra_ip"] * 5 + ["otra"] * 4, 1),
 ], ids=["otra_cuenta", "usuario_inexistente", "mitad_y_mitad", "intercalados", "solo_propios",
-        "bloqueo_vencido", "mas_propios_que_la_ip", "ajeno_tras_el_bloqueo"])
+        "bloqueo_vencido", "mas_propios_que_la_ip", "ajeno_tras_el_bloqueo",
+        "fallos_propios_de_mas_de_un_dia", "fallos_propios_desde_otra_ip"])
 def test_login_correcto_perdona_solo_los_fallos_de_su_cuenta(cuentas, pasos, quedan, reloj):
-    """Fallos (un número son minutos que pasan) y un login correcto en la
-    cuenta propia; después se cuentan los 401 hasta el 429: son los cinco del
-    tope menos los fallos que la IP hizo fuera de la cuenta propia."""
-    real, c = _ip(), TestClient(app)
+    """Fallos (un número son minutos que pasan; `@otra_ip`, desde otra IP) y un
+    login correcto en la cuenta propia; después se cuentan los 401 hasta el
+    429: son los cinco del tope menos los fallos que la IP hizo fuera de la
+    cuenta propia."""
+    real, lejos, c = _ip(), _ip(), TestClient(app)
     reloj()
     for paso in pasos:
         if isinstance(paso, int):
             reloj(paso * 60)
             continue
-        r = _login(c, cuentas[paso], "mal", real)
+        cuenta, _, otra_ip = paso.partition("@")
+        r = _login(c, cuentas[cuenta], "mal", lejos if otra_ip else real)
         assert r.status_code == 401, (paso, r.status_code, r.text)
     r = _login(c, cuentas["propia"], CLAVE, real)
     assert r.status_code == 200, (r.status_code, r.text)
     codigos = [_login(c, cuentas["otra"], "mal", real).status_code for _ in range(6)]
     assert codigos == [401] * quedan + [429] * (6 - quedan), codigos
+
+
+def test_descontar_no_deja_la_ip_en_negativo(reloj):
+    """La fila de la cuenta se escribe después que la de la IP y puede
+    vencer un instante más tarde: lo que perdona no baja la IP de cero."""
+    from proyecto_maria.core import limites_auth
+
+    async def _correr():
+        async with conn.AsyncSessionLocal() as s:
+            for _ in range(5):
+                await limites_auth.sumar_fallo(s, "login:ip", exacta=True)
+            reloj(1)
+            for _ in range(5):
+                await limites_auth.sumar_fallo(s, "cuenta:a:login:ip", exacta=True)
+            reloj(24 * 3600 - 0.5)
+            await limites_auth.sumar_fallo(s, "login:ip", exacta=True)
+            await limites_auth.descontar(s, "login:ip", "cuenta:a:login:ip")
+            return (await s.execute(text("select cuenta from limites_auth where clave = 'login:ip'"))).scalar()
+    reloj()
+    assert asyncio.run(_correr()) == 0
