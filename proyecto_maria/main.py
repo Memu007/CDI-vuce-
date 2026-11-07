@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import AfterValidator, BaseModel, field_validator
+from pydantic import AfterValidator, BaseModel, Field, field_validator
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 import glob
@@ -333,8 +333,8 @@ TextoCodificable = Annotated[str, AfterValidator(_guardable_en_pg)]
 
 
 def _clave_hasheable(clave):
-    # bcrypt rechaza más de 72 bytes y no puede codificar un surrogate; el NUL
-    # no se podría escribir en la columna de Postgres.
+    # bcrypt rechaza más de 72 bytes y no puede codificar un surrogate. El NUL
+    # no rompe bcrypt, pero una clave no se sanea en silencio: se rechaza.
     if _NO_GUARDABLE_EN_PG.search(clave) or len(clave.encode("utf-8")) > 72:
         raise ValueError("La contraseña puede tener hasta 72 bytes y no puede tener caracteres nulos ni inválidos")
     return clave
@@ -344,9 +344,10 @@ ClaveNueva = Annotated[str, AfterValidator(_clave_hasheable)]
 
 
 def _email_valido(email):
-    """El email limpio, o 400 si no tiene la forma usuario@dominio.com."""
+    """El email limpio, o 400 si no tiene la forma usuario@dominio.com o no
+    entra en la columna."""
     limpio = (email or "").strip().lower()
-    if not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', limpio):
+    if not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', limpio) or len(limpio) > 100:
         raise HTTPException(status_code=400, detail="Email no válido. Debe tener formato usuario@dominio.com")
     return limpio
 
@@ -365,7 +366,7 @@ class CardInput(BaseModel):
 class RegisterRequest(BaseModel):
     username: str
     password: ClaveNueva
-    name: TextoCodificable = None  # Optional, defaults to username
+    name: Annotated[TextoCodificable, Field(max_length=100)] = None  # Optional, defaults to username
     email: str  # REQUIRED - needed for password recovery
     plan: str = "premium"
     # Ola 4: el trial ya no requiere tarjeta simulada; el usuario elige plan
@@ -475,23 +476,28 @@ async def _http_exception_friendly(request: Request, exc: StarletteHTTPException
             content={"detail": _FRIENDLY_5XX, "code": "internal_error"},
         )
     # 4xx y 5xx controlados (503, 429, etc.) pasan sin ofuscar
-    detail = _guardable_en_pg(exc.detail) if exc.detail is not None else ""
-    return JSONResponse(
+    detail = exc.detail if exc.detail is not None else ""
+    return _JSONConTextoAjeno(
         status_code=exc.status_code, 
         content={"detail": detail},
         headers=getattr(exc, "headers", None) or {}
     )
 
 
+class _JSONConTextoAjeno(JSONResponse):
+    # Un surrogate suelto no se codifica en UTF-8: sale como su escape «\udXXX»,
+    # que sigue siendo JSON válido.
+    def render(self, content: Any) -> bytes:
+        return json.dumps(content, ensure_ascii=False, allow_nan=False,
+                          separators=(",", ":")).encode("utf-8", "backslashreplace")
+
+
 @app.exception_handler(RequestValidationError)
 async def _pedido_mal_armado(request: Request, exc: RequestValidationError):
     # Como el de FastAPI, sin repetir lo que llegó: puede ser una clave, bytes
-    # sueltos o un NaN que no es JSON. En ASCII, porque `loc` trae claves ajenas.
+    # sueltos o un NaN que no es JSON.
     errores = [{k: v for k, v in e.items() if k != "input"} for e in exc.errors()]
-    return Response(
-        json.dumps({"detail": jsonable_encoder(errores)}, ensure_ascii=True),
-        status_code=422, media_type="application/json",
-    )
+    return _JSONConTextoAjeno({"detail": jsonable_encoder(errores)}, status_code=422)
 
 
 @app.exception_handler(Exception)
@@ -2370,8 +2376,8 @@ async def update_user_profile(
     cambia_email = "email" in body and raw_email != (u.email or "").strip().lower()
     hash_validado = u.password
     if cambia_email:
-        if raw_email and not re.match(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", raw_email):
-            raise HTTPException(status_code=400, detail="Email no válido")
+        if raw_email:
+            _email_valido(raw_email)
         current_password = body.get("current_password")
         if not isinstance(current_password, str) or not current_password:
             raise HTTPException(status_code=400, detail="Para cambiar el email ingresá tu contraseña actual")
@@ -2382,7 +2388,7 @@ async def update_user_profile(
     # "Importadora & Hijos SRL" se guardan tal cual.
     if "name" in body:
         raw_name = body.get("name") or ""
-        u.name = str(raw_name).strip()[:100] or None
+        u.name = _guardable_en_pg(str(raw_name).strip()[:100]) or None
 
     # CUIT: solo digitos, 11 chars. Permitimos limpiar con string vacio
     if "cuit" in body:
@@ -8118,10 +8124,19 @@ async def save_client_operation(
             "historial_guardado": historial_guardado}
 
 
+class AgruparRequest(BaseModel):
+    item_ids: list[TextoCodificable] = []
+
+
+class DesagruparRequest(BaseModel):
+    # La columna es INTEGER: fuera de su rango la base da error, no «no existe».
+    grupo_id: Annotated[int, Field(ge=-2**31, le=2**31 - 1)] | None = None
+
+
 @app.post("/api/operacion/{operation_id}/agrupar")
 async def agrupar_items(
     operation_id: str,
-    request: Request,
+    pedido: AgruparRequest,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -8132,8 +8147,7 @@ async def agrupar_items(
     Asigna un grupo_id nuevo a todos.
     """
     username = user["username"]
-    data = await request.json()
-    item_ids = data.get("item_ids", [])
+    item_ids = pedido.item_ids
 
     if not item_ids or len(item_ids) < 2:
         raise HTTPException(status_code=400, detail="Se necesitan al menos 2 ítems para agrupar.")
@@ -8201,14 +8215,13 @@ async def agrupar_items(
 @app.post("/api/operacion/{operation_id}/desagrupar")
 async def desagrupar_items(
     operation_id: str,
-    request: Request,
+    pedido: DesagruparRequest,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Quita la agrupación de ítems (setea grupo_id = NULL)."""
     username = user["username"]
-    data = await request.json()
-    grupo_id = data.get("grupo_id")
+    grupo_id = pedido.grupo_id
 
     if grupo_id is None:
         raise HTTPException(status_code=400, detail="Se requiere grupo_id.")
@@ -10505,7 +10518,7 @@ async def logout_root(request: Request, response: Response, db: AsyncSession = D
 # ============================================================================
 
 class CreateOrgRequest(BaseModel):
-    name: TextoCodificable
+    name: Annotated[TextoCodificable, Field(max_length=200)]
     username: str
     password: ClaveNueva
     email: str
@@ -10697,12 +10710,9 @@ async def invite_to_organization(
     if user["username"] != org.owner_username:
         raise HTTPException(status_code=403, detail="Solo el administrador del estudio puede invitar")
 
-    clean_email = (req.email or "").strip().lower()
     # El mismo criterio que el registro: la invitación fija el email, y una que el
     # registro rechace no la puede usar nadie y ocupa un lugar hasta que vence.
-    if (not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', clean_email)
-            or len(clean_email) > 100):
-        raise HTTPException(status_code=400, detail="Email no válido. Debe tener formato usuario@dominio.com")
+    clean_email = _email_valido(req.email)
 
     # Un email, una cuenta (D40): si ya tiene una, en este estudio, en otro o
     # en ninguno, el registro la rechazaría y la invitación ocuparía un lugar
