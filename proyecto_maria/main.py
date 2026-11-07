@@ -1841,8 +1841,6 @@ class RecoverUsernameRequest(BaseModel):
 async def recover_username(request: RecoverUsernameRequest, req: Request, db: AsyncSession = Depends(get_db)):
     """Envía el username al email del usuario"""
     mensaje = {"message": "Si el email está registrado, te enviamos tu nombre de usuario."}
-    # Los mails se cuentan por cuenta y no por texto: dos textos que la base
-    # toma por el mismo email son una sola cuenta.
     if limiter.enabled and await limites_auth.contar(db, f"recuperar:ip:{get_client_ip(req)}", 15 * 60) > 5:
         log_429(req, "recuperar usuario")
         raise HTTPException(status_code=429, detail="Demasiados intentos. Intente en 15 minutos.")
@@ -1851,10 +1849,10 @@ async def recover_username(request: RecoverUsernameRequest, req: Request, db: As
     # Por seguridad, no revelar si el email existe
     if not user:
         return mensaje
+    # Por cuenta y no por texto: dos textos que la base toma por el mismo email son una cuenta.
     if limiter.enabled and await limites_auth.contar(db, f"recuperar:cuenta:{user.username}", 3600) > 3:
         return mensaje
-    
-    # 2. Enviar email con username
+
     email_body = f"""
     <h1>Tu nombre de usuario</h1>
     <p>Hola {user.name or user.username},</p>
@@ -3211,14 +3209,14 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
     if not user and "@" in (username or ""):
         user = await _cuenta_por_email(db, username)
     
-    # Los fallos con una cuenta se cuentan también aparte (con un prefijo que la IP
-    # del cliente no puede escribir) para que su login correcto perdone sólo esos.
+    # Lo de la cuenta se cuenta aparte, con la misma regla de olvido que la IP,
+    # para que su login correcto perdone sólo eso.
     clave_cuenta = f"cuenta:{user.username}:{clave_intentos}" if user else None
 
     async def handle_failed_login():
         await limites_auth.sumar_fallo(db, clave_intentos, exacta=True)
         if clave_cuenta:
-            await limites_auth.contar(db, clave_cuenta, 24 * 3600)
+            await limites_auth.sumar_fallo(db, clave_cuenta, exacta=True)
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
     if not user:

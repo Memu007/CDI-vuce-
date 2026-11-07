@@ -72,7 +72,8 @@ async def sumar_fallo(db: AsyncSession, clave: str, tope: int = 5, bloqueo: floa
     segundos sin fallos. Vencido un bloqueo, la cuenta vuelve a `tope`: pasa
     uno y bloquea de nuevo. Así, más de `tope` quiere decir que el fallo llegó
     con el bloqueo puesto, aunque haya pasado el chequeo previo a la vez que
-    otros. Con `exacta` cuenta cada fallo, para que `descontar` reste justo."""
+    otros. Con `exacta` cuenta cada fallo y no vuelve a `tope`, para que
+    `descontar` reste justo."""
     clave = _clave(clave)
     ahora = _ahora()
     vencido = and_(_T.c.bloqueado_hasta > 0, _T.c.bloqueado_hasta <= ahora)
@@ -104,12 +105,13 @@ async def limpiar(db: AsyncSession, clave: str) -> None:
 
 
 async def descontar(db: AsyncSession, clave: str, propia: str) -> None:
-    """Perdona en `clave` sólo lo contado en `propia`; el DELETE ... RETURNING
-    evita restar dos veces si dos llamadas corren a la vez."""
+    """Perdona en `clave` sólo lo contado en `propia`, sin bajar de cero: el
+    DELETE ... RETURNING evita restar dos veces si dos llamadas corren a la vez."""
     clave, propia = _clave(clave), _clave(propia)
     ahora = _ahora()
     await db.execute(delete(_T).where(_T.c.vence <= ahora))
     n = (await db.execute(delete(_T).where(_T.c.clave == propia).returning(_T.c.cuenta))).scalar() or 0
     if n:
-        await db.execute(update(_T).where(_T.c.clave == clave).values(cuenta=_T.c.cuenta - n))
+        await db.execute(update(_T).where(_T.c.clave == clave).values(
+            cuenta=case((_T.c.cuenta > n, _T.c.cuenta - n), else_=0)))
     await db.commit()
