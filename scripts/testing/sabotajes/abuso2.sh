@@ -83,6 +83,8 @@ sabotaje $L "descontar no olvida un bloqueo vencido" "$P[bloqueo_vencido]" \
 sabotaje $L "descontar deja la fila de la IP en cero o menos" "$P[mas_propios_que_la_ip]" \
   '        await db.execute(delete(_T).where(_T.c.clave == clave, _T.c.cuenta <= 0))' \
   '        pass'
+sabotaje $M "el login cuenta los fallos de la IP con el tope de recuperar" "$P[ajeno_tras_el_bloqueo]" \
+  'sumar_fallo(db, clave_intentos, exacta=True)' 'sumar_fallo(db, clave_intentos)'
 
 # --- recuperar usuario: el tope va por la cuenta, no por el texto
 T=tests/test_abuso1.py
