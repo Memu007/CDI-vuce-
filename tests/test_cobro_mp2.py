@@ -189,7 +189,7 @@ def test_si_mp_no_cancela_no_se_cancela_a_medias(client, responder):
     FALLA["GET"] = responder
     r = client.post("/api/billing/cancel")
     assert r.status_code in (502, 503), r.text
-    assert "No se pudo cancelar" in r.json()["detail"], r.json()
+    assert "No se pudo confirmar la cancelación" in r.json()["detail"], r.json()
     assert len(PEDIDOS) >= 1
     despues = _leer(usuario)
     assert despues["billing_status"] == "active", despues
@@ -821,7 +821,8 @@ def test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope(client, monkeypatc
     assert demora < 3, demora
     assert (_leer_org(org_id), {k: _leer(u) for k, u in nombres.items()}) == antes
     # Mercado Pago pudo haber cancelado igual: el aviso no dice que nada cambió.
-    assert pedido != _CANCELAR or "no se pudo confirmar" in r.json()["detail"].lower(), r.text
+    detalle = r.json()["detail"].lower()
+    assert pedido != _CANCELAR or ("no se pudo confirmar" in detalle and "sigue igual" not in detalle), r.text
 
 
 class _Lenta:

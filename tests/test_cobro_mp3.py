@@ -203,8 +203,8 @@ def test_un_aviso_sin_firma_verificable_no_cambia_nada(client, monkeypatch, secr
         if "clave" in aviso:
             firmado = aviso_firmado("payment", pid, aviso["clave"])
             if "v1" in aviso:
-                real = firmado["headers"]["x-signature"].split("v1=")[1]
-                firmado["headers"]["x-signature"] = f"ts=1700000000,v1={aviso['v1'](real)}"
+                ts, real = firmado["headers"]["x-signature"].split(",v1=")
+                firmado["headers"]["x-signature"] = f"{ts},v1={aviso['v1'](real)}"
             r = client.post(aviso["url"], **firmado)
         else:
             firma = {"x-signature": aviso["firma"], "x-request-id": "r"} if aviso.get("firma") else {}
