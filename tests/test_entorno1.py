@@ -55,9 +55,11 @@ def _sondear(valor, carpeta: Path) -> dict:
 @pytest.fixture(scope="module")
 def sondas(tmp_path_factory):
     # En paralelo: once arranques seguidos pueden pasar el tope de tiempo de la prueba.
+    # Las carpetas van antes del pool: mktemp no aguanta hilos en paralelo.
     valores = CERRADOS + ABIERTOS
+    carpetas = [tmp_path_factory.mktemp("entorno") for _ in valores]
     with ThreadPoolExecutor(max_workers=4) as pool:
-        datos = pool.map(lambda v: _sondear(v, tmp_path_factory.mktemp("entorno")), valores)
+        datos = pool.map(_sondear, valores, carpetas)
     return dict(zip(valores, datos))
 
 

@@ -73,7 +73,7 @@ C="FAILED $T::test_puerta_cerrada_fuera_de_desarrollo"
 VIEJO="no queda cerrada: {None: 'abierta', '': 'abierta', 'prod': 'abierta', 'staging': 'abierta', 'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}"
 
 if ! pytest_e1 >"$TMPD/base.log"; then
-  echo "BASE  | las pruebas ya están en rojo sin sabotaje: no se puede medir nada"; grep -E "^FAILED" "$TMPD/base.log"; exit 1
+  echo "BASE  | las pruebas ya están en rojo sin sabotaje: no se puede medir nada"; grep -E "^(FAILED|ERROR|E )" "$TMPD/base.log" | head -8; exit 1
 fi
 
 # Cada puerta vuelve a la condición vieja: abierta salvo con «production».
