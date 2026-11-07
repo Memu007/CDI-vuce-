@@ -55,7 +55,7 @@ def test_update_user_profile_email_invalido_400(auth_override, client):
     """PUT con email inválido → 400."""
     r = client.put("/api/user/profile", json={"email": "no-es-email"})
     assert r.status_code == 400
-    assert r.json()["detail"] == "Email no válido"
+    assert r.json()["detail"].startswith("Email no válido")
 
 
 def test_update_user_profile_defaults(auth_override, client):

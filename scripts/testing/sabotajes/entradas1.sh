@@ -70,14 +70,14 @@ sabotaje $M "cambio de clave acepta cualquier clave" "$C[cambio-surrogate]" \
     new_password: str"
 sabotaje $M "el registro acepta cualquier clave" "$C[registro-surrogate]" \
   "    password: ClaveNueva
-    name: TextoCodificable = None" "    password: str
-    name: TextoCodificable = None"
+    name: Annotated[TextoCodificable, Field(max_length=100)] = None" "    password: str
+    name: Annotated[TextoCodificable, Field(max_length=100)] = None"
 sabotaje $M "el alta de estudio acepta cualquier clave" "$C[estudio-surrogate]" \
-  "    name: TextoCodificable
-    username: str
-    password: ClaveNueva" "    name: TextoCodificable
-    username: str
-    password: str"
+  "    username: str
+    password: ClaveNueva
+    email: str" "    username: str
+    password: str
+    email: str"
 
 # --- Qué rechaza el validador
 sabotaje $M "sin el tope de 72 bytes" "$C[reset-73_bytes_o_mas]" \
@@ -89,22 +89,44 @@ sabotaje $M "sin mirar caracteres que no se guardan" "$C[reset-surrogate]" \
 
 # --- Textos del alta
 sabotaje $M "el nombre del registro sin validar" "$X[registro_nombre-surrogate]" \
-  "    name: TextoCodificable = None" "    name: str = None"
+  "    name: Annotated[TextoCodificable, Field(max_length=100)] = None" "    name: str = None"
 sabotaje $M "la invitación sin validar" "$X[registro_invitacion-surrogate]" \
   "    invite_token: TextoCodificable | None = None" "    invite_token: str | None = None"
 sabotaje $M "el nombre del estudio sin validar" "$X[estudio_nombre-surrogate]" \
-  "class CreateOrgRequest(BaseModel):
-    name: TextoCodificable" "class CreateOrgRequest(BaseModel):
-    name: str"
+  "    name: Annotated[TextoCodificable, Field(max_length=200)]" "    name: str"
 sabotaje $M "el alta de estudio sin la regla de email" "$X[estudio_email-surrogate]" \
   "    clean_email = _email_valido(req.email)" "    clean_email = req.email.strip().lower()"
 sabotaje $M "la regla de email acepta cualquier cosa" "$X[registro_email-surrogate]" \
-  "    if not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\$', limpio):" \
-  "    if not limpio:"
+  "    if not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\$', limpio) or" \
+  "    if not limpio or"
+
+# --- Topes y cuerpos
+L="FAILED $T::test_texto_mas_largo_que_su_columna_da_4xx_y_el_justo_entra"
+sabotaje $M "el nombre del registro sin tope" "$L[registro_nombre]" \
+  "Field(max_length=100)" "Field(max_length=101)"
+sabotaje $M "el nombre del estudio sin tope" "$L[estudio_nombre]" \
+  "Field(max_length=200)" "Field(max_length=201)"
+sabotaje $M "el email sin tope de largo" "$L[registro_email]" \
+  " or len(limpio) > 100:" ":"
+sabotaje $M "el perfil sin la regla de email" "$L[perfil_email]" \
+  "            _email_valido(raw_email)" "            pass"
+sabotaje $M "el nombre del perfil sin validar" "$X[perfil_nombre-surrogate]" \
+  "u.name = _guardable_en_pg(str(raw_name).strip()[:100]) or None" "u.name = str(raw_name).strip()[:100] or None"
+G="FAILED $T::test_agrupar_con_cuerpo_raro_da_4xx_en_json"
+sabotaje $M "agrupar sin modelo" "$G[agrupar_no_json]" \
+  "    pedido: AgruparRequest," "    pedido: Request," \
+  "    item_ids = pedido.item_ids" "    item_ids = (await pedido.json()).get(\"item_ids\", [])"
+sabotaje $M "desagrupar sin tope del entero" "$G[desagrupar_enorme]" \
+  "Field(ge=-2**31, le=2**31 - 1)" "Field()"
 
 # --- Lo que se responde
-sabotaje $M "el 400 repite el detalle tal cual" "$X[registro_plan-surrogate]" \
-  "    detail = _guardable_en_pg(exc.detail) if exc.detail" "    detail = exc.detail if exc.detail"
+R="FAILED $T::test_el_400_que_repite_texto_ajeno_en_una_lista_es_json_valido"
+sabotaje $M "el 400 se codifica en UTF-8 estricto" "$R" \
+  '.encode("utf-8", "backslashreplace")' '.encode("utf-8")'
+sabotaje $M "el 400 sale con la respuesta común" "$R" \
+  "    return _JSONConTextoAjeno(
+        status_code=exc.status_code," "    return JSONResponse(
+        status_code=exc.status_code,"
 sabotaje $M "el 422 repite lo que llegó" "FAILED $T::test_el_422_de_un_cuerpo_raro_es_json_valido[nan]" \
   'if k != "input"' 'if True'
 

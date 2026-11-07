@@ -4,7 +4,9 @@ mide. Comprueba que:
 1. una clave nueva con NUL da 422 en reset, cambio, registro y alta de
    estudio, y no cambia nada: el link sigue sirviendo, la clave vieja sigue
    y no se crea la cuenta;
-2. un NUL en cada texto del registro y del alta de estudio no da 500.
+2. un NUL en cada texto del registro, del alta de estudio, del perfil y en
+   los ítems de agrupar no da 500;
+3. un nombre o un email más largo que su columna da 400 o 422, y el justo entra.
 
 uso (con un Postgres local y descartable, nunca el de producción; el usuario
 tiene que poder crear bases):
@@ -119,6 +121,35 @@ try:
                             (estudio, "name"), (estudio, "username"), (estudio, "email")]:
             _, r = alta(**{campo: f"E{NUL}x"})
             chequear(r.status_code < 500, f"NUL en {alta.__name__}.{campo}: {r.status_code} {r.text[:100]}")
+
+        def perfil(**cambios):
+            u, r = registro()
+            sesion = {"Authorization": f"Bearer {r.json()['access_token']}"}
+            return u, c.put("/api/user/profile", headers=sesion, json={"current_password": CLAVE, **cambios})
+
+        for campo in ("name", "email"):
+            _, r = perfil(**{campo: f"E{NUL}x"})
+            chequear(r.status_code < 500, f"NUL en perfil.{campo}: {r.status_code} {r.text[:100]}")
+
+        u, r = registro()
+        r = c.post("/api/operacion/no-existe/agrupar", json={"item_ids": [f"a{NUL}", "b"]},
+                   headers={"Authorization": f"Bearer {r.json()['access_token']}"})
+        chequear(r.status_code < 500, f"NUL en agrupar.item_ids: {r.status_code} {r.text[:100]}")
+
+        # 3. más largo que la columna: rechazo claro, y el justo entra
+        def mail(largo):
+            return uuid.uuid4().hex + "a" * (largo - 32 - len("@example.com")) + "@example.com"
+
+        for alta, campo, texto, tope in [(registro, "name", lambda n: "N" * n, 100),
+                                         (registro, "email", mail, 100),
+                                         (estudio, "name", lambda n: "N" * n, 200),
+                                         (estudio, "email", mail, 100),
+                                         (perfil, "email", mail, 100)]:
+            _, largo = alta(**{campo: texto(tope + 1)})
+            _, justo = alta(**{campo: texto(tope)})
+            chequear(largo.status_code in (400, 422) and justo.status_code == 200,
+                     f"{alta.__name__}.{campo} de {tope + 1}: {largo.status_code} {largo.text[:80]}; "
+                     f"de {tope}: {justo.status_code} {justo.text[:80]}")
 finally:
     try:
         admin(f'drop database if exists "{BASE}" with (force)')

@@ -22,11 +22,22 @@ LARGA = "Clave-1!" + "ñ" * 33  # 74 bytes en UTF-8: bcrypt no la acepta
 JUSTA = "Clave-1!" + "ñ" * 32  # 72 bytes: la más larga que entra
 
 
-def _post(ruta, cuerpo, headers=None, tipo="application/json"):
+def _post(ruta, cuerpo, headers=None, tipo="application/json", metodo="POST"):
     """JSON en ASCII, como lo manda un navegador: así viaja un surrogate suelto."""
     contenido = cuerpo if isinstance(cuerpo, bytes) else json.dumps(cuerpo).encode()
     cabeceras = {**({"Content-Type": tipo} if tipo else {}), **(headers or {})}
-    return TestClient(app, raise_server_exceptions=False).post(ruta, content=contenido, headers=cabeceras)
+    cliente = TestClient(app, raise_server_exceptions=False)
+    return cliente.request(metodo, ruta, content=contenido, headers=cabeceras)
+
+
+def _sin_constantes(c):
+    raise ValueError(f"{c} no es JSON")
+
+
+def _json_valido(r):
+    """El cuerpo leído como JSON estricto: en UTF-8 y sin NaN."""
+    assert r.headers["content-type"] == "application/json", r.headers
+    return json.loads(r.content.decode("utf-8"), parse_constant=_sin_constantes)
 
 
 def _nuevo():
@@ -96,12 +107,19 @@ def _estudio_con(campo, valor):
     return _post("/api/organizations/create", cuerpo)
 
 
+def _perfil_con(campo, valor):
+    u, _ = _usuario()
+    return _post("/api/user/profile", {campo: valor, "current_password": CLAVE},
+                 _bearer(_login(u)), metodo="PUT")
+
+
 CAMPOS = {
     "registro_nombre": (_registro_con, "name"), "registro_invitacion": (_registro_con, "invite_token"),
     "registro_usuario": (_registro_con, "username"), "registro_email": (_registro_con, "email"),
     "registro_plan": (_registro_con, "plan"),
     "estudio_nombre": (_estudio_con, "name"), "estudio_usuario": (_estudio_con, "username"),
     "estudio_email": (_estudio_con, "email"),
+    "perfil_nombre": (_perfil_con, "name"), "perfil_email": (_perfil_con, "email"),
 }
 
 
@@ -113,8 +131,28 @@ def test_texto_del_alta_que_no_se_puede_guardar_no_da_500(campo, texto):
     assert r.status_code < 500, r.text
 
 
-def _sin_constantes(c):
-    raise ValueError(f"{c} no es JSON")
+def _mail_de(largo):
+    return uuid.uuid4().hex + "a" * (largo - 32 - len("@example.com")) + "@example.com"
+
+
+# Postgres no guarda un texto más largo que su columna y SQLite sí: acá se pide
+# el rechazo claro. Cada uno tiene su contrapunto de un carácter menos.
+LARGOS = {
+    "registro_nombre": (_registro_con, "name", lambda n: "N" * n, 100),
+    "registro_email": (_registro_con, "email", _mail_de, 100),
+    "estudio_nombre": (_estudio_con, "name", lambda n: "N" * n, 200),
+    "estudio_email": (_estudio_con, "email", _mail_de, 100),
+    "perfil_email": (_perfil_con, "email", _mail_de, 100),
+}
+
+
+@pytest.mark.parametrize("campo", LARGOS)
+def test_texto_mas_largo_que_su_columna_da_4xx_y_el_justo_entra(campo):
+    alta, nombre, texto, tope = LARGOS[campo]
+    r = alta(nombre, texto(tope + 1))
+    assert r.status_code in (400, 422), r.text
+    r = alta(nombre, texto(tope))
+    assert r.status_code == 200, r.text
 
 
 NO_UTF8 = b'{"username": "\xff\xfe", "password": 1}'
@@ -133,6 +171,32 @@ def test_el_422_de_un_cuerpo_raro_es_json_valido(cuerpo):
     tipo, contenido = CUERPOS[cuerpo]
     r = _post("/auth/login", contenido, tipo=tipo)
     assert r.status_code == 422, r.text
-    assert r.headers["content-type"] == "application/json"
-    datos = json.loads(r.content.decode("utf-8"), parse_constant=_sin_constantes)
+    datos = _json_valido(r)
     assert isinstance(datos["detail"], list) and datos["detail"], datos
+
+
+CUERPOS_DE_GRUPO = {
+    "agrupar_no_utf8": ("agrupar", b'{"item_ids": ["\xff\xfe", "b"]}'),
+    "agrupar_no_json": ("agrupar", b"nope"),
+    "agrupar_lista": ("agrupar", b"[1]"),
+    "desagrupar_no_json": ("desagrupar", b"nope"),
+    "desagrupar_lista": ("desagrupar", b"[1]"),
+    "desagrupar_enorme": ("desagrupar", b'{"grupo_id": 100000000000000000000}'),
+}
+
+
+@pytest.mark.parametrize("cuerpo", CUERPOS_DE_GRUPO)
+def test_agrupar_con_cuerpo_raro_da_4xx_en_json(cuerpo):
+    ruta, contenido = CUERPOS_DE_GRUPO[cuerpo]
+    u, _ = _usuario()
+    r = _post(f"/api/operacion/no-existe/{ruta}", contenido, _bearer(_login(u)))
+    assert 400 <= r.status_code < 500, r.text
+    _json_valido(r)
+
+
+def test_el_400_que_repite_texto_ajeno_en_una_lista_es_json_valido():
+    u, _ = _usuario()
+    r = _post("/generate_maria_export", {"operation_id": "x", "items": [], "comprador_pais": "Xx\ud800"},
+              _bearer(_login(u)))
+    assert r.status_code == 400, r.text
+    assert "Xx" in json.dumps(_json_valido(r)["detail"]), r.text
