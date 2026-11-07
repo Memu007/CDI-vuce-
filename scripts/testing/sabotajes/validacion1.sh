@@ -89,6 +89,12 @@ sabotaje "con una validación en curso, la que se ve no valida" \
   $'        if (window.__enVuelo) return;\n        window.__enVuelo = true;\n        const turno = ++turnoValidacion;' \
   $'        if (turno !== turnoValidacion) return;\n' \
   $'        window.__enVuelo = false;\n        if (turno !== turnoValidacion) return;\n'
+sabotaje "el caché no mira la cabecera" \
+  "FALLA: cabecera distinta, mismos ítems: no volvió a validar con la cabecera cambiada" \
+  'JSON.stringify({ items, operacion: cabeceraParaValidar() })' 'JSON.stringify({ items })'
+sabotaje "sin caché: siempre vuelve a pedir" \
+  "FALLA: panel, misma carga sin cambios: volvió a pedir la validación de la misma carga" \
+  'if (!force && lastValidation && pedido' 'if (false && lastValidation && pedido'
 
 git checkout -q -- proyecto_maria/
 echo "FALLAS=$FALLAS"

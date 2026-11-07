@@ -2,7 +2,8 @@
 // Dos cargas distintas, una atrás de la otra en menos de 60 s: el panel de
 // totales, el botón «Generar» y lo que se guarda en el historial salen de la
 // carga que se ve, no de la anterior, aunque la anterior conteste después o
-// el validador falle. Cada caso corre en una página nueva.
+// el validador falle. La misma carga, sin cambios, reusa su validación sin
+// volver a pedirla. Cada caso corre en una página nueva.
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_validacion1.js
 const { chromium } = require('playwright');
@@ -48,6 +49,11 @@ const CASOS = [
   { que: 'botón, falla al volver a validar la misma', a: SIN_PESO(A), validador: 'falla', mira: async page => {
       if (!await page.$eval('#validatingGenerate', b => b.disabled)) return 'deja generar con el peso en cero';
     } },
+  { que: 'panel, misma carga sin cambios', a: B, b: B, mira: async (page, _, pidio) =>
+      (pidio() ? 'volvió a pedir la validación de la misma carga' : await PANEL(page)) },
+  { que: 'cabecera distinta, mismos ítems', a: B, b: B, opB: { ...OP, flete: '120' }, mira: async (page, _, pidio) => {
+      if (!pidio()) return 'no volvió a validar con la cabecera cambiada';
+    } },
   { que: 'historial', a: A, b: B, cliente: true, mira: async (page, clienteId) => {
       const guardado = page.waitForRequest(r => r.method() === 'POST' &&
         r.url().endsWith('/api/clientes/' + clienteId + '/operaciones'), { timeout: 15000 });
@@ -65,10 +71,10 @@ const CASOS = [
 
 // «Nueva operación» y «Carga manual» con clics; los ítems se ponen como los deja la pantalla de NCM.
 // Sin «espera», no aguarda la respuesta. Devuelve qué faltó, o nada.
-async function validar(page, item, espera = true) {
+async function validar(page, item, espera = true, op = OP) {
   await page.click('[data-action="go-upload"]');
   await page.click('#uploadManualBtn');
-  await page.evaluate(([op, it]) => { CDI.state.operacion = { ...op }; CDI.state.items = [it]; CDI.goTo('validating'); }, [OP, item]);
+  await page.evaluate(([op, it]) => { CDI.state.operacion = { ...op }; CDI.state.items = [it]; CDI.goTo('validating'); }, [op, item]);
   if (espera && !await page.waitForFunction(() => !document.getElementById('validatingResults').hidden, null, { timeout: 15000 }).catch(() => null))
     return 'no mostró la validación de la que se ve';
 }
@@ -136,7 +142,9 @@ async function simular(page, modo) {
     const pedidoA = tarda && await pidioA;
     const desde = Date.now();
     const pidioB = tarda && page.waitForRequest(r => r.url().endsWith('/api/validate/smart') && r !== pedidoA, { timeout: 15000 });
-    mal = mal || (c.b ? await validar(page, c.b) : await revalidar(page));
+    let pidioDespues = 0;
+    page.on('request', r => { if (r.method() === 'POST' && r.url().endsWith('/api/validate/smart')) pidioDespues++; });
+    mal = mal || (c.b ? await validar(page, c.b, true, c.opB) : await revalidar(page));
     if (tarda) {
       if (!await pidioB.catch(() => null)) mal = mal || 'la que se ve no pidió validación mientras la anterior esperaba';
       sim.soltarla();
@@ -145,7 +153,7 @@ async function simular(page, modo) {
     }
     if (c.cliente) await page.evaluate(cl => CDI.setClienteActivo(cl), cliente);
     if (Date.now() - desde > 50000) throw new Error(c.que + ': entre las dos cargas pasaron más de 50 s');
-    mal = mal || await c.mira(page, String(cliente.id));
+    mal = mal || await c.mira(page, String(cliente.id), () => pidioDespues);
     if (mal) fallas.push(c.que + ': ' + mal); else console.log('OK | ' + c.que);
     await page.close();
   }
