@@ -106,6 +106,11 @@ IS_PRODUCTION = os.getenv("ENVIRONMENT", "development") == "production"
 IS_TESTING = os.getenv("ENVIRONMENT") == "testing"
 
 
+def _es_desarrollo() -> bool:
+    # Sin la variable o con un valor desconocido, las puertas de desarrollo quedan cerradas.
+    return os.getenv("ENVIRONMENT") in ("development", "test", "testing")
+
+
 def _pista_dev_habilitada(email_sent: bool) -> bool:
     # El token de reset o el usuario vuelven en la respuesta (ayuda sin SMTP)
     # sólo en el entorno de prueba, nunca cuando ENVIRONMENT falta.
@@ -179,7 +184,7 @@ def send_email(to_email: str, subject: str, body: str):
     smtp_from = os.getenv("SMTP_FROM_EMAIL")
 
     if not all([smtp_server, smtp_port, smtp_user, smtp_password, smtp_from]):
-        if IS_PRODUCTION:
+        if not _es_desarrollo():
             logging.warning("SMTP no configurado — email no enviado a %s", to_email[:3] + "***")
         else:
             print("=" * 60, flush=True)
@@ -1637,10 +1642,10 @@ async def lifespan(app: FastAPI):
                 {"username": "demo", "password": "demo123", "name": "Demo User", "plan": "premium"},
             ]
             
-            # SECURITY: No crear demo users en producción
-            if IS_PRODUCTION:
+            # SECURITY: demo users sólo en desarrollo
+            if not _es_desarrollo():
                 demo_users = []
-                logging.info("Skipping demo users in production")
+                logging.info("Skipping demo users outside development")
             
             for user_data in demo_users:
                 result = await session.execute(select(User).where(User.username == user_data["username"]))
@@ -3204,7 +3209,7 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
         pass
         
     # Fallback para usuarios demo antiguos con contraseña plana (solo en desarrollo)
-    if not is_valid and not IS_PRODUCTION and stored_password == password:
+    if not is_valid and _es_desarrollo() and stored_password == password:
         is_valid = True
         # Migrar a hash en background para que el fallback no se necesite más
         try:
@@ -3653,11 +3658,11 @@ async def simulate_charge(user=Depends(get_current_user), db: AsyncSession = Dep
     No llama a ningun gateway. Sirve para demos y tests. Cuando se integre
     Stripe/MP real, este endpoint se reemplaza por el webhook de pago exitoso.
 
-    SEGURIDAD: en producción está deshabilitado por default para evitar que
+    SEGURIDAD: fuera de desarrollo está deshabilitado por default para evitar que
     un usuario se auto-active sin pago real. Habilitar solo con
     ENABLE_SIMULATE_CHARGE=true (dev/demo).
     """
-    if IS_PRODUCTION and os.getenv("ENABLE_SIMULATE_CHARGE", "false").lower() != "true":
+    if not _es_desarrollo() and os.getenv("ENABLE_SIMULATE_CHARGE", "false").lower() != "true":
         raise HTTPException(status_code=404, detail="Not Found")
 
     result = await db.execute(select(User).where(User.username == user["username"]))
@@ -10847,7 +10852,7 @@ pending_payments = {}
 @app.get("/api/payments/demo-checkout/{preference_id}")
 async def demo_checkout_page(preference_id: str):
     """Página de checkout demo cuando no hay credenciales MP"""
-    if not _demo_permitida() or preference_id not in pending_payments:
+    if not _es_desarrollo() or preference_id not in pending_payments:
         raise HTTPException(status_code=404, detail="Pago no encontrado")
     
     payment = pending_payments[preference_id]
@@ -10895,7 +10900,7 @@ async def demo_checkout_page(preference_id: str):
 @app.post("/api/payments/demo-confirm/{preference_id}")
 async def demo_confirm_payment(preference_id: str):
     """Confirma un pago demo: no cobra ni cambia la cuenta."""
-    if not _demo_permitida() or preference_id not in pending_payments:
+    if not _es_desarrollo() or preference_id not in pending_payments:
         raise HTTPException(status_code=404, detail="Pago no encontrado")
     
     pending_payments[preference_id]["status"] = "approved"
@@ -11159,12 +11164,6 @@ def _cancelar_suscripcion_mp(sid: str) -> None:
         raise _SuscripcionMPError(f"{sid}: sigue sin cancelar")
 
 
-def _demo_permitida() -> bool:
-    """El checkout de prueba existe sólo en desarrollo y pruebas; si falta la
-    variable, no hay demo (COBRO-MP-2, D7.4)."""
-    return os.getenv("ENVIRONMENT") in ("development", "test", "testing")
-
-
 def _pago_del_cobro_mp(cobro) -> tuple:
     """(id del pago, id de la suscripción o None) de un cobro autorizado,
     según la documentación pública de Mercado Pago (COBRO-MP-1, D30: no se
@@ -11300,11 +11299,11 @@ def _verify_mp_webhook_signature(request: Request, raw_body: bytes) -> bool:
     Doc: https://www.mercadopago.com/developers/es/docs/your-integrations/notifications/webhooks#bookmark_validar_el_origen_de_la_notificación
 
     Si `MP_WEBHOOK_SECRET` no esta seteado:
-      - en produccion: rechaza (False) → defensa en profundidad.
-      - en dev/sandbox: pasa (True) para no frenar tests locales.
+      - fuera de desarrollo: rechaza (False) → defensa en profundidad.
+      - en desarrollo: pasa (True) para no frenar tests locales.
     """
     if not MP_WEBHOOK_SECRET:
-        return not IS_PRODUCTION
+        return _es_desarrollo()
 
     sig_header = request.headers.get("x-signature", "")
     req_id = request.headers.get("x-request-id", "")
@@ -11344,7 +11343,7 @@ async def mercadopago_webhook(request: Request):
 
     Seguridad:
       - Valida firma HMAC contra MP_WEBHOOK_SECRET (401 si falla).
-      - En prod sin secret seteado → rechaza siempre.
+      - Fuera de desarrollo sin secret seteado → rechaza siempre.
 
     Efecto sobre billing al recibir un pago aprobado:
       - user.plan = <plan del external_reference>
@@ -11597,7 +11596,7 @@ async def billing_checkout(
 
     # Modo demo cuando no hay credenciales, sólo en desarrollo y pruebas (D7.4)
     if not billing_service.is_configured():
-        if not _demo_permitida():
+        if not _es_desarrollo():
             raise HTTPException(status_code=503, detail="Los pagos no están disponibles en este momento. Probá más tarde.")
         demo_id = f"demo_{uuid.uuid4().hex[:8]}"
         pending_payments[demo_id] = {

@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-07 · fix: sin ENVIRONMENT o con un valor desconocido no se abre ninguna puerta de desarrollo (ENTORNO-1)
+
+- Sólo `development`, `test` o `testing` habilitan los usuarios demo, el login con la contraseña guardada tal cual, el webhook de Mercado Pago sin secreto, el link de reset por consola y el cobro simulado. Cualquier otro valor, o la variable ausente, se trata como producción para esas cinco puertas.
+
 ## 2026-11-07 · fix: un carácter que no se puede guardar no da 500 en login ni en recuperar (ABUSO-1)
 
 - Un surrogate suelto o un NUL en el usuario o el email de login, recuperar contraseña y recuperar usuario se cambia por «�» y la respuesta es la de un dato que no existe, en vez de 500.
