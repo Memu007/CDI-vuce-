@@ -61,8 +61,8 @@ def _limites_limpios(monkeypatch):
     (["otra", "otra", "propia", "propia", "bien"], 3),
     (["propia", "propia", 23 * 60, "otra", "otra", 61], 1),
     (["propia", "otra", 24 * 60 + 1], 5),
-    (["propia", "propia", 23 * 60], 5),
-    (["otra", "otra", 23 * 60], 3),
+    (["propia", "propia", 24 * 60 - 1], 5),
+    (["otra", "otra", 24 * 60 - 1], 3),
 ], ids=["otra_cuenta", "usuario_inexistente", "mitad_y_mitad", "intercalados", "solo_propios",
         "bloqueo_vencido", "mas_propios_que_la_ip", "ajeno_tras_el_bloqueo",
         "fallos_propios_de_mas_de_un_dia", "fallos_propios_desde_otra_ip",
@@ -80,7 +80,8 @@ def test_login_correcto_perdona_solo_los_fallos_de_su_cuenta(cuentas, pasos, que
             reloj(paso * 60)
             continue
         if paso == "bien":
-            assert _login(c, cuentas["propia"], CLAVE, real).status_code == 200
+            r = _login(c, cuentas["propia"], CLAVE, real)
+            assert r.status_code == 200, (paso, r.status_code, r.text)
             continue
         cuenta, _, otra_ip = paso.partition("@")
         r = _login(c, cuentas[cuenta], "mal", lejos if otra_ip else real)
@@ -100,8 +101,9 @@ def _filas():
 
 
 def test_un_login_correcto_no_cambia_otras_claves(cuentas):
-    """Fuera de la fila de su IP y la de su cuenta en esa IP, el login correcto
-    deja la tabla como estaba: otras IPs, otras cuentas, recuperar y registro."""
+    """El login correcto borra la fila de su cuenta en su IP y resta eso de la
+    IP, sin tocar el resto de la fila ni otras claves: otras IPs, otras
+    cuentas, recuperar, registro y cambio de clave."""
     from proyecto_maria.core import limites_auth
     real, lejos, c = _ip(), _ip(), TestClient(app)
     propia, otra = cuentas["propia"], cuentas["otra"]
@@ -118,8 +120,11 @@ def test_un_login_correcto_no_cambia_otras_claves(cuentas):
     antes = {k: v for k, v in _filas().items() if k not in suyas}
     assert set(antes) == {f"login:{lejos}", f"cuenta:{propia}:login:{lejos}",
                           f"cuenta:{otra}:login:{real}", *ajenas}
+    ip = _filas()[f"login:{real}"]
     assert _login(c, propia, CLAVE, real).status_code == 200
-    assert {k: v for k, v in _filas().items() if k not in suyas} == antes
+    despues = _filas()
+    assert despues.pop(f"login:{real}") == [ip[0] - 2, *ip[1:]]
+    assert despues == antes
 
 
 def test_descontar_no_deja_la_ip_en_negativo(reloj):
