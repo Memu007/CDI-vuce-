@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-07 · fix: la validación sale de la carga que se ve (VALIDACION-1)
+
+- **fix(validación):** al pasar de una carga a otra en menos de un minuto, el panel, el botón «Generar» y lo que se guarda en el historial ya no muestran ni usan la validación de la carga anterior, aunque ésa conteste después o el validador falle.
+
 ## 2026-11-06 · fix: en un estudio, una sola regla de quién toca la suscripción que paga (COBRO-MP-2)
 
 - **fix(cobro):** cancelar y reactivar el plan de un estudio lo hacen la dueña o quien abrió la suscripción que paga (autorizada o pausada). Sacar a un miembro sólo se frena si su suscripción es la que paga; una pendiente suya se cancela en Mercado Pago al sacarlo. Una pausada de otro miembro frena el checkout. Todos los miembros ven en el perfil la suscripción del estudio.
