@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 from typing import Optional
 
@@ -7,6 +8,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # En producción DEBE sobreescribirse con JWT_SECRET_KEY (o SECRET_KEY).
 _DEFAULT_DEV_SECRET = "tu-clave-secreta-super-segura-cambiar-en-produccion"
+
+
+def es_desarrollo() -> bool:
+    # Sin la variable o con un valor desconocido, la app se porta como en producción.
+    return os.getenv("ENVIRONMENT") in ("development", "test", "testing")
 
 
 class Settings(BaseSettings):

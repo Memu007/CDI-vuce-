@@ -99,16 +99,12 @@ from proyecto_maria.auth.dependencies import (
 )
 from proyecto_maria.auth.roles import roles_de
 from proyecto_maria.config import _DEFAULT_DEV_SECRET, get_settings
+from proyecto_maria.config import es_desarrollo as _es_desarrollo
 
 # ============== Configuración de Autenticación ==============
 _CLAVE_JWT = get_settings().jwt_secret
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development") == "production"
 IS_TESTING = os.getenv("ENVIRONMENT") == "testing"
-
-
-def _es_desarrollo() -> bool:
-    # Sin la variable o con un valor desconocido, las puertas de desarrollo quedan cerradas.
-    return os.getenv("ENVIRONMENT") in ("development", "test", "testing")
 
 
 def _pista_dev_habilitada(email_sent: bool) -> bool:
@@ -390,9 +386,9 @@ app = FastAPI(
     title="Optimizador de Carga para Sistema MARIA",
     description="Un proyecto para validar, enriquecer y generar archivos de carga para despachantes de aduana.",
     version="0.2.0 (Con Interfaz Web)",
-    docs_url=None if IS_PRODUCTION else "/docs",
-    redoc_url=None if IS_PRODUCTION else "/redoc",
-    openapi_url=None if IS_PRODUCTION else "/openapi.json"
+    docs_url="/docs" if _es_desarrollo() else None,
+    redoc_url="/redoc" if _es_desarrollo() else None,
+    openapi_url="/openapi.json" if _es_desarrollo() else None
 )
 
 # Configurar CORS (OWASP A5 - Broken Access Control)
@@ -2008,10 +2004,10 @@ _CSRF_EXEMPT_PATHS = frozenset({
 def _csrf_enforce_enabled() -> bool:
     """Lee el flag en vivo para poder togglear sin reiniciar (y en tests).
 
-    Default: en produccion bloquea (true), en dev/test reporta solo (false).
+    Default: fuera de desarrollo bloquea (true), en dev/test reporta solo (false).
     Setear CSRF_ENFORCE=false en .env para desactivar manualmente.
     """
-    default = "true" if IS_PRODUCTION else "false"
+    default = "false" if _es_desarrollo() else "true"
     return os.getenv("CSRF_ENFORCE", default).strip().lower() in ("1", "true", "yes")
 
 
@@ -2025,7 +2021,7 @@ def set_csrf_cookie(response: Response) -> None:
         key=CSRF_COOKIE_NAME,
         value=generate_csrf_token(),
         httponly=False,  # el front necesita leerla para reenviarla en el header
-        secure=IS_PRODUCTION,
+        secure=not _es_desarrollo(),
         samesite="strict",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
@@ -2066,7 +2062,7 @@ async def abrir_sesion(response: Response, db: AsyncSession, user: User, hash_va
     if not await guardar_si_la_clave_sigue(db, user.username, hash_validado, active_jti=jti, **cambios):
         return None
     response.set_cookie(key="access_token", value=f"Bearer {token}", httponly=True,
-                        secure=IS_PRODUCTION, samesite="strict",
+                        secure=not _es_desarrollo(), samesite="strict",
                         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60)
     set_csrf_cookie(response)
     return token
@@ -3678,11 +3674,9 @@ async def simulate_charge(user=Depends(get_current_user), db: AsyncSession = Dep
     No llama a ningun gateway. Sirve para demos y tests. Cuando se integre
     Stripe/MP real, este endpoint se reemplaza por el webhook de pago exitoso.
 
-    SEGURIDAD: fuera de desarrollo está deshabilitado por default para evitar que
-    un usuario se auto-active sin pago real. Habilitar solo con
-    ENABLE_SIMULATE_CHARGE=true (dev/demo).
+    SEGURIDAD: fuera de desarrollo da 404, para que nadie se active sin pago real.
     """
-    if not _es_desarrollo() and os.getenv("ENABLE_SIMULATE_CHARGE", "false").lower() != "true":
+    if not _es_desarrollo():
         raise HTTPException(status_code=404, detail="Not Found")
 
     result = await db.execute(select(User).where(User.username == user["username"]))

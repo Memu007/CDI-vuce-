@@ -5,6 +5,9 @@ from typing import Dict, Any, Optional
 
 import requests
 
+from proyecto_maria.config import es_desarrollo
+
+
 class SourceUnavailableError(Exception):
     def __init__(self, ncm: str):
         self.ncm = ncm
@@ -64,10 +67,8 @@ class VuceClient:
 
     def _request(self, path: str, params: Optional[dict] = None) -> Dict[str, Any]:
         mode = self.config.mode
-        is_production = os.getenv("ENVIRONMENT", "development") == "production"
-
         if mode == "fake":
-            if is_production:
+            if not es_desarrollo():
                 logger.error("[vuce] Intento de usar modo fake en produccion abortado.")
                 raise SourceUnavailableError(ncm=path.split("/")[-1])
             return self._fake_response(path, params)

@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-07 · fix: sin ENVIRONMENT o con un valor desconocido los controles de producción quedan puestos (ENTORNO-2)
+
+- Fuera de `development`, `test` o `testing`: el CSRF bloquea, las cookies van `Secure`, `/docs`, `/redoc` y `/openapi.json` dan 404, sin `DATABASE_URL` la app no arranca y el VUCE simulado no responde.
+- El cobro simulado da 404 fuera de desarrollo aunque esté `ENABLE_SIMULATE_CHARGE=true`: la variable ya no se lee.
+
 ## 2026-11-07 · fix: un login correcto no perdona los fallos que la IP hizo con otras cuentas (ABUSO-2)
 
 - Entrar bien a la propia cuenta descuenta sólo los fallos con esa cuenta: los intentos de la misma IP contra otras cuentas o usuarios inexistentes siguen contando para el bloqueo, también después de que un bloqueo venció.
