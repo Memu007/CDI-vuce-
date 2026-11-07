@@ -213,6 +213,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-07 17:58 UTC: vuelta. ABUSO-1 (`55bf408`) en revisión: 72 passed, PG OK, 35 sabotajes en rojo, Opus y Sonnet sin nada serio introducido; falta la suite. Técnica sin entrega (`b07acd5`, sabotajes de MP-2). Límite `allowed`.
 2026-11-07 15:57 UTC: vuelta. Sin entregas nuevas (MARIA en `50e1c8f`, técnica en `f283e64`, las dos trabajando). Límite `allowed`. MARIA con ventana de 1M (448k usados, otro modelo servido): pedido a Emi `/autocompact 200k` en ese chat. D62 ya contestada.
 2026-11-07 15:52 UTC: **RETOMADO por 24 h** (Emi, sabiendo que pasó el 50 %): tres rutinas prendidas, Devs despertadas (MARIA ABUSO-1; técnica devolución de COBRO-MP-2 y VALIDACION-1). Corte el 08/11 15:50 UTC por `trig_01QwEeyuXBFBx6LErxqapwRh`: lo en curso se termina.
 2026-11-06 12:35 UTC: **CATALOGO-LARGO-2 aceptada** (`d5bc7c1`, pruebas `b0bbd8c`, MARIA, sin integrar por `e0b8626`): 40 passed, PG `fallas: 0`, 37 sabotajes en rojo sin falla, suite con sólo los 5 de D73; Opus y Sonnet alto sin 500 nuevo ni pérdida. D84 a D87 (a); seis bajas a la cola; el aviso de qué producto no se aprendió va a CATALOGO-3. Emi: sí a VALIDACION-1 (técnica, tras COBRO-MP-2) y a que la sesión de limpieza siga ordenando el repo en tandas chicas que reviso yo.
@@ -238,7 +239,6 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 2026-11-05 22:00 UTC: **COBRO-CORTE-1 vuelve otra vez** (`0b9ccde`): lo de la vuelta anterior está, pero se cobra antes de entregar (falla al escribir el TXT: 500 y el reintento cuenta otra, reproducido) y una respuesta tardía le pasa el id a la carga siguiente (Opus y Sonnet por separado). Más, a cero: NUL/surrogate en el id da 500, aviso de borrar cliente, candado en `delete_cliente`. CATALOGO-LARGO-2: sí de Emi (21:41).
 
-2026-11-05 21:35 UTC: **RENDIMIENTO-1d aceptada** (`558c941`, MARIA): la salida del hijo ya no pierde texto (surrogate suelto o locale que no es UTF-8); tope de 64 K y fila por usuario con caso y sabotaje (12 ROJO). Mi ejemplo distinto, rojo en la base. Sin integrar, por lo mismo que `ca87d82`. Sigue DESPACHO-1d.
 
 
 ## /compact conservar de la PM principal
