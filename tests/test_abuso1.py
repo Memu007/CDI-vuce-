@@ -272,21 +272,32 @@ def reloj(monkeypatch):
     return mover
 
 
-def test_s6_recuperar_usuario_tiene_limite_por_ip(reloj):
+@pytest.mark.parametrize("ruta,cuerpo,pasa", [
+    ("/auth/login", {"username": "nadie", "password": "x"}, 401),
+    ("/auth/request-password-reset", {"email": "n@ejemplo.test"}, 200),
+    (RECUPERAR, {"email": "n@ejemplo.test"}, 200),
+])
+def test_los_limites_por_ip_duran_quince_minutos(ruta, cuerpo, pasa, reloj):
+    """Cinco pedidos y el sexto da 429; a los 14 minutos sigue cortado y a los
+    16 vuelve a pasar. El login, sin el 5/minuto de slowapi."""
+    from proyecto_maria.core.rate_limit import limiter
+    limiter.enabled = ruta != "/auth/login"
     real, c = _ip(), TestClient(app)
-    codigos = [c.post(RECUPERAR, json={"email": f"n{i}@ejemplo.test"}, headers=_xff(real, _ip())).status_code
-               for i in range(6)]
-    assert codigos == [200] * 5 + [429], codigos
+    codigos = [c.post(ruta, json=cuerpo, headers=_xff(real, _ip())).status_code for _ in range(6)]
+    assert codigos == [pasa] * 5 + [429], codigos
     reloj()
-    reloj(15 * 60 + 1)
-    r = c.post(RECUPERAR, json={"email": "n7@ejemplo.test"}, headers=_xff(real))
-    assert r.status_code == 200, r.text
+    reloj(14 * 60)
+    assert c.post(ruta, json=cuerpo, headers=_xff(real)).status_code == 429
+    reloj(2 * 60)
+    r = c.post(ruta, json=cuerpo, headers=_xff(real))
+    assert r.status_code == pasa, (r.status_code, r.text)
 
 
-def test_s6_recuperar_usuario_corta_en_silencio_por_email(token, monkeypatch):
+def test_s6_recuperar_usuario_corta_en_silencio_por_email(token, monkeypatch, reloj):
     """Tres pedidos por hora para un mismo email, cuente como venga escrito;
     el cuarto contesta lo mismo pero no manda el mail. Desde EMAIL-1 cada
-    variante encuentra la cuenta y el mail va a la dirección guardada."""
+    variante encuentra la cuenta y el mail va a la dirección guardada. La
+    ventana es de una hora."""
     enviados = []
     monkeypatch.setattr(main_mod, "send_email", lambda to, *a, **k: enviados.append(to) or True)
     email = f"{token[0]}@ejemplo.test"
@@ -298,6 +309,13 @@ def test_s6_recuperar_usuario_corta_en_silencio_por_email(token, monkeypatch):
     r = c.post(RECUPERAR, json={"email": email}, headers=_xff(_ip()))
     assert r.status_code == 200 and r.json() == {"message": MSJ_RECUPERAR}, r.text
     assert enviados == [email] * 3, "el cuarto pedido de la hora mandó el mail"
+    reloj()
+    reloj(59 * 60)
+    c.post(RECUPERAR, json={"email": email}, headers=_xff(_ip()))
+    assert enviados == [email] * 3, "a los 59 minutos ya mandó otro"
+    reloj(2 * 60)
+    c.post(RECUPERAR, json={"email": email}, headers=_xff(_ip()))
+    assert enviados == [email] * 4, "pasada la hora no volvió a mandar"
 
 
 def _registrar(c, real):
@@ -474,19 +492,23 @@ def _claves_largas():
     return asyncio.run(_correr())
 
 
-@pytest.mark.parametrize("ruta,cuerpo", [
-    ("/auth/login", {"username": "nadie", "password": "x"}),
-    (RESET, {"email": "n@ejemplo.test"}),
-    ("/auth/recover-username", {"email": "n@ejemplo.test"}),
-    ("/auth/register", {"username": "ab1l_" + uuid.uuid4().hex[:8], "password": CLAVE,
-                        "email": f"ab1l_{uuid.uuid4().hex[:8]}@ejemplo.test", "name": "Ab"}),
-])
-def test_tabla_una_ip_larga_entra_en_la_clave(ruta, cuerpo):
+def _cuerpo_auth(ruta):
+    u = "ab1l_" + uuid.uuid4().hex[:8]
+    return {"/auth/login": {"username": "nadie", "password": "x"},
+            "/auth/register": {"username": u, "password": CLAVE, "email": f"{u}@ejemplo.test", "name": "Ab"},
+            }.get(ruta, {"email": "n@ejemplo.test"})
+
+
+@pytest.mark.parametrize("ruta", ("/auth/login", RESET, RECUPERAR, "/auth/register"))
+def test_tabla_una_ip_larga_entra_en_la_clave(ruta):
     """La clave de la tabla tiene 120 caracteres: una IP más larga no puede
-    llegar tal cual (en Postgres el INSERT falla y la ruta da 500)."""
-    r = TestClient(app).post(ruta, json=cuerpo, headers=_xff(_ip_larga()))
-    assert r.status_code in (200, 401), (r.status_code, r.text)
-    assert _claves_largas() == []
+    llegar tal cual (en Postgres el INSERT falla y la ruta da 500). Los largos
+    dejan la clave, con su prefijo, entre 121 y 300 caracteres y por encima."""
+    for largo in (115, 200, 287, 332):
+        ip = ("x" * largo + uuid.uuid4().hex)[-largo:]
+        r = TestClient(app).post(ruta, json=_cuerpo_auth(ruta), headers=_xff(ip))
+        assert r.status_code in (200, 401), (largo, r.status_code, r.text)
+        assert _claves_largas() == [], largo
 
 
 def test_s4_una_ip_larga_tambien_se_bloquea():
@@ -505,3 +527,20 @@ def test_s4_dos_ips_largas_con_el_mismo_comienzo_no_se_pisan():
         _login(c, "nadie", "x", una)
     r = _login(c, "nadie", "x", otra)
     assert r.status_code == 401, (r.status_code, r.text)
+
+
+@pytest.mark.parametrize("ruta,cuerpo,pasa", [
+    (RECUPERAR, b'{"email": "a\\ud800@ejemplo.test"}', 200),
+    (RESET, b'{"email": "a\\udfff\\u0000@ejemplo.test"}', 200),
+    ("/auth/login", b'{"username": "a\\ud800", "password": "x"}', 401),
+])
+@pytest.mark.parametrize("limitador", (True, False))
+def test_un_surrogate_suelto_no_da_500(ruta, cuerpo, pasa, limitador):
+    """JSON acepta «\\ud800» sin su par y «\\u0000»; ese texto no se puede
+    codificar ni guardar en Postgres, y la ruta daba 500. Ahora responde como a
+    un dato que no existe."""
+    from proyecto_maria.core.rate_limit import limiter
+    limiter.enabled = limitador
+    r = TestClient(app, raise_server_exceptions=False).post(
+        ruta, content=cuerpo, headers={"Content-Type": "application/json", **_xff(_ip())})
+    assert r.status_code == pasa, (r.status_code, r.text[:200])
