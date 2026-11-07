@@ -3,7 +3,8 @@
 # regla tiene que fallar por ese motivo.
 # Login (tests/test_abuso2.py): un login correcto perdona sólo los fallos que
 # la IP hizo con su cuenta, una sola vez y sin lo vencido, y no cambia otras
-# claves; la cuenta y la IP olvidan a las 24 h. Recuperar usuario: el tope de 3 por hora se
+# claves; la cuenta se cuenta por la cuenta encontrada, también si se tipeó
+# el email, y la cuenta y la IP olvidan a las 24 h. Recuperar usuario: el tope de 3 por hora se
 # cuenta por la cuenta encontrada y no por el texto pedido; en SQLite lo ve
 # tests/test_abuso1.py con mayúsculas y, con PG_URL, la İ que sólo Postgres
 # junta lo ve scripts/testing/abuso2_postgres.py.
@@ -78,6 +79,8 @@ sabotaje $M "los fallos de la cuenta no se cuentan aparte" "$P[solo_propios]" \
   $'        if False:\n            await limites_auth.sumar_fallo'
 sabotaje $M "la cuenta se cuenta sin la IP" "$P[fallos_propios_desde_otra_ip]" \
   'f"cuenta:{user.username}:{clave_intentos}"' 'f"cuenta:{user.username}"'
+sabotaje $M "la cuenta se cuenta por el texto tipeado" "$P[fallos_con_el_email]" \
+  'f"cuenta:{user.username}:{clave_intentos}"' 'f"cuenta:{username}:{clave_intentos}"'
 sabotaje $M "la cuenta se cuenta en una ventana fija" "$P[fallos_propios_de_mas_de_un_dia]" \
   'sumar_fallo(db, clave_cuenta, exacta=True)' 'contar(db, clave_cuenta, 24 * 3600)'
 sabotaje $L "descontar borra lo propio pero no lo resta de la IP" "$P[mitad_y_mitad]" \
@@ -88,6 +91,12 @@ sabotaje $M "el login cuenta los fallos de la IP con el tope de recuperar" "$P[a
   'sumar_fallo(db, clave_intentos, exacta=True)' 'sumar_fallo(db, clave_intentos)'
 sabotaje $L "descontar resta en todas las claves" "FAILED $T::test_un_login_correcto_no_cambia_otras_claves" \
   'update(_T).where(_T.c.clave == clave).values(' 'update(_T).values('
+sabotaje $L "descontar resta también en reset" "FAILED $T::test_un_login_correcto_no_cambia_otras_claves" \
+  'update(_T).where(_T.c.clave == clave).values(' \
+  'update(_T).where((_T.c.clave == clave) | _T.c.clave.like("reset:%")).values('
+sabotaje $L "descontar resta también en el tope diario de registro" "FAILED $T::test_un_login_correcto_no_cambia_otras_claves" \
+  'update(_T).where(_T.c.clave == clave).values(' \
+  'update(_T).where((_T.c.clave == clave) | _T.c.clave.like("registro:d:%")).values('
 sabotaje $L "descontar alarga el olvido de la IP" "FAILED $T::test_un_login_correcto_no_cambia_otras_claves" \
   'cuenta=case((_T.c.cuenta > n, _T.c.cuenta - n), else_=0)))' \
   'cuenta=case((_T.c.cuenta > n, _T.c.cuenta - n), else_=0), vence=ahora + 24 * 3600))'
