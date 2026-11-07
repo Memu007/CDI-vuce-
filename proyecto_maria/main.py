@@ -11011,6 +11011,7 @@ def _consultar_mp(llamada, que: str) -> dict:
     if not isinstance(resp, dict) or resp.get("status") != 200 or not isinstance(resp.get("response"), dict):
         estado = resp.get("status") if isinstance(resp, dict) else type(resp).__name__
         raise _MPIlegible(f"{que}: {str(estado)[:40]}")
+    # Si guardarlo da 500, Mercado Pago reintenta el aviso sin fin.
     return _guardable_en_pg(resp["response"])
 
 
