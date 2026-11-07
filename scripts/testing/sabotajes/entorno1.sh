@@ -68,6 +68,7 @@ sabotaje() {
 }
 
 M=proyecto_maria/main.py
+CF=proyecto_maria/config.py
 T=tests/test_entorno1.py
 C="FAILED $T::test_puerta_cerrada_fuera_de_desarrollo"
 VIEJO="no queda cerrada: {None: 'abierta', '': 'abierta', 'prod': 'abierta', 'staging': 'abierta', 'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}"
@@ -94,27 +95,27 @@ sabotaje $M "link de reset por consola salvo en producción" \
   $'        if IS_PRODUCTION:\n            logging.warning("SMTP no configurado' \
   "$C[link_de_reset_en_stdout]" "link_de_reset_en_stdout $VIEJO"
 sabotaje $M "cobro simulado salvo en producción" \
-  'if not _es_desarrollo() and os.getenv("ENABLE_SIMULATE_CHARGE"' \
-  'if IS_PRODUCTION and os.getenv("ENABLE_SIMULATE_CHARGE"' \
+  $'    if not _es_desarrollo():\n        raise HTTPException(status_code=404, detail="Not Found")\n\n    result = await db.execute(select(User).where(User.username == user["username"]))' \
+  $'    if IS_PRODUCTION:\n        raise HTTPException(status_code=404, detail="Not Found")\n\n    result = await db.execute(select(User).where(User.username == user["username"]))' \
   "$C[cobro_simulado]" "cobro_simulado $VIEJO"
 sabotaje $M "clave JWT de desarrollo salvo en producción" \
   'if not _es_desarrollo() and (_is_default_key' 'if IS_PRODUCTION and (_is_default_key' \
   "$C[clave_jwt_de_desarrollo]" "clave_jwt_de_desarrollo $VIEJO"
 
 # El lugar único: sin mirar mayúsculas ni espacios, o con un valor más.
-sabotaje $M "desarrollo sin mirar mayúsculas ni espacios" \
+sabotaje $CF "desarrollo sin mirar mayúsculas ni espacios" \
   'return os.getenv("ENVIRONMENT") in ("development", "test", "testing")' \
   'return (os.getenv("ENVIRONMENT") or "").strip().lower() in ("development", "test", "testing")' \
   "$C[demo]" "$C[cobro_simulado]" "cobro_simulado no queda cerrada: {'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}"
-sabotaje $M "staging cuenta como desarrollo" \
+sabotaje $CF "staging cuenta como desarrollo" \
   'in ("development", "test", "testing")' 'in ("development", "test", "testing", "staging")' \
   "$C[webhook_sin_secreto]" "webhook_sin_secreto no queda cerrada: {'staging': 'abierta'}"
-sabotaje $M "variable ausente cuenta como desarrollo" \
+sabotaje $CF "variable ausente cuenta como desarrollo" \
   'return os.getenv("ENVIRONMENT") in' 'return os.getenv("ENVIRONMENT", "development") in' \
   "$C[login_con_lo_guardado]" "login_con_lo_guardado no queda cerrada: {None: 'abierta'}"
 
 # Contrapunto: si las puertas no abren en ningún lado, la prueba lo ve.
-sabotaje $M "ninguna puerta abre ni en desarrollo" \
+sabotaje $CF "ninguna puerta abre ni en desarrollo" \
   'return os.getenv("ENVIRONMENT") in ("development", "test", "testing")' 'return False' \
   "FAILED $T::test_puerta_abierta_en_desarrollo[demo]" \
   "FAILED $T::test_puerta_abierta_en_desarrollo[cobro_simulado]" \
