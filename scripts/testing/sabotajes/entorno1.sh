@@ -95,6 +95,9 @@ sabotaje $M "cobro simulado salvo en producción" \
   'if not _es_desarrollo() and os.getenv("ENABLE_SIMULATE_CHARGE"' \
   'if IS_PRODUCTION and os.getenv("ENABLE_SIMULATE_CHARGE"' \
   "$C[cobro_simulado]" "cobro_simulado $VIEJO"
+sabotaje $M "clave JWT de desarrollo salvo en producción" \
+  'if not _es_desarrollo() and (_is_default_key' 'if IS_PRODUCTION and (_is_default_key' \
+  "$C[clave_jwt_de_desarrollo]" "clave_jwt_de_desarrollo $VIEJO"
 
 # El lugar único: sin mirar mayúsculas ni espacios, o con un valor más.
 sabotaje $M "desarrollo sin mirar mayúsculas ni espacios" \
