@@ -20,6 +20,8 @@ AUSENTE = None
 CERRADOS = [AUSENTE, "", "production", "prod", "staging", "Development", " development", "TESTING"]
 ABIERTOS = ["development", "test", "testing"]
 
+IMPORTAR_SIN_ENV = "import dotenv; dotenv.load_dotenv = lambda *a, **k: False; import proyecto_maria.main"
+
 pytestmark = pytest.mark.security
 
 
@@ -41,6 +43,12 @@ def _sondear(valor, carpeta: Path) -> dict:
     assert proc.returncode == 0 and linea, f"ENVIRONMENT={valor!r}: la sonda no terminó\n{salida[-3000:]}"
     datos = json.loads(linea[-1][len("SONDA "):])
     datos["link_en_salida"] = bool(datos["token"]) and datos["token"] in salida.replace(linea[-1], "")
+    # Sin JWT_SECRET_KEY la app usaría la clave de desarrollo, que está en el repositorio.
+    del env["JWT_SECRET_KEY"]
+    arranque = subprocess.run([sys.executable, "-c", IMPORTAR_SIN_ENV], capture_output=True, text=True,
+                              cwd=str(carpeta), env=env, timeout=120)
+    datos["arranca_sin_clave"] = arranque.returncode == 0
+    datos["rechaza_sin_clave"] = "insecure JWT_SECRET_KEY" in arranque.stderr
     return datos
 
 
@@ -65,6 +73,7 @@ PUERTAS = {
     "link_de_reset_en_stdout": lambda d: _estado(bool(d["token"]) and d["link_en_salida"],
                                                  bool(d["token"]) and not d["link_en_salida"]),
     "cobro_simulado": lambda d: _estado(d["cobro"] == 200, d["cobro"] == 404),
+    "clave_jwt_de_desarrollo": lambda d: _estado(d["arranca_sin_clave"], d["rechaza_sin_clave"]),
 }
 
 
