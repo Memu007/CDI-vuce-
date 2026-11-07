@@ -427,3 +427,7 @@ Corte por la regla de Emi del 04/11: las tres sesiones muestran el límite seman
 ### 2026-11-07 15:50 UTC (PM principal)
 
 Emi: «Podés trabajar con el team por 24hs … 24 y cortar (si hay algo haciéndose se termina)». Rutinas de PM, MARIA y técnica prendidas otra vez; Devs despertadas en su orden. Corte el 2026-11-08 15:50 UTC (`trig_01QwEeyuXBFBx6LErxqapwRh`): rutinas apagadas, cada Dev termina el paso en curso, sube y anota dónde quedó. `allowed_warning` ya no corta (Emi decidió seguir sabiéndolo).
+
+### 2026-11-07 18:15 UTC (PM principal)
+
+ABUSO-1 aceptada sobre `55bf408`, sin integrar por `e0b8626`; supuestos 1 a 3 de MARIA aceptados. D94 (a), D95 (a), D96 (a), decididas por la PM. Piezas nuevas bajo «arreglos chicos de seguridad a cero» (Emi): ENTRADAS-1 (ningún texto de afuera da 500: surrogate/NUL en claves y registro, claves de más de 72 bytes, cuerpo no UTF-8, `NaN` en el 422) y ABUSO-2 (un login bueno en otra cuenta no borra el contador de la IP; el tope de recuperar usuario cuenta como PG). Orden de MARIA: ENTORNO-1 → ENTRADAS-1 → ABUSO-2. Rojo intermitente de `test_despacho1b` a la cola. Acta: `REPRODUCCION-ABUSO-1-2026-11-07.md`.
