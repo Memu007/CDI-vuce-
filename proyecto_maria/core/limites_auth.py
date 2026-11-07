@@ -111,8 +111,5 @@ async def descontar(db: AsyncSession, clave: str, propia: str) -> None:
     await db.execute(delete(_T).where(_T.c.vence <= ahora))
     n = (await db.execute(delete(_T).where(_T.c.clave == propia).returning(_T.c.cuenta))).scalar() or 0
     if n:
-        await db.execute(update(_T).where(_T.c.clave == clave).values(
-            cuenta=_T.c.cuenta - n,
-            bloqueado_hasta=case((_T.c.bloqueado_hasta <= ahora, 0.0), else_=_T.c.bloqueado_hasta)))
-        await db.execute(delete(_T).where(_T.c.clave == clave, _T.c.cuenta <= 0))
+        await db.execute(update(_T).where(_T.c.clave == clave).values(cuenta=_T.c.cuenta - n))
     await db.commit()
