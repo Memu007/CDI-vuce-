@@ -5,8 +5,8 @@
 # Content-Length; uno de hasta 16 KB se guarda; ninguno escribe
 # logs/ui_events.jsonl.
 # S4: la IP es la última de X-Forwarded-For; el 429 del login deja la IP en el
-# log; el login correcto borra los fallos.
-# S6 y C9: recuperar usuario (5 cada 15 min por IP, 3 por hora por email en
+# log; el login correcto borra los fallos de su cuenta.
+# S6 y C9: recuperar usuario (5 cada 15 min por IP, 3 por hora por cuenta en
 # silencio), registro (5 por hora y 20 por día), recuperar contraseña sin
 # pasar el tope con pedidos simultáneos.
 # Eventos: 120 por minuto por ruta; sin sesión, sólo los de la lista.
@@ -15,7 +15,7 @@
 # sha256), se bloquea, no pisa a otra con el mismo comienzo y el login correcto
 # la limpia; una de hasta 300 también.
 # Duración: el bloqueo y el corte por IP de recuperar duran 15 minutos; la
-# ventana por email de recuperar, una hora.
+# ventana por cuenta de recuperar, una hora.
 # Un surrogate suelto o un NUL en login, reset, recuperar o el token de
 # restablecer no da 500, tampoco en el 422.
 #
@@ -125,22 +125,18 @@ sabotaje $M "el 429 del login no deja la IP en el log" \
   '        log_429(request, "login bloqueado")' '        pass' \
   "FAILED $T::test_s4_el_429_del_login_deja_ip_y_entradas_en_el_log"
 sabotaje $M "el login correcto no borra los fallos" \
-  $'# Login exitoso: limpiar intentos fallidos\n    await limites_auth.limpiar(db, clave_intentos)' \
-  $'# Login exitoso: limpiar intentos fallidos\n    pass' \
+  '    await limites_auth.descontar(db, clave_intentos, clave_cuenta)' '    pass' \
   "FAILED $T::test_s4_el_login_correcto_borra_los_fallos" "[401, 429, 429, 429]"
 
 # --- S6: recuperar usuario
 sabotaje $M "recuperar usuario sin límite por IP" \
   '15 * 60) > 5:' '15 * 60) > 10**6:' \
   "FAILED $T::test_los_limites_por_ip_duran_quince_minutos[/auth/recover-username-cuerpo2-200]" "[200, 200, 200, 200, 200, 200]"
-sabotaje $M "recuperar usuario: 4 por hora por email" \
+sabotaje $M "recuperar usuario: 4 por hora por cuenta" \
   '3600) > 3:' '3600) > 4:' \
   "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email" "el cuarto pedido de la hora mandó el mail"
-sabotaje $M "recuperar usuario: pasado el tope por email busca y manda igual" \
-  $'3600) > 3:\n            return mensaje' $'3600) > 3:\n            pass' \
-  "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email" "el cuarto pedido de la hora mandó el mail"
-sabotaje $M "recuperar usuario: la clave por email distingue mayúsculas" \
-  'request.email.strip().lower().encode()' 'request.email.strip().encode()' \
+sabotaje $M "recuperar usuario: pasado el tope por cuenta manda igual" \
+  $'3600) > 3:\n        return mensaje' $'3600) > 3:\n        pass' \
   "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email" "el cuarto pedido de la hora mandó el mail"
 
 # --- C9: registro
@@ -194,9 +190,8 @@ sabotaje $L "la clave larga se corta sin hash" \
 sabotaje $L "segundos_bloqueado no acorta la clave" \
   $'0 si no está bloqueada."""\n    clave = _clave(clave)' $'0 si no está bloqueada."""' \
   "FAILED $T::test_s4_una_ip_larga_tambien_se_bloquea" "[401, 401, 401, 401, 401, 401]"
-sabotaje $L "limpiar no acorta la clave" \
-  '    await db.execute(delete(_T).where(_T.c.clave == _clave(clave)))' \
-  '    await db.execute(delete(_T).where(_T.c.clave == clave))' \
+sabotaje $L "descontar no acorta la clave propia" \
+  '    clave, propia = _clave(clave), _clave(propia)' '    clave, propia = _clave(clave), propia' \
   "FAILED $T::test_s4_el_login_correcto_borra_los_fallos[True]" "[401, 429, 429, 429]"
 sabotaje $L "una clave de hasta 300 entra tal cual" \
   '    if len(clave) <= 120:' '    if len(clave) <= 300:' \
@@ -211,7 +206,7 @@ sabotaje $L "el bloqueo dura un minuto" \
 sabotaje $M "recuperar usuario: el corte por IP dura un minuto" \
   '15 * 60) > 5:' '60) > 5:' \
   "FAILED $T::test_los_limites_por_ip_duran_quince_minutos[/auth/recover-username-cuerpo2-200]"
-sabotaje $M "recuperar usuario: la ventana por email es de un minuto" \
+sabotaje $M "recuperar usuario: la ventana por cuenta es de un minuto" \
   '3600) > 3:' '60) > 3:' \
   "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email"
 

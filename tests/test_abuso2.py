@@ -14,7 +14,7 @@ from sqlalchemy import text
 
 import proyecto_maria.database.connection as conn
 from proyecto_maria.main import app
-from tests.test_abuso1 import CLAVE, _ip, _login
+from tests.test_abuso1 import CLAVE, _ip, _login, reloj  # noqa: F401
 
 
 @pytest.fixture(scope="module")
@@ -47,21 +47,28 @@ def _limites_limpios(monkeypatch):
     limiter.enabled = antes
 
 
-@pytest.mark.parametrize("fallos,quedan", [
+@pytest.mark.parametrize("pasos,quedan", [
     (["otra"] * 4, 1),
     (["nadie"] * 4, 1),
     (["otra", "otra", "propia", "propia"], 3),
     (["propia", "nadie", "propia", "otra"], 3),
     (["propia"] * 4, 5),
-], ids=["otra_cuenta", "usuario_inexistente", "mitad_y_mitad", "intercalados", "solo_propios"])
-def test_login_correcto_perdona_solo_los_fallos_de_su_cuenta(cuentas, fallos, quedan):
-    """Tras los fallos, un login correcto en la cuenta propia; después se
-    cuentan los 401 hasta el 429: son los cinco del tope menos los fallos que
-    la IP hizo fuera de la cuenta propia."""
+    (["otra"] * 3 + ["propia"] * 2 + [16], 2),
+    (["propia"] * 5 + [16, "propia", 16], 5),
+], ids=["otra_cuenta", "usuario_inexistente", "mitad_y_mitad", "intercalados", "solo_propios",
+        "bloqueo_vencido", "mas_propios_que_la_ip"])
+def test_login_correcto_perdona_solo_los_fallos_de_su_cuenta(cuentas, pasos, quedan, reloj):
+    """Fallos (un número son minutos que pasan) y un login correcto en la
+    cuenta propia; después se cuentan los 401 hasta el 429: son los cinco del
+    tope menos los fallos que la IP hizo fuera de la cuenta propia."""
     real, c = _ip(), TestClient(app)
-    for quien in fallos:
-        r = _login(c, cuentas[quien], "mal", real)
-        assert r.status_code == 401, (quien, r.status_code, r.text)
+    reloj()
+    for paso in pasos:
+        if isinstance(paso, int):
+            reloj(paso * 60)
+            continue
+        r = _login(c, cuentas[paso], "mal", real)
+        assert r.status_code == 401, (paso, r.status_code, r.text)
     r = _login(c, cuentas["propia"], CLAVE, real)
     assert r.status_code == 200, (r.status_code, r.text)
     codigos = [_login(c, cuentas["otra"], "mal", real).status_code for _ in range(6)]
