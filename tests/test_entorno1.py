@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -45,26 +46,40 @@ def _sondear(valor, carpeta: Path) -> dict:
 
 @pytest.fixture(scope="module")
 def sondas(tmp_path_factory):
-    return {v: _sondear(v, tmp_path_factory.mktemp("entorno")) for v in CERRADOS + ABIERTOS}
+    # En paralelo: once arranques seguidos pueden pasar el tope de tiempo de la prueba.
+    valores = CERRADOS + ABIERTOS
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        datos = pool.map(lambda v: _sondear(v, tmp_path_factory.mktemp("entorno")), valores)
+    return dict(zip(valores, datos))
+
+
+def _estado(abierta: bool, cerrada: bool) -> str:
+    # Una respuesta que no es ni la abierta ni la cerrada no cuenta como cerrada.
+    return "abierta" if abierta else "cerrada" if cerrada else "sin medir"
 
 
 PUERTAS = {
-    "demo": lambda d: bool(d["demo"]),
-    "login_con_lo_guardado": lambda d: d["login_hash"] == 200,
-    "webhook_sin_secreto": lambda d: d["firma"] is True,
-    "link_de_reset_en_stdout": lambda d: d["link_en_salida"],
-    "cobro_simulado": lambda d: d["cobro"] != 404,
+    "demo": lambda d: _estado(d["demo"] == ["basico", "demo", "premium"], d["demo"] == []),
+    "login_con_lo_guardado": lambda d: _estado(d["login_hash"] == 200, d["login_hash"] == 401),
+    "webhook_sin_secreto": lambda d: _estado(d["firma"] is True, d["firma"] is False),
+    "link_de_reset_en_stdout": lambda d: _estado(bool(d["token"]) and d["link_en_salida"],
+                                                 bool(d["token"]) and not d["link_en_salida"]),
+    "cobro_simulado": lambda d: _estado(d["cobro"] == 200, d["cobro"] == 404),
 }
+
+
+def _distintos(sondas, puerta, valores, esperado):
+    return {v: e for v in valores if (e := PUERTAS[puerta](sondas[v])) != esperado}
 
 
 @pytest.mark.parametrize("puerta", PUERTAS)
 def test_puerta_cerrada_fuera_de_desarrollo(sondas, puerta):
-    abiertas = [v for v in CERRADOS if PUERTAS[puerta](sondas[v])]
-    assert not abiertas, f"{puerta} abre con ENVIRONMENT en {abiertas!r}"
+    otros = _distintos(sondas, puerta, CERRADOS, "cerrada")
+    assert not otros, f"{puerta} no queda cerrada: {otros!r}"
 
 
 @pytest.mark.parametrize("puerta", PUERTAS)
 def test_puerta_abierta_en_desarrollo(sondas, puerta):
     """Contrapunto: la prueba distingue, porque en desarrollo la puerta sigue."""
-    cerradas = [v for v in ABIERTOS if not PUERTAS[puerta](sondas[v])]
-    assert not cerradas, f"{puerta} no abre con ENVIRONMENT en {cerradas!r}"
+    otros = _distintos(sondas, puerta, ABIERTOS, "abierta")
+    assert not otros, f"{puerta} no queda abierta: {otros!r}"

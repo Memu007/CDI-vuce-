@@ -15,7 +15,7 @@ PY="${PY:-python}"
 TMPD="$(mktemp -d)"; WT="$TMPD/wt"
 git -C "$REPO" worktree add --detach "$WT" "$SHA" >/dev/null || exit 2
 trap 'git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMPD"' EXIT
-cd "$WT"
+cd "$WT" || exit 2
 export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
        DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=.
 FALLAS=0
@@ -68,7 +68,7 @@ sabotaje() {
 M=proyecto_maria/main.py
 T=tests/test_entorno1.py
 C="FAILED $T::test_puerta_cerrada_fuera_de_desarrollo"
-VIEJO="ENVIRONMENT en [None, '', 'prod', 'staging', 'Development', ' development', 'TESTING']"
+VIEJO="no queda cerrada: {None: 'abierta', '': 'abierta', 'prod': 'abierta', 'staging': 'abierta', 'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}"
 
 if ! pytest_e1 >"$TMPD/base.log"; then
   echo "BASE  | las pruebas ya están en rojo sin sabotaje: no se puede medir nada"; grep -E "^FAILED" "$TMPD/base.log"; exit 1
@@ -78,42 +78,42 @@ fi
 sabotaje $M "usuarios demo salvo en producción" \
   $'            if not _es_desarrollo():\n                demo_users = []' \
   $'            if IS_PRODUCTION:\n                demo_users = []' \
-  "$C[demo]" "demo abre con $VIEJO"
+  "$C[demo]" "demo $VIEJO"
 sabotaje $M "login con la contraseña guardada salvo en producción" \
   'if not is_valid and _es_desarrollo() and stored_password == password:' \
   'if not is_valid and not IS_PRODUCTION and stored_password == password:' \
-  "$C[login_con_lo_guardado]" "login_con_lo_guardado abre con $VIEJO"
+  "$C[login_con_lo_guardado]" "login_con_lo_guardado $VIEJO"
 sabotaje $M "webhook sin secreto acepta salvo en producción" \
   $'    if not MP_WEBHOOK_SECRET:\n        return _es_desarrollo()' \
   $'    if not MP_WEBHOOK_SECRET:\n        return not IS_PRODUCTION' \
-  "$C[webhook_sin_secreto]" "webhook_sin_secreto abre con $VIEJO"
+  "$C[webhook_sin_secreto]" "webhook_sin_secreto $VIEJO"
 sabotaje $M "link de reset por consola salvo en producción" \
   $'        if not _es_desarrollo():\n            logging.warning("SMTP no configurado' \
   $'        if IS_PRODUCTION:\n            logging.warning("SMTP no configurado' \
-  "$C[link_de_reset_en_stdout]" "link_de_reset_en_stdout abre con $VIEJO"
+  "$C[link_de_reset_en_stdout]" "link_de_reset_en_stdout $VIEJO"
 sabotaje $M "cobro simulado salvo en producción" \
   'if not _es_desarrollo() and os.getenv("ENABLE_SIMULATE_CHARGE"' \
   'if IS_PRODUCTION and os.getenv("ENABLE_SIMULATE_CHARGE"' \
-  "$C[cobro_simulado]" "cobro_simulado abre con $VIEJO"
+  "$C[cobro_simulado]" "cobro_simulado $VIEJO"
 
 # El lugar único: sin mirar mayúsculas ni espacios, o con un valor más.
 sabotaje $M "desarrollo sin mirar mayúsculas ni espacios" \
   'return os.getenv("ENVIRONMENT") in ("development", "test", "testing")' \
   'return (os.getenv("ENVIRONMENT") or "").strip().lower() in ("development", "test", "testing")' \
-  "$C[demo]" "$C[cobro_simulado]" "ENVIRONMENT en ['Development', ' development', 'TESTING']"
+  "$C[demo]" "$C[cobro_simulado]" "cobro_simulado no queda cerrada: {'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}"
 sabotaje $M "staging cuenta como desarrollo" \
   'in ("development", "test", "testing")' 'in ("development", "test", "testing", "staging")' \
-  "$C[webhook_sin_secreto]" "ENVIRONMENT en ['staging']"
+  "$C[webhook_sin_secreto]" "webhook_sin_secreto no queda cerrada: {'staging': 'abierta'}"
 sabotaje $M "variable ausente cuenta como desarrollo" \
   'return os.getenv("ENVIRONMENT") in' 'return os.getenv("ENVIRONMENT", "development") in' \
-  "$C[login_con_lo_guardado]" "ENVIRONMENT en [None]"
+  "$C[login_con_lo_guardado]" "login_con_lo_guardado no queda cerrada: {None: 'abierta'}"
 
 # Contrapunto: si las puertas no abren en ningún lado, la prueba lo ve.
 sabotaje $M "ninguna puerta abre ni en desarrollo" \
   'return os.getenv("ENVIRONMENT") in ("development", "test", "testing")' 'return False' \
   "FAILED $T::test_puerta_abierta_en_desarrollo[demo]" \
   "FAILED $T::test_puerta_abierta_en_desarrollo[cobro_simulado]" \
-  "demo no abre con ENVIRONMENT en ['development', 'test', 'testing']"
+  "demo no queda abierta: {'development': 'cerrada', 'test': 'cerrada', 'testing': 'cerrada'}"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

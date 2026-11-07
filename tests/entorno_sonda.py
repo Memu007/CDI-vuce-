@@ -5,6 +5,11 @@ import asyncio
 import json
 import sys
 
+import dotenv
+
+# Un .env local no completa las variables que la prueba deja afuera a propósito.
+dotenv.load_dotenv = lambda *a, **k: False
+
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from starlette.requests import Request
@@ -22,7 +27,8 @@ async def _consultar(fn):
 async def _crear_usuario():
     async def crear(s):
         s.add(User(username="sonda", email="sonda@example.com", name="Sonda",
-                   password=m.hash_password("Clave-sonda-1"), is_verified=True))
+                   password=m.hash_password("Clave-sonda-1"), is_verified=True,
+                   billing_status="trial", payment_method_last4="4242"))
         await s.commit()
         return (await s.execute(select(User.password).where(User.username == "sonda"))).scalar_one()
     return await _consultar(crear)
