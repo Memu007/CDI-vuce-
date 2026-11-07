@@ -55,8 +55,9 @@ def _limites_limpios(monkeypatch):
     (["propia"] * 4, 5),
     (["otra"] * 3 + ["propia"] * 2 + [16], 2),
     (["propia"] * 5 + [16, "propia", 16], 5),
+    (["propia"] * 5 + [16, "otra", 16], 4),
 ], ids=["otra_cuenta", "usuario_inexistente", "mitad_y_mitad", "intercalados", "solo_propios",
-        "bloqueo_vencido", "mas_propios_que_la_ip"])
+        "bloqueo_vencido", "mas_propios_que_la_ip", "ajeno_tras_el_bloqueo"])
 def test_login_correcto_perdona_solo_los_fallos_de_su_cuenta(cuentas, pasos, quedan, reloj):
     """Fallos (un número son minutos que pasan) y un login correcto en la
     cuenta propia; después se cuentan los 401 hasta el 429: son los cinco del
