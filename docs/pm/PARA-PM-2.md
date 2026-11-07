@@ -8,7 +8,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 |---|---|
 | Producto | `118447a` (puertas), `dcc9bd5` (clave JWT) |
 | Pruebas y negativos | `d74a5df`, `66df521`, `e358942`, `86b9240`, `a767154`, `8082c99`, `d985df1`, `b907e96`, `83085e4` |
-| Suite completa | sobre `83085e4` |
+| Suite completa | sobre `83085e4`: `5017 passed, 335 skipped, 3 xfailed` en 12:48, 0 failed |
 | Informe | el commit `docs:` que sigue a `83085e4` |
 
 **Resultado.** Hay un solo lugar que dice «esto es desarrollo»:
@@ -179,8 +179,8 @@ mi prueba.
 
 | Puerta | Sobre | Resultado |
 |---|---|---|
-| `pytest` completo | `83085e4`, worktree limpio | corriendo: el resultado va en el commit siguiente |
-| `tests/test_entorno1.py` | `83085e4` | se corre solo después de la suite |
+| `pytest` completo | `83085e4`, worktree limpio | `5017 passed, 335 skipped, 3 xfailed, 99 warnings in 768.46s (0:12:48)` |
+| `tests/test_entorno1.py` | `83085e4` | `12 passed, 3 warnings in 11.90s` |
 | `compileall -q proyecto_maria` | `83085e4` | salida 0 |
 | sabotajes `entorno1.sh` | `83085e4` | 10 ROJO, 0 sin rojo |
 | sabotajes `cobro_mp2.sh` | `83085e4` | 23 ROJO, 0 con falla |
