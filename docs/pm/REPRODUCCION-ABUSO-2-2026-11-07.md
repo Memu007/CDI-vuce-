@@ -56,7 +56,7 @@ y M14 es equivalente al código.
 |---|---|
 | chequeo-6 `0c4893b..1f79a8e` | producto +0/−0, arnés +86/−9, avisos 0: igual que el informe |
 | `test_abuso2.py` + `test_abuso1.py` | `90 passed` |
-| `abuso2.sh 1f79a8e` (con `PG_URL`) | (corriendo: el resultado va en el commit siguiente) |
+| `abuso2.sh 1f79a8e` (con `PG_URL`) | 20 ROJO (también el de Postgres), `fallas: 0` |
 | Mi ejemplo distinto: `descontar` resta `n − 1` | `7 failed, 83 passed`: lo ve |
 | Mi ejemplo distinto: el `delete` de lo propio por prefijo (`like propia%`) | `90 passed`: no lo ve |
 

@@ -213,7 +213,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-08 00:10 UTC: **ABUSO-2 aceptada** (`1f79a8e`, MARIA, sólo pruebas, sin integrar): las cinco mutaciones en rojo, (corriendo: el resultado va en el commit siguiente); mi `n − 1` cae, un `delete` por prefijo queda verde como riesgo. Técnica sin entrega nueva (espera sus sabotajes de COBRO). Contextos bajo 145k.
+2026-11-08 00:10 UTC: **ABUSO-2 aceptada** (`1f79a8e`, MARIA, sólo pruebas, sin integrar): las cinco mutaciones en rojo, 20 ROJO (también el de Postgres), `fallas: 0`; mi `n − 1` cae, un `delete` por prefijo queda verde como riesgo. Técnica sin entrega nueva (espera sus sabotajes de COBRO). Contextos bajo 145k.
 2026-11-07 23:15 UTC: **ENTRADAS-1 aceptada** (`c839197`, MARIA, sólo pruebas, sin integrar): 32 sabotajes en rojo (antes 22), los cuatro de la devolución caen; mi ejemplo distinto también.
 2026-11-07 22:55 UTC: **rojo de `despacho1b` aceptado** (`d69233c`, MARIA, sólo prueba, sin integrar): el recolector sobre la memoria de la suite se come el tope; medido 0,53 s y 0 con `gc.freeze`. D106 (a).
 2026-11-07 22:40 UTC: **ABUSO-2 devolución sólo de pruebas** (`8ad47ee`, MARIA): producto bien (83 passed, 9 sabotajes en rojo, Opus sin nada serio); reproduje dos mutaciones de `descontar` en verde (resta de todas las claves, perdona dos veces). D105 (a).

@@ -81,7 +81,7 @@ primero, después ENTORNO-2. Próxima D: D107.
 
 Producto `8ad47ee`, pruebas `22a2c4b`, `b6ad266` y `1f79a8e`. Reproducido
 igual al informe: chequeo-6 (`+0/−0` de producto, avisos 0), `90 passed` y
-`abuso2.sh` (corriendo: el resultado va en el commit siguiente). Mi ejemplo distinto (`descontar` resta `n − 1`)
+`abuso2.sh` 20 ROJO (también el de Postgres), `fallas: 0`. Mi ejemplo distinto (`descontar` resta `n − 1`)
 cae en 7 casos. Acta: `REPRODUCCION-ABUSO-2-2026-11-07.md`.
 
 Riesgo, no devolución: un `delete` de lo propio por prefijo pasa en verde
