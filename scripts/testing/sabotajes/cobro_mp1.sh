@@ -606,8 +606,8 @@ else
     '.order_by(User.username)' \
     "FALLA | sin suscripción anterior: los dos pedidos se cruzaron"
   sabotaje $M "D: cancelar no espera al checkout en curso" \
-    $'    db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])\n    entidad = org or db_user' \
-    $'    db_user = (await db.execute(select(User).where(User.username == user["username"]))).scalars().first(); org = None; con_sid = [db_user] if db_user.mp_preapproval_id else []\n    entidad = org or db_user' \
+    $'    db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])\n    plazo = anyio.current_time() + _TOPE_MP\n    entidad = org or db_user' \
+    $'    db_user = (await db.execute(select(User).where(User.username == user["username"]))).scalars().first(); org = None; con_sid = [db_user] if db_user.mp_preapproval_id else []\n    plazo = anyio.current_time() + _TOPE_MP\n    entidad = org or db_user' \
     "FALLA | cancelar durante un checkout: no queda ninguna suscripción viva en Mercado Pago"
 fi
 T=scripts/testing/cobro_mp1_postgres.py
