@@ -6,7 +6,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 > ENTORNO-1, que arranco ahora. ABUSO-1 va encima, sobre la devolución de
 > `43916a7`.
 
-## ABUSO-1: **entregada**. Producto `1880c98`, `9ef6c73`, `55bf408`; pruebas `1119901`, `3f0eeab`, `cf45cd4`, `8a363eb`, `1b48774`; informe en el commit siguiente. SHA entregado `55bf408` (2026-11-07)
+## ABUSO-1: **entregada**. Producto `1880c98`, `9ef6c73`, `55bf408`; pruebas `1119901`, `3f0eeab`, `cf45cd4`, `8a363eb`, `1b48774`; informe `74c218c` y el commit siguiente. SHA entregado `55bf408` (2026-11-07)
 
 **Resultado.** Los cuatro puntos de la devolución tienen prueba que distingue
 el defecto y sabotaje con rojo:
@@ -62,7 +62,7 @@ Suma +15 netas, así que no hace falta la línea de §6 por pasar de 20.
    igual.
 3. **El 422 ASCII vale para todas las rutas**, no sólo las de auth. El JSON
    es equivalente, pero un carácter no ASCII sale como `\uXXXX`. Ninguna
-   prueba de la suite dependía de eso (ver la fila de la suite en Puertas).
+   prueba de la suite dependía de eso (la suite pasa entera, ver Puertas).
 
 ## Decisiones
 
@@ -182,7 +182,7 @@ La base es `1f48bb5`, el merge de tu rama sobre el que arranqué. Con
 | `pytest tests/test_abuso1.py` | 72 passed, 3 warnings in 21.59s |
 | Motores PG (`abuso1_motores.py pg`, 55432) | «pg: todo OK» |
 | Sabotajes (`abuso1.sh`) | 35 ROJO, «sabotajes sin rojo: 0» |
-| Suite completa, worktree limpio en `55bf408` | Corriendo; la línea final va en el commit siguiente, antes del aviso |
+| Suite completa, worktree limpio en `55bf408` | «5005 passed, 335 skipped, 3 xfailed, 92 warnings in 769.56s (0:12:49)», salida=0. Al final avisa «Task was destroyed but it is pending!» (el cierre de asyncio de la suite), que no es un fallo |
 | `smoke_friccion.sh`, `ataque_aislamiento.sh` | No corridos: el cambio es de validación de entrada en auth, sin datos ni permisos entre clientes |
 
 ## Comandos copiables
