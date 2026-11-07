@@ -213,6 +213,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-07 15:57 UTC: vuelta. Sin entregas nuevas (MARIA en `50e1c8f`, técnica en `f283e64`, las dos trabajando). Límite `allowed`. MARIA con ventana de 1M (448k usados, otro modelo servido): pedido a Emi `/autocompact 200k` en ese chat. D62 ya contestada.
 2026-11-07 15:52 UTC: **RETOMADO por 24 h** (Emi, sabiendo que pasó el 50 %): tres rutinas prendidas, Devs despertadas (MARIA ABUSO-1; técnica devolución de COBRO-MP-2 y VALIDACION-1). Corte el 08/11 15:50 UTC por `trig_01QwEeyuXBFBx6LErxqapwRh`: lo en curso se termina.
 2026-11-06 12:35 UTC: **CATALOGO-LARGO-2 aceptada** (`d5bc7c1`, pruebas `b0bbd8c`, MARIA, sin integrar por `e0b8626`): 40 passed, PG `fallas: 0`, 37 sabotajes en rojo sin falla, suite con sólo los 5 de D73; Opus y Sonnet alto sin 500 nuevo ni pérdida. D84 a D87 (a); seis bajas a la cola; el aviso de qué producto no se aprendió va a CATALOGO-3. Emi: sí a VALIDACION-1 (técnica, tras COBRO-MP-2) y a que la sesión de limpieza siga ordenando el repo en tandas chicas que reviso yo.
 2026-11-06 11:40 UTC: **COBRO-MP-2 vuelve con devolución** (`4f1822f`): una sola cuenta aguanta (55 passed, Postgres sin fallas, Opus y Sonnet sin cobro doble ni días perdidos). Vuelve por el estudio: reactivar sin permiso, checkout que cancela la pausada que paga, no se puede sacar a quien dejó una pendiente, «Próximo cobro» según quién mira, espera sin tope con MP caído. D62 (a).
