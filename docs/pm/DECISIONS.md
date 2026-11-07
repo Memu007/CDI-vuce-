@@ -455,3 +455,7 @@ Rojo de `despacho1b` aceptado sobre `d69233c` (sólo prueba, sin integrar). D106
 ### 2026-11-07 23:15 UTC (PM principal)
 
 ENTRADAS-1 aceptada sobre `c839197` (vuelta sólo de pruebas), sin integrar porque la rama lleva debajo piezas en devolución.
+
+### 2026-11-08 00:10 UTC (PM principal)
+
+ABUSO-2 aceptada sobre `1f79a8e` (vuelta sólo de pruebas; producto `8ad47ee`), sin integrar porque la rama lleva debajo piezas en devolución. Riesgo decidido por la PM: el `delete` de lo propio por prefijo no tiene prueba; hoy no tiene camino.
