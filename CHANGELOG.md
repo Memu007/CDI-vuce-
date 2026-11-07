@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-07 · fix: cancelar sin respuesta de Mercado Pago no afirma que el plan sigue igual (COBRO-MP-2)
+
+- **fix(cobro):** si Mercado Pago no contesta a tiempo al cancelar, el aviso dice que no se pudo confirmar la cancelación, sin afirmar que el plan sigue igual: Mercado Pago pudo haberla cancelado.
+
 ## 2026-11-07 · fix: la validación sale de la carga que se ve (VALIDACION-1)
 
 - **fix(validación):** al pasar de una carga a otra en menos de un minuto, el panel, el botón «Generar» y lo que se guarda en el historial ya no muestran ni usan la validación de la carga anterior, aunque ésa conteste después o el validador falle.

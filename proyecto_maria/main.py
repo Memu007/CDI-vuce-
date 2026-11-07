@@ -2097,7 +2097,7 @@ async def cancel_billing(
     db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])
     plazo = anyio.current_time() + _TOPE_MP
     entidad = org or db_user
-    no_se_pudo = "No se pudo cancelar en Mercado Pago; tu plan sigue igual. Probá de nuevo en unos minutos."
+    no_se_pudo = "No se pudo confirmar la cancelación en Mercado Pago. Probá de nuevo en unos minutos."
     paga = await _quien_toca_el_plan(db_user, org, con_sid, "cancelar el plan", no_se_pudo, plazo)
 
     if entidad.billing_status not in ("trial", "active", "past_due") and not con_sid:
