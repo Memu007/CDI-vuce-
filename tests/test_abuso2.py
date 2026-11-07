@@ -58,19 +58,29 @@ def _limites_limpios(monkeypatch):
     (["propia"] * 5 + [16, "otra", 16], 4),
     (["propia"] * 3 + [23 * 60, "propia", "propia", 61], 5),
     (["propia@otra_ip"] * 5 + ["otra"] * 4, 1),
+    (["otra", "otra", "propia", "propia", "bien"], 3),
+    (["propia", "propia", 23 * 60, "otra", "otra", 61], 1),
+    (["propia", "otra", 24 * 60 + 1], 5),
+    (["propia", "propia", 23 * 60], 5),
+    (["otra", "otra", 23 * 60], 3),
 ], ids=["otra_cuenta", "usuario_inexistente", "mitad_y_mitad", "intercalados", "solo_propios",
         "bloqueo_vencido", "mas_propios_que_la_ip", "ajeno_tras_el_bloqueo",
-        "fallos_propios_de_mas_de_un_dia", "fallos_propios_desde_otra_ip"])
+        "fallos_propios_de_mas_de_un_dia", "fallos_propios_desde_otra_ip",
+        "dos_logins_seguidos", "propios_vencidos_con_la_ip_viva", "los_dos_olvidan_al_dia",
+        "la_cuenta_recuerda_un_dia", "la_ip_recuerda_un_dia"])
 def test_login_correcto_perdona_solo_los_fallos_de_su_cuenta(cuentas, pasos, quedan, reloj):
-    """Fallos (un número son minutos que pasan; `@otra_ip`, desde otra IP) y un
-    login correcto en la cuenta propia; después se cuentan los 401 hasta el
-    429: son los cinco del tope menos los fallos que la IP hizo fuera de la
-    cuenta propia."""
+    """Fallos (un número son minutos que pasan; `@otra_ip`, desde otra IP;
+    `bien`, un login correcto más) y un login correcto en la cuenta propia;
+    después se cuentan los 401 hasta el 429: son los cinco del tope menos los
+    fallos que la IP todavía recuerda fuera de lo propio no vencido."""
     real, lejos, c = _ip(), _ip(), TestClient(app)
     reloj()
     for paso in pasos:
         if isinstance(paso, int):
             reloj(paso * 60)
+            continue
+        if paso == "bien":
+            assert _login(c, cuentas["propia"], CLAVE, real).status_code == 200
             continue
         cuenta, _, otra_ip = paso.partition("@")
         r = _login(c, cuentas[cuenta], "mal", lejos if otra_ip else real)
@@ -79,6 +89,37 @@ def test_login_correcto_perdona_solo_los_fallos_de_su_cuenta(cuentas, pasos, que
     assert r.status_code == 200, (r.status_code, r.text)
     codigos = [_login(c, cuentas["otra"], "mal", real).status_code for _ in range(6)]
     assert codigos == [401] * quedan + [429] * (6 - quedan), codigos
+
+
+def _filas():
+    async def _leer():
+        async with conn.AsyncSessionLocal() as s:
+            r = await s.execute(text("select clave, cuenta, bloqueado_hasta, vence from limites_auth"))
+            return {clave: resto for clave, *resto in r.all()}
+    return asyncio.run(_leer())
+
+
+def test_un_login_correcto_no_cambia_otras_claves(cuentas):
+    """Fuera de la fila de su IP y la de su cuenta en esa IP, el login correcto
+    deja la tabla como estaba: otras IPs, otras cuentas, recuperar y registro."""
+    from proyecto_maria.core import limites_auth
+    real, lejos, c = _ip(), _ip(), TestClient(app)
+    propia, otra = cuentas["propia"], cuentas["otra"]
+    for cuenta, ip in [(propia, lejos), (otra, real), (propia, real), (propia, real)]:
+        assert _login(c, cuenta, "mal", ip).status_code == 401
+    ajenas = [f"recuperar:cuenta:{propia}", f"recuperar:ip:{real}", f"registro:h:{real}", f"pwd:{propia}"]
+
+    async def _sumar():
+        async with conn.AsyncSessionLocal() as s:
+            for clave in ajenas * 3:
+                await limites_auth.contar(s, clave, 3600)
+    asyncio.run(_sumar())
+    suyas = {f"login:{real}", f"cuenta:{propia}:login:{real}"}
+    antes = {k: v for k, v in _filas().items() if k not in suyas}
+    assert set(antes) == {f"login:{lejos}", f"cuenta:{propia}:login:{lejos}",
+                          f"cuenta:{otra}:login:{real}", *ajenas}
+    assert _login(c, propia, CLAVE, real).status_code == 200
+    assert {k: v for k, v in _filas().items() if k not in suyas} == antes
 
 
 def test_descontar_no_deja_la_ip_en_negativo(reloj):

@@ -85,6 +85,21 @@ sabotaje $L "descontar deja la IP en negativo" "FAILED $T::test_descontar_no_dej
   'case((_T.c.cuenta > n, _T.c.cuenta - n), else_=0)' '_T.c.cuenta - n'
 sabotaje $M "el login cuenta los fallos de la IP con el tope de recuperar" "$P[ajeno_tras_el_bloqueo]" \
   'sumar_fallo(db, clave_intentos, exacta=True)' 'sumar_fallo(db, clave_intentos)'
+sabotaje $L "descontar resta en todas las claves" "FAILED $T::test_un_login_correcto_no_cambia_otras_claves" \
+  'update(_T).where(_T.c.clave == clave).values(' 'update(_T).values('
+sabotaje $L "descontar lee lo propio y no lo borra" "$P[dos_logins_seguidos]" \
+  'delete(_T).where(_T.c.clave == propia).returning(_T.c.cuenta)' \
+  'select(_T.c.cuenta).where(_T.c.clave == propia)'
+sabotaje $L "descontar resta lo propio vencido" "$P[propios_vencidos_con_la_ip_viva]" \
+  $'    await db.execute(delete(_T).where(_T.c.vence <= ahora))\n    n =' '    n ='
+sabotaje $M "la cuenta olvida a las 48 h" "$P[propios_vencidos_con_la_ip_viva]" \
+  'sumar_fallo(db, clave_cuenta, exacta=True)' 'sumar_fallo(db, clave_cuenta, exacta=True, olvido=48 * 3600)'
+sabotaje $M "la cuenta olvida a las 12 h" "$P[la_cuenta_recuerda_un_dia]" \
+  'sumar_fallo(db, clave_cuenta, exacta=True)' 'sumar_fallo(db, clave_cuenta, exacta=True, olvido=12 * 3600)'
+sabotaje $M "la IP olvida a las 48 h" "$P[los_dos_olvidan_al_dia]" \
+  'sumar_fallo(db, clave_intentos, exacta=True)' 'sumar_fallo(db, clave_intentos, exacta=True, olvido=48 * 3600)'
+sabotaje $M "la IP olvida a las 12 h" "$P[la_ip_recuerda_un_dia]" \
+  'sumar_fallo(db, clave_intentos, exacta=True)' 'sumar_fallo(db, clave_intentos, exacta=True, olvido=12 * 3600)'
 
 # --- recuperar usuario: el tope va por la cuenta, no por el texto
 T=tests/test_abuso1.py
