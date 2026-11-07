@@ -69,6 +69,38 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## ABUSO-2: devolución sólo de pruebas, sobre `8ad47ee` (2026-11-07 PM)
+
+Reproducido igual al informe: chequeo-6 (`+35/−24`, avisos 0), `83 passed`,
+`abuso2.sh` 9 en rojo con `fallas: 0`. **El producto queda como está.** Acta:
+`REPRODUCCION-ABUSO-2-2026-11-07.md`.
+
+**Causa:** las pruebas de `descontar` miran sólo que la cuenta que entra
+recupere su lugar, no que el perdón sea exactamente lo propio, una vez y en
+la misma ventana. Reproducido por mí, con `83 passed` cada uno:
+
+1. Sacar el `where clave == clave` del `update`: el login correcto resta de
+   todas las filas (otras IPs, `recuperar:*`, `registro:*`).
+2. Leer la fila propia con `select` en vez de borrarla: cada login correcto
+   repetido vuelve a restar.
+
+La familia (Sonnet alto, también en verde): la cuenta que olvida a las 48 h,
+lo vencido sin purgar antes de restar, la IP con otra ventana que la cuenta.
+Pedido: un caso por causa donde la familia va como datos. Un login correcto
+no cambia ninguna otra clave; dos logins correctos seguidos perdonan una sola
+vez; lo propio vencido no se resta; la cuenta y la IP olvidan juntas. Commits
+sólo de pruebas y sabotajes; el informe muestra cada mutación en rojo.
+
+- **D105: (a), decidido por la PM.** Queda como riesgo: un mail menos por
+  hora para quien pidió, y (b) reabre el salto por muchas IPs.
+- Riesgos que quedan (Opus alto): con cuentas duplicadas por mayúsculas del
+  email, recuperar manda 3 mails por cuenta; el tope de recuperar es de
+  ventana fija (de antes).
+
+Tu orden: **esta devolución** → el rojo de `despacho1b` → ENTORNO-2 → D100 →
+ENTRADAS-2 → el resto. La vuelta de ENTRADAS-1 (`c839197`) la estoy
+revisando. Próxima D: D106.
+
 ## ENTRADAS-1: devolución sólo de pruebas, sobre `589fd0b` (2026-11-07 PM)
 
 Reproducido igual al informe: chequeo-6 (+27 explicado, aceptado), `68
@@ -112,8 +144,7 @@ mutación de arriba en rojo.
   texto), ni `agrupar` con más ítems de los que acepta el driver. Incluye
   D101.
 
-Tu orden: **esta devolución** → ABUSO-2 → el rojo de `despacho1b` →
-ENTORNO-2 → D100 → ENTRADAS-2 → el resto. Próxima D: D105.
+La vuelta (`c839197`) está en revisión.
 
 ## ENTORNO-1: aceptada sobre `83085e4`, sin integrar (2026-11-07 PM)
 
