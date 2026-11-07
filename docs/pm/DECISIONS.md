@@ -435,3 +435,7 @@ ABUSO-1 aceptada sobre `55bf408`, sin integrar por `e0b8626`; supuestos 1 a 3 de
 ### 2026-11-07 19:20 UTC (PM principal)
 
 ENTORNO-1 aceptada sobre `83085e4`, sin integrar por `e0b8626`; supuestos S1 a S4 aceptados. D97 (a) y D98 (a), decididas por la PM: pieza nueva ENTORNO-2 (MARIA, después de ABUSO-2) bajo «arreglos chicos de seguridad a cero» (Emi). D99 a Emi: si producción arrancó alguna vez sin `ENVIRONMENT=production`, pueden existir `demo`/`premium`/`basico`; ver usuarios. Acta: `REPRODUCCION-ENTORNO-1-2026-11-07.md`.
+
+### 2026-11-07 20:45 UTC (PM principal)
+
+ENTRADAS-1: devolución sólo de pruebas sobre `589fd0b`; producto sin cambios, supuestos S1 a S6 aceptados. Decididas por la PM: D100 (a) pieza FRONT-422; D101 (a) dentro de ENTRADAS-2; D102 (a) chore de fijar `bcrypt`; D103 (a) cola de limpieza; D104 (a) pieza nueva ENTRADAS-2 (operación manual, clientes, NUL en parámetros de ruta, agrupar con más ítems que el driver), bajo «arreglos chicos de seguridad a cero».

@@ -69,6 +69,52 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## ENTRADAS-1: devolución sólo de pruebas, sobre `589fd0b` (2026-11-07 PM)
+
+Reproducido igual al informe: chequeo-6 (+27 explicado, aceptado), `68
+passed`, Postgres `fallas: 0`, `entradas1.sh` 22 en rojo; suite `1 failed, 5070 passed` igual a la tuya (el rojo de `despacho1b`). Login
+y `current_password` con claves rotas dan 401/400. Opus alto: sin 500 nuevo
+ni regresión de acceso. **El producto queda como está.** Acta:
+`REPRODUCCION-ENTRADAS-1-2026-11-07.md`. **Supuestos S1 a S6: aceptados.**
+
+**Causa de la devolución:** las pruebas miran «no es 500» y no la propiedad
+que la pieza promete, así que daños reales del arreglo pasan en verde. Sonnet
+alto, con mutaciones sobre una copia, obtuvo `54 passed` con cada una:
+
+1. El 422 devuelve la clave en `input` o la pega en `msg`. Pedido: ninguna
+   respuesta de las cuatro vías contiene la clave enviada (`not in r.text`).
+2. `> 72` cambiado por `> 73`. Pedido: caso de 73 bytes justos, también
+   con un carácter multibyte que cruza el borde.
+3. `\x00` sacado de `_NO_GUARDABLE_EN_PG`: ningún caso de texto cae, porque
+   SQLite guarda el NUL. Pedido: los casos de texto miran lo guardado (sin
+   NUL ni surrogate, con «�»), no sólo el código; un sabotaje del NUL.
+4. El handler 422 vuelto a `JSONResponse`, o `allow_nan=True`. Pedido: un
+   caso que los distinga.
+
+La familia: cada regla que la pieza agrega tiene un caso que cae si esa regla
+se afloja. Commits sólo de pruebas y sabotajes; el informe muestra cada
+mutación de arriba en rojo.
+
+- **D100: (a), decidido por la PM.** Pieza chica de frontend después de
+  ENTORNO-2: un 422 con `detail` en lista muestra su `msg` en español, en
+  todas las pantallas.
+- **D101: (a), decidido por la PM.** Va con ENTRADAS-2: la misma política
+  de clave en registro y alta de estudio.
+- **D102: (a), decidido por la PM.** Chore aparte: fijar `bcrypt` en
+  `requirements`, con la versión que ya corre la suite.
+- **D103: (a).** A la cola de limpieza, junto con el username que acepta
+  un `\n` final (`re.match` con `$`), registro y alta de estudio.
+- **D104: (a), pieza nueva ENTRADAS-2**, después de ENTORNO-2. Ningún texto
+  o número de afuera da 500 en Postgres en la operación manual y en clientes
+  (números finitos, texto guardable, rango int32), **ni un NUL en un
+  parámetro de ruta** (Opus lo dio en `GET /api/invitations/{token}` sin
+  sesión, `agrupar` y `desagrupar`; la familia son las rutas con path de
+  texto), ni `agrupar` con más ítems de los que acepta el driver. Incluye
+  D101.
+
+Tu orden: **esta devolución** → ABUSO-2 → el rojo de `despacho1b` →
+ENTORNO-2 → D100 → ENTRADAS-2 → el resto. Próxima D: D105.
+
 ## ENTORNO-1: aceptada sobre `83085e4`, sin integrar (2026-11-07 PM)
 
 Reproducido: chequeo-6 igual al informe, `82 passed`, `entorno1.sh` 10 en
@@ -91,30 +137,8 @@ abre ninguna puerta; nada serio introducido. Acta:
 - A la cola de limpieza: los parches de `IS_PRODUCTION` en `test_email1` y
   la clase tautológica de `test_prelaunch_block3`.
 
-Tu orden: ENTRADAS-1 → ABUSO-2 → el rojo de `despacho1b` (falló una vez en
-la suite entera y pasa solo; diagnosticar la causa, el diff no toca el
-lector) → ENTORNO-2 → el resto de la cola. Próxima D: D100.
-
-## RESET-2: aceptada sobre `99d3f69`, sin integrar (2026-11-06 PM)
-
-Reproducido: `test_email1` + `test_reset1` `32 passed`, rojo con la puerta
-vieja `2 failed`, y un negativo propio con `ENVIRONMENT` ausente,
-`development`, `test` y `Testing`: ninguno da la pista. Acta:
-`REPRODUCCION-RESET-2-2026-11-06.md`.
-
-- **D91 y D92: decidido por la PM, pieza nueva ENTORNO-1** (seguridad chica,
-  Emi: «a cero»). Va **después de ABUSO-1**, sin cortarla. Comportamiento
-  pedido: con `ENVIRONMENT` ausente o con un valor que no sea uno conocido,
-  no se abre ninguna puerta de desarrollo: el login no acepta la contraseña
-  guardada tal cual, no se crean usuarios demo, el webhook de MP sin secreto
-  no acepta firmas cualquiera y el link de reset no sale por stdout. Prueba:
-  un caso por causa, con la familia de valores de `ENVIRONMENT` como datos,
-  y el rojo con cada puerta vieja. Sugerencia (no es criterio): un solo
-  lugar que diga «esto es desarrollo» y que exija el valor explícito.
-  Revisión más fuerte: toca autenticación y dinero.
-- **D93: (a).** El script manual usa `ENVIRONMENT=testing`; no se toca.
-
-Tu orden: ENTORNO-1 → el resto de la cola (ver ABUSO-1 arriba).
+El rojo de `despacho1b`: falló una vez en la suite entera y pasa solo;
+diagnosticar la causa (el diff no toca el lector).
 
 ## PYPDF-1: aceptada sobre `974263e`, sin integrar (2026-11-06 PM)
 
