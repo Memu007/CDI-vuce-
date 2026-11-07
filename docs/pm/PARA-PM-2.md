@@ -2,77 +2,100 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## Rojo de `despacho1b`: **diagnosticado y entregado**. Prueba en `d69233c`, más este informe (2026-11-07)
+## ABUSO-2, devolución: **entregada**. Sólo pruebas y sabotajes, en `22a2c4b`, `b6ad266` y `1f79a8e`, más este informe (2026-11-07)
 
 | Qué | SHAs |
 |---|---|
-| Prueba | `d69233c` (sólo `tests/test_despacho1b.py`) |
-| Producto | ninguno |
-| Informe | el commit `docs:` que sigue a `d69233c` |
-| Base | `9417c3b` |
+| Pruebas y sabotajes | `22a2c4b`, `b6ad266`, `1f79a8e` (sólo `tests/test_abuso2.py` y `scripts/testing/sabotajes/abuso2.sh`) |
+| Producto | ninguno: `producto +0/−0` |
+| Informe | el commit `docs:` que sigue a `1f79a8e` |
+| Base | `0c4893b` |
 
-**Causa.** Es la memoria de la suite, por el recolector de basura. No es el orden de los casos, no son hilos y no es el producto.
-- `test_las_hojas_leidas_antes_del_corte_dan_sus_productos` llama a `leer_despacho` dentro del proceso de pytest, con `limite_cpu_s=1.0`. El corte de extraer llega a los 0,8 s, porque `_PARTE_PARA_EXTRAER = 0.8`. Para entender el texto quedan unos 0,2 s, y el caso gasta 50 ms a propósito.
-- En la suite entera quedan millones de objetos vivos. Una pasada completa del recolector (generación 2) sobre esa memoria cuesta **0,608 s de CPU**, medido con `gc.callbacks` y 3 millones de objetos. Si esa pasada cae entre el corte y el final de `leer_texto`, se come el tope que queda. Sale exactamente tu rojo: renglones vacíos, «leí hasta la hoja 2» y «no pude leer sus productos».
-- Por eso pasa solo y con su archivo, y en la suite a veces sí y a veces no: depende de si la pasada cae en esa ventana. Con memoria chica, cada pasada cuesta de 36 a 80 ms.
-- Tu prueba con un hilo girando no lo reproducía porque la causa no es CPU de otros hilos.
+**Resultado.** Las cinco mutaciones que pediste dan rojo, cada una en el caso de su causa, y `abuso2.sh` termina con `fallas: 0` (salida abajo).
 
-**Por qué el producto no cambia.** En producción `leer_despacho` sólo corre en el proceso aparte (`_MODOS["leer"]`, lanzado por `_leer_aparte`), que arranca con poca memoria. Busqué los usos en `proyecto_maria/` y no hay otra llamada.
+**Cómo quedaron los casos**, un caso por causa, con la familia como datos:
+- `test_login_correcto_perdona_solo_los_fallos_de_su_cuenta`: 16 filas. Cada fila es una lista de pasos y cuántos 401 quedan antes del 429. Las filas nuevas:
+  - `dos_logins_seguidos`: dos logins correctos perdonan una sola vez.
+  - `propios_vencidos_con_la_ip_viva`: lo propio vencido no se resta.
+  - `los_dos_olvidan_al_dia`, `la_cuenta_recuerda_un_dia` y `la_ip_recuerda_un_dia`: la cuenta y la IP olvidan juntas, a las 24 h y no antes.
+  - `fallos_con_el_email`: los fallos tipeando el email se perdonan al entrar con el usuario.
+- `test_un_login_correcto_no_cambia_otras_claves` lee la tabla entera antes y después del login correcto. Sólo cambia la fila de la IP, y de ella sólo `cuenta`, que baja en lo propio. No cambian `bloqueado_hasta` ni `vence`, ni las otras claves: otra IP, otra cuenta, recuperar (cuenta e IP), registro (hora y día), reset y cambio de clave.
 
-**Arreglo (sólo prueba).** El caso envuelve la llamada con `gc.freeze()` / `gc.unfreeze()`. Así lo que heredó de la suite no entra en la pasada, y las pasadas del propio lector siguen contando, como en el proceso aparte.
+Nada para decidir. D105 y D106 ya están decididas (a). Próxima D libre: D107.
 
-**Evidencia** (un fixture, justo antes del caso, deja vivos 3 millones de dicts con una lista cada uno; 6 corridas por brazo; lo corrí tres veces, la última con el bloque de «Comandos copiables» tal cual, y dio lo mismo):
+## Tus mutaciones, en rojo
 
-| | resultado |
-|---|---|
-| sin memoria extra, sin arreglo | `1 passed` |
-| 3 M objetos, sin arreglo | `3 failed`, `3 passed` |
-| 3 M objetos, con arreglo | `6 passed` |
-| 3 M objetos + `gc.freeze` desde afuera, sin arreglo | 6 de 6 lecturas con los 3 renglones (medido en el script) |
+Copiado de la salida de `abuso2.sh 1f79a8e`:
 
-Las 6 corridas por brazo no son repetir hasta el verde: cambia una sola variable, la memoria. El rojo sin arreglo no sale siempre, porque depende de dónde cae la pasada del recolector.
+| Tu mutación | Sabotaje | Rojo |
+|---|---|---|
+| M2, `update` sin `where clave == clave` | «descontar resta en todas las claves» | `ROJO`, `test_un_login_correcto_no_cambia_otras_claves` |
+| M5, `select` en vez de `delete … returning` | «descontar lee lo propio y no lo borra» | `ROJO`, `test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[dos_logins_seguidos]` |
+| M1, sin purga | «descontar resta lo propio vencido» | `ROJO`, `test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[propios_vencidos_con_la_ip_viva]` |
+| M8b, la cuenta olvida a las 48 h | «la cuenta olvida a las 48 h» | `ROJO`, `test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[propios_vencidos_con_la_ip_viva]` |
+| M15, la IP tiene otra ventana | «la IP olvida a las 48 h» | `ROJO`, `test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[los_dos_olvidan_al_dia]` |
 
-**Para decidir: D106** (sale de `/code-review`, es producto y no lo toqué).
-- Hoy el tiempo para entender el texto es lo que sobra del tope después de extraer. No tiene un mínimo propio.
-- Si extraer se pasa del 80 % por más que el resto, `leer_texto` arranca con 1 ms y el aviso es «no pude leer sus productos», aunque las hojas se leyeron.
-- En producción el tope es `_MAX_CPU_LECTURA = 10.0`, así que el resto son 2 s, y el proceso aparte tiene poca memoria.
+Salida entera:
 
-Las opciones:
-- (a) Queda así.
-- (b) Pieza aparte: reservar `limite_cpu_s × 0,2` desde que terminó de verdad la extracción.
-
-Recomiendo **(a)**: para gastar 2 s de más entre el corte y `leer_texto` haría falta algo que no vi pasar en el proceso aparte.
-
-D99 sigue con Emi. D105 está en tu mano desde el informe de ABUSO-2. Próxima D libre: D107.
+```
+Preparing worktree (detached HEAD 1f79a8e)
+BASE  | en verde
+ROJO  | el login correcto borra todos los fallos de la IP: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[otra_cuenta]»
+ROJO  | los fallos de la cuenta no se cuentan aparte: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[solo_propios]»
+ROJO  | la cuenta se cuenta sin la IP: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[fallos_propios_desde_otra_ip]»
+ROJO  | la cuenta se cuenta por el texto tipeado: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[fallos_con_el_email]»
+ROJO  | la cuenta se cuenta en una ventana fija: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[fallos_propios_de_mas_de_un_dia]»
+ROJO  | descontar borra lo propio pero no lo resta de la IP: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[mitad_y_mitad]»
+ROJO  | descontar deja la IP en negativo: dice «FAILED tests/test_abuso2.py::test_descontar_no_deja_la_ip_en_negativo»
+ROJO  | el login cuenta los fallos de la IP con el tope de recuperar: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[ajeno_tras_el_bloqueo]»
+ROJO  | descontar resta en todas las claves: dice «FAILED tests/test_abuso2.py::test_un_login_correcto_no_cambia_otras_claves»
+ROJO  | descontar resta también en reset: dice «FAILED tests/test_abuso2.py::test_un_login_correcto_no_cambia_otras_claves»
+ROJO  | descontar resta también en el tope diario de registro: dice «FAILED tests/test_abuso2.py::test_un_login_correcto_no_cambia_otras_claves»
+ROJO  | descontar alarga el olvido de la IP: dice «FAILED tests/test_abuso2.py::test_un_login_correcto_no_cambia_otras_claves»
+ROJO  | descontar lee lo propio y no lo borra: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[dos_logins_seguidos]»
+ROJO  | descontar resta lo propio vencido: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[propios_vencidos_con_la_ip_viva]»
+ROJO  | la cuenta olvida a las 48 h: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[propios_vencidos_con_la_ip_viva]»
+ROJO  | la cuenta olvida a las 23,5 h: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[la_cuenta_recuerda_un_dia]»
+ROJO  | la IP olvida a las 48 h: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[los_dos_olvidan_al_dia]»
+ROJO  | la IP olvida a las 23,5 h: dice «FAILED tests/test_abuso2.py::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta[la_ip_recuerda_un_dia]»
+ROJO  | el tope de recuperar va por el texto pedido: dice «FAILED tests/test_abuso1.py::test_s6_recuperar_usuario_corta_en_silencio_por_email»
+ROJO  | Postgres: el tope de recuperar va por el texto en minúsculas de Python: dice «FALLA | cinco variantes del mismo email mandan tres mails»
+fallas: 0
+```
 
 ## Autorrevisión
 
 | Quién (modelo, esfuerzo) | Hallazgo | Qué hice |
 |---|---|---|
-| adversario-sonnet-medio | 1. Con `_PARTE_PARA_EXTRAER = 1.0` o `0.99`, el caso da rojo con «no pude leer sus productos» y `[] == [3 renglones]`. Sigue distinguiendo el defecto, y el sabotaje de `despacho1b.sh` ya apunta a este caso | — |
-| | 2. Nadie más usa `gc.freeze`, `unfreeze`, `disable` ni `collect` en `tests/` o `proyecto_maria/`. Si el lector falla, el `finally` descongela, y después del caso `gc.get_freeze_count()` da 0 | — |
-| | 3. Forzó un `gc.collect()` justo antes de `leer_texto`, con 3 M objetos: con el arreglo da verde y sin el arreglo da rojo. Sin forzarlo, le dio verde 4 de 4 con y sin arreglo: el rojo no sale siempre. No verificó mi 3 de 6 | Lo reproduje. Su memoria estaba hecha al arrancar pytest, y así a mí tampoco me sale el rojo (6 de 6 verdes sin arreglo). Hecha justo antes del caso, otra vez 3 de 6 rojos sin arreglo y 6 de 6 verdes con él. Así quedó en «Comandos copiables» |
-| | 4. En producción `leer_despacho` corre sólo por `leer_despacho_aparte` (`main.py:8735`), en un `sys.executable -m` aparte. Las llamadas en el mismo proceso son todas de tests | — |
-| | 5. Otros hilos del proceso cuentan para `process_time` e `ITIMER_PROF` | Queda, R2. El hilo de `test_despacho1b.py:1019` se espera con `join` y el caso exige que no quede vivo |
-| `/code-review high` | #1. Hilos (lo mismo que el 5) | R2 |
-| | #2. Correr el caso en el proceso aparte con `_medir_aparte` en vez de congelar | No lo hice. Habría que pasar los 50 ms a `pdf_bombas` por variable de entorno: más código para la misma cobertura. Si lo preferís, es chico |
-| | #3. `unfreeze` descongela también lo que congeló otro | Queda, R3. Hoy nadie congela |
-| | #4. La basura con ciclos que había al congelar pasa a la generación vieja | Queda. Se libera en la próxima pasada completa, y para eso haría falta un `gc.collect()` que sólo suma tiempo |
-| | #5. Reserva mínima para entender el texto | D106, arriba |
+| `/code-review high` | 1. Una ventana de 23,5 h no se veía | Filas `la_cuenta_recuerda_un_dia` y `la_ip_recuerda_un_dia`, con su sabotaje para cada una |
+| | 2. Un `select` seguido de un `delete` aparte no es atómico | No se prueba: haría falta concurrencia en Postgres. Queda como R1 |
+| | 3. `descontar` podía cambiar otras columnas de la fila de la IP | El caso compara la fila entera. Sabotaje «descontar alarga el olvido de la IP» |
+| | 4. `la_cuenta` repetía una fila | La hice más estricta |
+| | 5. El paso `bien` no tenía mensaje en el assert | Arreglado |
+| | 6. `_filas` repite el lector de `test_abuso1.py` | Queda: son 5 líneas, y unificarlo toca otro archivo |
+| | 7. El docstring no nombraba el cambio de clave | Arreglado |
+| | 8. El encabezado del script estaba viejo | Arreglado |
+| adversario-sonnet-alto (sobre `22a2c4b`) | Base 17 passed. Vio las cinco mutaciones tuyas, ventanas de 25 h y 23 h, el olvido por omisión en 48 h y 12 h, n ± 1, la purga con margen y un `update` que también toca cambio de clave, recuperar, login y cuenta | — |
+| | a. Las claves ajenas no tenían `reset:{ip}` (`main.py:1777`) ni `registro:d:{ip}` (`main.py:3381`). Un `update` que también tocara esas claves quedaba verde | Las sumé como datos en `1f79a8e`, con un sabotaje para cada una |
+| | b. Que `descontar` alargue `vence` quedaba verde | Ya lo veía `b6ad266`, que salió después de su corrida: sabotaje «descontar alarga el olvido de la IP», en rojo. Que `descontar` ponga `bloqueado_hasta` en 0 es casi equivalente, porque una IP bloqueada no llega a `descontar` |
+| | c. Armar la clave de cuenta con lo tipeado en vez de `user.username` quedaba verde, porque nadie entraba con el email. Fallaría para el lado seguro, no abriría nada | Fila `fallos_con_el_email` y sabotaje «la cuenta se cuenta por el texto tipeado», en `1f79a8e` |
+| | d. Mover `descontar` antes de la verificación de email quedaba verde, porque el módulo la apaga | Queda, R4 |
+| | Equivalentes: `>= n` en vez de `> n`, y poner 0 en vez de borrar | — |
 
-## Puertas (sobre `d69233c`)
+## Puertas (sobre `1f79a8e`)
 
 | Puerta | Salida |
 |---|---|
-| `tests/test_despacho1b.py` | `283 passed in 50.28s` |
-| `chequeo-6.py 9417c3b d69233c` | abajo, `avisos: 0` |
+| `tests/test_abuso2.py` | `18 passed in 37.01s`, sobre el árbol antes de cortar una línea del docstring. Sobre `1f79a8e` mismo lo corrió la `BASE` de `abuso2.sh`, en verde |
+| `abuso2.sh 1f79a8e` con `PG_URL` | `BASE  \| en verde`, 20 `ROJO`, `fallas: 0` |
+| `chequeo-6.py 0c4893b 1f79a8e` | abajo, `avisos: 0` |
 | grep de historia de §6 | vacío |
-| Suite completa | **no corrida**. El cambio es un caso y no toca producto. El rojo no sale siempre en la suite, así que una corrida verde no prueba nada: la prueba es el A/B con la memoria cargada |
+| Suite completa | **no corrida**. Sólo cambian dos archivos de prueba; el producto no cambia |
 
 ```
-chequeo-6 9417c3b..d69233c: avisos para mirar, no un veredicto
+chequeo-6 0c4893b..1f79a8e: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +8/−1
+arnés +86/−9
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
@@ -82,36 +105,22 @@ avisos: 0
 
 ## Riesgos
 
-- **R1, baja.** Otros casos que llamen al lector con un tope chico dentro de pytest podrían tener el mismo problema. Revisé este archivo: `test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado` sólo pide que corte, y un recolector caro lo hace cortar antes, así que no da falso rojo. `test_el_tope_de_cpu_cubre_entender_el_texto` corre aparte.
-- **R2, baja.** `process_time` e `ITIMER_PROF` también cuentan la CPU de otros hilos del proceso. Un hilo vivo que dejara otro caso podría gastar el resto del tope, y `gc.freeze` no cubre eso. Tu prueba con un hilo girando no dio rojo, y no encontré hilos que queden vivos.
-- **R3, baja.** `gc.unfreeze` descongela todo. Si algún día un plugin congela memoria al arrancar, este caso se la descongela. Hoy nadie congela.
-- D106, arriba.
+- **R1, baja.** La atomicidad de `delete … returning` frente a dos logins correctos simultáneos no tiene prueba: necesita concurrencia en Postgres. Lo que sí está probado es que dos logins seguidos perdonan una vez.
+- **R2, baja (de antes de esta pieza, lo marcaste vos).** Con cuentas duplicadas por mayúsculas en el email, recuperar manda 3 mails por cuenta.
+- **R3, baja (de antes, lo marcaste vos).** El tope de recuperar usa una ventana fija.
+- **R4, baja.** Ningún caso de este módulo ve el orden entre `descontar` y la verificación de email, porque la apaga para medir sólo el bloqueo.
+- **Proceso.** La primera corrida de `abuso2.sh` sobre `b6ad266` coincidió con las pruebas del subagente: fueron dos suites a la vez. La corrida que vale es la de `1f79a8e`, sola.
 
 ## Comandos copiables
 
 ```bash
-# desde la raíz, con el venv del proyecto
+# desde la raíz, con el venv del proyecto y el Postgres local en 55432
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-T=test_las_hojas_leidas_antes_del_corte_dan_sus_productos
-# un fixture que, justo antes del caso, deja vivos 3 M dicts con una lista cada uno (6 M objetos).
-# Tienen que ser recién creados: hechos al arrancar pytest, el recolector ya los pasó y el rojo no sale
-mkdir -p /tmp/lastre && cat > /tmp/lastre/conftest_heap.py <<'E'
-import gc, os, pytest
-_LASTRE = []
-@pytest.fixture(autouse=True)
-def _heap_grande():
-    n = int(os.environ.get("LASTRE", "0"))
-    if n and not _LASTRE:
-        _LASTRE.extend([{"a": [i]} for i in range(n)])
-    yield
-E
-git show 9417c3b:tests/test_despacho1b.py > tests/_sin_arreglo_despacho1b.py
-for f in _sin_arreglo_despacho1b test_despacho1b; do echo "== $f"; for i in 1 2 3 4 5 6; do rm -f test.db
-  PYTHONPATH=/tmp/lastre LASTRE=3000000 python -m pytest -q --no-cov -p no:cacheprovider -W ignore -p conftest_heap \
-    "tests/$f.py::$T" 2>&1 | tail -1; done; done
-#   → sin arreglo, rojos y verdes mezclados (a mí, tres veces: 3 failed y 3 passed); con arreglo, 6 veces «1 passed»
-rm tests/_sin_arreglo_despacho1b.py
-python3 docs/pm/herramientas/chequeo-6.py 9417c3b d69233c
+rm -f test.db; python -m pytest -q --no-cov -p no:cacheprovider -W ignore tests/test_abuso2.py
+#   → 18 passed
+PY=$(command -v python) PG_URL=postgresql://cdi@127.0.0.1:55432/postgres scripts/testing/sabotajes/abuso2.sh 1f79a8e
+#   → BASE en verde, todas las líneas ROJO, «fallas: 0»
+python3 docs/pm/herramientas/chequeo-6.py 0c4893b 1f79a8e
 #   → producto +0/−0, avisos: 0
 ```
