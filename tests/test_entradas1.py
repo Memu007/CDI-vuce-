@@ -78,7 +78,7 @@ def _por_estudio(clave):
 VIAS = {"reset": _por_reset, "cambio": _por_cambio, "registro": _por_registro, "estudio": _por_estudio}
 # Las dos de 73 bytes: una en caracteres de un byte y otra con la «ñ» que
 # cruza el byte 72 (72 caracteres).
-CLAVES_MALAS = {"surrogate": SURROGATE, "nul": NUL, "73_bytes": "Clave-1!" + "x" * 65,
+CLAVES_MALAS = {"surrogate": SURROGATE, "surrogate_bajo": "Clave-1!\udfff", "nul": NUL, "73_bytes": "Clave-1!" + "x" * 65,
                 "multibyte_en_el_borde": "Clave-1!" + "x" * 63 + "ñ"}
 
 
@@ -93,6 +93,24 @@ def test_clave_nueva_que_no_se_puede_hashear_da_422_y_no_cambia_nada(via, clave)
     assert nada_cambio()
 
 
+# Sin un campo obligatorio, el `input` del 422 es el cuerpo entero, clave incluida.
+SIN_UN_CAMPO = {
+    "reset": ("/auth/reset-password", {}, "new_password"),
+    "cambio": ("/api/user/change-password", {}, "new_password"),
+    "registro": ("/auth/register", {"username": "x"}, "password"),
+    "estudio": ("/api/organizations/create", {"username": "x", "email": "x@example.com"}, "password"),
+}
+
+
+@pytest.mark.parametrize("via", SIN_UN_CAMPO)
+def test_el_422_de_un_campo_que_falta_no_repite_la_clave(via):
+    ruta, cuerpo, campo = SIN_UN_CAMPO[via]
+    clave = "Secreta-" + uuid.uuid4().hex
+    r = _post(ruta, {**cuerpo, campo: clave}, _bearer(_login(_usuario()[0])) if via == "cambio" else None)
+    assert r.status_code == 422, r.text
+    assert clave not in r.text, r.text
+
+
 @pytest.mark.parametrize("via", VIAS)
 def test_clave_de_72_bytes_entra(via):
     """Contrapunto: el tope corta en el byte 73, no antes."""
@@ -100,7 +118,7 @@ def test_clave_de_72_bytes_entra(via):
     assert r.status_code == 200, r.text
 
 
-TEXTOS_MALOS = {"surrogate": "Ent\ud800", "nul": "Ent\x00x"}
+TEXTOS_MALOS = {"surrogate": "Ent\ud800", "surrogate_bajo": "Ent\udfff", "nul": "Ent\x00x"}
 
 
 def _registro_con(campo, valor):
@@ -131,7 +149,7 @@ async def _escalar(s, consulta):
 
 
 # Los nombres se guardan con «�» en lugar de lo que no se puede guardar.
-GUARDADOS = {"surrogate": "Ent\ufffd", "nul": "Ent\ufffdx"}
+GUARDADOS = {"surrogate": "Ent\ufffd", "surrogate_bajo": "Ent\ufffd", "nul": "Ent\ufffdx"}
 NOMBRES = {
     "registro_nombre": (_registro_con, User.name), "estudio_nombre": (_estudio_con, Organization.name),
     "perfil_nombre": (_perfil_con, User.name),
@@ -209,6 +227,7 @@ def test_el_422_de_un_cuerpo_raro_es_json_valido(cuerpo):
 
 CUERPOS_DE_GRUPO = {
     "agrupar_no_utf8": ("agrupar", b'{"item_ids": ["\xff\xfe", "b"]}'),
+    "agrupar_surrogate": ("agrupar", b'{"item_ids": ["a\\ud800", "b"]}'),
     "agrupar_no_json": ("agrupar", b"nope"),
     "agrupar_lista": ("agrupar", b"[1]"),
     "desagrupar_no_json": ("desagrupar", b"nope"),
@@ -236,18 +255,21 @@ def test_el_400_que_repite_texto_ajeno_en_una_lista_es_json_valido():
 
 # Por HTTP el 422 nunca trae estos valores (se saca `input` y FastAPI arma
 # `msg` y `ctx` fijos): el caso mira la respuesta del manejador directamente.
+# El NaN puede cortar con ValueError antes de responder; el surrogate nunca.
 ERRORES_RAROS = {
-    "surrogate_en_msg": {"type": "value_error", "loc": ("body", "x"), "msg": "Xx\ud800", "input": "y"},
-    "nan_en_ctx": {"type": "value_error", "loc": ("body", "x"), "msg": "Xx", "ctx": {"tope": float("nan")}},
+    "surrogate_en_msg": ({"type": "value_error", "loc": ("body", "x"), "msg": "Xx\ud800", "input": "y"}, False),
+    "nan_en_ctx": ({"type": "value_error", "loc": ("body", "x"), "msg": "Xx", "ctx": {"tope": float("nan")}}, True),
 }
 
 
 @pytest.mark.parametrize("error", ERRORES_RAROS)
 def test_el_manejador_del_422_nunca_responde_json_invalido(error):
+    detalle, puede_cortar = ERRORES_RAROS[error]
     try:
-        r = asyncio.run(_pedido_mal_armado(None, RequestValidationError([ERRORES_RAROS[error]])))
-    except ValueError:
-        return  # Un NaN que no se puede escribir corta antes de responder: no sale JSON inválido.
+        r = asyncio.run(_pedido_mal_armado(None, RequestValidationError([detalle])))
+    except ValueError as e:
+        assert puede_cortar and not isinstance(e, UnicodeError), repr(e)
+        return
     assert r.status_code == 422
     datos = json.loads(r.body.decode("utf-8"), parse_constant=_sin_constantes)
     assert "Xx" in json.dumps(datos), datos

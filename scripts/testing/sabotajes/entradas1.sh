@@ -94,6 +94,8 @@ sabotaje $M "sin mirar caracteres que no se guardan" "$C[reset-surrogate]" \
   '    if _NO_GUARDABLE_EN_PG.search(clave) or len(' '    if len('
 sabotaje $M "el NUL no cuenta como no guardable" "$N[registro_nombre-nul]" \
   're.compile("[\x00\ud800-\udfff]")' 're.compile("[\ud800-\udfff]")'
+sabotaje $M "el surrogate bajo cuenta como guardable" "$C[reset-surrogate_bajo]" \
+  're.compile("[\x00\ud800-\udfff]")' 're.compile("[\x00\ud800-\udbff]")'
 sabotaje $M "el rechazo de la clave la repite" "$C[reset-surrogate]" \
   'raise ValueError("La contraseña puede' 'raise ValueError(clave + "La contraseña puede'
 
@@ -128,6 +130,8 @@ G="FAILED $T::test_agrupar_con_cuerpo_raro_da_4xx_en_json"
 sabotaje $M "agrupar sin modelo" "$G[agrupar_no_json]" \
   "    pedido: AgruparRequest," "    pedido: Request," \
   "    item_ids = pedido.item_ids" "    item_ids = (await pedido.json()).get(\"item_ids\", [])"
+sabotaje $M "los ítems de agrupar sin validar" "$G[agrupar_surrogate]" \
+  "    item_ids: list[TextoCodificable] = []" "    item_ids: list[str] = []"
 sabotaje $M "desagrupar sin tope del entero" "$G[desagrupar_enorme]" \
   "Field(ge=-2**31, le=2**31 - 1)" "Field()"
 
@@ -143,6 +147,9 @@ sabotaje $M "el 422 repite lo que llegó" "FAILED $T::test_el_422_de_un_cuerpo_r
   'if k != "input"' 'if True'
 sabotaje $M "el 422 repite la clave que llegó" "$C[reset-surrogate]" \
   'if k != "input"' 'if True'
+sabotaje $M "el 422 repite el cuerpo de un campo que falta" \
+  "FAILED $T::test_el_422_de_un_campo_que_falta_no_repite_la_clave[reset]" \
+  'if k != "input"' 'if k != "input" or isinstance(v, dict)'
 sabotaje $M "el 422 sale con la respuesta común" "$H[surrogate_en_msg]" \
   'return _JSONConTextoAjeno({"detail"' 'return JSONResponse({"detail"'
 sabotaje $M "el 422 escribe NaN" "$H[nan_en_ctx]" \
