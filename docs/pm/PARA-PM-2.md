@@ -2,146 +2,208 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-> **PYPDF-1** ya la aceptaste (974263e, D89 a / D90 a); gracias. RESET-2 va
-> encima. Traje tu rama con merge (`3d5451c`): veredicto y limpieza tanda 3,
-> todo docs.
+> **RESET-2** ya la aceptaste (99d3f69, D93 a); gracias. D91/D92 quedan como
+> ENTORNO-1, que arranco ahora. ABUSO-1 va encima, sobre la devolución de
+> `43916a7`.
 
-## RESET-2: **entregada**. Producto `249cfd4`, pruebas+sabotaje `99d3f69`, informe en el commit siguiente. SHA entregado `99d3f69` (2026-11-06)
+## ABUSO-1: **entregada**. Producto `1880c98`, `9ef6c73`, `55bf408`; pruebas `1119901`, `3f0eeab`, `cf45cd4`, `8a363eb`, `1b48774`; informe en el commit siguiente. SHA entregado `55bf408` (2026-11-07)
 
-**Resultado.** El token de reset y el nombre de usuario se devolvían en la
-respuesta (comodidad sin SMTP) siempre que `ENVIRONMENT` no fuera
-«production». Con `ENVIRONMENT` sin poner —ni producción ni prueba— el token
-de reset se filtraba en la respuesta HTTP. Ahora un único helper
-(`_pista_dev_habilitada`) los devuelve sólo en el entorno de prueba
-(`IS_TESTING`, es decir `ENVIRONMENT=="testing"`), nunca cuando falta. Vale
-para los dos lugares (reset y recuperar usuario); el chequeo repetido queda en
-uno (§6). El marcador del repo es `testing` (lo pone `conftest.py`), no el
-literal «test»: gaté sobre el `IS_TESTING` que ya usa el resto de `main.py`.
+**Resultado.** Los cuatro puntos de la devolución tienen prueba que distingue
+el defecto y sabotaje con rojo:
+
+- **D44 (una sola conexión en el login).** Ya lo había arreglado `ce7cd9d`
+  (SESION-1 v2), que está entre `43916a7` y mi base `1f48bb5`. No toqué
+  producto para esto: sumé la prueba en PG que pediste. En
+  `abuso1_motores.py`, 120 logins malos y 120 buenos a la vez contra PG
+  local (55432) con `/health` consultado en paralelo:
+
+  | Código | 120 malos | 120 buenos | `/health` |
+  |---|---|---|---|
+  | `55bf408` | `[401]` (500: 0) | `[200]` (500: 0) | 200 en 4.116 s y 5.896 s |
+  | `ce7cd9d^` (2ª conexión) | `[401, 500]` (500: 93) | — | 200 en 0.06 s |
+  | mutante: `limpiar` con conexión propia | `[401]` (500: 0) | `[200, 500]` (500: 96) | `HTTP Error 503` a 31.46 s |
+
+  El mutante muestra por qué hacen falta los dos casos: el login malo pasa
+  por `registrar`, el bueno por `limpiar`.
+- **Punto 1 (duración).** Casos «a los 14 min sigue 429, a los 16 pasa» para
+  el bloqueo por IP del login, el corte por IP de recuperar usuario y la
+  ventana por email de recuperar (3600 s, «a los 59 min sigue, a los 61
+  no»). Los mutantes «el bloqueo dura un minuto», «recuperar usuario: el
+  corte por IP dura un minuto» y «la ventana por email es de un minuto» dan
+  rojo.
+- **Punto 2 (claves de 121 a 300 en PG).** Una IP de 100, 200, 287 y 332
+  caracteres no rompe ninguna ruta con contador y se bloquea al quinto fallo
+  en PG («una IP de N caracteres también se bloquea al quinto fallo», todas
+  OK). En SQLite, `test_tabla_una_ip_larga_entra_en_la_clave`. El mutante
+  «una clave de hasta 300 entra tal cual» (el `len(clave) <= 300`) da rojo.
+- **Punto 3 (surrogate).** Un surrogate suelto o un NUL ya no dan 500 en
+  `/auth/recover-username`, `/auth/request-password-reset`, `/auth/login`
+  ni `/auth/reset-password`. Tampoco en el 422, que antes repetía lo que
+  llegó y se caía al codificarlo. Lo cubre `test_un_surrogate_suelto_no_da_500`,
+  con 12 entradas como datos de un solo caso.
+
+**Producto +35/−20**, sólo en `main.py`:
+
+- `TextoCodificable` valida con el `_guardable_en_pg` que ya existía, que
+  subí de lugar en el archivo. Lo usan `LoginRequest.username`,
+  `PasswordResetRequest.email`, `PasswordResetConfirm.token` y
+  `RecoverUsernameRequest.email`.
+- Un manejador de `RequestValidationError` arma el 422 en JSON ASCII.
+
+Suma +15 netas, así que no hace falta la línea de §6 por pasar de 20.
+
+### Supuestos (reversibles; rechazalos si no van)
+
+1. **Más allá del correo.** La devolución nombraba el correo de recuperar
+   usuario. Extendí lo mismo al usuario del login, al correo de reset y al
+   token de reset-password, porque los cuatro daban el mismo 500 (rojo en
+   `1119901` y `8a363eb`).
+2. **El NUL también.** Se trata como el surrogate, porque PG lo rechaza
+   igual.
+3. **El 422 ASCII vale para todas las rutas**, no sólo las de auth. El JSON
+   es equivalente, pero un carácter no ASCII sale como `\uXXXX`. Ninguna
+   prueba de la suite dependía de eso (ver la fila de la suite en Puertas).
 
 ## Decisiones
 
-- **D91 (seguridad, ALTA — fuera de RESET-2, te lo propongo como pieza):** la
-  misma raíz `not IS_PRODUCTION` deja dos agujeros en el **login** cuando
-  `ENVIRONMENT` falta (`main.py:3181` y el alta de usuarios demo en el
-  `lifespan`, `main.py:1608`):
-  1. `demo/demo123` entra como **admin** por el camino normal (sin
-     prerrequisito).
-  2. El fallback de contraseña plana compara `stored_password == password`:
-     quien conozca el **hash** de una cuenta entra presentándolo como
-     contraseña, y encima la «migra» (rehashea el hash y la clave real queda
-     inválida).
-  El adversario lo reprodujo con `ENVIRONMENT` sin poner (200) vs
-  `production` (401). **Recomiendo una pieza chica que gate esto en el entorno
-  de prueba (o saque el fallback plano y los demo de producción), como hicimos
-  en reset.** No lo toqué: es login, fuera de RESET-2.
+- **D94 (seguridad media, fuera de ABUSO-1, te lo propongo como pieza).**
+  Una contraseña de más de 72 bytes da **500** en reset (`main.py:1874`),
+  cambio (`2458`), registro (`3414`) y `10515`. La causa: `hash_password`
+  (`3151`) llama a `bcrypt.hashpw`, y bcrypt 5.0.0 levanta `ValueError:
+  password cannot be longer than 72 bytes`. Esas validaciones tienen mínimo
+  de 8 pero no máximo. Opciones:
+  - (a) Tope de 72 bytes en UTF-8 en un solo validador que usen las cuatro
+    rutas, con 400 y un mensaje claro.
+  - (b) Prehash (sha256 → base64) antes de bcrypt. Cambia el formato y pide
+    migración.
+  - (c) Dejarlo.
 
-- **D92 (seguridad, media — fuera de RESET-2):** mismo patrón
-  `not IS_PRODUCTION` en otros dos lugares: la validación de firma del webhook
-  de Mercado Pago (`main.py:11294`, acepta cualquier firma si falta
-  `MP_WEBHOOK_SECRET` y `ENVIRONMENT`) y el `send_email` sin SMTP, que imprime
-  el link de reset entero en stdout (queda en los logs con `ENVIRONMENT` sin
-  poner; no llega al cliente). **Recomiendo barrerlos en la misma pieza que
-  D91.**
+  **Recomiendo (a)**: resta una rama a cada ruta y no toca los hashes ya
+  guardados.
+- **D95 (entorno de prueba, baja).** En SQLite, 120 logins a la vez dan
+  «database is locked»: 12 de 120 malos y 7 de 120 buenos. En PG no pasa
+  (cuadro de arriba), y producción es PG. Opciones:
+  - (a) Dejarlo y anotarlo.
+  - (b) Darle un `busy_timeout` al motor de prueba.
 
-- **D93 (reversible, baja):** el script manual `scripts/test_reset_flow.py`
-  dependía de la pista bajo `ENVIRONMENT=development`; ahora necesita
-  `ENVIRONMENT=testing` (el token sigue en stdout). No lo toqué (es script
-  manual, no de la suite). **Recomiendo (a): dejarlo y que el script use
-  `testing`.** Opción (b): que lo arregle una limpieza.
+  **Recomiendo (a).**
+- **D96 (robustez, baja).** El mismo surrogate en otros campos JSON
+  (registro, `new_password`, otros formularios) todavía puede dar 500 al
+  guardarlo, aunque el 422 ya no se cae. Opciones:
+  - (a) Pieza chica que aplique `TextoCodificable` a los modelos de entrada
+    que guardan texto.
+  - (b) Dejarlo.
 
-Próxima D libre: **D94**.
+  **Recomiendo (a)**, después de ENTORNO-1.
+
+Próxima D libre: D97.
 
 ## Rojo antes del arreglo
 
-Con `ENVIRONMENT` ausente (`IS_PRODUCTION=False`, `IS_TESTING=False`), sobre el
-código viejo (`not IS_PRODUCTION`): `test_la_pista_de_dev_solo_en_el_entorno_de_prueba`
-daba `2 failed` (el token y el usuario volvían igual). Con el arreglo, `2 passed`.
+| Commit | Sobre | Salida |
+|---|---|---|
+| `1119901` (pruebas) | base `1f48bb5` | «6 failed, 60 passed»; los 6 son 500 con `UnicodeEncodeError` |
+| `8a363eb` (pruebas) | `1880c98` | «6 failed, 6 passed, 60 deselected, 3 warnings in 1.13s», en el token de reset-password y en el 422 |
+| `9ef6c73` (arreglo) | — | «72 passed, 3 warnings in 21.59s» |
+
+Último rojo copiado de `rojo_cr.log`:
+`FAILED tests/test_abuso1.py::test_un_surrogate_suelto_no_da_500[False-/auth/login-{"username": "a\ud800"}-422]`.
+
+Los casos de duración (punto 1) y la clave larga (punto 2) no tenían rojo en
+la base: el producto ya era correcto, y lo que faltaba era una prueba que
+distinguiera el defecto. Sus rojos son los de los sabotajes.
 
 ## Autorrevisión
 
-- **Adversario Sonnet alto:** confirmó que RESET-2 cierra la fuga y que no
-  queda ningún camino de vuelta del token al cliente fuera de prueba.
-  Encontró D91/D92/D93 (la misma raíz en login/webhook/stdout), reproducidos.
-- **`/code-review high`:** sin bug en el diff; marcó dos AVISO de §6 en mi
-  helper (nombre de pieza e historia en el comentario, y 4 líneas) →
-  **corregidos** (comentario de 2 líneas sin historia; rehíce los dos commits
-  locales sobre `7417fe8`). También señaló D91/D92 como preexistentes.
-- **`/security-review`:** sin vulnerabilidad nueva en el diff; el gate
-  `IS_TESTING` es un subconjunto estricto de `not IS_PRODUCTION`, así que no
-  amplía la exposición en ningún entorno.
+| Revisor | Modelo y esfuerzo | Hallazgo | Qué hice |
+|---|---|---|---|
+| Adversario | Sonnet, alto | #1 el token de reset-password con surrogate da 500 | Arreglado (`8a363eb` → `9ef6c73`) |
+| | | #2 el 422 repite la entrada y se cae | Arreglado (handler ASCII) |
+| | | #3 otros campos JSON con surrogate | Va como D96 |
+| | | #4 el mutante de `limpiar` sobrevive en SQLite | Muerto en PG (120 logins buenos) |
+| | | #5 XFF y `TRUSTED_PROXY_HOPS`, #6 IPv6 | A riesgos, como pediste |
+| `/code-review high` | — | #5 movida de un comentario de Mercado Pago | Comentario devuelto a su lugar (`55bf408`) |
+| | | #6 largo de la IP de prueba | Uso 100 caracteres, que sí cruza el corte de 120 en la clave compuesta |
+| | | #7 el hilo de `/health` usaba una espera fija | Ahora un `Event` |
+| | | #9 la fórmula de la IP | Queda: la clave es `ruta:IP` y el corte se calcula sobre el total |
+| `/security-review` | — | Ninguno de confianza alta | — |
 
-## Riesgos / límites
+En el diff completo `1f48bb5..55bf408` no hay nada fuera de la tarea, aparte
+de los supuestos 1–3. El grep de historia de §6 da vacío.
 
-- La prueba parchea las constantes `IS_PRODUCTION`/`IS_TESTING` (congeladas al
-  importar), no la variable de entorno. Si un refactor futuro leyera
-  `os.getenv` directo, la prueba no vería la regresión. Es el modo que usa el
-  resto de las pruebas de estas rutas.
-- Si un despliegue real quedara en `ENVIRONMENT=testing` por error, la pista
-  se filtra igual que antes: igual de malo, no peor (no se puede atar a
-  `PYTEST_CURRENT_TEST` porque los motores usan un server real con `testing`).
-- D91/D92 siguen abiertos hasta que decidas la pieza.
+## Riesgos / límites (sin tocar producto, como pediste)
 
-## chequeo-6 (`7417fe8` → `99d3f69`)
+- **XFF y `TRUSTED_PROXY_HOPS`.** El conteo por IP depende de que
+  `TRUSTED_PROXY_HOPS` coincida con los saltos reales de Railway. Mal puesto,
+  o todos comparten una IP o cada uno elige la suya.
+- **IPv6 y puerto sin normalizar.** Un mismo cliente IPv6 rota dentro de su
+  /64 y saca contadores nuevos.
+- **Bordes de la duración.** Las pruebas miran los minutos 14 y 16 (y 59 y
+  61), así que un mutante con un bloqueo de 14.5 min sobrevive. Tampoco hay
+  caso para el rebloqueo después de que vence un bloqueo viejo.
+- **Deadlock en PG con ventanas cortas.** 38 de 400 pedidos, con las
+  ventanas achicadas a propósito. Con las ventanas de producción no lo medí.
+- **Filas sin tope.** `limites_auth` crece con cada IP o email distinto
+  hasta que vence; no hay purga con tope.
+- **Telemetría.** Un token revocado todavía escribe un evento de telemetría.
+- **Tiempo del login.** Un usuario existente tarda 0.673 s y uno inexistente
+  0.010 s, por bcrypt, así que se puede enumerar usuarios por tiempo.
+- **Truncado a 200.** El `StringDataRightTruncationError` con 200 sólo lo
+  vi con el mutante. Con el producto, las IPs de 200, 287 y 332 dan OK.
+- **`/health` lento bajo carga.** Tarda 4–6 s con 120 logins a la vez en PG
+  (bcrypt ocupa los hilos). Está por debajo del tope de 15 s, pero no es
+  instantáneo.
+- **Choque con la Dev 1.** Subí `_guardable_en_pg` de lugar en `main.py`; si
+  COBRO-MP toca esas líneas puede haber conflicto de merge. No cambié su
+  cuerpo.
+- **Sin prueba de duración ni de concurrencia** para la ventana
+  `registro:h` ni para `verificar_clave_actual`.
+
+## chequeo-6 (`1f48bb5` → `55bf408`)
 
 ```
-chequeo-6 7417fe8..99d3f69: avisos para mirar, no un veredicto
-producto +8/−2
-arnés +22/−0
+chequeo-6 1f48bb5..55bf408: avisos para mirar, no un veredicto
+producto +35/−20
+arnés +182/−38
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/main.py: 11944 → 11950
+  proyecto_maria/main.py: 11950 → 11965
 avisos: 0
 ```
 
-## Puertas (SHA entregado `99d3f69`)
+La base es `1f48bb5`, el merge de tu rama sobre el que arranqué. Con
+`43916a7` como base entrarían 69 archivos (+3742/−24065) de otras piezas.
+
+## Puertas (SHA entregado `55bf408`)
 
 | Puerta | Resultado |
 |---|---|
-| suite completa | `4991 passed, 335 skipped, 3 xfailed, 95 warnings in 886.49s`, salida=0 (2 nuevas de RESET-2) |
-| `compileall proyecto_maria` | `compileall=0` |
-| sabotaje de la pieza | `email1.sh`: el sabotaje «la pista de dev vuelve con ENVIRONMENT que falta» da ROJO (verificado directo: `2 failed` en `test_la_pista_de_dev_solo_en_el_entorno_de_prueba`). El `email1.sh` entero es puerta tuya antes de publicar. |
-| `/code-review high`, `/security-review`, adversario Sonnet alto | Ver «Autorrevisión». |
+| `compileall -q proyecto_maria` | salida=0 |
+| `pytest tests/test_abuso1.py` | 72 passed, 3 warnings in 21.59s |
+| Motores PG (`abuso1_motores.py pg`, 55432) | «pg: todo OK» |
+| Sabotajes (`abuso1.sh`) | 35 ROJO, «sabotajes sin rojo: 0» |
+| Suite completa, worktree limpio en `55bf408` | Corriendo; la línea final va en el commit siguiente, antes del aviso |
+| `smoke_friccion.sh`, `ataque_aislamiento.sh` | No corridos: el cambio es de validación de entrada en auth, sin datos ni permisos entre clientes |
 
 ## Comandos copiables
 
 ```bash
-# 1) el gate: sólo el entorno de prueba
-git -C /home/user/CDI-vuce- show 249cfd4 -- proyecto_maria/main.py
-# 2) rojo del caso con el gate viejo (en un worktree descartable)
-#    (sacar IS_TESTING y poner not IS_PRODUCTION → 2 failed)
-# 3) la D91 (login), para que la veas:
-sed -n '3178,3183p' /home/user/CDI-vuce-/proyecto_maria/main.py
+# Desde la raíz, con el entorno de prueba exportado
+python -m pytest -q --no-cov tests/test_abuso1.py
+#   → 72 passed
+python scripts/testing/abuso1_motores.py pg postgresql://cdi@127.0.0.1:<puerto>/postgres
+#   → última línea «pg: todo OK»; 120 malos [401] y 120 buenos [200], 500: 0
+PY=python bash scripts/testing/sabotajes/abuso1.sh 55bf408
+#   → 35 líneas ROJO y «sabotajes sin rojo: 0»
+python docs/pm/herramientas/chequeo-6.py 1f48bb5 55bf408
+#   → producto +35/−20, historia vacío, avisos: 0
 ```
 
 ## Archivos de producto tocados
 
-- `proyecto_maria/core`/… no; sólo `proyecto_maria/main.py` (helper + los dos
-  lugares) y `CHANGELOG.md`.
+- `proyecto_maria/main.py`
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP, aviso a la PM session_01B7FVQspcEHF7PqNv797wNM priority next. RESET-2 ENTREGADA: producto 249cfd4 (helper _pista_dev_habilitada: token/usuario de reset vuelven en la respuesta sólo con IS_TESTING, nunca con ENVIRONMENT ausente), pruebas+sabotaje 99d3f69, informe en el commit siguiente, SHA 99d3f69. Antes entregué PYPDF-1 (f3bd528, informe 7417fe8) sin integrar. Decisiones abiertas para la PM: D91 (ALTA, fuera de alcance: login con ENVIRONMENT ausente deja entrar demo/demo123 como admin y entrar con el hash como contraseña — main.py:3181 y demo en lifespan 1608; recomiendo pieza chica que gate en prueba), D92 (webhook MP main.py:11294 y link de reset en stdout, misma raíz), D93 (test_reset_flow.py manual ahora necesita ENVIRONMENT=testing). Próxima D libre D94. Sigue: ABUSO-1 (orden del roadmap tras RESET-2). Reglas de Emi: nada se publica sin su «dale» para el SHA (no propongo SHA; la rama lleva e0b8626 no aceptada), nunca main, nunca force/amend de lo ya pusheado (rehíce 249cfd4/99d3f69 porque eran locales, sobre el pusheado 7417fe8), sin secretos ni datos reales, subagentes hasta alto sin Fable, no uso advisor, Postgres local 55432. conftest pisa ENVIRONMENT a 'testing'.
+Arnés: `tests/test_abuso1.py`, `scripts/testing/abuso1_motores.py` y
+`scripts/testing/sabotajes/abuso1.sh`.
 
----
-
-## ABUSO-1 (en pausa por el corte, sin commitear nada)
-
-Arranqué la investigación; **no toqué producto ni pruebas** (sólo leí código y
-reproduje en un PG descartable local). Dónde quedó cada punto de la devolución
-sobre `43916a7`, contra HEAD actual:
-
-- **D44 (2ª conexión del login):** ya está arreglado por `ce7cd9d` (SESION-1
-  v2: `limites_auth` usa la conexión del pedido). Falta: una prueba de
-  concurrencia en PG que lo pruebe (verde en HEAD) y un sabotaje que devuelva
-  la 2ª conexión.
-- **Punto 1 (duración de bloqueos):** abierto. Las pruebas mueven el reloj
-  justo pasado el tope, así que el mutante `bloqueo=60` sobrevive. Falta:
-  casos «a los 14 min sigue 429, a los 16 pasa» (bloqueo de 15 min) y el
-  equivalente para la ventana de recuperar (3600 s), con la fixture `reloj`.
-- **Punto 2 (claves 121-300 en PG):** por confirmar el mecanismo exacto;
-  `hash_password` usa `bcrypt.hashpw`, que en bcrypt moderno **levanta** con
-  >72 bytes → probable 500 en registro/reset/cambio. Falta reproducir y topear
-  el largo antes de la base + matar el mutante `len(clave) <= 300`.
-- **Punto 3 (surrogate 500 en recover-username):** abierto. `main.py:1791`
-  `request.email...encode()` levanta `UnicodeEncodeError` con un surrogate
-  suelto → 500. Falta hacerlo a prueba de surrogates + caso.
-
-Retomo con `/respondio` cuando se levante el corte. Próxima D: D94.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP, aviso a la PM session_01B7FVQspcEHF7PqNv797WNM priority next. ABUSO-1 ENTREGADA en 55bf408 (producto 1880c98/9ef6c73/55bf408: TextoCodificable con _guardable_en_pg en login/reset/token/recover y 422 ASCII; D44 ya arreglado por ce7cd9d, probado en PG con 120 logins malos y buenos). D abiertas: D94 (bcrypt >72 bytes da 500 en reset/cambio/registro; recomiendo tope de 400), D95 (SQLite locked, dejar), D96 (surrogate en otros campos JSON). Próxima D libre D97. Sigue: ENTORNO-1 (D91/D92: login con ENVIRONMENT ausente, demo admin, hash como contraseña, webhook MP y link de reset en stdout). Corte el 2026-11-08 15:50 UTC. Reglas de Emi: nada se publica sin su «dale» para el SHA (no propongo SHA), nunca main, nunca force/amend de lo pusheado, sin secretos ni datos reales, subagentes hasta alto sin Fable, no uso advisor, Postgres local 55432.
