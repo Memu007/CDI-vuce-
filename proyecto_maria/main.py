@@ -2083,7 +2083,7 @@ async def cancel_billing(
     """Cancela la suscripción de la cuenta que paga: el usuario o su organización.
 
     Primero se cancelan en Mercado Pago todas las suscripciones de la cuenta;
-    si una no se puede, el plan no cambia y sólo se olvidan las ya canceladas.
+    si una no se puede, billing_status no cambia y sólo se olvidan las ya canceladas.
     Deja `billing_status='canceled'`, que sigue generando hasta `trial_ends_at`
     (billing_service.tiene_acceso): la
     cuenta en gracia o con la prueba vencida queda sin acceso
@@ -2106,7 +2106,7 @@ async def cancel_billing(
             detail=f"No se puede cancelar desde el estado actual: {entidad.billing_status}",
         )
 
-    # La que paga va última: si otra falla, el plan sigue cobrando, como dice el 503.
+    # La que paga va última: si otra falla, la que paga queda sin tocar.
     for cuenta in sorted(con_sid, key=paga.get):
         try:
             await _en_hilo_mp(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)
