@@ -95,7 +95,9 @@ sabotaje $M "la invitación sin validar" "$X[registro_invitacion-surrogate]" \
 sabotaje $M "el nombre del estudio sin validar" "$X[estudio_nombre-surrogate]" \
   "    name: Annotated[TextoCodificable, Field(max_length=200)]" "    name: str"
 sabotaje $M "el alta de estudio sin la regla de email" "$X[estudio_email-surrogate]" \
-  "    clean_email = _email_valido(req.email)" "    clean_email = req.email.strip().lower()"
+  "    # Validar email duplicado
+    clean_email = _email_valido(req.email)" "    # Validar email duplicado
+    clean_email = req.email.strip().lower()"
 sabotaje $M "la regla de email acepta cualquier cosa" "$X[registro_email-surrogate]" \
   "    if not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\$', limpio) or" \
   "    if not limpio or"
