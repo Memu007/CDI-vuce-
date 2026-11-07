@@ -98,8 +98,7 @@ from proyecto_maria.auth.dependencies import (
     firmar_token,
 )
 from proyecto_maria.auth.roles import roles_de
-from proyecto_maria.config import _DEFAULT_DEV_SECRET, get_settings
-from proyecto_maria.config import es_desarrollo as _es_desarrollo
+from proyecto_maria.config import _DEFAULT_DEV_SECRET, es_desarrollo as _es_desarrollo, get_settings
 
 # ============== Configuración de Autenticación ==============
 _CLAVE_JWT = get_settings().jwt_secret
