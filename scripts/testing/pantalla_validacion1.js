@@ -27,6 +27,15 @@ const PANEL = async page => {
 const HABILITADO = async page => {
   if (await page.$eval('#validatingGenerate', b => b.disabled)) return 'no deja generar por el error de la anterior';
 };
+// Además del botón, el clic tiene que llegar a generar: onGenerate corta en silencio si queda el error de la anterior.
+const GENERA = async page => {
+  const mal = await HABILITADO(page);
+  if (mal) return mal;
+  const pedido = page.waitForRequest(r => r.method() === 'POST' && r.url().includes('/generate_maria'), { timeout: 15000 });
+  await page.fill('#sbtSufijoValor', 'AA(1)-CA00-');
+  await page.click('#validatingGenerate');
+  if (!await pedido.catch(() => null)) return 'el botón está habilitado pero el clic no genera';
+};
 
 const CASOS = [
   { que: 'panel', a: A, b: B, mira: PANEL },
@@ -35,7 +44,7 @@ const CASOS = [
       if (!await page.$eval('#validatingGenerate', b => b.disabled)) return 'deja generar con el peso en cero';
     } },
   { que: 'botón, error sólo en la anterior', a: SIN_PESO(A), b: B, mira: HABILITADO },
-  { que: 'botón, falla el validador', a: SIN_PESO(A), b: B, validador: 'falla', mira: HABILITADO },
+  { que: 'botón, falla el validador', a: SIN_PESO(A), b: B, validador: 'falla', mira: GENERA },
   { que: 'historial', a: A, b: B, cliente: true, mira: async (page, clienteId) => {
       const guardado = page.waitForRequest(r => r.method() === 'POST' &&
         r.url().endsWith('/api/clientes/' + clienteId + '/operaciones'), { timeout: 15000 });
@@ -52,11 +61,27 @@ const CASOS = [
 ];
 
 // «Nueva operación» y «Carga manual» con clics; los ítems se ponen como los deja la pantalla de NCM.
-async function validar(page, item) {
+// Sin «espera», no aguarda la respuesta. Devuelve qué faltó, o nada.
+async function validar(page, item, espera = true) {
   await page.click('[data-action="go-upload"]');
   await page.click('#uploadManualBtn');
   await page.evaluate(([op, it]) => { CDI.state.operacion = { ...op }; CDI.state.items = [it]; CDI.goTo('validating'); }, [OP, item]);
-  await page.waitForFunction(() => !document.getElementById('validatingResults').hidden, null, { timeout: 15000 });
+  if (espera && !await page.waitForFunction(() => !document.getElementById('validatingResults').hidden, null, { timeout: 15000 }).catch(() => null))
+    return 'no mostró la validación de la que se ve';
+}
+
+// El validador simulado, sólo en su caso: «tarda» retiene la primera validación hasta que la suelta el caso;
+// «falla» contesta 500 a la segunda.
+async function simular(page, modo) {
+  const sim = { pedidos: 0 };
+  sim.retenida = new Promise(ok => { sim.soltarla = ok; });
+  await page.route('**/api/validate/smart', async route => {
+    const n = ++sim.pedidos;
+    if (modo === 'tarda' && n === 1) { await sim.retenida; return route.fulfill({ response: await route.fetch() }); }
+    if (modo === 'falla' && n === 2) return route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"validador caído"}' });
+    return route.continue();
+  });
+  return sim;
 }
 
 (async () => {
@@ -76,12 +101,25 @@ async function validar(page, item) {
     const page = await ctx.newPage();
     await page.goto(base + '/dashboard');
     await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.api && document.querySelector('.screen.is-active'));
-    await validar(page, c.a);
+    const sim = c.validador ? await simular(page, c.validador) : null;
+    const tarda = c.validador === 'tarda';
+    const pidioA = tarda && page.waitForRequest('**/api/validate/smart');
+    await validar(page, c.a, !tarda);
+    const pedidoA = tarda && await pidioA;
     const desde = Date.now();
-    await validar(page, c.b);
+    const pidioB = tarda && page.waitForRequest(r => r.url().endsWith('/api/validate/smart') && r !== pedidoA, { timeout: 15000 });
+    let mal = await validar(page, c.b);
+    if (tarda) {
+      if (!await pidioB.catch(() => null)) mal = mal || 'la que se ve no pidió validación mientras la anterior esperaba';
+      const terminoA = page.waitForEvent('requestfinished', r => r === pedidoA);
+      sim.soltarla();
+      await terminoA;
+      // La respuesta de A ya llegó; se cede un turno a la página para que la procese antes de mirar.
+      await page.evaluate(() => new Promise(ok => setTimeout(ok, 0)));
+    }
     if (c.cliente) await page.evaluate(cl => CDI.setClienteActivo(cl), cliente);
     if (Date.now() - desde > 50000) throw new Error(c.que + ': entre las dos cargas pasaron más de 50 s');
-    const mal = await c.mira(page, String(cliente.id));
+    mal = mal || await c.mira(page, String(cliente.id));
     if (mal) fallas.push(c.que + ': ' + mal); else console.log('OK | ' + c.que);
     await page.close();
   }
