@@ -8,6 +8,7 @@ Mercado Pago simulado: ni el SDK real ni internet.
 """
 import asyncio
 import threading
+from datetime import datetime, timezone
 
 import httpx
 import pytest
@@ -166,7 +167,14 @@ _SIN_FIRMA = {
     "ipn de cobro": {"url": "/api/payments/webhook?topic=subscription_authorized_payment&id={pid}"},
     "json sin firma": {"url": "/api/payments/webhook",
                        "content": '{{"type": "payment", "data": {{"id": "{pid}"}}}}'},
-    "firma con otra clave": {"url": "/api/payments/webhook", "otra_clave": True},
+    "firma con otra clave": {"url": "/api/payments/webhook", "clave": "otra-clave"},
+    "firmado con clave vacía": {"url": "/api/payments/webhook", "clave": ""},
+    "sólo los primeros caracteres": {"url": "/api/payments/webhook", "clave": SECRETO,
+                                     "v1": lambda v: v[:8] + "".join("1" if c == "0" else "0" for c in v[8:])},
+    "el último carácter cambiado": {"url": "/api/payments/webhook", "clave": SECRETO,
+                                    "v1": lambda v: v[:-1] + ("1" if v[-1] == "0" else "0")},
+    "firma más corta": {"url": "/api/payments/webhook", "clave": SECRETO, "v1": lambda v: v[:-1]},
+    "firma más larga": {"url": "/api/payments/webhook", "clave": SECRETO, "v1": lambda v: v + "0"},
     "cuerpo que no es un objeto": {"url": "/api/payments/webhook", "content": '["{pid}"]', "firma": b"ts=1,v1=00"},
     "data que no es un objeto": {"url": "/api/payments/webhook", "content": '{{"data": ["{pid}"]}}',
                                  "firma": b"ts=1,v1=00"},
@@ -187,12 +195,17 @@ def test_un_aviso_sin_firma_verificable_no_cambia_nada(client, monkeypatch, secr
     client.cookies.clear()
     _set_user(usuario, billing_status="past_due", ops_used_this_period=7)
     antes = _get_user(usuario)
-    for nombre, aviso in _SIN_FIRMA.items():
-        pid = f"sf-{nombre.replace(' ', '-')}-{usuario}"
+    for i, (nombre, aviso) in enumerate(_SIN_FIRMA.items()):
+        pid = f"sf-{i}-{usuario}"
         PAGOS[pid] = {"id": pid, "status": "approved", "external_reference": f"{usuario}:premium",
-                      "transaction_amount": 45000.0, "currency_id": "ARS", "payer": {"id": "p"}}
-        if aviso.get("otra_clave"):
-            r = client.post(aviso["url"], **aviso_firmado("payment", pid, "otra-clave"))
+                      "transaction_amount": 45000.0, "currency_id": "ARS", "payer": {"id": "p"},
+                      "date_approved": datetime.now(timezone.utc).isoformat()}
+        if "clave" in aviso:
+            firmado = aviso_firmado("payment", pid, aviso["clave"])
+            if "v1" in aviso:
+                real = firmado["headers"]["x-signature"].split("v1=")[1]
+                firmado["headers"]["x-signature"] = f"ts=1700000000,v1={aviso['v1'](real)}"
+            r = client.post(aviso["url"], **firmado)
         else:
             firma = {"x-signature": aviso["firma"], "x-request-id": "r"} if aviso.get("firma") else {}
             r = client.post(aviso["url"].format(pid=pid), content=aviso.get("content", "").format(pid=pid),

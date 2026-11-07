@@ -104,6 +104,16 @@ sabotaje $M "la firma se compara como texto" "'firma con letras no ascii'" \
   "    return _hmac.compare_digest(expected.encode(), received_v1.encode())" \
   "    return _hmac.compare_digest(expected, received_v1)"
 
+sabotaje $M "sin clave configurada, se verifica con la clave vacía" "('firmado con clave vacía', 200" \
+  $'    if not MP_WEBHOOK_SECRET:\n        return False\n' ""
+for fila in "sólo los primeros caracteres|_hmac.compare_digest(expected.encode()[:8], received_v1.encode()[:8])" \
+            "firma más corta|expected.startswith(received_v1)" \
+            "firma más larga|received_v1.startswith(expected)" \
+            "el último carácter cambiado|_hmac.compare_digest(expected.encode()[:-1], received_v1.encode()[:-1])"; do
+  sabotaje $M "la firma se compara a medias (${fila%%|*})" "('${fila%%|*}', 200" \
+    "    return _hmac.compare_digest(expected.encode(), received_v1.encode())" "    return ${fila#*|}"
+done
+
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]

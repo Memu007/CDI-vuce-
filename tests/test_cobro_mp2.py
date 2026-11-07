@@ -460,7 +460,8 @@ def test_otro_miembro_no_abre_una_segunda_suscripcion_de_la_org(client, estado_m
 
 def _org_con_suscripcion(client, quien_entra: str):
     """Org activa: la dueña A y B, que abrió la suscripción; C, un miembro más.
-    La sesión queda en quien_entra («duena», «abrio» o «miembro»): se registra último."""
+    La sesión queda en quien_entra («duena», «abrio», «miembro» o «duena_de_otro»,
+    dueña de otro estudio): se registra último."""
     from tests.test_cobro_mp1 import _org
     nombres = {k: _unique(f"mp2_{k}") for k in ("duena", "abrio", "miembro")}
     for k in sorted(nombres, key=lambda k: k == quien_entra):
@@ -475,6 +476,10 @@ def _org_con_suscripcion(client, quien_entra: str):
         _set_user(u, organization_id=org_id, billing_status="trial",
                   trial_ends_at=datetime.now(timezone.utc) + timedelta(days=3))
     _set_user(nombres["abrio"], mp_preapproval_id=sid)
+    if quien_entra == "duena_de_otro":
+        otra = _unique("mp2_otra")
+        _register(client, otra)
+        _set_user(otra, organization_id=_org(otra, billing_status="active", plan="premium", trial_ends_at=fin))
     return nombres, sid, org_id, fin
 
 
@@ -594,6 +599,12 @@ def _sin_cambios(nombres, sid, org_id):
     pass
 
 
+def _cancelada_con_la_suya_anotada(nombres, sid, org_id):
+    from tests.test_cobro_mp1 import _leer_org
+    SUS[sid] = "paused"
+    _leer_org(org_id, billing_status="canceled", payment_provider=None)
+
+
 def _cancelada_por_la_duena(nombres, sid, org_id):
     from tests.test_cobro_mp1 import _leer_org
     SUS[sid] = "cancelled"
@@ -648,24 +659,27 @@ def _salio_sin_suscripcion(cancelaciones):
 
 _SACAR_MIEMBRO = ("delete", "/api/organizations/members/{miembro}")
 _SACAR_ABRIO = ("delete", "/api/organizations/members/{abrio}")
-# Escenario → (preparar, pedido, lo que hace un 200, código para la dueña, quien abrió y otro miembro).
+_SACA = {"duena": 200, "abrio": 403, "miembro": 403, "duena_de_otro": 404}
+# Escenario → (preparar, pedido, lo que hace un 200, código según quién lo pide).
 _QUIEN_TOCA = {
-    "cancelar": (_sin_cambios, ("post", "/api/billing/cancel"), _cancelo, (200, 200, 403)),
+    "cancelar": (_sin_cambios, ("post", "/api/billing/cancel"), _cancelo,
+                 {"duena": 200, "abrio": 200, "miembro": 403}),
     "reactivar": (_cancelada_por_la_duena, ("post", "/api/billing/reactivate"), _volvio_a_la_prueba,
-                  (200, 403, 403)),
-    "checkout_con_pausada": (_pausada_y_vencida, ("post", "/api/billing/checkout"), _abrio_otra, (409, 200, 409)),
-    "sacar_con_pendiente": (_del_miembro("pending"), _SACAR_MIEMBRO, _salio_sin_suscripcion(1),
-                            (200, 403, 403)),
-    "sacar_con_cancelada": (_del_miembro("cancelled"), _SACAR_MIEMBRO, _salio_sin_suscripcion(0),
-                            (200, 403, 403)),
-    "sacar_sin_mp": (_del_miembro("pending", _contesta_500), _SACAR_MIEMBRO, None, (503, 403, 403)),
-    "sacar_a_la_que_paga": (_la_que_paga("authorized"), _SACAR_ABRIO, None, (409, 403, 403)),
-    "sacar_a_la_pausada": (_la_que_paga("paused"), _SACAR_ABRIO, None, (409, 403, 403)),
+                  {"duena": 200, "abrio": 403, "miembro": 403}),
+    "reactivar_con_la_suya": (_cancelada_con_la_suya_anotada, ("post", "/api/billing/reactivate"),
+                              _volvio_a_la_prueba, {"duena": 200, "abrio": 200, "miembro": 403}),
+    "checkout_con_pausada": (_pausada_y_vencida, ("post", "/api/billing/checkout"), _abrio_otra,
+                             {"duena": 409, "abrio": 200, "miembro": 409}),
+    "sacar_con_pendiente": (_del_miembro("pending"), _SACAR_MIEMBRO, _salio_sin_suscripcion(1), _SACA),
+    "sacar_con_cancelada": (_del_miembro("cancelled"), _SACAR_MIEMBRO, _salio_sin_suscripcion(0), _SACA),
+    "sacar_sin_mp": (_del_miembro("pending", _contesta_500), _SACAR_MIEMBRO, None, {**_SACA, "duena": 503}),
+    "sacar_a_la_que_paga": (_la_que_paga("authorized"), _SACAR_ABRIO, None, {**_SACA, "duena": 409}),
+    "sacar_a_la_pausada": (_la_que_paga("paused"), _SACAR_ABRIO, None, {**_SACA, "duena": 409}),
 }
 
 
-@pytest.mark.parametrize("quien", ["duena", "abrio", "miembro"])
-@pytest.mark.parametrize("escenario", list(_QUIEN_TOCA))
+@pytest.mark.parametrize("escenario, quien", [
+    pytest.param(e, q, id=f"{e}-{q}") for e, (*_, codigos) in _QUIEN_TOCA.items() for q in codigos])
 def test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan(client, escenario, quien):
     from tests.test_cobro_mp1 import _leer_org
     preparar, (metodo, ruta), hecho, codigos = _QUIEN_TOCA[escenario]
@@ -673,7 +687,7 @@ def test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan(client, escenario, qui
     preparar(nombres, sid, org_id)
     antes = (dict(SUS), {k: _leer(u) for k, u in nombres.items()}, _leer_org(org_id))
     r = getattr(client, metodo)(ruta.format(**nombres), **({"json": {"plan": "premium"}} if "checkout" in ruta else {}))
-    codigo = dict(zip(("duena", "abrio", "miembro"), codigos))[quien]
+    codigo = codigos[quien]
     assert r.status_code == codigo, r.text
     if codigo == 200:
         assert hecho(nombres, sid, org_id), r.text
@@ -806,3 +820,51 @@ def test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope(client, monkeypatc
     assert r.status_code == 503, r.text
     assert demora < 3, demora
     assert (_leer_org(org_id), {k: _leer(u) for k, u in nombres.items()}) == antes
+    # Mercado Pago pudo haber cancelado igual: el aviso no dice que nada cambió.
+    assert pedido != _CANCELAR or "no se pudo confirmar" in r.json()["detail"].lower(), r.text
+
+
+class _Lenta:
+    """Cada pedido a la API tarda 0,6 s (entrada simulada, no una espera del caso)."""
+    en_curso = 0
+    cambio = threading.Condition()
+
+    @classmethod
+    def responder(cls, pedido):
+        with cls.cambio:
+            cls.en_curso += 1
+        try:
+            threading.Event().wait(0.6)
+            return _api_mp(pedido)
+        finally:
+            with cls.cambio:
+                cls.en_curso -= 1
+                cls.cambio.notify_all()
+
+
+# Cada pedido entra en el tope y la suma lo pasa: cancelar dos pendientes, sacar a
+# quien abrió una pendiente y el checkout de quien la abrió leen y cancelan.
+@pytest.mark.parametrize("pedido, quien", [(_CANCELAR, "duena"), (_SACAR_ABRIO, "duena"), (_CHECKOUT, "abrio")],
+                         ids=["cancelar", "sacar", "checkout"])
+def test_el_tope_es_uno_para_todos_los_pedidos_a_mp(client, monkeypatch, pedido, quien):
+    import proyecto_maria.main as main_mod
+    from tests.test_cobro_mp1 import _leer_org
+    monkeypatch.setattr(main_mod, "_TOPE_MP", 1.0, raising=False)
+    if pedido == _CANCELAR:
+        nombres, *_, org_id = _dos_pendientes(client)
+    else:
+        nombres, sid, org_id, _ = _org_con_suscripcion(client, quien)
+        SUS[sid] = "pending"
+    monkeypatch.setattr(main_mod.httpx, "Client",
+                        lambda **kw: httpx.Client(transport=httpx.MockTransport(_Lenta.responder), **kw))
+    antes = _leer_org(org_id), {k: _leer(u) for k, u in nombres.items()}
+    metodo, ruta = pedido
+    inicio = time.monotonic()
+    r = getattr(client, metodo)(ruta.format(**nombres), **({"json": {"plan": "premium"}} if metodo == "post" else {}))
+    demora = time.monotonic() - inicio
+    with _Lenta.cambio:
+        assert _Lenta.cambio.wait_for(lambda: _Lenta.en_curso == 0, timeout=10)
+    assert r.status_code == 503, r.text
+    assert demora < 2, demora
+    assert (_leer_org(org_id), {k: _leer(u) for k, u in nombres.items()}) == antes
+    assert CREADAS == []

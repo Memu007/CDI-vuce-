@@ -262,6 +262,21 @@ sabotaje $M "el checkout da 500 cuando el SDK corta solo antes del tope" \
   "FAILED $T::test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope[checkout_crea_sdk_corta]" \
   "    except (_SuscripcionMPError, requests.RequestException) as e:" "    except _SuscripcionMPError as e:"
 
+sabotaje $M "cada pedido a Mercado Pago tiene su propio tope" \
+  "FAILED $T::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[cancelar]" \
+  "    with anyio.fail_after(max(hasta - anyio.current_time(), 0)):" "    with anyio.fail_after(_TOPE_MP):"
+sabotaje $M "si Mercado Pago no contesta, cancelar dice que el plan sigue igual" \
+  "FAILED $T::test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope[cancelar_lee]" \
+  "No se pudo confirmar la cancelación en Mercado Pago. Probá" "No se pudo cancelar en Mercado Pago; tu plan sigue igual. Probá"
+
+# --- Quién toca a quién entre estudios
+sabotaje $M "la dueña de un estudio saca a un miembro de otro" \
+  "FAILED $T::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[sacar_con_pendiente-duena_de_otro]" \
+  "User.username == username, User.organization_id == org.id).with_for_update())" "User.username == username).with_for_update())"
+sabotaje $M "reactivar no mira la suscripción de quien la abrió" \
+  "FAILED $T::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[reactivar_con_la_suya-abrio]" \
+  "_quien_toca_el_plan(db_user, org, con_sid, \"reactivar el plan\"" "_quien_toca_el_plan(db_user, org, [], \"reactivar el plan\""
+
 # --- Un pago no pierde días (D7.1)
 sabotaje $M "el pago suma desde el fin sólo si está activa" \
   "FAILED $T::test_un_pago_suma_desde_el_fin_del_periodo" \
