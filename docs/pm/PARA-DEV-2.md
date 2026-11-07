@@ -72,7 +72,7 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
 ## ENTRADAS-1: devolución sólo de pruebas, sobre `589fd0b` (2026-11-07 PM)
 
 Reproducido igual al informe: chequeo-6 (+27 explicado, aceptado), `68
-passed`, Postgres `fallas: 0`, `entradas1.sh` 22 en rojo; suite en curso (va en el acta). Login
+passed`, Postgres `fallas: 0`, `entradas1.sh` 22 en rojo; suite `1 failed, 5070 passed` igual a la tuya (el rojo de `despacho1b`). Login
 y `current_password` con claves rotas dan 401/400. Opus alto: sin 500 nuevo
 ni regresión de acceso. **El producto queda como está.** Acta:
 `REPRODUCCION-ENTRADAS-1-2026-11-07.md`. **Supuestos S1 a S6: aceptados.**

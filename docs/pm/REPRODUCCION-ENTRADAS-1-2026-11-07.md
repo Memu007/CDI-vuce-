@@ -15,7 +15,7 @@ probó; las pruebas no distinguen cuatro daños reales del arreglo.
 | `test_entradas1.py` + `test_user_profile_coverage.py` | `68 passed` |
 | `entradas1_postgres.py` (PG 55462, rol `cdi`) | `fallas: 0` |
 | `sabotajes/entradas1.sh 589fd0b` | `BASE en verde`, 22 `ROJO`, `sabotajes con falla: 0` |
-| Suite completa sobre `589fd0b` | en curso al escribir; se completa en el commit siguiente |
+| Suite completa sobre `589fd0b` | `1 failed, 5070 passed, 335 skipped, 3 xfailed in 805.15s`, igual a la Dev; el rojo es `test_despacho1b.py::test_las_hojas_leidas_antes_del_corte_dan_sus_productos`, que solo da `1 passed` (el intermitente de su cola) |
 | Negativo de PM | login con clave de 73 bytes, surrogate, NUL o 200 bytes: 401; `current_password` así en cambio de clave: 400 «incorrecta»; nueva de 72 bytes con «ñ» pasa el validador de largo, de 73 da 422 |
 
 ## Adversarios
