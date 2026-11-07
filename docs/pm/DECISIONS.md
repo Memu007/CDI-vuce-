@@ -447,3 +447,7 @@ COBRO-MP-2 vuelta + COBRO-MP-3: devolución de pruebas sobre `cb740f3` (firma, q
 ### 2026-11-07 22:40 UTC (PM principal)
 
 ABUSO-2: devolución sólo de pruebas sobre `8ad47ee`; producto sin cambios. D105 (a), decidida por la PM: el tope de recuperar por cuenta queda así y va como riesgo (un mail menos por hora para quien pidió; contar también por IP reabre el salto con muchas IPs).
+
+### 2026-11-07 22:55 UTC (PM principal)
+
+Rojo de `despacho1b` aceptado sobre `d69233c` (sólo prueba, sin integrar). D106 (a), decidida por la PM: el resto del tope para entender el texto queda sin mínimo propio; riesgo, con el tope de producción son 2 s en un proceso con poca memoria.

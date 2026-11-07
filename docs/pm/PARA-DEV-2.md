@@ -69,6 +69,14 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## Rojo de `despacho1b`: aceptado sobre `d69233c`, sin integrar (2026-11-07 PM)
+
+`283 passed`, chequeo-6 `+0/−0` sin avisos; la causa la medí aparte (una
+pasada del recolector con 3 M objetos gasta 0,53 s; con `gc.freeze`, 0).
+Acta: `REPRODUCCION-DESPACHO1B-ROJO-2026-11-07.md`. **D106: (a), decidido
+por la PM**, queda como riesgo. Tu orden no cambia: la devolución de ABUSO-2
+primero, después ENTORNO-2. Próxima D: D107.
+
 ## ABUSO-2: devolución sólo de pruebas, sobre `8ad47ee` (2026-11-07 PM)
 
 Reproducido igual al informe: chequeo-6 (`+35/−24`, avisos 0), `83 passed`,
@@ -97,9 +105,9 @@ sólo de pruebas y sabotajes; el informe muestra cada mutación en rojo.
   email, recuperar manda 3 mails por cuenta; el tope de recuperar es de
   ventana fija (de antes).
 
-Tu orden: **esta devolución** → el rojo de `despacho1b` → ENTORNO-2 → D100 →
+Tu orden: **esta devolución** → ENTORNO-2 → D100 →
 ENTRADAS-2 → el resto. La vuelta de ENTRADAS-1 (`c839197`) la estoy
-revisando. Próxima D: D106.
+revisando.
 
 ## ENTRADAS-1: devolución sólo de pruebas, sobre `589fd0b` (2026-11-07 PM)
 
