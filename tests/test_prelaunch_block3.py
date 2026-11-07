@@ -317,9 +317,9 @@ class TestWebhookSeguridad:
         assert resp.json().get("skipped") is not None
 
     def test_produccion_sin_secret_rechaza_todo(self, client, monkeypatch):
-        """En IS_PRODUCTION=True sin MP_WEBHOOK_SECRET → rechaza (401) por defensa en profundidad."""
+        """En producción sin MP_WEBHOOK_SECRET → rechaza (401) por defensa en profundidad."""
         monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "")
-        monkeypatch.setattr(main_mod, "IS_PRODUCTION", True)
+        monkeypatch.setenv("ENVIRONMENT", "production")
         body = {"type": "payment", "data": {"id": "pay-prod"}}
         resp = client.post(
             "/api/payments/webhook",

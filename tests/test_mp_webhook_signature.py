@@ -56,7 +56,7 @@ def test_signature_no_secret_in_prod_rejects(monkeypatch):
     """En prod sin secret seteado → rechaza siempre (defensa en profundidad)."""
     from proyecto_maria import main as m
     m.MP_WEBHOOK_SECRET = ""
-    monkeypatch.setattr(m, "IS_PRODUCTION", True)
+    monkeypatch.setenv("ENVIRONMENT", "production")
 
     req = MagicMock()
     req.headers = {"x-signature": "ts=1,v1=fake", "x-request-id": "x"}
@@ -68,7 +68,7 @@ def test_signature_no_secret_in_dev_allows(monkeypatch):
     """En dev sin secret → True (para no frenar tests locales)."""
     from proyecto_maria import main as m
     m.MP_WEBHOOK_SECRET = ""
-    monkeypatch.setattr(m, "IS_PRODUCTION", False)
+    monkeypatch.setenv("ENVIRONMENT", "development")
 
     req = MagicMock()
     req.headers = {}
