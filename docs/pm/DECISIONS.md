@@ -423,3 +423,7 @@ RESET-2 aceptada sobre `99d3f69`, sin integrar por `e0b8626`. D93 (a). D91/D92, 
 ### 2026-11-06 15:57 UTC (PM principal)
 
 Corte por la regla de Emi del 04/11: las tres sesiones muestran el límite semanal en `allowed_warning` antes del 06/11 21:30 UTC. Rutinas de la PM, MARIA y técnica apagadas (`enabled false`); las dos Devs frenadas con un mensaje; el control de las 21:30 también apagado. Retomar sólo con Emi.
+
+### 2026-11-07 15:50 UTC (PM principal)
+
+Emi: «Podés trabajar con el team por 24hs … 24 y cortar (si hay algo haciéndose se termina)». Rutinas de PM, MARIA y técnica prendidas otra vez; Devs despertadas en su orden. Corte el 2026-11-08 15:50 UTC (`trig_01QwEeyuXBFBx6LErxqapwRh`): rutinas apagadas, cada Dev termina el paso en curso, sube y anota dónde quedó. `allowed_warning` ya no corta (Emi decidió seguir sabiéndolo).
