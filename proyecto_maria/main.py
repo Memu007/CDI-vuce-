@@ -117,8 +117,8 @@ def _pista_dev_habilitada(email_sent: bool) -> bool:
     return not email_sent and IS_TESTING
 
 # --- SECURITY CHECK reforzado ---
-# 1) Default dev key nunca puede usarse en prod.
-# 2) Key demasiado corta (<32) es insegura para HS256, fail en prod, warn en dev.
+# 1) Default dev key nunca puede usarse fuera de desarrollo.
+# 2) Key demasiado corta (<32) es insegura para HS256, fail fuera de desarrollo, warn en dev.
 # 3) En dev, log visible si estamos usando la default para no olvidarse al
 #    pasar a prod.
 _known_weak_substrings = ("cambiar-en-produccion", "changeme", "secret", "default", "12345")
@@ -126,9 +126,9 @@ _is_default_key = _CLAVE_JWT == _DEFAULT_DEV_SECRET
 _is_obviously_weak = any(w in _CLAVE_JWT.lower() for w in _known_weak_substrings)
 _is_too_short = len(_CLAVE_JWT) < 32
 
-if IS_PRODUCTION and (_is_default_key or _is_obviously_weak or _is_too_short):
+if not _es_desarrollo() and (_is_default_key or _is_obviously_weak or _is_too_short):
     raise ValueError(
-        "CRITICAL SECURITY ERROR: running in PRODUCTION with an insecure "
+        "CRITICAL SECURITY ERROR: running outside development with an insecure "
         "JWT_SECRET_KEY. Requirements: >=32 chars, no obvious words "
         "('secret', 'changeme', 'default', etc). Set JWT_SECRET_KEY in .env."
     )
