@@ -1841,9 +1841,8 @@ class RecoverUsernameRequest(BaseModel):
 async def recover_username(request: RecoverUsernameRequest, req: Request, db: AsyncSession = Depends(get_db)):
     """Envía el username al email del usuario"""
     mensaje = {"message": "Si el email está registrado, te enviamos tu nombre de usuario."}
-    # 5 pedidos cada 15 minutos por IP; 3 mails por hora por cuenta, y después
-    # se contesta lo mismo sin mandar. Se cuenta la cuenta y no el texto
-    # pedido: dos textos que la base toma por el mismo email son una sola.
+    # Los mails se cuentan por cuenta y no por texto: dos textos que la base
+    # toma por el mismo email son una sola cuenta.
     if limiter.enabled and await limites_auth.contar(db, f"recuperar:ip:{get_client_ip(req)}", 15 * 60) > 5:
         log_429(req, "recuperar usuario")
         raise HTTPException(status_code=429, detail="Demasiados intentos. Intente en 15 minutos.")
@@ -3212,10 +3211,8 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
     if not user and "@" in (username or ""):
         user = await _cuenta_por_email(db, username)
     
-    # Desde el quinto fallo de la IP, bloqueo de 15 minutos. Los fallos con
-    # una cuenta existente se cuentan también aparte, para que su login
-    # correcto perdone sólo esos y no los que la IP probó con otras. El
-    # prefijo propio evita que una IP escrita por el cliente pise esta clave.
+    # Los fallos con una cuenta se cuentan también aparte (con un prefijo que la IP
+    # del cliente no puede escribir) para que su login correcto perdone sólo esos.
     clave_cuenta = f"cuenta:{user.username}:{clave_intentos}" if user else None
 
     async def handle_failed_login():

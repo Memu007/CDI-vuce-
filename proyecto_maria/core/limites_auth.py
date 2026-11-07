@@ -104,11 +104,8 @@ async def limpiar(db: AsyncSession, clave: str) -> None:
 
 
 async def descontar(db: AsyncSession, clave: str, propia: str) -> None:
-    """Borra el contador `propia` y resta lo que contaba del de `clave`: los
-    fallos que se contaron en los dos se perdonan y los demás de `clave`
-    quedan. El DELETE ... RETURNING hace que dos llamadas a la vez no resten
-    dos veces. Un bloqueo ya vencido se olvida, así lo que queda vuelve a
-    sumar hasta el tope."""
+    """Perdona en `clave` sólo lo contado en `propia`; el DELETE ... RETURNING
+    evita restar dos veces si dos llamadas corren a la vez."""
     clave, propia = _clave(clave), _clave(propia)
     ahora = _ahora()
     await db.execute(delete(_T).where(_T.c.vence <= ahora))
