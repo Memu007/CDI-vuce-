@@ -785,6 +785,8 @@ class _NoContesta:
 
 _CANCELAR = ("post", "/api/billing/cancel")
 _CHECKOUT = ("post", "/api/billing/checkout")
+_REACTIVAR = ("post", "/api/billing/reactivate")
+_NO_SE_CONFIRMO_CANCELAR = "No se pudo confirmar la cancelación en Mercado Pago. Probá de nuevo en unos minutos."
 
 
 # Quién pide, qué, dónde se traba Mercado Pago (al leer, al cancelar o al crear) y
@@ -820,52 +822,61 @@ def test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope(client, monkeypatc
     assert r.status_code == 503, r.text
     assert demora < 3, demora
     assert (_leer_org(org_id), {k: _leer(u) for k, u in nombres.items()}) == antes
-    # Mercado Pago pudo haber cancelado igual: el aviso no dice que nada cambió.
-    detalle = r.json()["detail"].lower()
-    assert pedido != _CANCELAR or ("no se pudo confirmar" in detalle and "sigue igual" not in detalle), r.text
+    # Mercado Pago pudo haber cancelado igual: el aviso no afirma cómo quedó el plan.
+    assert pedido != _CANCELAR or r.json()["detail"] == _NO_SE_CONFIRMO_CANCELAR, r.text
 
 
 class _Lenta:
-    """Cada pedido a la API tarda 0,6 s (entrada simulada, no una espera del caso)."""
+    """Cada pedido a Mercado Pago tarda `demora` (entrada simulada, no una espera del caso)."""
+    demora = 0.0
     en_curso = 0
     cambio = threading.Condition()
 
     @classmethod
-    def responder(cls, pedido):
-        with cls.cambio:
-            cls.en_curso += 1
-        try:
-            threading.Event().wait(0.6)
-            return _api_mp(pedido)
-        finally:
+    def tarda(cls, fn):
+        def lenta(*args):
             with cls.cambio:
-                cls.en_curso -= 1
-                cls.cambio.notify_all()
+                cls.en_curso += 1
+            try:
+                threading.Event().wait(cls.demora)
+                return fn(*args)
+            finally:
+                with cls.cambio:
+                    cls.en_curso -= 1
+                    cls.cambio.notify_all()
+        return lenta
 
 
-# Cada pedido entra en el tope y la suma lo pasa: cancelar dos pendientes, sacar a
-# quien abrió una pendiente y el checkout de quien la abrió leen y cancelan.
-@pytest.mark.parametrize("pedido, quien", [(_CANCELAR, "duena"), (_SACAR_ABRIO, "duena"), (_CHECKOUT, "abrio")],
-                         ids=["cancelar", "sacar", "checkout"])
-def test_el_tope_es_uno_para_todos_los_pedidos_a_mp(client, monkeypatch, pedido, quien):
+# Cada pedido entra en el tope y la suma lo pasa justo en el pedido n.º `fase`: un
+# plazo propio en esa fase la deja terminar (cambia algo, contesta otra cosa o tarda).
+@pytest.mark.parametrize("pedido, quien, fase", [
+    (_CANCELAR, "duena", 2), (_CANCELAR, "duena", 3), (_REACTIVAR, "duena", 2),
+    (_CHECKOUT, "abrio", 2), (_CHECKOUT, "abrio", 3), (_CHECKOUT, "abrio", 4), (_SACAR_ABRIO, "duena", 2),
+], ids=["cancelar_lee", "cancelar_cancela", "reactivar_lee", "checkout_relee", "checkout_cancela",
+        "checkout_crea", "sacar_cancela"])
+def test_el_tope_es_uno_para_todos_los_pedidos_a_mp(client, monkeypatch, pedido, quien, fase):
     import proyecto_maria.main as main_mod
     from tests.test_cobro_mp1 import _leer_org
-    monkeypatch.setattr(main_mod, "_TOPE_MP", 1.0, raising=False)
-    if pedido == _CANCELAR:
+    tope = 1.0
+    monkeypatch.setattr(main_mod, "_TOPE_MP", tope, raising=False)
+    if quien == "duena" and pedido != _SACAR_ABRIO:
         nombres, *_, org_id = _dos_pendientes(client)
     else:
         nombres, sid, org_id, _ = _org_con_suscripcion(client, quien)
         SUS[sid] = "pending"
+    monkeypatch.setattr(_Lenta, "demora", 0.9 * tope / (fase - 1))
     monkeypatch.setattr(main_mod.httpx, "Client",
-                        lambda **kw: httpx.Client(transport=httpx.MockTransport(_Lenta.responder), **kw))
+                        lambda **kw: httpx.Client(transport=httpx.MockTransport(_Lenta.tarda(_api_mp)), **kw))
+    monkeypatch.setattr(_Creador, "create", _Lenta.tarda(_Creador.create))
     antes = _leer_org(org_id), {k: _leer(u) for k, u in nombres.items()}
+    if pedido == _CHECKOUT and fase == 4:
+        antes[1]["abrio"]["mp_preapproval_id"] = None  # ya cancelada en Mercado Pago
     metodo, ruta = pedido
     inicio = time.monotonic()
-    r = getattr(client, metodo)(ruta.format(**nombres), **({"json": {"plan": "premium"}} if metodo == "post" else {}))
+    r = getattr(client, metodo)(ruta.format(**nombres), **({"json": {"plan": "premium"}} if pedido == _CHECKOUT else {}))
     demora = time.monotonic() - inicio
     with _Lenta.cambio:
         assert _Lenta.cambio.wait_for(lambda: _Lenta.en_curso == 0, timeout=10)
     assert r.status_code == 503, r.text
-    assert demora < 2, demora
+    assert demora < 1.4 * tope, demora
     assert (_leer_org(org_id), {k: _leer(u) for k, u in nombres.items()}) == antes
-    assert CREADAS == []
