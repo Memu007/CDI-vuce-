@@ -3,6 +3,7 @@ y escribe en la última línea, como JSON, qué puertas de desarrollo abre."""
 
 import asyncio
 import json
+import os
 import sys
 
 import dotenv
@@ -34,14 +35,30 @@ async def _crear_usuario():
     return await _consultar(crear)
 
 
+def _vuce_simulado():
+    from proyecto_maria.core.vuce_connector import VuceClient
+    try:
+        VuceClient()._request("/ncm/01012100")
+        return "responde"
+    except Exception as e:
+        return type(e).__name__
+
+
 def main():
     with TestClient(m.app) as c:
         demo = asyncio.run(_consultar(lambda s: _escalar(s, select(User.username).where(
             User.username.in_(["demo", "premium", "basico"])))))
         guardada = asyncio.run(_crear_usuario())
-        sesion = c.post("/auth/login", json={"username": "sonda", "password": "Clave-sonda-1"}).json()
-        cobro = c.post("/api/billing/simulate-charge",
-                       headers={"Authorization": f"Bearer {sesion['access_token']}"}).status_code
+        entrada = c.post("/auth/login", json={"username": "sonda", "password": "Clave-sonda-1"})
+        sesion = entrada.json()
+        cookies = {h.split("=", 1)[0]: "; secure" in h.lower() for h in entrada.headers.get_list("set-cookie")}
+        bearer = {"Authorization": f"Bearer {sesion['access_token']}"}
+        cobro = c.post("/api/billing/simulate-charge", headers=bearer).status_code
+        os.environ["ENABLE_SIMULATE_CHARGE"] = "true"
+        cobro_con_bandera = c.post("/api/billing/simulate-charge", headers=bearer).status_code
+        c.cookies.clear()
+        csrf = c.post("/api/ruta-que-no-existe", headers={"Cookie": "access_token=x"}).status_code
+        docs = [c.get(p).status_code for p in ("/docs", "/redoc", "/openapi.json")]
         # Al final: si la puerta abre, cambia la clave guardada.
         login_hash = c.post("/auth/login", json={"username": "sonda", "password": guardada}).status_code
         c.post("/auth/request-password-reset", json={"email": "sonda@example.com"})
@@ -52,7 +69,9 @@ def main():
     sys.stdout.flush()
     print("\nSONDA " + json.dumps({"demo": sorted(demo), "login_hash": login_hash,
                                    "token": token[0] if token else None, "firma": firma,
-                                   "cobro": cobro}))
+                                   "cobro": cobro, "cobro_con_bandera": cobro_con_bandera,
+                                   "cookies": cookies, "csrf": csrf, "docs": docs,
+                                   "vuce": _vuce_simulado()}))
 
 
 async def _escalar(s, q):

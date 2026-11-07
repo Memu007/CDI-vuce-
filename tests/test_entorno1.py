@@ -20,7 +20,9 @@ AUSENTE = None
 CERRADOS = [AUSENTE, "", "production", "prod", "staging", "Development", " development", "TESTING"]
 ABIERTOS = ["development", "test", "testing"]
 
-IMPORTAR_SIN_ENV = "import dotenv; dotenv.load_dotenv = lambda *a, **k: False; import proyecto_maria.main"
+SIN_DOTENV = "import dotenv; dotenv.load_dotenv = lambda *a, **k: False; "
+IMPORTAR_SIN_ENV = SIN_DOTENV + "import proyecto_maria.main"
+IMPORTAR_SIN_BASE = SIN_DOTENV + "import proyecto_maria.database.connection"
 
 pytestmark = pytest.mark.security
 
@@ -49,6 +51,11 @@ def _sondear(valor, carpeta: Path) -> dict:
                               cwd=str(carpeta), env=env, timeout=120)
     datos["arranca_sin_clave"] = arranque.returncode == 0
     datos["rechaza_sin_clave"] = "insecure JWT_SECRET_KEY" in arranque.stderr
+    env["JWT_SECRET_KEY"], _ = "clave-larga-de-cuarenta-y-dos-caracteres-para-prueba-xx", env.pop("DATABASE_URL")
+    base = subprocess.run([sys.executable, "-c", IMPORTAR_SIN_BASE], capture_output=True, text=True,
+                          cwd=str(carpeta), env=env, timeout=120)
+    datos["arranca_sin_base"] = base.returncode == 0
+    datos["rechaza_sin_base"] = "DATABASE_URL no está definida" in base.stderr
     return datos
 
 
@@ -76,6 +83,15 @@ PUERTAS = {
                                                  bool(d["token"]) and not d["link_en_salida"]),
     "cobro_simulado": lambda d: _estado(d["cobro"] == 200, d["cobro"] == 404),
     "clave_jwt_de_desarrollo": lambda d: _estado(d["arranca_sin_clave"], d["rechaza_sin_clave"]),
+    # El segundo cobro pasa la puerta y da 409 si el primero ya activó la cuenta.
+    "cobro_simulado_con_bandera": lambda d: _estado(d["cobro_con_bandera"] in (200, 409),
+                                                    d["cobro_con_bandera"] == 404),
+    "csrf_que_sólo_avisa": lambda d: _estado(d["csrf"] == 404, d["csrf"] == 403),
+    "cookies_sin_secure": lambda d: _estado(d["cookies"] == {"access_token": False, "csrf_token": False},
+                                            d["cookies"] == {"access_token": True, "csrf_token": True}),
+    "docs_y_openapi": lambda d: _estado(d["docs"] == [200, 200, 200], d["docs"] == [404, 404, 404]),
+    "sqlite_sin_database_url": lambda d: _estado(d["arranca_sin_base"], d["rechaza_sin_base"]),
+    "vuce_simulado": lambda d: _estado(d["vuce"] == "responde", d["vuce"] == "SourceUnavailableError"),
 }
 
 
