@@ -332,6 +332,25 @@ def _guardable_en_pg(valor):
 TextoCodificable = Annotated[str, AfterValidator(_guardable_en_pg)]
 
 
+def _clave_hasheable(clave):
+    # bcrypt rechaza más de 72 bytes y no puede codificar un surrogate; el NUL
+    # no se podría escribir en la columna de Postgres.
+    if _NO_GUARDABLE_EN_PG.search(clave) or len(clave.encode("utf-8")) > 72:
+        raise ValueError("La contraseña puede tener hasta 72 bytes y no puede tener caracteres nulos ni inválidos")
+    return clave
+
+
+ClaveNueva = Annotated[str, AfterValidator(_clave_hasheable)]
+
+
+def _email_valido(email):
+    """El email limpio, o 400 si no tiene la forma usuario@dominio.com."""
+    limpio = (email or "").strip().lower()
+    if not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', limpio):
+        raise HTTPException(status_code=400, detail="Email no válido. Debe tener formato usuario@dominio.com")
+    return limpio
+
+
 class LoginRequest(BaseModel):
     username: TextoCodificable
     password: str
@@ -345,15 +364,15 @@ class CardInput(BaseModel):
 
 class RegisterRequest(BaseModel):
     username: str
-    password: str
-    name: str = None  # Optional, defaults to username
+    password: ClaveNueva
+    name: TextoCodificable = None  # Optional, defaults to username
     email: str  # REQUIRED - needed for password recovery
     plan: str = "premium"
     # Ola 4: el trial ya no requiere tarjeta simulada; el usuario elige plan
     # y paga al vencer los 14 días (vía MP subscriptions o checkout manual).
     payment_method: CardInput | None = None
     # Organizaciones: token de invitación para unirse a un estudio
-    invite_token: str | None = None
+    invite_token: TextoCodificable | None = None
 
 class PlanCheckoutRequest(BaseModel):
     plan: str  # solo "premium" (Ola 4 MVP)
@@ -456,7 +475,7 @@ async def _http_exception_friendly(request: Request, exc: StarletteHTTPException
             content={"detail": _FRIENDLY_5XX, "code": "internal_error"},
         )
     # 4xx y 5xx controlados (503, 429, etc.) pasan sin ofuscar
-    detail = exc.detail if exc.detail is not None else ""
+    detail = _guardable_en_pg(exc.detail) if exc.detail is not None else ""
     return JSONResponse(
         status_code=exc.status_code, 
         content={"detail": detail},
@@ -466,10 +485,11 @@ async def _http_exception_friendly(request: Request, exc: StarletteHTTPException
 
 @app.exception_handler(RequestValidationError)
 async def _pedido_mal_armado(request: Request, exc: RequestValidationError):
-    # Como el de FastAPI, que repite lo que llegó, pero en ASCII: así también
-    # se puede responder un surrogate suelto.
+    # Como el de FastAPI, sin repetir lo que llegó: puede ser una clave, bytes
+    # sueltos o un NaN que no es JSON. En ASCII, porque `loc` trae claves ajenas.
+    errores = [{k: v for k, v in e.items() if k != "input"} for e in exc.errors()]
     return Response(
-        json.dumps({"detail": jsonable_encoder(exc.errors())}, ensure_ascii=True),
+        json.dumps({"detail": jsonable_encoder(errores)}, ensure_ascii=True),
         status_code=422, media_type="application/json",
     )
 
@@ -1742,7 +1762,7 @@ async def _cuenta_por_email(db: AsyncSession, email: str):
 
 class PasswordResetConfirm(BaseModel):
     token: TextoCodificable
-    new_password: str
+    new_password: ClaveNueva
 
 
 @app.post("/auth/request-password-reset")
@@ -2443,7 +2463,7 @@ async def verificar_clave_actual(db: AsyncSession, username: str, clave: str, ha
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str
+    new_password: ClaveNueva
 
 
 @app.post("/api/user/change-password")
@@ -3364,10 +3384,7 @@ async def register(request: RegisterRequest, req: Request, background_tasks: Bac
         raise HTTPException(status_code=400, detail="Username inválido. Solo se permiten letras, números, guiones y guiones bajos (3-30 caracteres)")
 
     # Validar formato de email
-    clean_email = (request.email or "").strip().lower()
-    if not clean_email or not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', clean_email):
-        raise HTTPException(status_code=400, detail="Email no válido. Debe tener formato usuario@dominio.com")
-    request.email = clean_email
+    request.email = _email_valido(request.email)
 
     # Verificar si el username ya existe
     result = await db.execute(select(User).where(User.username == request.username))
@@ -10488,9 +10505,9 @@ async def logout_root(request: Request, response: Response, db: AsyncSession = D
 # ============================================================================
 
 class CreateOrgRequest(BaseModel):
-    name: str
+    name: TextoCodificable
     username: str
-    password: str
+    password: ClaveNueva
     email: str
     plan: str = "premium"
 
@@ -10526,7 +10543,7 @@ async def create_organization(
         raise HTTPException(status_code=400, detail="Usuario ya existe")
 
     # Validar email duplicado
-    clean_email = req.email.strip().lower()
+    clean_email = _email_valido(req.email)
     existing_email = await db.execute(select(User).where(func.lower(User.email) == clean_email))
     if existing_email.scalars().first():
         raise HTTPException(status_code=400, detail="Email ya registrado")

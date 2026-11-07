@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-07 · fix: una clave o un texto que no se puede guardar da 422 o 400, no 500 (ENTRADAS-1)
+
+- Una clave nueva (reset, cambio, registro, alta de estudio) de más de 72 bytes o con un carácter nulo o inválido da 422 y no cambia nada: el link de reset sigue sirviendo.
+- El nombre y la invitación del registro y el nombre del estudio con esos caracteres dan 422; el alta de estudio valida el email como el registro. El 422 de un cuerpo raro (bytes que no son UTF-8, `NaN`, `1e999`) es JSON válido y ya no repite lo que llegó.
+
 ## 2026-11-07 · fix: sin ENVIRONMENT o con un valor desconocido no se abre ninguna puerta de desarrollo (ENTORNO-1)
 
 - Sólo `development`, `test` o `testing` habilitan los usuarios demo, el login con la contraseña guardada tal cual, el webhook de Mercado Pago sin secreto, el link de reset por consola y el cobro simulado. Cualquier otro valor, o la variable ausente, se trata como producción para esas cinco puertas.
