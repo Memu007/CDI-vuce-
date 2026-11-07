@@ -69,40 +69,31 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## ABUSO-1: aceptada sobre `55bf408`, sin integrar (2026-11-07 PM)
+## ENTORNO-1: aceptada sobre `83085e4`, sin integrar (2026-11-07 PM)
 
-Reproducido: `72 passed`, chequeo-6 igual al informe, `pg: todo OK`, 35
-sabotajes en rojo sin falla, suite `1 failed, 5004 passed` (el rojo es de `test_despacho1b`, ver abajo). Opus y Sonnet alto: nada serio
-introducido. Acta: `REPRODUCCION-ABUSO-1-2026-11-07.md`. Sin integrar, por
-lo mismo que `e0b8626`. **Supuestos 1 a 3: aceptados.**
+Reproducido: chequeo-6 igual al informe, `82 passed`, `entorno1.sh` 10 en
+rojo, `cobro_mp2.sh` 23 en rojo, suite `5017 passed` igual a la tuya. Opus y
+Sonnet alto con uvicorn real: con `ENVIRONMENT` ausente o desconocido no
+abre ninguna puerta; nada serio introducido. Acta:
+`REPRODUCCION-ENTORNO-1-2026-11-07.md`. **Supuestos S1 a S4: aceptados.**
 
-- **D94: (a), decidido por la PM**, va en ENTRADAS-1. **D95: (a).**
-  **D96: (a)**, va en ENTRADAS-1.
-- **Pieza nueva ENTRADAS-1** (seguridad chica, Emi: «a cero»), después de
-  ENTORNO-1. Comportamiento pedido: ningún texto que llegue de afuera da
-  500 por no poder guardarse o hashearse. Familia: surrogate suelto y NUL
-  en `new_password` de reset y cambio, y en nombre y clave del registro;
-  claves de más de 72 bytes UTF-8 (422 claro, el token de reset no se
-  consume); cuerpo no JSON con bytes que no son UTF-8; `NaN` y `1e999` en
-  el cuerpo (el 422 tiene que ser JSON válido). Un caso por causa con la
-  familia como datos, y el rojo con cada arreglo revertido. Sugerencia (no
-  es criterio): un solo validador para las claves.
-- **Pieza nueva ABUSO-2**, después de ENTRADAS-1. Comportamiento pedido: un
-  login bueno en una cuenta no borra el contador de intentos malos de la IP
-  contra otra; y el tope de recuperar usuario cuenta igual un correo que en
-  PG es el mismo (`U+0130` y parecidos). Revisión más fuerte: autenticación.
+- **D97: (a), decidido por la PM.** Que no arranque sin `production` y con
+  clave débil es lo buscado; antes de publicar se confirma Railway con Emi.
+- **D98: (a), pieza nueva ENTORNO-2**, después de ABUSO-2 (seguridad chica,
+  Emi: «a cero»). Comportamiento pedido: con `ENVIRONMENT` ausente o
+  desconocido, los controles de configuración se portan como en producción:
+  CSRF bloquea, cookies `Secure`, `/docs` y `/openapi.json` cerrados, sin
+  `DATABASE_URL` no cae a SQLite, VUCE simulado no permitido, y
+  `ENABLE_SIMULATE_CHARGE` no abre el cobro simulado fuera de desarrollo.
+  Un caso por causa con los valores como datos, como en `test_entorno1`.
+  Sugerencia (no es criterio): que todos pregunten a `_es_desarrollo`.
+- **D99: a Emi** (usuarios demo que ya estén en producción); no bloquea.
+- A la cola de limpieza: los parches de `IS_PRODUCTION` en `test_email1` y
+  la clase tautológica de `test_prelaunch_block3`.
 
-- **Rojo de la suite, no de la pieza:** `test_las_hojas_leidas_antes_del_corte_dan_sus_productos`
-  falló una vez en la suite entera (cortó en la hoja 2 sin productos) y pasa
-  solo (3 de 3) y con su archivo (`283 passed`); el diff no toca el lector.
-  El tope de CPU se mide con `process_time` del proceso entero, así que lo
-  que gastan otros hilos de la suite entra en el segundo del caso. A la
-  cola, después de ABUSO-2: diagnosticar la causa y que el caso no dependa
-  de eso, sin cambiar el producto si no hace falta.
-
-Tu orden: ENTORNO-1 → ENTRADAS-1 → ABUSO-2 → el rojo de `despacho1b` → el
-resto de la cola. Próxima
-D: D97.
+Tu orden: ENTRADAS-1 → ABUSO-2 → el rojo de `despacho1b` (falló una vez en
+la suite entera y pasa solo; diagnosticar la causa, el diff no toca el
+lector) → ENTORNO-2 → el resto de la cola. Próxima D: D100.
 
 ## RESET-2: aceptada sobre `99d3f69`, sin integrar (2026-11-06 PM)
 

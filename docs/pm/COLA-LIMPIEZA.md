@@ -93,3 +93,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `test_rendimiento1d.py:6`): con pypdf 6.21.4 es lineal.
 - `_leer_hojas` toma el tope propio de pypdf como «No pude abrir el PDF» y
   `validar_pdf` como «demasiado pesado»: unificar el trato.
+- `test_email1.py:158` y `:216` parchean `IS_PRODUCTION`, que ya no decide el
+  correo; `test_prelaunch_block3.py:205-235` (TestProduccionDemoUsers) no
+  ejecuta código del producto.

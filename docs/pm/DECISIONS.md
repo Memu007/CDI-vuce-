@@ -431,3 +431,7 @@ Emi: «Podés trabajar con el team por 24hs … 24 y cortar (si hay algo hacién
 ### 2026-11-07 18:15 UTC (PM principal)
 
 ABUSO-1 aceptada sobre `55bf408`, sin integrar por `e0b8626`; supuestos 1 a 3 de MARIA aceptados. D94 (a), D95 (a), D96 (a), decididas por la PM. Piezas nuevas bajo «arreglos chicos de seguridad a cero» (Emi): ENTRADAS-1 (ningún texto de afuera da 500: surrogate/NUL en claves y registro, claves de más de 72 bytes, cuerpo no UTF-8, `NaN` en el 422) y ABUSO-2 (un login bueno en otra cuenta no borra el contador de la IP; el tope de recuperar usuario cuenta como PG). Orden de MARIA: ENTORNO-1 → ENTRADAS-1 → ABUSO-2. Rojo intermitente de `test_despacho1b` a la cola. Acta: `REPRODUCCION-ABUSO-1-2026-11-07.md`.
+
+### 2026-11-07 19:20 UTC (PM principal)
+
+ENTORNO-1 aceptada sobre `83085e4`, sin integrar por `e0b8626`; supuestos S1 a S4 aceptados. D97 (a) y D98 (a), decididas por la PM: pieza nueva ENTORNO-2 (MARIA, después de ABUSO-2) bajo «arreglos chicos de seguridad a cero» (Emi). D99 a Emi: si producción arrancó alguna vez sin `ENVIRONMENT=production`, pueden existir `demo`/`premium`/`basico`; ver usuarios. Acta: `REPRODUCCION-ENTORNO-1-2026-11-07.md`.
