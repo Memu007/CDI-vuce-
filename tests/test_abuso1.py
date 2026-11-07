@@ -533,12 +533,15 @@ def test_s4_dos_ips_largas_con_el_mismo_comienzo_no_se_pisan():
     (RECUPERAR, b'{"email": "a\\ud800@ejemplo.test"}', 200),
     (RESET, b'{"email": "a\\udfff\\u0000@ejemplo.test"}', 200),
     ("/auth/login", b'{"username": "a\\ud800", "password": "x"}', 401),
+    ("/auth/reset-password", b'{"token": "a\\ud800\\u0000", "new_password": "Abcdef12!"}', 400),
+    (RECUPERAR, b'{"email": ["a\\ud800"]}', 422),
+    ("/auth/login", b'{"username": "a\\ud800"}', 422),
 ])
 @pytest.mark.parametrize("limitador", (True, False))
 def test_un_surrogate_suelto_no_da_500(ruta, cuerpo, pasa, limitador):
     """JSON acepta «\\ud800» sin su par y «\\u0000»; ese texto no se puede
     codificar ni guardar en Postgres, y la ruta daba 500. Ahora responde como a
-    un dato que no existe."""
+    un dato que no existe o, si el pedido está mal armado, con 422."""
     from proyecto_maria.core.rate_limit import limiter
     limiter.enabled = limitador
     r = TestClient(app, raise_server_exceptions=False).post(
