@@ -69,7 +69,7 @@ CLAVES_MALAS = {"surrogate": SURROGATE, "nul": NUL, "73_bytes_o_mas": LARGA}
 def test_clave_nueva_que_no_se_puede_hashear_da_422_y_no_cambia_nada(via, clave):
     r, nada_cambio = VIAS[via](CLAVES_MALAS[clave])
     assert r.status_code == 422, r.text
-    assert "contraseña" in r.text, r.text
+    assert "contraseña" in str(r.json()["detail"]), r.text
     # El link de reset sigue sirviendo, la clave vieja sigue y no se creó ninguna cuenta.
     assert nada_cambio()
 
@@ -99,6 +99,7 @@ def _estudio_con(campo, valor):
 CAMPOS = {
     "registro_nombre": (_registro_con, "name"), "registro_invitacion": (_registro_con, "invite_token"),
     "registro_usuario": (_registro_con, "username"), "registro_email": (_registro_con, "email"),
+    "registro_plan": (_registro_con, "plan"),
     "estudio_nombre": (_estudio_con, "name"), "estudio_usuario": (_estudio_con, "username"),
     "estudio_email": (_estudio_con, "email"),
 }
