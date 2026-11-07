@@ -439,3 +439,7 @@ ENTORNO-1 aceptada sobre `83085e4`, sin integrar por `e0b8626`; supuestos S1 a S
 ### 2026-11-07 20:45 UTC (PM principal)
 
 ENTRADAS-1: devolución sólo de pruebas sobre `589fd0b`; producto sin cambios, supuestos S1 a S6 aceptados. Decididas por la PM: D100 (a) pieza FRONT-422; D101 (a) dentro de ENTRADAS-2; D102 (a) chore de fijar `bcrypt`; D103 (a) cola de limpieza; D104 (a) pieza nueva ENTRADAS-2 (operación manual, clientes, NUL en parámetros de ruta, agrupar con más ítems que el driver), bajo «arreglos chicos de seguridad a cero».
+
+### 2026-11-07 22:10 UTC (PM principal)
+
+COBRO-MP-2 vuelta + COBRO-MP-3: devolución de pruebas sobre `cb740f3` (firma, quién toca a quién, plazo único) y un texto falso al cancelar con el PUT abandonado. D64 (a): antes de publicar, Emi configura Webhooks con secreto en MP y carga `MP_WEBHOOK_SECRET` en Railway, y prueba en sandbox. D66 (a): el límite de avisos queda por `get_client_ip`; cambiar `core/rate_limit.py` sería pieza aparte. Acta: `REPRODUCCION-COBRO-MP-2-3-2026-11-07.md`.
