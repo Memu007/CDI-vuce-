@@ -1748,7 +1748,8 @@ def _es_admin(user) -> bool:
 async def _exigir_username_libre(db: AsyncSession, username: str):
     """Un nombre de ADMIN_USERNAMES se reserva: el arranque le daría admin a quien lo registre.
     La lista y las cuentas se comparan sin distinguir mayúsculas, para que nadie registre
-    uno que se lea igual a otro; el formato es ASCII, así que lower() no tiene sorpresas."""
+    uno que se lea igual a otro. El pedido ya es ASCII; si una cuenta vieja no lo es, el
+    lower() de la base a lo sumo bloquea un nombre de más."""
     if not re.fullmatch(r"[a-zA-Z0-9_-]{3,30}", username):
         raise HTTPException(status_code=400, detail="Username inválido. Solo se permiten letras, números, guiones y guiones bajos (3-30 caracteres)")
     if username.lower() in {u.lower() for u in _admin_usernames()} or (
