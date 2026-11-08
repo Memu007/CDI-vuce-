@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: un Excel chico con forma cara se lee en el carril pesado (EXCEL-2c)
+
+- **fix(excel):** antes de leer, se miden la fila y la columna máximas de la primera hoja (celdas, filas y `<dimension>`), los elementos de `styles.xml` y los del sst. Más de 20 000 filas, 64 columnas, 5 000 elementos de estilos o 40 000 del sst (unos 20 000 textos) mandan la lectura a los hilos pesados aunque el archivo pese poco; los topes se cambian con `EXCEL_LIVIANO_FILAS`, `_COLUMNAS`, `_ESTILOS` y `_TEXTOS`.
+- **fix(excel):** las celdas sin `r` también cuentan para el rechazo de más de 256 columnas. Un `.xls` no se mide: su carril sigue saliendo de los bytes.
+
 ## 2026-11-08 · fix: un miembro con una suscripción cancelada no toca el plan del estudio (COBRO-MP-2)
 
 - **fix(cobro):** reintentar cancelar después de un corte concilia sólo si todas las suscripciones del estudio ya están canceladas en Mercado Pago. Un miembro con la suya cancelada ya no cancela la pendiente de otro ni reactiva el plan.
