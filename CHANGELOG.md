@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: un nombre de usuario que ya existe con otras mayúsculas no se registra (NOMBRES-1)
+
+- **fix(permisos):** el registro y crear un estudio rechazan con «Usuario ya existe» un nombre que ya existe escrito con otras mayúsculas (`emi` existe → `Emi`, `EMI`), para todas las cuentas. Las cuentas que ya difieren sólo en mayúsculas siguen entrando con su nombre exacto; nada se migra.
+
 ## 2026-11-08 · fix: nadie registra un nombre que se lea como el de una admin (PERMISOS-3)
 
 - **fix(seguridad):** el registro y crear un estudio rechazan con 400 un nombre de usuario con un salto de línea u otro carácter fuera de letras, números, `_` y `-`, y un nombre de `ADMIN_USERNAMES` escrito con otras mayúsculas («Usuario ya existe»).
