@@ -2,72 +2,63 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## AVISOS-2b (arreglo de AVISOS-2): **entregada** en `aa115f4` (2026-11-08), base `8fda3d2`
+## RESET-3 (D132 a): **entregada** en `8fda3d2` (2026-11-08), base `2fba5c9`
 
 | SHA | qué |
 |---|---|
-| `ffd1b95` | fix: el lector y el perfil usan la misma regla de código que el TXT; CHANGELOG |
-| `cbe7b76` | test: casos del lector y del perfil, `IC_4` al caso de forma, sabotajes en `avisos2.sh` |
-| `9cfe87c` | fix: el lector ya no calcula la destinación que después pisa (hallazgo de `/code-review`) |
-| `aa115f4` | test: los sabotajes del lector leen la destinación de `documento` |
+| `3d0083a` | fix: tope de 3 pedidos de reset por hora por cuenta; CHANGELOG |
+| `4458020` | test: casos, arnés de Postgres y `reset3.sh` |
+| `1a02fc2` | refactor: reset y recuperar usan un solo `_tope_por_cuenta` (hallazgo de `/code-review`) |
+| `d07c004` | test: el login correcto no toca la clave de reset por cuenta; anclas del arnés al helper |
+| `0c0b541` | test: una IP inventada con forma de clave de cuenta no gasta el tope (rojo sobre `d07c004`) |
+| `e187466` | fix: la clave pasa a `reset-cuenta:<usuario>`, fuera de las `reset:` de la IP; CHANGELOG |
+| `8fda3d2` | test: arnés y casos con la clave nueva y el sabotaje de la colisión |
 | este commit | docs: el informe |
 
 **Producto +14/−7** (7 netas).
 
-La base es `8fda3d2` y no `4db641b`: debajo están los commits de RESET-3
-(`3d0083a..8fda3d2`), que ya había empezado cuando llegó tu veredicto. No
-están entregados; son lo que sigue (abajo).
-
-**El orden.** Tu canal (`dcf35c6`) dice «AVISOS-2b → RESET-3». Tu mensaje
-de las 19:56 decía lo contrario: «cerrala y entregala [RESET-3], y después
-AVISOS-2b». Lo leí recién con AVISOS-2b terminada y su suite corriendo. Seguí
-el canal. RESET-3 es lo próximo que entrego.
+AVISOS-2b (`ffd1b95..aa115f4`, aceptada) está arriba de RESET-3 en la rama;
+la base de esta pieza es `2fba5c9` y su punta `8fda3d2`.
 
 Qué hace:
 
-1. **D133 (a).** `codigo_de_destinacion` (`maria_generator.py`) es la regla:
-   cuatro letras o números ASCII después de `strip()`, en mayúsculas, o `""`.
-   `destinacion_del_txt` la usa (y da `ValueError` si queda vacía) y el
-   lector (`validar_documento_importacion`) también: lo que no es código
-   queda vacío y la revisión pone IC04, como con el vacío de hoy. Datos del
-   caso: `"\u200b"*65 + "EC01"`, `IC-04`, `IC04 (consumo)`, `\u200bIC04`,
-   `ＩＣ０４`, `IC_4` y `\u212aC04` quedan en `""`; ` ic04 ` queda en `IC04`.
-2. **D135 (a).** El PUT del perfil pasa el default por `_destinacion_o_400`
-   (la misma que los endpoints de importación): `IC041`, `IC0`, `EC01` e
-   `IC_4` dan 400 y no cambia nada del perfil (ni el default ni el nombre
-   que venía en el mismo pedido); ` ic04 ` guarda `IC04`; `""` lo vacía.
-3. **`IC_4`** está en los datos de `test_lo_que_no_es_un_codigo_da_400_y_no_genera`.
-
-Rojo de `cbe7b76` sobre `8fda3d2` (el producto sin arreglar): «19 failed,
-62 passed». 14 son del lector y 4 del perfil. El 19.º era el caso del default
-vacío, que yo había escrito mal; lo corregí antes de commitear.
-
-**Corrijo a la baja un hallazgo del adversario.** Dijo que un default viejo
-guardado antes de este arreglo (`IC04CONSUM`, `EC01`) traba todo guardado
-del perfil. Desde la pantalla no pasa: el default es un `<select>`
-(`dashboard_v2.html:1476`) con "", IC04, IC05, IT01, ZFI1 y TRAN.
-`profile.js:166` lo carga con `p.default_tipo_destinacion || ''`, y un valor
-que no está entre las opciones queda en "". Al guardar se manda "", la
-respuesta es 200 y el default viejo se borra sin avisar. Ese default ya daba
-400 en cada generación desde AVISOS-2. Sólo un cliente de la API que
-reenvía el valor viejo recibe 400, y eso es lo que pide D135 (a). Por eso
-no lo subo como D.
+1. `request_password_reset` (`main.py`) cuenta los pedidos de la cuenta con
+   `limites_auth.contar(db, "reset-cuenta:<usuario>", 3600)`, antes de trabar
+   la cuenta. Desde el cuarto de la hora contesta el mismo
+   `{"message": "Si el email existe, se envió un link."}`, pero no crea el
+   link ni manda el mail. Los pedidos pueden llegar de IPs distintas.
+2. El tope se cuenta antes del `with_for_update`: `contar` hace commit y
+   soltaría la traba de RESET-1. Lo cubre el sabotaje de Postgres.
+3. Reset y recuperar usuario usan el mismo `_tope_por_cuenta`. El chequeo
+   estaba escrito dos veces.
+4. La clave es `reset-cuenta:` y no `reset:cuenta:`. Sin un proxy que
+   agregue su entrada, la IP la escribe el cliente en `X-Forwarded-For`.
+   Con `reset:cuenta:` como clave, una IP inventada `cuenta:<usuario>` caía
+   en el contador de esa cuenta. Además, un bloqueo de 24 h por IP en esa
+   misma clave dejaba sin links a la cuenta. Lo reprodujo un adversario:
+   «COLISION 200 mails: 0 links: 0». Arreglado en `e187466`, con el rojo
+   antes en `0c0b541`.
 
 ## Decisiones
 
-**D137. El smoke quedó viejo desde ABUSO-1** (rojo de arriba). No frena
-esta entrega.
+**D138. Quien conoce el email de una cuenta la deja sin links.** Cuatro
+pedidos por hora alcanzan, desde cualquier IP, y se puede sostener. La
+persona recibe la misma respuesta y no le llega nada. Es lo mismo que ya
+pasa con recuperar usuario desde ABUSO-2.
 
-- (a) El smoke espera el rechazo sin sesión en los dos eventos (lo que hace
-  el producto hoy) y sigue con `by-cuit`. Sólo cambia el script.
-- (b) El smoke inicia sesión con un usuario que crea para eso y manda los
-  eventos con sesión.
-- (c) Se retira y queda lo que cubre la suite.
+- (a) Se acepta como en recuperar: el tope es lo que pidió D132 (a).
+- (b) Se sube el tope (por ejemplo, a 10 por hora). Hace falta más trabajo
+  para sostener el bloqueo, pero deja pasar más links por hora.
+- (c) Al llegar al tope se le manda a la cuenta un único aviso por hora, sin
+  link, que diga que se pidieron muchos cambios de clave.
 
-Recomiendo **(a)**: es un cambio chico de script, no necesita credenciales
-y vuelve a dar una señal verde o roja que signifique algo. (b) necesita un
-usuario y una clave en el script. Si decís (a) o (b), lo hago como pieza
-chica después de RESET-3.
+Recomiendo **(a)**:
+
+- (b) sólo corre el número;
+- (c) es un mail nuevo, con su texto y su propio tope, y conviene que lo
+  pida Emi.
+
+Si decís (c), es una pieza aparte.
 
 Siguen abiertas:
 
@@ -77,128 +68,107 @@ Siguen abiertas:
 
 Supuestos que podés rechazar:
 
-- Un invisible solo (`\u200b`) como default del perfil da 400, no vacía el
-  default: `strip()` no lo saca y no es un código.
-- `ABCD` o `1234` se aceptan en el perfil y en el lector: son la regla de
-  AVISOS-2 (cuatro letras o números), no una lista de destinaciones.
+- El tope por cuenta depende de `limiter.enabled`, igual que el de
+  recuperar. El de la IP no depende.
+- Un pedido para un email que no existe no cuenta en ninguna clave de
+  cuenta: no hay cuenta.
 
 ## Comandos
 
 ```bash
-git checkout aa115f4
-# negativos de AVISOS-2 y 2b: «BASE | ... 155 passed», 16 ROJO, «sabotajes sin rojo: 0»
-PY=python scripts/testing/sabotajes/avisos2.sh aa115f4
-# negativos de AVISOS-1, que comparten es_exportacion: «BASE | ... 151 passed», 22 ROJO, «sabotajes sin rojo: 0»
-PY=python scripts/testing/sabotajes/avisos1.sh aa115f4
+git checkout 8fda3d2
+# negativos de RESET-3: «BASE | ... 74 passed», 7 ROJO en SQLite, «BASE | Postgres: fallas: 0», 1 ROJO en Postgres, «sabotajes sin rojo: 0»
+PY=python scripts/testing/sabotajes/reset3.sh 8fda3d2
+# negativos de ABUSO-2, que comparten limites_auth y recuperar: «BASE | en verde», 20 ROJO, «fallas: 0»
+PY=python scripts/testing/sabotajes/abuso2.sh 8fda3d2
 # producto +14/−7, «avisos: 0»
-python docs/pm/herramientas/chequeo-6.py 8fda3d2 aa115f4
+python docs/pm/herramientas/chequeo-6.py 2fba5c9 8fda3d2
 # los casos de la pieza solos: 0 failed
-python -m pytest -q --no-cov tests/test_avisos2.py
+python -m pytest -q --no-cov tests/test_abuso1.py -k reset
 ```
 
-Los cuatro sabotajes nuevos de `avisos2.sh`, cada uno con lo que dice su rojo:
+Los sabotajes de `reset3.sh`, cada uno con lo que dice su rojo:
 
 | sabotaje | dice |
 |---|---|
-| el lector pasa la destinación sin mirar la forma | `FAILED tests/test_avisos2.py::test_el_lector_deja_vacio_lo_que_no_es_un_codigo[IC_4--pymupdf]` y `…[IC-04--pdf_directo]` |
-| el lector mira la forma del texto ya en minúsculas | `FAILED …test_el_lector_deja_vacio_lo_que_no_es_un_codigo[\u212aC04--pymupdf]` |
-| el perfil guarda el default sin mirar la forma | `FAILED tests/test_avisos2.py::test_el_perfil_solo_guarda_un_codigo_de_importacion[IC041-400-IC05]` y `…[IC_4-400-IC05]` |
-| el perfil guarda una exportación | `FAILED …test_el_perfil_solo_guarda_un_codigo_de_importacion[EC01-400-IC05]` |
+| sin el tope por cuenta | `FAILED tests/test_abuso1.py::test_reset_tres_por_hora_por_cuenta_aunque_cambie_la_ip`, «el cuarto pedido de la hora mandó el mail» |
+| el tope cuenta la IP | ídem |
+| la clave de la cuenta cae dentro de las de la IP | `FAILED tests/test_abuso1.py::test_reset_una_ip_inventada_no_gasta_el_tope_de_la_cuenta`, «una IP inventada gastó el tope de la cuenta» |
+| el tope deja pasar cuatro | `…test_reset_tres_por_hora…`, «el cuarto pedido de la hora mandó el mail» |
+| el tope corta después de crear el link | ídem, «el cuarto pedido de la hora creó un link» |
+| la ventana dura menos de una hora | ídem, «a los 59 minutos ya mandó otro» |
+| la ventana dura dos horas | ídem, «pasada la hora no volvió a mandar» |
+| (Postgres) el tope se cuenta con la cuenta trabada | «FALLA \| el tope por cuenta no suelta la traba» |
 
 ## Puertas
 
-Todo sobre `aa115f4`, desde un worktree limpio.
+Todo sobre `8fda3d2`, desde un worktree limpio.
 
 | puerta | salida exacta |
 |---|---|
-| suite completa (`pytest -q --no-cov --timeout=120`) | `==== 5432 passed, 335 skipped, 3 xfailed, 98 warnings in 1052.07s (0:17:32) ====`, salida 0 (AVISOS-2 había dado 5406 passed) |
-| `compileall -q proyecto_maria` | sin salida, `compileall 0` |
-| `smoke_friccion.sh` contra uvicorn local (entorno de test) | **rojo**: `[FAIL] POST /api/ui/event`, salida 1. Igual sobre `8fda3d2`: no es de esta pieza (abajo y D137) |
-| `avisos2.sh aa115f4` | `BASE  \| ======================= 155 passed, 5 warnings in 28.67s =======================`; 16 `ROJO`; `sabotajes sin rojo: 0` |
-| `avisos1.sh aa115f4` | `BASE  \| ====================== 151 passed, 17 warnings in 10.91s =======================`; 22 `ROJO`; `sabotajes sin rojo: 0` |
-| `chequeo-6.py 8fda3d2 aa115f4` | `avisos: 0` (abajo, entera) |
-| grep de historia de §6 | vacío |
-
-**El rojo del smoke.** El endpoint contesta
-`{"ok":false,"detail":"Evento sin sesión no admitido"}`: es el rechazo que
-agregó ABUSO-1 (`a3abd92`), y el smoke (último cambio en `b88da9c`) sigue
-mandando el evento sin sesión. Lo levanté sobre `8fda3d2` con el mismo
-entorno y da el mismo `[FAIL] POST /api/ui/event`. Los otros dos pasos los
-corrí a mano en los dos SHAs: `/api/session/state` da el mismo rechazo y
-`by-cuit` da `401`, como pide el smoke. Ninguno de los tres pasos toca lo que
-cambió esta pieza. Desde ABUSO-1 nadie lo había corrido: los informes y las
-reproducciones lo declaran no corrido.
-
-**No corrido:**
-
-- `ataque_aislamiento.sh`: la pieza no toca datos de otros, sesión ni
-  permisos.
-- `/security-review` con subagentes, como lo pide el skill. La pieza toca el
-  perfil, y por eso lo hice, pero a mano y en la sesión, sin subagentes. Sin
-  hallazgos:
-  - sólo achica lo que se acepta (`[A-Z0-9]{4}` o vacío);
-  - el texto del 400 es fijo;
-  - el front lo muestra con `textContent`.
+| `pytest -q --no-cov --timeout=120` | `5408 passed, 335 skipped, 3 xfailed, 102 warnings in 1059.97s (0:17:39)`, salida 0 (AVISOS-2b da más casos porque suma los suyos arriba) |
+| `compileall -q proyecto_maria` | sin salida, salida 0 |
+| `smoke_friccion.sh` contra uvicorn | `[FAIL] POST /api/ui/event`, salida 1: el rojo conocido desde ABUSO-1 que arregla SMOKE-1 (D137 a). Como se corta en el primer evento, el resto del smoke **no corrió** |
+| `ataque_aislamiento.sh` (`PUERTO=18799`) | `Bloqueado: 47 · Fugas: 0 · Sin probar: 0`, `✅ PUERTA G3 PASADA`, salida 0 |
+| `reset3.sh 8fda3d2` | `BASE  \| ... 74 passed, 5 warnings in 29.33s`, 7 ROJO en SQLite, `BASE  \| Postgres: fallas: 0`, 1 ROJO en Postgres, `sabotajes sin rojo: 0` |
+| `abuso2.sh 8fda3d2` | `BASE  \| en verde`, 20 ROJO, `fallas: 0` |
+| `reset1_postgres.py` (PG 16 descartable) | `BASE  \| en verde`, `fallas: 0`, salida 0 |
 
 ## Hallazgos de la autorrevisión
 
 | quién | modelo y esfuerzo | hallazgo | qué hice |
 |---|---|---|---|
-| `adversario-sonnet-alto` | Sonnet, alto | un default viejo que no es código traba todo guardado del perfil (media) | corregido a la baja, arriba: sólo pasa por la API; desde la pantalla se borra en silencio |
-| ídem | ídem | el perfil acepta tipos que no son texto: `true` guarda `TRUE` y `1234` guarda `1234` (baja) | riesgo, abajo |
-| ídem | ídem | `true` en el lector queda `TRUE` (baja) | riesgo, abajo |
-| ídem | ídem | `ABCD` y `1234` se aceptan (informativo) | es la regla; supuesto, arriba |
-| ídem | ídem | `\u200b` solo ahora da 400 en el perfil (informativo) | supuesto, arriba |
-| `/code-review high` sobre `8fda3d2..cbe7b76` | el de la sesión, alto | la destinación que calculaba la comprensión del lector quedó muerta: se pisaba siempre | arreglado en `9cfe87c`; los sabotajes que dependían de ella, reescritos en `aa115f4` (los dos dan rojo) |
-| ídem | ídem | `IC-05` en el lector queda vacío y la revisión pone IC04, no IC05 | riesgo, abajo (ya previsto en D133) |
-| ídem | ídem | 65 invisibles + `EC01` en el lector terminan como IC04 | riesgo ya decidido en D133 (a) |
-| ídem | ídem | el default viejo traba el perfil | igual que el primero del adversario |
-| ídem | ídem | el 400 del perfil se muestra en el lugar del error del CUIT (`profile.js:264`) | riesgo, abajo |
-| ídem | ídem | con `EC01` el mensaje del perfil habla de «TXT de importación» | riesgo, abajo |
-| ídem | ídem | doble `strip()` en `destinacion_del_txt` | queda: es una línea y no cambia nada |
-| ídem | ídem | doble normalización en el perfil (`strip()` antes y `_destinacion_o_400` después) | queda: el `strip()` decide si se vacía |
+| `adversario-opus-alto` sobre `4458020` | Opus, alto | colisión de `reset:cuenta:<u>` con `reset:{ip}` cuando el cliente escribe `X-Forwarded-For`: un bloqueo de 24 h dejaba sin links a la cuenta (media-baja). Reproducido: «COLISION 200 mails: 0 links: 0» | arreglado en `e187466`; rojo antes en `0c0b541`; sabotaje en `8fda3d2` |
+| ídem | ídem | la ventana fija deja pasar hasta 6 links en 3601 s (baja) | riesgo, abajo; igual en recuperar |
+| ídem | ídem | el caso no distingue «por cuenta» de «por email normalizado» (baja) | riesgo de cobertura, abajo |
+| ídem | ídem | diferencia de tiempo por el SMTP síncrono (baja) | ya existía; no reproducido |
+| `adversario-sonnet-alto` sobre `4458020` | Sonnet, alto | quien conoce el email deja a la cuenta sin links (media) | **D138** |
+| ídem | ídem | tiempo de cuenta existente frente a inexistente: 71–75 ms contra 17–18 ms con el simulador (baja) | ya existía; riesgo, abajo |
+| `/code-review high` sobre `2fba5c9..4458020` | Opus, alto (subagente) | el chequeo del tope estaba dos veces (§6) | arreglado en `1a02fc2` |
+| ídem | ídem | `test_abuso2` no listaba la clave nueva entre las que el login no toca | arreglado en `d07c004` |
+| ídem | ídem | `response = mensaje` era un alias del dict compartido | sacado en `1a02fc2` |
+| ídem | ídem | el tope por cuenta depende de `limiter.enabled` y el de la IP no | supuesto, arriba; igual en recuperar |
+| ídem | ídem | contar antes del re-select gasta un cupo si el email cambia en medio (baja) | riesgo, abajo; es la carrera ya aceptada en RESET-1 |
+| ídem | ídem | DoS de ventana fija sostenido | igual que el de Sonnet: D138 |
+| ídem | ídem | el caso de reset copia casi entero el de recuperar, en vez de un caso con la ruta como dato (§6) | **queda**: unirlos cambia el nombre de `test_s6_recuperar_…`, que anclan `abuso1.sh`, `abuso2.sh` y `email1.sh`. Lo propongo para la cola de limpieza |
+| ídem | ídem | `_links_de_reset` repite en SQL lo que `test_email1._tokens_de` lee por el ORM | queda: es de prueba; va con el anterior a la cola |
+| ídem | ídem | `reset3.sh` copia el armado de los demás sabotajes en vez de usar `_entorno_comun.sh` | queda: es el mismo armado que el resto de los scripts de sabotaje |
+| `/security-review` sobre `2fba5c9..8fda3d2` | Sonnet, alto (subagente) | sin hallazgos. Excluido por alcance: agotar el tope de una cuenta ajena | D138 |
 
 ## Riesgos
 
-- Hasta que se decida D137, `smoke_friccion.sh` da rojo en cualquier SHA
-  desde ABUSO-1, y no distingue nada.
-
-- Un `IC-05` (o similar) que lee el modelo se pierde: la revisión pone IC04
-  y la persona tiene que elegir IC05 a mano. Es lo que decidiste en D133 (a).
-- El 400 del perfil aparece donde se muestra el error del CUIT
-  (`profile.js:264`). Desde la pantalla no se puede provocar: el select sólo
-  manda códigos válidos.
-- Con `EC01` por la API, el mensaje dice lo mismo que en la generación de
-  importación («TXT de importación»), aunque se esté guardando el perfil.
-- Por la API, un `true` o un `1234` como default se guardan como `TRUE` y
-  `1234`. Son cuatro letras o números, así que el TXT los acepta igual que
-  antes de esta pieza.
-- No hay migración: un default viejo que no es código sigue en la base hasta
-  que la persona guarde el perfil desde la pantalla.
+- **D138:** cuatro pedidos por hora dejan a una cuenta sin links.
+- Ventana fija: alrededor del cambio de hora pasan hasta 6 links en poco
+  más de una hora. Igual en recuperar.
+- El caso no distingue el tope «por cuenta» del tope «por email
+  normalizado». Hoy dan lo mismo y sólo divergen si una cuenta cambia de
+  email o con D38.
+- Si la cuenta cambia de email entre contar y trabar, el pedido gasta un
+  cupo y no crea link. Es la carrera de RESET-1.
+- El tiempo de respuesta sigue distinguiendo una cuenta que existe de una
+  que no: el SMTP es síncrono. Esto ya existía antes.
+- Con `limiter.enabled` apagado no hay tope por cuenta (igual que en
+  recuperar). En producción está prendido.
 
 ## chequeo-6
 
 ```
-chequeo-6 8fda3d2..aa115f4: avisos para mirar, no un veredicto
+chequeo-6 2fba5c9..8fda3d2: avisos para mirar, no un veredicto
 producto +14/−7
-arnés +57/−10
+arnés +213/−3
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/core/maria_generator.py: 2341 → 2347
-  proyecto_maria/main.py: 12085 → 12086
-  proyecto_maria/pdf_extractor.py: 2893 → 2893
+  proyecto_maria/main.py: 12078 → 12085
 avisos: 0
 ```
 
 ## Archivos de producto
 
-`proyecto_maria/core/maria_generator.py`, `proyecto_maria/main.py`,
-`proyecto_maria/pdf_extractor.py`.
+`proyecto_maria/main.py` (`request_password_reset`, `recover_username` y el
+helper `_tope_por_cuenta`), `CHANGELOG.md`.
 
 ## Lo que sigue
 
-RESET-3 (D132 a, el tope de pedidos de reset por cuenta) ya está en la
-rama, debajo de esta pieza (`3d0083a..8fda3d2`, base `2fba5c9`), y subido.
-No lo entregué todavía: lo cierro con `/entregar` y te aviso.
+SMOKE-1 (D137 a), después OBSERVABILIDAD-1.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (send_message next, «Dev MARIA: …»), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. AVISOS-2b entregada en aa115f4 (informe en este archivo, base 8fda3d2); abiertas D131 (de EMAIL-1, va a Emi) y D136 (decidida: no traigo tu rama hasta que INTEGRAR-1 esté aceptada); D137 abierta (el smoke viejo); la próxima D libre es la D138. Sigue la entrega de RESET-3 (3d0083a..8fda3d2, base 2fba5c9, ya subido), después OBSERVABILIDAD-1, ORG-1+D40 y D102. Nunca main, nada se publica sin el «dale» de Emi para el SHA, sin secretos, sólo datos inventados.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (send_message next, «Dev MARIA: …»), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. RESET-3 entregada en 8fda3d2 (informe en este archivo, base 2fba5c9); AVISOS-2b aceptada sobre aa115f4 sin integrar. Abiertas: D131 (de EMAIL-1, va a Emi), D136 (decidida: no traigo tu rama hasta que INTEGRAR-1 esté aceptada), D138 (DoS del tope por cuenta). D137 (a) decidida: SMOKE-1. La próxima D libre es la D139. Sigue SMOKE-1, después OBSERVABILIDAD-1, después ORG-1+D40 y D102. Nunca main, nada se publica sin el «dale» de Emi para el SHA, sin secretos, sólo datos inventados.
