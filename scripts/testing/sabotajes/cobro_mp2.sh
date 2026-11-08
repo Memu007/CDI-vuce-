@@ -184,10 +184,10 @@ sabotaje $M "en una org, cualquier miembro cancela el plan" \
   "    if miembro and db_user not in con_sid:" "    if False:"
 sabotaje $M "en una org, un miembro con una pendiente propia cancela el plan" \
   "FAILED $T::test_un_miembro_cuya_suscripcion_no_paga_no_cancela_el_plan_del_estudio[pending-403]" \
-  "    if miembro and not paga[db_user]:" "    if False:"
+  "    if miembro and not (paga[db_user] or reintento):" "    if False:"
 sabotaje $M "en una org, quien abrió una suscripción pausada no la cancela" \
   "FAILED $T::test_en_una_org_cancelar_cancela_la_suscripcion_y_sigue_hasta_el_fin[abrio-paused]" \
-  "                in _ESTADOS_QUE_PAGAN for cuenta in con_sid}" "                in (\"authorized\",) for cuenta in con_sid}"
+  "estado in _ESTADOS_QUE_PAGAN for cuenta, estado in estados.items()}" "estado in (\"authorized\",) for cuenta, estado in estados.items()}"
 sabotaje $M "al cancelar, la que paga no va última" \
   "FAILED $T::test_al_cancelar_la_que_paga_se_cancela_ultima[duena-pendiente]" \
   "    for cuenta in sorted(con_sid, key=paga.get):" "    for cuenta in con_sid:"
@@ -241,7 +241,7 @@ for fila in cancelar_cancela sacar_lee sacar_cancela cancelar_lee checkout_lee c
         except" ;;
     sacar_lee) viejo="_leer_suscripcion_mp, member.mp_preapproval_id, hasta=plazo)" ;;
     sacar_cancela) viejo="_cancelar_suscripcion_mp, member.mp_preapproval_id, hasta=plazo)" ;;
-    cancelar_lee) viejo="        paga = {cuenta: await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)" ;;
+    cancelar_lee) viejo="        estados = {cuenta: await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)" ;;
     checkout_lee) viejo="        estado_mp = await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)" ;;
     checkout_cancela) viejo="                await _en_hilo_mp(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)" ;;
     checkout_crea) viejo="org_id=org_id, hasta=plazo)" ;;
@@ -268,7 +268,7 @@ sabotaje $M "cada pedido a Mercado Pago tiene su propio tope" \
 # Un pedido con su propio plazo, aunque cada uno quede bajo el tope, suma más que el tope.
 for fila in cancelar_lee cancelar_cancela checkout_relee checkout_cancela checkout_crea sacar_cancela; do
   case $fila in
-    cancelar_lee) viejo="        paga = {cuenta: await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)" ;;
+    cancelar_lee) viejo="        estados = {cuenta: await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)" ;;
     cancelar_cancela) viejo="            await _en_hilo_mp(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)
         except" ;;
     checkout_relee) viejo="        estado_mp = await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)" ;;
@@ -280,6 +280,10 @@ for fila in cancelar_lee cancelar_cancela checkout_relee checkout_cancela checko
     "FAILED $T::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[$fila]" \
     "$viejo" "${viejo/hasta=plazo/hasta=anyio.current_time() + _TOPE_MP}"
 done
+sabotaje $M "las lecturas iniciales del checkout tienen su propio plazo" \
+  "FAILED $T::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[checkout_lee_dos]" \
+  "_estado_suscripcion_vieja(db, db_user, cuenta, plazo) for cuenta in con_sid]" \
+  "_estado_suscripcion_vieja(db, db_user, cuenta, anyio.current_time() + _TOPE_MP) for cuenta in con_sid]"
 sabotaje $M "reactivar no tiene tope" \
   "FAILED $T::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[reactivar_lee]" \
   "    plazo = anyio.current_time() + _TOPE_MP
@@ -296,6 +300,31 @@ sabotaje $M "la dueña de un estudio saca a un miembro de otro" \
 sabotaje $M "reactivar no mira la suscripción de quien la abrió" \
   "FAILED $T::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[reactivar_con_la_suya-abrio]" \
   "_quien_toca_el_plan(db_user, org, con_sid, \"reactivar el plan\"" "_quien_toca_el_plan(db_user, org, [], \"reactivar el plan\""
+sabotaje $M "reactivar acepta a quien abrió una suscripción que no paga" \
+  "FAILED $T::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[reactivar_con_una_propia_que_no_paga-abrio]" \
+  "    if miembro and not (paga[db_user] or reintento):" "    if miembro and not (paga[db_user] or reintento or not cancelar):"
+
+# --- Reintentar cancelar cuando Mercado Pago canceló sin confirmarlo
+R="FAILED $T::test_si_mp_cancelo_sin_confirmar_el_reintento_concilia"
+sabotaje $M "el reintento no concilia" "$R[abrio-False-200]" \
+  "    if miembro and not (paga[db_user] or reintento):" "    if miembro and not paga[db_user]:"
+sabotaje $M "cancelar no avisa que es un reintento" "$R[abrio-False-200]" \
+  "no_se_pudo, plazo, cancelar=True)" "no_se_pudo, plazo)"
+sabotaje $M "el reintento concilia aunque otra suscripción pague" "$R[abrio-True-403]" \
+  "estados.get(db_user) == \"cancelled\" and not any(paga.values())" "estados.get(db_user) == \"cancelled\""
+sabotaje $M "reactivar acepta una suscripción propia ya cancelada" \
+  "FAILED $T::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[reactivar-abrio]" \
+  "    reintento = cancelar and estados" "    reintento = estados"
+
+# --- Lo que dicen los 503: nada que Mercado Pago no confirmó
+sabotaje $M "si Mercado Pago no contesta, sacar dice que el miembro ya salió" \
+  "FAILED $T::test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope[sacar_lee]" \
+  "; sigue en el estudio. " "; ya no está en el estudio. "
+sabotaje $M "si Mercado Pago no crea la nueva, el checkout dice que el plan sigue igual" \
+  "FAILED $T::test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope[checkout_crea]" \
+  "        await db.commit()
+        raise HTTPException(status_code=503, detail=\"Mercado Pago no contestó. Probá" "        await db.commit()
+        raise HTTPException(status_code=503, detail=\"Mercado Pago no contestó; tu plan sigue igual. Probá"
 
 # --- Un pago no pierde días (D7.1)
 sabotaje $M "el pago suma desde el fin sólo si está activa" \

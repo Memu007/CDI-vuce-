@@ -109,10 +109,15 @@ sabotaje $M "sin clave configurada, se verifica con la clave vacía" "('firmado 
 for fila in "sólo los primeros caracteres|_hmac.compare_digest(expected.encode()[:8], received_v1.encode()[:8])" \
             "firma más corta|expected.startswith(received_v1)" \
             "firma más larga|received_v1.startswith(expected)" \
-            "el último carácter cambiado|_hmac.compare_digest(expected.encode()[:-1], received_v1.encode()[:-1])"; do
+            "el carácter 0 cambiado|_hmac.compare_digest(expected.encode()[1:], received_v1.encode()[1:])" \
+            "el carácter 8 cambiado|_hmac.compare_digest(expected.encode()[:8] + expected.encode()[-1:], received_v1.encode()[:8] + received_v1.encode()[-1:])" \
+            "el carácter 30 cambiado|_hmac.compare_digest(expected.encode()[:30] + expected.encode()[34:], received_v1.encode()[:30] + received_v1.encode()[34:])" \
+            "el carácter 63 cambiado|_hmac.compare_digest(expected.encode()[:-1], received_v1.encode()[:-1])"; do
   sabotaje $M "la firma se compara a medias (${fila%%|*})" "('${fila%%|*}', 200" \
     "    return _hmac.compare_digest(expected.encode(), received_v1.encode())" "    return ${fila#*|}"
 done
+sabotaje $M "con dos v1 vale el último" "('dos v1, la buena al final', 200" \
+  $'    if len(parts) != len(pares):\n        return False\n' ""
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"
