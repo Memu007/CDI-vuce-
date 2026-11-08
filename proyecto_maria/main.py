@@ -1772,6 +1772,11 @@ async def _cuenta_por_email(db: AsyncSession, email: str):
         return None
     return cuentas[0] if cuentas else None
 
+
+async def _tope_por_cuenta(db: AsyncSession, clave: str) -> bool:
+    """Más de tres pedidos en la hora para la cuenta de la clave, lleguen de la IP que lleguen."""
+    return limiter.enabled and await limites_auth.contar(db, clave, 3600) > 3
+
 class PasswordResetConfirm(BaseModel):
     token: TextoCodificable
     new_password: ClaveNueva
@@ -1796,7 +1801,7 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
     # 1. Buscar usuario
     user = await _cuenta_por_email(db, request.email)
     # Antes de trabar la cuenta: contar hace commit y soltaría la traba.
-    if user and limiter.enabled and await limites_auth.contar(db, f"reset:cuenta:{user.username}", 3600) > 3:
+    if user and await _tope_por_cuenta(db, f"reset:cuenta:{user.username}"):
         return mensaje
     if user:
         # Trabar la cuenta con el email leído: un cambio de clave o email a la vez barre este link o lo impide.
@@ -1835,13 +1840,11 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
     
     email_sent = send_email(user.email, "Recuperar Contraseña - CDI", email_body)
     
-    response = mensaje
     if _pista_dev_habilitada(email_sent):
         # MODO DEV: Devolver token para facilitar pruebas si no hay SMTP
         print(f"🔑 [DEV] Reset Token para {user.username}: {token}")
-        response["dev_token_hint"] = token
-        
-    return response
+        mensaje["dev_token_hint"] = token
+    return mensaje
 
 class RecoverUsernameRequest(BaseModel):
     email: TextoCodificable
@@ -1859,7 +1862,7 @@ async def recover_username(request: RecoverUsernameRequest, req: Request, db: As
     if not user:
         return mensaje
     # Por cuenta y no por texto: dos textos que la base toma por el mismo email son una cuenta.
-    if limiter.enabled and await limites_auth.contar(db, f"recuperar:cuenta:{user.username}", 3600) > 3:
+    if await _tope_por_cuenta(db, f"recuperar:cuenta:{user.username}"):
         return mensaje
 
     email_body = f"""
