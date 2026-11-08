@@ -92,7 +92,10 @@ def _entrar(c, username, clave):
     return c.post("/auth/login", json={"username": username, "password": clave})
 
 
-def test_dos_cuentas_viejas_que_difieren_en_mayusculas_siguen_entrando(monkeypatch, nombre):
+# Cada una de las dos cuentas es la de la lista: el arranque tiene que promover la exacta
+# aunque la base devuelva primero la otra.
+@pytest.mark.parametrize("de_la_lista", ["n", "N"], ids=["minusculas", "mayusculas"])
+def test_dos_cuentas_viejas_que_difieren_en_mayusculas_siguen_entrando(monkeypatch, nombre, de_la_lista):
     claves = {nombre: "Minus#123", nombre.upper(): "Mayus#456"}
     for username, clave in claves.items():
         _run(_sembrar(username, clave))
@@ -105,8 +108,10 @@ def test_dos_cuentas_viejas_que_difieren_en_mayusculas_siguen_entrando(monkeypat
         assert me.json()["username"] == username
     assert _entrar(c, nombre, claves[nombre.upper()]).status_code == 401
 
-    monkeypatch.setenv("ADMIN_USERNAMES", nombre)
+    admin = _formas(nombre)[de_la_lista]
+    monkeypatch.setenv("ADMIN_USERNAMES", admin)
     with TestClient(main.app):
         pass
-    assert main.roles_de({"roles": _run(_fila(nombre)).roles}).count("admin") == 1
-    assert "admin" not in main.roles_de({"roles": _run(_fila(nombre.upper())).roles})
+    for username in claves:
+        roles = main.roles_de({"roles": _run(_fila(username)).roles})
+        assert roles.count("admin") == (username == admin), (username, roles)

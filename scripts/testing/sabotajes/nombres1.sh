@@ -70,7 +70,7 @@ sabotaje "el login busca sin distinguir mayúsculas" \
   "$V" "$T[mayusculas-/auth/register]"
 sabotaje "el arranque promueve sin distinguir mayúsculas" \
   'select(User).where(User.username == identifier))' \
-  'select(User).where(func.lower(User.username) == identifier.lower()).order_by(User.username))' \
+  'select(User).where(func.lower(User.username) == identifier.lower()))' \
   "$V" "$T[mayusculas-/auth/register]"
 
 git checkout -q -- proyecto_maria/
