@@ -2029,7 +2029,7 @@ def validar_documento_importacion(result: dict) -> dict:
     if not isinstance(documento, dict):
         raise DocumentoNoAdmitido(MENSAJE_DOCUMENTO_NO_ADMITIDO)
     clase = {campo: str(documento.get(campo) or "").strip().lower()
-             for campo in ("tipo", "operacion", "destinacion")}
+             for campo in ("tipo", "operacion")}
     operacion = result.get("operacion") if isinstance(result.get("operacion"), dict) else {}
     if (clase["tipo"] != "factura_comercial" or clase["operacion"] != "importacion"
             or any(es_exportacion(destinacion) for destinacion in (
