@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Negativos de AVISOS-1: cada sabotaje afloja o estira el rechazo de una
 # destinación de exportación (EC*), que generar, los avisos y el generador
-# comparten, y el caso tiene que fallar por ese motivo.
+# comparten, o deshace lo que la persona lee del seguro y dónde lo lee, y el
+# caso tiene que fallar por ese motivo.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/avisos1.sh [SHA]
 # Trabaja en un worktree descartable con su propia SQLite y sin terceros: no
@@ -18,7 +19,7 @@ cd "$WT"
 export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
        DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=.
 FALLAS=0
-CASOS=(tests/test_doc1_documentos.py tests/test_generar_maria_txt.py)
+CASOS=(tests/test_doc1_documentos.py tests/test_generar_maria_txt.py tests/test_avisos1_seguro.py)
 
 correr_casos() {
   rm -f test.db
@@ -88,6 +89,59 @@ sabotaje $G "rechaza cualquier destinación" \
   "$P" 'return re.match(r"[^A-Z0-9]*[A-Z]", texto) is not None' \
   "FAILED $T"'[IC04-False-/generate_maria/avisos]' \
   "FAILED $T"'[\u200bIC04-False-/generate_maria/avisos]'
+
+# El seguro borrado al pasar a un incoterm con el seguro en el precio, y el
+# motivo del 400 a la vista en la revisión.
+M=proyecto_maria/main.py
+F=proyecto_maria/static/v2/screens/finalize.js
+R=proyecto_maria/static/v2/screens/review.js
+A=tests/test_avisos1_seguro.py
+FAM="$A::test_cada_400_que_cambia_de_pantalla_deja_el_motivo_a_la_vista"
+sabotaje $M "el servidor no mira el borrado" \
+  'return SEGURO_BORRADO if request.seguro_borrado else SEGURO_PARA_COMPLETAR' 'return SEGURO_PARA_COMPLETAR' \
+  "FAILED $A::test_el_seguro_borrado_no_genera_y_dice_lo_que_paso"
+sabotaje $F "borrarlo no lo marca" \
+  '        op.seguro_borrado = true;
+' '' \
+  "FAILED $A::test_pasar_a_cif_marca_el_borrado_y_la_nota_lo_dice"
+sabotaje $F "el pedido no dice que se borró" \
+  '            seguro_borrado: !!op.seguro_borrado,
+' '' \
+  "FAILED $A::test_pasar_a_cif_marca_el_borrado_y_la_nota_lo_dice"
+sabotaje $F "la nota dice que no se leyó" \
+  'seguroSinLeer(op) && op.seguro_borrado ?' 'false ?' \
+  "FAILED $A::test_pasar_a_cif_marca_el_borrado_y_la_nota_lo_dice"
+sabotaje $F "recalcularlo deja la marca de borrado" \
+  '        delete op.seguro_borrado;
+' '' \
+  "FAILED $A::test_la_marca_de_borrado_se_va[recalcularlo]"
+sabotaje $R "escribirlo deja la marca de borrado" \
+  ' delete op.seguro_borrado; delete' ' delete' \
+  "FAILED $A::test_la_marca_de_borrado_se_va[escribirlo]"
+sabotaje $R "marcar no muestra el motivo" \
+  '{ errEl.textContent = texto; errEl.hidden = false; }' '{ errEl.textContent = texto; }' \
+  "FAILED $A::test_marcar_en_la_revision_pone_el_motivo_junto_al_campo"
+sabotaje $R "la revisión no exporta la marca" \
+  '    CDI.marcarEnLaRevision = marcarEnLaRevision;
+' '' \
+  "FAILED $A::test_la_revision_exporta_la_marca"
+sabotaje $F "el 400 del seguro no se marca" \
+  "                    if (CDI.marcarEnLaRevision) CDI.marcarEnLaRevision('seguro', detail);
+" '' \
+  "FAILED $FAM[seguro_sin_leer]" "FAILED $FAM[seguro_borrado]"
+sabotaje $F "se marca antes de entrar a la revisión" \
+  "                    CDI.goTo('review');
+                    if (CDI.marcarEnLaRevision) CDI.marcarEnLaRevision('seguro', detail);
+" "                    if (CDI.marcarEnLaRevision) CDI.marcarEnLaRevision('seguro', detail);
+                    CDI.goTo('review');
+" \
+  "FAILED $FAM[seguro_sin_leer]" "FAILED $FAM[seguro_borrado]"
+sabotaje $F "el borrado no vuelve a la revisión" \
+  '(no pudimos leerlo|el que calculó el sistema se borró)' '(no pudimos leerlo)' \
+  "FAILED $FAM[seguro_borrado]"
+sabotaje proyecto_maria/templates/dashboard_v2.html "la pista no pide el 0" \
+  'Si la factura no trae seguro, escribí 0.</span>' 'Dejar en 0 si no aplica.</span>' \
+  "FAILED $A::test_la_pista_del_seguro_pide_el_0_si_la_factura_no_lo_trae"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

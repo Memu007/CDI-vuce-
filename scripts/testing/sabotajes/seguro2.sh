@@ -73,7 +73,7 @@ T=tests/test_seguro2.py
 # 1. El seguro para completar frena; el 0 escrito, no.
 sabotaje $M "el servidor no mira si sigue para completar" \
   '    if request.seguro_para_completar:
-        return SEGURO_PARA_COMPLETAR
+        return SEGURO_BORRADO if request.seguro_borrado else SEGURO_PARA_COMPLETAR
 ' '' \
   "FAILED $T::test_un_seguro_sin_leer_no_genera_y_los_avisos_lo_dicen[CIF-]" \
   "FAILED $T::test_un_seguro_sin_leer_no_genera_y_los_avisos_lo_dicen[FOB-]"
@@ -110,7 +110,7 @@ sabotaje $R "otro monto sin leer también se vacía" \
   "FAILED $T::test_un_campo_sin_leer_se_ve_vacio_en_la_revision[flete_sin_leer]"
 sabotaje $F "el 400 se queda en la pantalla de generar" \
   "                    CDI.goTo('review');
-                    throw new Error(detail);" '                    throw new Error(detail);' \
+                    if (CDI.marcarEnLaRevision)" '                    if (CDI.marcarEnLaRevision)' \
   "FAILED $T::test_si_el_servidor_pide_completarlo_se_vuelve_a_la_revision"
 
 # 2. El 1 % dejado frena sólo con un incoterm que ya lleva el seguro en el precio.
