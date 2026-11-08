@@ -15,6 +15,19 @@ def es_desarrollo() -> bool:
     return os.getenv("ENVIRONMENT") in ("development", "test", "testing")
 
 
+def get_frontend_url() -> str:
+    """Base pública de la UI para los links de los emails y la vuelta del cobro."""
+    url = (os.getenv("FRONTEND_URL") or "").rstrip("/")
+    if url:
+        return url
+    if not es_desarrollo():
+        raise RuntimeError(
+            "FRONTEND_URL no esta seteada y ENVIRONMENT no es development, test ni testing. "
+            "Definir p.ej. FRONTEND_URL=https://cdi.tu-dominio.com"
+        )
+    return "http://127.0.0.1:8010"
+
+
 class Settings(BaseSettings):
     # JWT Configuration
     # Lee JWT_SECRET_KEY → SECRET_KEY → JWT_SECRET. Firma y verificación la

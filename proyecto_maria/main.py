@@ -99,7 +99,7 @@ from proyecto_maria.auth.dependencies import (
     firmar_token,
 )
 from proyecto_maria.auth.roles import roles_de
-from proyecto_maria.config import _DEFAULT_DEV_SECRET, es_desarrollo as _es_desarrollo, get_settings
+from proyecto_maria.config import _DEFAULT_DEV_SECRET, es_desarrollo as _es_desarrollo, get_frontend_url, get_settings
 
 # ============== Configuración de Autenticación ==============
 _CLAVE_JWT = get_settings().jwt_secret
@@ -211,24 +211,6 @@ def send_email(to_email: str, subject: str, body: str):
     except Exception as e:
         print(f"❌ Error enviando email: {e}")
         return False
-
-
-# ============== FRONTEND URL HELPER ==============
-# FRONTEND_URL es la base publica desde la que se sirve la UI. Usada para
-# armar links en emails (reset password, verificacion). En prod ES OBLIGATORIO
-# que venga del .env apuntando al dominio real. En dev default a localhost.
-def get_frontend_url() -> str:
-    url = (os.getenv("FRONTEND_URL") or "").rstrip("/")
-    if url:
-        return url
-    if not _es_desarrollo():
-        # Fail fast: mandar un email con link a localhost es un bug silencioso
-        # que vuelve el reset de password inutil.
-        raise RuntimeError(
-            "FRONTEND_URL no esta seteada y ENVIRONMENT no es development, test ni testing. "
-            "Definir p.ej. FRONTEND_URL=https://cdi.tu-dominio.com"
-        )
-    return "http://127.0.0.1:8010"
 
 
 def _email_verification_enabled() -> bool:
@@ -409,6 +391,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 # Default de dev: permitir localhost + 127.0.0.1 en puertos comunes.
 # Prod: ALLOWED_ORIGINS debe venir del .env con la URL real del frontend.
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
+# Fuera de desarrollo, sin FRONTEND_URL no arranca: los links saldrían rotos recién al mandarlos.
+get_frontend_url()
 if _raw_origins and _raw_origins != "*":
     allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 elif not _es_desarrollo():
