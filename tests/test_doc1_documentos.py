@@ -58,17 +58,18 @@ def test_endpoint_rechaza_antes_de_heuristica(auth_override, client, monkeypatch
     ("EC02", True), (" ec01 ", True), ("EC99", True),
     # Lo que va adelante del código no lo vuelve de importación.
     *((adelante + "EC01", True) for adelante in
-      ("\x00", "\x1f", "\x85", "\t", "\xa0", "\u2028", "\u200b", "\u2060", "\ufeff", "\u200b ")),
+      ("\x00", "\x1f", "\x85", "\t", "\xa0", "\u2028", "\u200b", "\u2060", "\ufeff", "\u200b ", "\u3164", "\uffa0", "-")),
+    ("\uff25\uff23" + "01", True),
     ("\u200bIC04", False), ("IC04", False),
 ])
 def test_ec_directa_nunca_entra_a_importacion(auth_override, client, ruta, destinacion, es_exportacion):
     r = client.post(ruta, json={"operation_id": "SINTETICA", "items": [], "tipo_destinacion": destinacion})
     assert ("exportación" in str(r.json().get("detail"))) is es_exportacion, r.text
-    if es_exportacion:
-        assert r.status_code == 400, r.text
+    # Sin ítems generar da 400 igual; los avisos de una importación salen.
+    assert r.status_code == (400 if es_exportacion or ruta == "/generate_maria" else 200), r.text
 
 
-@pytest.mark.parametrize("destinacion", ["EC02", " ec01 ", "EC99"])
+@pytest.mark.parametrize("destinacion", ["EC02", " ec01 ", "EC99", "\u200bEC01", "\u3164EC01"])
 def test_generador_directo_rechaza_ec(destinacion):
     from tests.test_generar_maria_txt import _gen
     with pytest.raises(ValueError, match="exportación"):

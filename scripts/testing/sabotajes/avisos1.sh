@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Negativos de AVISOS-1: cada sabotaje afloja o estira el rechazo de una
-# destinación de exportación (EC*) en generar y en los avisos, y el caso tiene
-# que fallar por ese motivo.
+# destinación de exportación (EC*), que generar, los avisos y el generador
+# comparten, y el caso tiene que fallar por ese motivo.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/avisos1.sh [SHA]
 # Trabaja en un worktree descartable con su propia SQLite y sin terceros: no
@@ -10,15 +10,15 @@
 set -uo pipefail
 REPO="$(git rev-parse --show-toplevel)"
 SHA="$(git -C "$REPO" rev-parse "${1:-HEAD}")"
-PY="${PY:-python}"
+PY="$(command -v "${PY:-python}")" || exit 2
 TMPD="$(mktemp -d)"; WT="$TMPD/wt"
-git -C "$REPO" worktree add --detach "$WT" "$SHA" >/dev/null || exit 2
 trap 'git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMPD"' EXIT
+git -C "$REPO" worktree add --detach "$WT" "$SHA" >/dev/null || exit 2
 cd "$WT"
 export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
        DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=.
 FALLAS=0
-CASOS=(tests/test_doc1_documentos.py)
+CASOS=(tests/test_doc1_documentos.py tests/test_generar_maria_txt.py)
 
 correr_casos() {
   rm -f test.db
@@ -63,23 +63,30 @@ sabotaje() {
 salida="$(correr_casos)" || { echo "BASE  | los casos no pasan sin sabotaje"; tail -20 <<<"$salida"; exit 1; }
 echo "BASE  | $(tail -1 <<<"$salida")"
 
-M=proyecto_maria/main.py
+G=proyecto_maria/core/maria_generator.py
 T=tests/test_doc1_documentos.py::test_ec_directa_nunca_entra_a_importacion
-P='re.match(r"[\W_]*EC", request.tipo_destinacion or "", re.IGNORECASE)'
+P='return re.match(r"[^A-Z0-9]*EC", texto) is not None'
 
-sabotaje $M "sólo se saca lo que saca strip" \
-  "$P" '(request.tipo_destinacion or "").strip().upper().startswith("EC")' \
+sabotaje $G "sólo se saca lo que saca strip" \
+  "$P" 'return texto.strip().startswith("EC")' \
   "FAILED $T"'[\u200bEC01-True-/generate_maria]' \
   "FAILED $T"'[\x00EC01-True-/generate_maria/avisos]'
-sabotaje $M "distingue mayúsculas" \
-  "$P" 're.match(r"[\W_]*EC", request.tipo_destinacion or "")' \
+sabotaje $G "sólo saltea lo que no es palabra" \
+  "$P" 'return re.match(r"[\W_]*EC", texto) is not None' \
+  "FAILED $T"'[\u3164EC01-True-/generate_maria]' \
+  "FAILED tests/test_doc1_documentos.py::test_generador_directo_rechaza_ec[\u3164EC01]"
+sabotaje $G "no lleva el ancho completo a EC" \
+  'unicodedata.normalize("NFKC", str(tipo_destinacion or ""))' 'str(tipo_destinacion or "")' \
+  "FAILED $T"'[\uff25\uff2301-True-/generate_maria/avisos]'
+sabotaje $G "distingue mayúsculas" \
+  'str(tipo_destinacion or "")).upper()' 'str(tipo_destinacion or ""))' \
   "FAILED $T"'[ ec01 -True-/generate_maria]'
-sabotaje $M "exige algo delante" \
-  "$P" 're.match(r"[\W_]+EC", request.tipo_destinacion or "", re.IGNORECASE)' \
+sabotaje $G "exige algo delante" \
+  "$P" 'return re.match(r"[^A-Z0-9]+EC", texto) is not None' \
   "FAILED $T"'[EC02-True-/generate_maria]'
-sabotaje $M "rechaza cualquier destinación" \
-  "$P" 're.match(r"[\W_]*[A-Z]", request.tipo_destinacion or "", re.IGNORECASE)' \
-  "FAILED $T"'[IC04-False-/generate_maria]' \
+sabotaje $G "rechaza cualquier destinación" \
+  "$P" 'return re.match(r"[^A-Z0-9]*[A-Z]", texto) is not None' \
+  "FAILED $T"'[IC04-False-/generate_maria/avisos]' \
   "FAILED $T"'[\u200bIC04-False-/generate_maria/avisos]'
 
 git checkout -q -- proyecto_maria/
