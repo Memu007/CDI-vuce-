@@ -15,7 +15,7 @@ de casos, que es mayor (abajo).
 | `chequeo-6.py e6adea1 0aed334` | `producto +54/−16`, arnés `+331/−8`, historia vacía, 3 avisos, los tres explicados en el informe (igual) |
 | pytest de las seis suites del informe | `256 passed`, salida 0 |
 | `sabotajes/avisos1.sh 0aed334` | `BASE 149 passed`, 22 `ROJO`, «sabotajes sin rojo: 0», salida 0 |
-| `sabotajes/seguro2.sh 0aed334` | `BASE 78 passed`; en curso al subir esta acta (11 de 19 `ROJO`, ninguno sin rojo); el final va en el commit siguiente |
+| `sabotajes/seguro2.sh 0aed334` | `BASE 78 passed`, 19 `ROJO`, «sabotajes sin rojo: 0», salida 0 |
 
 El informe dice `199 passed` para las seis suites; en `0aed334` se juntan
 256 casos (72 + 60 + 17 + 25 + 52 + 30, con `--collect-only` por archivo) y

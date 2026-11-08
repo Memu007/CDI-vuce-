@@ -535,3 +535,11 @@ PERMISOS-3 aceptada sobre `9428e00`, sin integrar (`REPRODUCCION-PERMISOS-3-2026
 ### 2026-11-08 15:12 UTC (PM principal)
 
 AVISOS-1 aceptada sobre `0aed334` y SEPARADORES-1b-ARNÉS sobre `1063b32`, sin integrar (sus `REPRODUCCION-…-2026-11-08.md`). Decididas por la PM: D129 (a), predicado único antes de limpiar; D130 (a), pieza AVISOS-2 de MARIA después de EMAIL-1, con tres bajas del adversario (texto enorme, texto del 400 en FOB, exportación con destinación de importación).
+
+### 2026-11-08 15:50 UTC (PM principal)
+
+Corte de las 24 h que dio Emi el 07/11 a las 15:50 UTC. Apagadas las rutinas de PM, MARIA y técnica (`enabled=false`). Las dos Devs frenaron con commit y push: técnica en `65af1d3`, MARIA en `cf68314` con EMAIL-1 entregada y sin revisar. Al retomar: revisar EMAIL-1, contestar D131 y D132 y volver a prender las tres rutinas.
+
+### 2026-11-08 17:05 UTC (PM principal, con Emi)
+
+Emi: «Trabaja 12 horas mas». Vuelven las tres rutinas; corte el 2026-11-09 a las 05:00 UTC (trig_01QwEeyuXBFBx6LErxqapwRh, mismo procedimiento). La técnica no tenía piezas en la lista; Emi eligió NOMBRES-1 (D127 b): nombres únicos sin mayúsculas para todas las cuentas, sin tocar las que ya existen, así que no hace falta mirar producción.
