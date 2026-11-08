@@ -380,12 +380,13 @@ def _numero_que_cambiaria(valor: str) -> str:
                 return _alrededor(valor, i)
     t, limpio = sufijos_arca.sin_tildes(valor), sufijos_arca.caracteres_del_maria(valor)
     palabra = {i: p for p in _PALABRA.finditer(t) for i in range(p.start(), p.end())}
+    se_lee_igual = lru_cache(maxsize=None)(_SE_LEE_IGUAL.fullmatch)   # una vez por palabra
     for i, (antes, despues) in enumerate(zip(t, limpio)):
         if antes == despues or despues != " ":
             continue
         p = palabra.get(i)
         if antes.isnumeric() or (p is None and _signo_de_un_numero(t, i)) or (
-                p and not _SE_LEE_IGUAL.fullmatch(p[0])):
+                p and not se_lee_igual(p[0])):
             return p[0] if p else _alrededor(t, i)
     return ""
 
