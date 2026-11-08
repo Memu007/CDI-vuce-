@@ -211,7 +211,7 @@ sabotaje $C "con la cantidad mala vuelve a nombrar valor y peso" \
 sabotaje $F "los estilos vuelven a tener sólo tope de MB" \
   '                                     or _mas_elementos_que(z, parte, tope_elementos)):' \
   '                                     or False):' \
-  "FAILED $T::test_estilos_con_millones_de_elementos_se_rechazan_antes_de_abrir[xf]"
+  "FAILED $T::test_estilos_con_millones_de_elementos_se_rechazan_antes_de_abrir[font]"
 sabotaje $F "una relación de Type raro vuelve a no ser hoja" \
   '        destinos[r.get("Id")] = (destino, "chartsheet" in (r.get("Type") or ""))' \
   '        destinos[r.get("Id")] = (destino, not (r.get("Type") or "").endswith("/worksheet"))' \

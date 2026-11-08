@@ -851,12 +851,12 @@ def test_un_libro_con_entidades_xml_se_rechaza_antes_de_abrir(parte, monkeypatch
 
 
 def test_estilos_con_un_prefijo_no_ascii_tambien_se_cuentan():
-    """Revisión Opus: <ñ:xf/> no lo contaba el patrón y 10 MB llegaban a
+    """Revisión Opus: <ñ:font/> no lo contaba el patrón y 10 MB llegaban a
     948 MB."""
     from proyecto_maria.security.file_security import ExcelDemasiadoGrande, _contar_hojas_xlsx
     ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
-    xml = (f'<?xml version="1.0" encoding="UTF-8"?><ñ:styleSheet xmlns:ñ="{ns}"><ñ:cellXfs>'
-           + "<ñ:xf/>" * 600_000 + "</ñ:cellXfs></ñ:styleSheet>").encode()
+    xml = (f'<?xml version="1.0" encoding="UTF-8"?><ñ:styleSheet xmlns:ñ="{ns}"><ñ:fonts>'
+           + "<ñ:font/>" * 600_000 + "</ñ:fonts></ñ:styleSheet>").encode()
     contenido = _cambiar_parte(_libro([ENCABEZADO]), "xl/styles.xml", lambda _: xml)
     with pytest.raises(ExcelDemasiadoGrande):
         _contar_hojas_xlsx(contenido)
