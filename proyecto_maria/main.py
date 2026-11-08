@@ -1562,7 +1562,16 @@ async def _migrate_add_api_logs_owner_column():
     """
     from proyecto_maria.database.connection import engine, IS_SQLITE
 
+    async def ddl(conn, sql):
+        if not IS_SQLITE:
+            # Si otra conexión tiene tomada la tabla, mejor fallar al rato (y
+            # reintentar en el próximo arranque) que colgar el arranque.
+            await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
+        await conn.exec_driver_sql(sql)
+
     try:
+        # Columna e índice en transacciones separadas: el lock exclusivo del
+        # ALTER no espera al índice, y si el índice falla la columna queda.
         async with engine.begin() as conn:
             if IS_SQLITE:
                 res = await conn.exec_driver_sql("PRAGMA table_info(api_logs)")
@@ -1576,21 +1585,20 @@ async def _migrate_add_api_logs_owner_column():
             if not columnas:
                 # Base vacía: init_db ya la crea con la columna y el índice.
                 return
-            if not IS_SQLITE:
-                # Si otra conexión tiene tomada la tabla, mejor fallar al rato
-                # (y reintentar en el próximo arranque) que colgar el arranque.
-                await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
-            if "owner_username" not in columnas:
-                await conn.exec_driver_sql(
+            agrega_columna = "owner_username" not in columnas
+            if agrega_columna:
+                await ddl(conn,
                     "ALTER TABLE api_logs ADD COLUMN owner_username VARCHAR(50)"
                     if IS_SQLITE else
                     "ALTER TABLE api_logs ADD COLUMN IF NOT EXISTS owner_username VARCHAR(50)"
                 )
-                print("✅ Migracion: agregada columna api_logs.owner_username")
+        if agrega_columna:
+            print("✅ Migracion: agregada columna api_logs.owner_username")
 
-            # Un índice cuya primera columna sea owner_username alcanza, se
-            # llame como lo nombra create_all o como `ix_api_logs_owner`, el
-            # de scripts/migrate_add_owner.py.
+        # Un índice cuya primera columna sea owner_username alcanza, se
+        # llame como lo nombra create_all o como `ix_api_logs_owner`, el
+        # de scripts/migrate_add_owner.py.
+        async with engine.begin() as conn:
             if IS_SQLITE:
                 res = await conn.exec_driver_sql("PRAGMA index_list(api_logs)")
                 tiene_indice = False
@@ -1607,11 +1615,12 @@ async def _migrate_add_api_logs_owner_column():
                 )
                 tiene_indice = res.first() is not None
             if not tiene_indice:
-                await conn.exec_driver_sql(
+                await ddl(conn,
                     "CREATE INDEX IF NOT EXISTS ix_api_logs_owner_username "
                     "ON api_logs (owner_username)"
                 )
-                print("✅ Migracion: agregado indice ix_api_logs_owner_username")
+        if not tiene_indice:
+            print("✅ Migracion: agregado indice ix_api_logs_owner_username")
     except Exception:
         logging.exception(
             "[OBSERVABILIDAD-1] no se pudo agregar api_logs.owner_username; "
@@ -1979,8 +1988,11 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                 # Crear tarea en background (no bloquea respuesta al usuario)
                 # Usamos el loop de eventos actual
                 import asyncio
+                # El molde y no el camino: el camino trae tokens, hashes,
+                # CUIT y nombres de archivo. El router lo deja en el scope.
+                ruta = request.scope.get("route")
                 asyncio.create_task(log_request_background(
-                    str(request.url.path),
+                    getattr(ruta, "path_format", None) or "<sin ruta>",
                     request.method,
                     request.client.host,
                     status_code,

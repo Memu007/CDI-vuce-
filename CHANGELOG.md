@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: las métricas guardan la ruta y no el camino pedido (OBSERVABILIDAD-1)
+
+- El panel de uso muestra `/api/invitations/{token}` en vez del token, el hash, el CUIT o el nombre de archivo que traía el camino; un pedido a una ruta que no existe queda como `<sin ruta>`.
+- La migración de `api_logs` agrega la columna y el índice en transacciones separadas: si el índice falla, la columna queda, y el log anuncia cada uno recién cuando quedó guardado.
+
 ## 2026-11-08 · fix: el lector y el perfil sólo dejan pasar una destinación que es un código (AVISOS-2b)
 
 - El lector de facturas deja vacía la destinación que no es un código de 4 letras o números ASCII, en vez de pasarla en mayúsculas a la revisión.
