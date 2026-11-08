@@ -2,188 +2,190 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## AVISOS-2 (D130 (a) y las tres bajas): **entregada** en `4db641b` (2026-11-08)
+## AVISOS-2b (arreglo de AVISOS-2): **entregada** en `aa115f4` (2026-11-08), base `8fda3d2`
 
 | SHA | qué |
 |---|---|
-| `217c7cd` | fix: sólo un código de 4 letras o números ASCII llega como destinación al TXT; las tres bajas; CHANGELOG |
-| `e51d54f` | test: la forma de la destinación, la exportación, el texto enorme y el lector; arnés `avisos2.sh` |
-| `c10462a` | test: el arnés espera los ids no ASCII como los escribe pytest |
-| `cfd03a5` | fix: los blancos delante de la destinación se sacan antes del corte (regresión mía, ver abajo) |
-| `bd6330d` | test: 70 blancos y 70 tabs delante de EC, y el generador directo con lo que no es código |
-| `4db641b` | fix: el comentario de `es_exportacion` en dos líneas (el AVISO de chequeo-6) |
+| `ffd1b95` | fix: el lector y el perfil usan la misma regla de código que el TXT; CHANGELOG |
+| `cbe7b76` | test: casos del lector y del perfil, `IC_4` al caso de forma, sabotajes en `avisos2.sh` |
+| `9cfe87c` | fix: el lector ya no calcula la destinación que después pisa (hallazgo de `/code-review`) |
+| `aa115f4` | test: los sabotajes del lector leen la destinación de `documento` |
 | este commit | docs: el informe |
 
-**Producto +29/−16** (13 netas).
+**Producto +14/−7** (7 netas).
+
+La base es `8fda3d2` y no `4db641b`: debajo están los commits de RESET-3
+(`3d0083a..8fda3d2`), que ya había empezado cuando llegó tu veredicto. No
+están entregados; son lo que sigue (abajo).
+
+**El orden.** Tu canal (`dcf35c6`) dice «AVISOS-2b → RESET-3». Tu mensaje
+de las 19:56 decía lo contrario: «cerrala y entregala [RESET-3], y después
+AVISOS-2b». Lo leí recién con AVISOS-2b terminada y su suite corriendo. Seguí
+el canal. RESET-3 es lo próximo que entrego.
 
 Qué hace:
 
-1. **D130 (a).** `destinacion_del_txt` (`maria_generator.py`) es el único
-   lugar que decide qué destinación va al ISTA: cuatro letras o números
-   ASCII después de `strip()`, en mayúsculas; si no, `ValueError` con el
-   ejemplo («como IC04» o «como EC01»). Lo usan el generador, los dos
-   endpoints de importación y el de exportación (vía `_destinacion_o_400`,
-   que lo vuelve 400). Antes, `IC041` salía como `IC04` y `ＩＣ０４` o
-   `ıc04` llegaban al TXT.
-2. **Baja 1, texto enorme.** `es_exportacion` corta a 64 caracteres después
-   del `strip()` y antes de normalizar. 5 millones de caracteres: 0,022 s.
-3. **Baja 2, seguro borrado de vuelta a FOB.** El 400 dice «el que calculó
-   el sistema se borró al cambiar el incoterm», sin «en el precio». Vale
-   para ir y volver.
-4. **Baja 3.** `/generate_maria_export` da 400 con `IC04`, `TRAN` o
-   cualquier destinación que no sea EC*, y escribe la normalizada
-   (` ec01 ` → `EC01`).
-5. El lector (`validar_documento_importacion`) usa el mismo `es_exportacion`
-   para los tres lugares donde puede venir la destinación.
+1. **D133 (a).** `codigo_de_destinacion` (`maria_generator.py`) es la regla:
+   cuatro letras o números ASCII después de `strip()`, en mayúsculas, o `""`.
+   `destinacion_del_txt` la usa (y da `ValueError` si queda vacía) y el
+   lector (`validar_documento_importacion`) también: lo que no es código
+   queda vacío y la revisión pone IC04, como con el vacío de hoy. Datos del
+   caso: `"\u200b"*65 + "EC01"`, `IC-04`, `IC04 (consumo)`, `\u200bIC04`,
+   `ＩＣ０４`, `IC_4` y `\u212aC04` quedan en `""`; ` ic04 ` queda en `IC04`.
+2. **D135 (a).** El PUT del perfil pasa el default por `_destinacion_o_400`
+   (la misma que los endpoints de importación): `IC041`, `IC0`, `EC01` e
+   `IC_4` dan 400 y no cambia nada del perfil (ni el default ni el nombre
+   que venía en el mismo pedido); ` ic04 ` guarda `IC04`; `""` lo vacía.
+3. **`IC_4`** está en los datos de `test_lo_que_no_es_un_codigo_da_400_y_no_genera`.
 
-**Contradigo la propuesta con evidencia.** La regex `^[A-Z]{2}\d{2}$` que
-estaba en D130 rechaza `ZFI1` y `TRAN`, que hoy están en el select de la
-revisión. Por eso la regla es «cuatro letras o números ASCII», no «dos
-letras y dos números». Si querés la más estricta, es una D aparte con su
-lista de destinaciones.
+Rojo de `cbe7b76` sobre `8fda3d2` (el producto sin arreglar): «19 failed,
+62 passed». 14 son del lector y 4 del perfil. El 19.º era el caso del default
+vacío, que yo había escrito mal; lo corregí antes de commitear.
 
-**Lo admito: metí una regresión y la encontré antes de entregar.** En
-`217c7cd` el corte a 64 iba antes del `strip()`. Con 64 blancos o más
-delante de `EC01`, un TXT de **importación** salía con `ISTA=EC01`, en el
-endpoint, el generador y el lector. La base no lo dejaba pasar. La
-encontraron `/code-review high` y el adversario Sonnet alto, los dos. La
-prueba del texto enorme que yo había escrito no la veía: usaba `\u200b`,
-que `strip()` no saca, y esperaba `ValueError`, que da igual el chequeo de
-forma. Arreglo en `cfd03a5`; las pruebas que la distinguen, en `bd6330d`
-(70 blancos y 70 tabs, en los dos endpoints, el lector y exportación).
-Rojo con `cfd03a5` revertido: «9 failed, 122 passed»; en el arnés es el
-sabotaje «corta antes de sacar los blancos».
+**Corrijo a la baja un hallazgo del adversario.** Dijo que un default viejo
+guardado antes de este arreglo (`IC04CONSUM`, `EC01`) traba todo guardado
+del perfil. Desde la pantalla no pasa: el default es un `<select>`
+(`dashboard_v2.html:1476`) con "", IC04, IC05, IT01, ZFI1 y TRAN.
+`profile.js:166` lo carga con `p.default_tipo_destinacion || ''`, y un valor
+que no está entre las opciones queda en "". Al guardar se manda "", la
+respuesta es 200 y el default viejo se borra sin avisar. Ese default ya daba
+400 en cada generación desde AVISOS-2. Sólo un cliente de la API que
+reenvía el valor viejo recibe 400, y eso es lo que pide D135 (a). Por eso
+no lo subo como D.
 
 ## Decisiones
 
-La D134 ya la usaste vos en `PARA-DEV.md`; por eso la segunda mía es la D135.
+**D137. El smoke quedó viejo desde ABUSO-1** (rojo de arriba). No frena
+esta entrega.
 
-**D133. El lector deja pasar una destinación que no es código.**
-`pdf_extractor.py:2576` guarda `documento["destinacion"]` sólo con
-`strip()`/`upper()`. Si el modelo devuelve `IC-04`, `IC04 (consumo)` o
-`\u200bIC04`, la operación la lleva, el select de la revisión queda en
-blanco (no es una opción) y cada generación da 400 «Destinación: va un
-código de 4 letras o números». La persona no ve qué está mal hasta que
-abre el select. Antes se cortaba a 4 y generaba.
+- (a) El smoke espera el rechazo sin sesión en los dos eventos (lo que hace
+  el producto hoy) y sigue con `by-cuit`. Sólo cambia el script.
+- (b) El smoke inicia sesión con un usuario que crea para eso y manda los
+  eventos con sesión.
+- (c) Se retira y queda lo que cubre la suite.
 
-- (a) El lector la pasa por la misma regla y, si no es código, la deja
-  vacía (la revisión pone IC04, como hoy con el vacío). Recomiendo esta:
-  una línea, y el 400 no aparece.
-- (b) La revisión muestra el valor que vino aunque no esté en la lista.
-- (c) Queda así: el 400 dice qué falta.
+Recomiendo **(a)**: es un cambio chico de script, no necesita credenciales
+y vuelve a dar una señal verde o roja que signifique algo. (b) necesita un
+usuario y una clave en el script. Si decís (a) o (b), lo hago como pieza
+chica después de RESET-3.
 
-Va con un caso que ahora el lector admite y la base rechazaba:
-`"\u200b"*65 + "EC01"`. El endpoint y el generador lo rechazan con 400, así
-que **nunca sale un TXT**; con (a) el lector lo deja vacío.
+Siguen abiertas:
 
-**D135. Un default de perfil puede trabar todas las importaciones.**
-`default_tipo_destinacion` se guarda con `_sanitize_op_default`
-(`main.py:2425`): letras y números hasta 10. `IC041`, `IC0` o `EC01`
-guardados por la API se ponen en cada operación sin destinación, y cada
-generación da 400 hasta que la persona la cambie a mano. Antes `IC041`
-se cortaba a `IC04`.
+- **D131**, de EMAIL-1: va a Emi.
+- **D136**: no traigo tu rama hasta que me avises que INTEGRAR-1 está
+  aceptada.
 
-- (a) Al guardar el perfil, la misma regla: 400 si no es un código de
-  importación. Recomiendo esta.
-- (b) Al aplicar el default en la revisión, ignorarlo si no es código.
-- (c) Queda así.
+Supuestos que podés rechazar:
 
-**D136. No integré tu rama: trae la de la técnica y choca en producto.**
-`origin/claude/practical-shannon-szpwkn` ahora tiene `f95ca5d` (el merge de
-`claude/dev-tecnica`): 177 commits que no están en `main`. Mergearla en la
-mía da conflicto en `main.py` (7 bloques), `finalize.js` (4),
-`clientes.js`, `file_security.py` y `CHANGELOG.md`. No son de forma: las dos
-ramas cambiaron distinto el webhook de MP sin secreto (en desarrollo, una lo
-deja pasar y otra lo rechaza), qué pasa con las operaciones al borrar un
-cliente (se borran sus presupuestos o la operación queda «Sin cliente»), el
-registro (de un lado el tope por IP y la regex del username, del otro
-`_exigir_username_libre`) y el guardado al historial
-en `finalize.js`. Elegir un lado borra trabajo aceptado de una de las dos.
-Los tres commits tuyos que trae (`f4f1d8f`, `40bf363`, `740ba3a`) tocan sólo
-`docs/pm/`, y los leí: mi cola queda AVISOS-2 → RESET-3 → OBSERVABILIDAD-1
-→ ORG-1+D40 → D102.
-
-- (a) Integrás vos las dos ramas (en `main` o en la tuya, con su suite) y
-  yo traigo eso. Recomiendo esta: la integración entre Devs es tuya, y
-  RESET-3 toca `main.py`, así que conviene antes de que crezca la
-  diferencia.
-- (b) La resuelvo yo como pieza aparte, con suite y los arneses de las dos
-  ramas, y decidís cada bloque de fondo.
-- (c) Sigo sin traerla hasta que aceptes AVISOS-2.
-
-Mientras no decidas, sigo con RESET-3 sobre mi rama y no traigo la tuya.
+- Un invisible solo (`\u200b`) como default del perfil da 400, no vacía el
+  default: `strip()` no lo saca y no es un código.
+- `ABCD` o `1234` se aceptan en el perfil y en el lector: son la regla de
+  AVISOS-2 (cuatro letras o números), no una lista de destinaciones.
 
 ## Comandos
 
 ```bash
-git checkout 4db641b
-# negativos de AVISOS-2: 12 ROJO, «sabotajes sin rojo: 0»
-PY=python scripts/testing/sabotajes/avisos2.sh 4db641b
-# negativos de AVISOS-1, que comparten es_exportacion: 22 ROJO, «sabotajes sin rojo: 0»
-PY=python scripts/testing/sabotajes/avisos1.sh 4db641b
-# 13 netas, avisos 0
-python docs/pm/herramientas/chequeo-6.py 8504691 4db641b
+git checkout aa115f4
+# negativos de AVISOS-2 y 2b: «BASE | ... 155 passed», 16 ROJO, «sabotajes sin rojo: 0»
+PY=python scripts/testing/sabotajes/avisos2.sh aa115f4
+# negativos de AVISOS-1, que comparten es_exportacion: «BASE | ... 151 passed», 22 ROJO, «sabotajes sin rojo: 0»
+PY=python scripts/testing/sabotajes/avisos1.sh aa115f4
+# producto +14/−7, «avisos: 0»
+python docs/pm/herramientas/chequeo-6.py 8fda3d2 aa115f4
+# los casos de la pieza solos: 0 failed
+python -m pytest -q --no-cov tests/test_avisos2.py
 ```
+
+Los cuatro sabotajes nuevos de `avisos2.sh`, cada uno con lo que dice su rojo:
+
+| sabotaje | dice |
+|---|---|
+| el lector pasa la destinación sin mirar la forma | `FAILED tests/test_avisos2.py::test_el_lector_deja_vacio_lo_que_no_es_un_codigo[IC_4--pymupdf]` y `…[IC-04--pdf_directo]` |
+| el lector mira la forma del texto ya en minúsculas | `FAILED …test_el_lector_deja_vacio_lo_que_no_es_un_codigo[\u212aC04--pymupdf]` |
+| el perfil guarda el default sin mirar la forma | `FAILED tests/test_avisos2.py::test_el_perfil_solo_guarda_un_codigo_de_importacion[IC041-400-IC05]` y `…[IC_4-400-IC05]` |
+| el perfil guarda una exportación | `FAILED …test_el_perfil_solo_guarda_un_codigo_de_importacion[EC01-400-IC05]` |
 
 ## Puertas
 
-Todo sobre `4db641b`, desde un worktree limpio.
+Todo sobre `aa115f4`, desde un worktree limpio.
 
 | puerta | salida exacta |
 |---|---|
-| suite completa (`pytest -q --no-cov --timeout=120`) | `5406 passed, 335 skipped, 3 xfailed, 97 warnings in 1086.06s (0:18:06)`, `pytest=0` |
-| `compileall -q proyecto_maria` | `compileall=0` |
-| `avisos2.sh 4db641b` | `BASE \| 131 passed`; 12 `ROJO`; `sabotajes sin rojo: 0` |
-| `avisos1.sh 4db641b` | `BASE \| 151 passed`; 22 `ROJO`; `sabotajes sin rojo: 0` |
-| `chequeo-6.py 8504691 4db641b` | `avisos: 0` (abajo, entera) |
+| suite completa (`pytest -q --no-cov --timeout=120`) | `==== 5432 passed, 335 skipped, 3 xfailed, 98 warnings in 1052.07s (0:17:32) ====`, salida 0 (AVISOS-2 había dado 5406 passed) |
+| `compileall -q proyecto_maria` | sin salida, `compileall 0` |
+| `smoke_friccion.sh` contra uvicorn local (entorno de test) | **rojo**: `[FAIL] POST /api/ui/event`, salida 1. Igual sobre `8fda3d2`: no es de esta pieza (abajo y D137) |
+| `avisos2.sh aa115f4` | `BASE  \| ======================= 155 passed, 5 warnings in 28.67s =======================`; 16 `ROJO`; `sabotajes sin rojo: 0` |
+| `avisos1.sh aa115f4` | `BASE  \| ====================== 151 passed, 17 warnings in 10.91s =======================`; 22 `ROJO`; `sabotajes sin rojo: 0` |
+| `chequeo-6.py 8fda3d2 aa115f4` | `avisos: 0` (abajo, entera) |
 | grep de historia de §6 | vacío |
 
-**No corrido:** `smoke_friccion.sh`: necesita la app levantada y no la
-levanté; lo que cambió (el 400 de generar, avisos y exportación) lo cubren
-los casos de la suite contra la app en proceso. `ataque_aislamiento.sh`: la
-pieza no toca datos, sesión ni permisos.
+**El rojo del smoke.** El endpoint contesta
+`{"ok":false,"detail":"Evento sin sesión no admitido"}`: es el rechazo que
+agregó ABUSO-1 (`a3abd92`), y el smoke (último cambio en `b88da9c`) sigue
+mandando el evento sin sesión. Lo levanté sobre `8fda3d2` con el mismo
+entorno y da el mismo `[FAIL] POST /api/ui/event`. Los otros dos pasos los
+corrí a mano en los dos SHAs: `/api/session/state` da el mismo rechazo y
+`by-cuit` da `401`, como pide el smoke. Ninguno de los tres pasos toca lo que
+cambió esta pieza. Desde ABUSO-1 nadie lo había corrido: los informes y las
+reproducciones lo declaran no corrido.
+
+**No corrido:**
+
+- `ataque_aislamiento.sh`: la pieza no toca datos de otros, sesión ni
+  permisos.
+- `/security-review` con subagentes, como lo pide el skill. La pieza toca el
+  perfil, y por eso lo hice, pero a mano y en la sesión, sin subagentes. Sin
+  hallazgos:
+  - sólo achica lo que se acepta (`[A-Z0-9]{4}` o vacío);
+  - el texto del 400 es fijo;
+  - el front lo muestra con `textContent`.
 
 ## Hallazgos de la autorrevisión
 
 | quién | modelo y esfuerzo | hallazgo | qué hice |
 |---|---|---|---|
-| `/code-review high` sobre `8504691..c10462a` | el de la sesión, alto | corte a 64 antes del `strip()`: `ISTA=EC01` en importación (generador, endpoint) | arreglado en `cfd03a5`, rojo antes |
-| ídem | ídem | lo mismo en el lector | ídem |
-| ídem | ídem | la prueba del texto enorme no distingue el defecto | `bd6330d`: 70 blancos y 70 tabs |
-| ídem | ídem | el sabotaje «el generador corta» sólo daba rojo porque también borraba el rechazo de exportación | `bd6330d`: `test_el_generador_tampoco_escribe_lo_que_no_es_un_codigo`; el sabotaje espera `[IC041]` |
-| ídem | ídem | el lector guarda la destinación cruda (`pdf_extractor.py:2576`) | D133 |
-| ídem | ídem | el default del perfil sin la regla (`main.py:2425`) | D135 |
-| ídem | ídem | el chequeo corre dos veces en importación (endpoint y generador), §6 | no lo toqué: ya estaba así en la base (`_rechazar_exportacion_en_importacion` y el generador) y el endpoint tiene que rechazar antes de `_estudio_elegido`. Riesgo, abajo |
-| `adversario-sonnet-alto` | Sonnet, alto | la misma regresión de los blancos | ídem que la primera |
-| ídem | ídem | 300 000 combinaciones (prefijos, anchos, mayúsculas, largos, los tres endpoints, el lector): ninguna otra falla y ningún 500 | — |
-
-`/security-review` **no se corrió**: la pieza valida un texto antes de
-escribir el TXT; no toca dinero, sesión, permisos ni lo que se guarda.
+| `adversario-sonnet-alto` | Sonnet, alto | un default viejo que no es código traba todo guardado del perfil (media) | corregido a la baja, arriba: sólo pasa por la API; desde la pantalla se borra en silencio |
+| ídem | ídem | el perfil acepta tipos que no son texto: `true` guarda `TRUE` y `1234` guarda `1234` (baja) | riesgo, abajo |
+| ídem | ídem | `true` en el lector queda `TRUE` (baja) | riesgo, abajo |
+| ídem | ídem | `ABCD` y `1234` se aceptan (informativo) | es la regla; supuesto, arriba |
+| ídem | ídem | `\u200b` solo ahora da 400 en el perfil (informativo) | supuesto, arriba |
+| `/code-review high` sobre `8fda3d2..cbe7b76` | el de la sesión, alto | la destinación que calculaba la comprensión del lector quedó muerta: se pisaba siempre | arreglado en `9cfe87c`; los sabotajes que dependían de ella, reescritos en `aa115f4` (los dos dan rojo) |
+| ídem | ídem | `IC-05` en el lector queda vacío y la revisión pone IC04, no IC05 | riesgo, abajo (ya previsto en D133) |
+| ídem | ídem | 65 invisibles + `EC01` en el lector terminan como IC04 | riesgo ya decidido en D133 (a) |
+| ídem | ídem | el default viejo traba el perfil | igual que el primero del adversario |
+| ídem | ídem | el 400 del perfil se muestra en el lugar del error del CUIT (`profile.js:264`) | riesgo, abajo |
+| ídem | ídem | con `EC01` el mensaje del perfil habla de «TXT de importación» | riesgo, abajo |
+| ídem | ídem | doble `strip()` en `destinacion_del_txt` | queda: es una línea y no cambia nada |
+| ídem | ídem | doble normalización en el perfil (`strip()` antes y `_destinacion_o_400` después) | queda: el `strip()` decide si se vacía |
 
 ## Riesgos
 
-- D133, D135 y D136, arriba.
-- Con CIF y el seguro borrado, el 400 ya no dice «en el precio»: dice «al
-  cambiar el incoterm», que es cierto en los dos sentidos.
-- En exportación, una destinación vacía da 400 («como EC01»). Antes llegaba
-  vacía al generador de exportación.
-- `generate_maria_export_txt` no tiene chequeo propio: su único llamador es
-  el endpoint, que ya lo hace.
-- El doble chequeo de importación (endpoint y generador) queda como en la
-  base. Si lo querés una vez, propongo la línea para la cola de limpieza:
-  «`/generate_maria` y `/avisos` asignan `request.tipo_destinacion` con
-  `_destinacion_o_400` y el generador confía en lo que recibe».
+- Hasta que se decida D137, `smoke_friccion.sh` da rojo en cualquier SHA
+  desde ABUSO-1, y no distingue nada.
+
+- Un `IC-05` (o similar) que lee el modelo se pierde: la revisión pone IC04
+  y la persona tiene que elegir IC05 a mano. Es lo que decidiste en D133 (a).
+- El 400 del perfil aparece donde se muestra el error del CUIT
+  (`profile.js:264`). Desde la pantalla no se puede provocar: el select sólo
+  manda códigos válidos.
+- Con `EC01` por la API, el mensaje dice lo mismo que en la generación de
+  importación («TXT de importación»), aunque se esté guardando el perfil.
+- Por la API, un `true` o un `1234` como default se guardan como `TRUE` y
+  `1234`. Son cuatro letras o números, así que el TXT los acepta igual que
+  antes de esta pieza.
+- No hay migración: un default viejo que no es código sigue en la base hasta
+  que la persona guarde el perfil desde la pantalla.
 
 ## chequeo-6
 
 ```
-chequeo-6 8504691..HEAD: avisos para mirar, no un veredicto
-producto +29/−16
-arnés +268/−6
+chequeo-6 8fda3d2..aa115f4: avisos para mirar, no un veredicto
+producto +14/−7
+arnés +57/−10
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/core/maria_generator.py: 2331 → 2341
-  proyecto_maria/main.py: 12075 → 12078
+  proyecto_maria/core/maria_generator.py: 2341 → 2347
+  proyecto_maria/main.py: 12085 → 12086
   proyecto_maria/pdf_extractor.py: 2893 → 2893
 avisos: 0
 ```
@@ -193,4 +195,10 @@ avisos: 0
 `proyecto_maria/core/maria_generator.py`, `proyecto_maria/main.py`,
 `proyecto_maria/pdf_extractor.py`.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (send_message next, «Dev MARIA: …»), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. AVISOS-2 entregada en 4db641b (informe en este archivo); abiertas D131 (de EMAIL-1, va a Emi), D133, D135 y D136 (no traje tu rama: trae la técnica y choca en producto); la próxima D libre es la D137. Sigue RESET-3 (D132 a: tope por cuenta al pedir el reset, rojo con IPs distintas, sabotaje propio), después OBSERVABILIDAD-1, ORG-1+D40 y D102. Nunca main, nada se publica sin el «dale» de Emi para el SHA, sin secretos, sólo datos inventados.
+## Lo que sigue
+
+RESET-3 (D132 a, el tope de pedidos de reset por cuenta) ya está en la
+rama, debajo de esta pieza (`3d0083a..8fda3d2`, base `2fba5c9`), y subido.
+No lo entregué todavía: lo cierro con `/entregar` y te aviso.
+
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (send_message next, «Dev MARIA: …»), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. AVISOS-2b entregada en aa115f4 (informe en este archivo, base 8fda3d2); abiertas D131 (de EMAIL-1, va a Emi) y D136 (decidida: no traigo tu rama hasta que INTEGRAR-1 esté aceptada); D137 abierta (el smoke viejo); la próxima D libre es la D138. Sigue la entrega de RESET-3 (3d0083a..8fda3d2, base 2fba5c9, ya subido), después OBSERVABILIDAD-1, ORG-1+D40 y D102. Nunca main, nada se publica sin el «dale» de Emi para el SHA, sin secretos, sólo datos inventados.
