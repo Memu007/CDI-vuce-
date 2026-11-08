@@ -24,7 +24,8 @@ sino en PGPASSWORD, y ningún error la muestra.
 
 COPIA_PG_BIN es la carpeta de pg_dump y pg_restore (por defecto, los del PATH).
 COPIA_PLAZO_S es cuántos segundos puede durar la orden entera (por defecto, 3600):
-en copiar, cuenta también la verificación.
+en copiar, cuenta también la verificación. Al cortarse, borrar la base de prueba
+puede sumar hasta TOPE_BORRADO_S.
 Correrlo contra producción lo decide Emi.
 """
 import argparse
@@ -289,9 +290,9 @@ def _filas(tablas: dict) -> int:
     return filas
 
 
-async def _borrar_restauracion(admin, base: str) -> None:
-    """Un corte no deja el borrado a medias: se termina, con su propio tope para
-    que un DROP colgado no espere para siempre, y después sigue el corte."""
+async def _borrar_restauracion(admin, base: str) -> bool:
+    """Un corte no deja el borrado a medias: se termina, con su tope, y sigue el corte.
+    Si la base queda se avisa acá: una excepción taparía la del corte o la de verificar."""
     async def borrar():
         try:
             await admin.execute(f'DROP DATABASE IF EXISTS "{base}" WITH (FORCE)')
@@ -303,10 +304,21 @@ async def _borrar_restauracion(admin, base: str) -> None:
     try:
         await asyncio.shield(tarea)
     except asyncio.CancelledError:
-        await asyncio.gather(tarea, return_exceptions=True)
+        await asyncio.wait([tarea])
+        _quedo(tarea, base)
         raise
-    except TimeoutError:
-        raise Falla(f"no se pudo borrar {base} en {TOPE_BORRADO_S} s: hay que borrarla a mano") from None
+    except Exception:  # noqa: BLE001 - lo informa _quedo
+        pass
+    return not _quedo(tarea, base)
+
+
+def _quedo(tarea, base: str) -> bool:
+    error = tarea.exception()
+    if error is not None:
+        motivo = (f"en {TOPE_BORRADO_S} s" if isinstance(error, TimeoutError)
+                  else f"({tapar(f'{type(error).__name__}: {error}')})")
+        print(f"no se pudo borrar {base} {motivo}: hay que borrarla a mano", file=sys.stderr)
+    return error is not None
 
 
 def _resumen(err: str) -> str:
@@ -398,9 +410,11 @@ async def verificar(archivo: str) -> int:
             finally:
                 await restaurada.close()
     finally:
-        await _borrar_restauracion(admin, base)
+        borrada = await _borrar_restauracion(admin, base)
     if problemas:
         print("LA COPIA NO SIRVE:\n  " + "\n  ".join(problemas), file=sys.stderr)
+        return 1
+    if not borrada:
         return 1
     _escribir(_de_marca(archivo), f"{suma}  {os.path.basename(archivo)}\n")
     print(f"copia verificada: {len(datos['tablas'])} tablas, {filas} filas")
