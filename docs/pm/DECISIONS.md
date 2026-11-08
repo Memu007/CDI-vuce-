@@ -459,3 +459,7 @@ ENTRADAS-1 aceptada sobre `c839197` (vuelta sólo de pruebas), sin integrar porq
 ### 2026-11-08 00:10 UTC (PM principal)
 
 ABUSO-2 aceptada sobre `1f79a8e` (vuelta sólo de pruebas; producto `8ad47ee`), sin integrar porque la rama lleva debajo piezas en devolución. Riesgo decidido por la PM: el `delete` de lo propio por prefijo no tiene prueba; hoy no tiene camino.
+
+### 2026-11-08 01:12 UTC (PM principal)
+
+ENTORNO-2 aceptada sobre `bf92bf9`, sin integrar. D107 decidida por la PM: (a), pieza ENTORNO-3 de MARIA después de ENTRADAS-2 (FRONTEND_URL, ALLOWED_ORIGINS, HSTS y el pase de rate limit de 127.0.0.1 con la regla de `es_desarrollo()`), dentro de «arreglos chicos de seguridad a cero» (Emi). Riesgo para publicar: Railway necesita `ENVIRONMENT=production` exacto (D99).

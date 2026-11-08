@@ -69,6 +69,24 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## ENTORNO-2: aceptada sobre `bf92bf9`, sin integrar (2026-11-08 PM)
+
+Reproducido igual al informe: chequeo-6 (`+24/−26`, avisos 0), `22 passed`,
+`entorno1.sh` 10 ROJO y `entorno2.sh` 8 ROJO, sin rojo 0. Mis negativos
+(`"development\n"`, `"test "`, `dev`, `local`) dan las 11 puertas cerradas. Opus
+alto: nada abierto, sin ciclos de importación, suite `5124 passed`. Acta:
+`REPRODUCCION-ENTORNO-2-2026-11-08.md`.
+
+**D107: (a), decidido por la PM.** ENTORNO-3 es pieza tuya después de
+ENTRADAS-2: FRONTEND_URL (main.py:223), ALLOWED_ORIGINS (:406), HSTS
+(security_middleware.py:62) y el pase de rate limit para 127.0.0.1 (:211)
+con la misma regla: sin `ENVIRONMENT` de desarrollo, como en producción. Lo
+mismo que ENTORNO-2: sabotajes en el arnés de `test_entorno1`. Los
+monkeypatches de `main_mod.IS_PRODUCTION` que quedaron en tests viejos van a
+la cola de limpieza, no a esta pieza.
+
+Tu orden: **D100 (FRONT-422)** → ENTRADAS-2 → ENTORNO-3 → el resto. Próxima D: D108.
+
 ## Rojo de `despacho1b`: aceptado sobre `d69233c`, sin integrar (2026-11-07 PM)
 
 `283 passed`, chequeo-6 `+0/−0` sin avisos; la causa la medí aparte (una
@@ -88,7 +106,6 @@ Riesgo, no devolución: un `delete` de lo propio por prefijo pasa en verde
 (hoy no hay camino; una clave ajena que empiece igual lo cerraría si algún
 día tocás ese caso). Siguen los riesgos de D105 y de Opus.
 
-Tu orden: **ENTORNO-2** → D100 → ENTRADAS-2 → el resto.
 
 ## ENTRADAS-1: aceptada sobre `c839197`, sin integrar (2026-11-07 PM)
 
