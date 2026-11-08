@@ -2,92 +2,88 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## COBRO-MP-4 (con D124), entregada en `0fb991c` (informe en el commit de arriba)
+## PERMISOS-2, entregada en `a1db966` (informe en el commit de arriba)
 
-Base: `3be86b7`. El código está en `0fb991c`, un merge de tu rama que trae `9eef8a2` y sólo toca `docs/pm`. El informe va en el commit de arriba.
+Base: `bc5d6b4`. El código está en `a1db966`, un merge de tu rama que trae `75942ce` y sólo toca `docs/pm`. El informe va en el commit de arriba.
 
 | Commit | Qué |
 |---|---|
-| `f152a7a` | producto: la marca del 503 y quién concilia |
-| `674da8f` | casos, `cobro_mp4.sh` y `cobro_mp4_postgres.py` |
-| `83a2957` | producto: conciliar borra las marcas de todo el estudio; en el CHANGELOG, la vuelta atrás va después del código |
-| `31da854` | casos de la marca de otra cuenta y del borrado |
-| `b5c9dc0` | merge de tu rama (`docs/pm`) |
-| `162468e` | D124: la CI instala `xlwt` |
-| `7cb4918` | dos casos de tiempo de `test_cobro_mp2.py` esperan la marca nueva (abajo, «Un BASE en rojo») |
-| `0fb991c` | merge de tu rama (`docs/pm`) |
+| `0d65cc3` | producto: `_es_admin` mira sólo el rol, el registro y crear un estudio rechazan un nombre de la lista, el arranque lee los roles con `roles_de` |
+| `6fa309f` | casos: `tests/test_permisos2.py` y los de `test_admin_solo_admin.py` que esperaban lo de antes |
+| `052ec48` | `permisos2.sh` |
+| `2082647` | producto: el comentario de quién es admin cambia sólo lo que cambió |
+| `3076947` | `aislamiento2.sh` sigue la línea nueva de `_es_admin`; en `admin2.sh` sale un sabotaje que ya no distingue nada (abajo, «Decisiones»); el rechazo del registro exige su texto |
+| `ae8d844` | merge de tu rama (`docs/pm`) |
+| `2c0f73e` | el caso de cobro que pediste y su sabotaje en `cobro_mp4.sh` (punto 1 de la tarea; sin cambio de producto) |
+| `f6d62cc` | `ataque_aislamiento.sh` frena si no pudo crear al administrador |
+| `a1db966` | merge de tu rama (`docs/pm`) |
 
-COBRO-MP-2+3 vuelta 3, PERMISOS-1 y BACKUP-1a: leí que las aceptaste sobre `ca84c5f`, sin integrar. EXCEL-2d, aceptada sobre `84fd9f2`.
+COBRO-MP-4 (con D124): leí que la aceptaste sobre `0fb991c`, sin integrar. SEGURO-2, sobre `d160738`.
 
 ### Resultado
 
-- **La marca.** Cuando cancelar recibe un 503, la cuenta que pidió queda anotada en `users.cancelar_sin_confirmar` con la suscripción que Mercado Pago no confirmó. La columna es nueva, de 100 caracteres y puede quedar vacía; la agrega el arranque.
-- **Quién concilia.** Al reintentar, con todas las suscripciones canceladas, concilian sólo la dueña o quien tenga una marca igual a una suscripción del estudio que sigue anotada. Un miembro sin la marca recibe 403 y no cambia nada. El caso cubre que su suscripción venga cancelada, con 404 en MP o sin sid, y además que la marca sea de una suscripción que ya no está.
-- **Se borra al conciliar.** Se borra la marca de quien pide y la de cada cuenta del estudio cuya suscripción se cancela.
-- **El orden de cancelar.** Ahora cancela primero las de otras cuentas, después la de quien pide y al final la que paga. Así, si falla una de otra cuenta, quien pide sigue teniendo su suscripción anotada y puede volver a conciliar (`test_el_reintento_que_falla_en_otra_deja_la_suya_para_volver_a_conciliar`).
-- **La migración** se probó en un Postgres 16 descartable (`cobro_mp4_postgres.py`): el arranque agrega la columna a una base con datos, el 503 guarda la marca, el reintento concilia y la borra, y un segundo arranque no cambia nada. La vuelta atrás se corrió dos veces.
-- **Vuelta atrás.** Primero el código anterior y después `alter table users drop column if exists cancelar_sin_confirmar`. Se pierden las marcas pendientes: después de volver atrás, el reintento de un miembro vuelve a la regla anterior. Está en el CHANGELOG.
-- **D124.** La CI instala `xlwt==1.3.0` en un paso aparte, después de `requirements.txt` (`162468e`). Producción no lo instala.
-- **Archivos de producto:**
-  - `proyecto_maria/main.py`: `cancel_billing`, `_quien_toca_el_plan` y la lista de `_migrate_add_user_billing_columns`;
-  - `proyecto_maria/database/models.py`;
-  - `CHANGELOG.md`;
-  - `.github/workflows/ci.yml` (D124).
+1. **El caso de cobro (punto 1).** `test_si_falla_la_suya_la_duena_no_concilia_ni_toca_la_que_paga`: la dueña con sid propio que no paga y otra cuenta autorizada; falla el PUT de la dueña, la respuesta es 503 y la que paga sigue `authorized`. Con el desempate invertido (`key=lambda c: (c is db_user, paga[c])`) da rojo (abajo). Para que distinga, el GET falla recién después del PUT: si falla antes, cancelar corta antes de ordenar y el caso queda verde con o sin el sabotaje.
+2. **PERMISOS-2.**
+   - `_es_admin` es `"admin" in roles_de(user)`. Estar en `ADMIN_USERNAMES` ya no alcanza.
+   - El registro (`/auth/register`) y crear un estudio (`/api/organizations/create`) rechazan un nombre de la lista con el mismo 400 «Usuario ya existe» que un nombre tomado. Los dos usan un solo chequeo, `_exigir_username_libre`, que reemplaza el de nombre repetido que tenía cada uno.
+   - **La cuenta que ya existe sigue siendo admin al reiniciar.** El arranque le pone el rol a la cuenta de la lista, como hasta ahora; ahora lee los roles con `roles_de`, así que también los arregla si estaban guardados como texto o como otro formato. El caso registra la cuenta sin la lista, comprueba 403, pone el nombre en la lista y levanta la app dos veces con el arranque entero (`with TestClient(main.app)`): da 200 las dos veces y `admin` queda una sola vez. Corre con roles `None`, `[]`, `["operador"]`, `"administrador"` y `{"admin": False}`.
+   - El CHANGELOG dice cómo sumar un admin nuevo: que se registre primero, después agregar su nombre a la lista y reiniciar.
+3. **Archivos de producto:**
+   - `proyecto_maria/main.py`: `_es_admin`, `_exigir_username_libre` (nueva), `register`, `create_organization` y el arranque (`lifespan`);
+   - `CHANGELOG.md`.
 
-**producto +14/−6**.
+**producto +15/−15**.
 
 ### Decisiones
 
 Nada para decidir. Supuestos que se pueden revertir:
 
-- **El orden de cancelar** cambió (arriba, «El orden de cancelar»). La tarea no lo pedía. Sin él, cuando falla la suscripción de otra cuenta, la de quien pide ya se canceló y su marca no coincide con ninguna anotada: no podría volver a conciliar. Si preferís el orden de antes, ese caso pasa a esperar 403.
-- **Conciliar borra las marcas de todo el estudio**, no sólo la de quien pide (`83a2957`). Una marca que queda apunta a una suscripción que ya no está anotada, así que no sirve para nada; borrarla deja la fila limpia.
-- **Un segundo 503 pisa la marca** con la suscripción que falló esta vez. Es la que sigue anotada, así que la marca sigue sirviendo.
-
-### Un BASE en rojo, arreglado en las pruebas
-
-`cobro_mp2.sh` dio BASE en rojo sobre `31da854`. Dos casos de tiempo, `test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope` y `test_el_tope_es_uno_para_todos_los_pedidos_a_mp`, comparaban la fila de quien pidió antes y después del 503 y veían la marca nueva. La marca es justamente lo que la pieza agrega. `7cb4918` los ajusta para esperarla en el 503 de cancelar y para seguir exigiendo que nada más cambie. El producto no se tocó.
+- **En `admin2.sh` saqué el sabotaje «cohort-retention vuelve a pedir el rol».** Buscaba un caso que esta pieza cambió: antes, estar en la lista sin el rol tenía que entrar; ahora tiene que dar 403. Con la regla nueva ese sabotaje no distingue nada. Lo que cubría lo cubre ahora el primer sabotaje de `permisos2.sh`.
+- **`ataque_aislamiento.sh` frena si no pudo crear al administrador** (`f6d62cc`). Antes descartaba la respuesta del registro: si fallaba, el ataque seguía y daba sus resultados sin admin. La tarea no lo pedía.
+- **Que el arranque arregle roles guardados como texto u otro formato** tampoco lo pedía la tarea. Sin eso, una cuenta de la lista con `roles` guardado como `"administrador"` quedaba sin admin después de esta pieza, porque `roles_de` no ve `admin` ahí y el arranque de antes no lo sumaba.
 
 ### Sabotajes
 
-`cobro_mp4.sh` sobre `0fb991c`: `BASE  | en verde`, 8 `ROJO`, `sabotajes con falla: 0`, salida 0.
+`permisos2.sh` sobre `6fa309f`: 7 `ROJO`, `sabotajes con falla: 0`.
 
 | Sabotaje | El rojo dice |
 |---|---|
-| el 503 de cancelar no anota quién lo recibió | «FAILED tests/test_cobro_mp2.py::test_si_mp_cancelo_sin_confirmar_el_reintento_concilia[abrio» |
-| conciliar no borra la marca de la dueña | «FAILED tests/test_cobro_mp2.py::test_si_mp_cancelo_sin_confirmar_el_reintento_concilia[duena» |
-| un miembro sin la marca concilia | «FAILED tests/test_cobro_mp2.py::test_un_miembro_sin_la_marca_no_concilia[cancelada]» |
-| una marca de una suscripción que ya no está concilia | «FAILED tests/test_cobro_mp2.py::test_un_miembro_sin_la_marca_no_concilia[marca_de_otra]» |
-| conciliar deja las marcas de las otras cuentas | «FAILED tests/test_cobro_mp2.py::test_conciliar_borra_las_marcas_de_todo_el_estudio» |
-| la marca de otra cuenta del estudio concilia | «FAILED tests/test_cobro_mp2.py::test_la_marca_de_otra_cuenta_no_concilia[abrio-miembro]» |
-| cancelar empieza por la suscripción de quien pide | «FAILED tests/test_cobro_mp2.py::test_el_reintento_que_falla_en_otra_deja_la_suya_para_volver_a_conciliar» |
-| el arranque no agrega la columna a una base que ya existe | la línea `FALLA` de «el arranque agrega cancelar_sin_confirmar» |
+| ADMIN_USERNAMES vuelve a dar admin sin el rol | «FAILED tests/test_admin_solo_admin.py::test_en_admin_usernames_sin_el_rol_no_entra» |
+| el registro deja pasar un nombre de la lista | «FAILED tests/test_permisos2.py::test_un_nombre_de_admin_usernames_no_se_registra[solo-/auth/register]» |
+| crear un estudio deja pasar un nombre de la lista | «FAILED tests/test_permisos2.py::test_un_nombre_de_admin_usernames_no_se_registra[en_una_lista-/api/organizations/create]» |
+| el chequeo compartido no reserva la lista | «FAILED tests/test_permisos2.py::test_un_nombre_de_admin_usernames_no_se_registra[en_una_lista-/auth/register]» |
+| el arranque no pone el rol | «FAILED tests/test_permisos2.py::test_la_cuenta_de_admin_usernames_sigue_siendo_admin_al_reiniciar[None]» |
+| el arranque mira roles como texto o clave | «FAILED tests/test_permisos2.py::test_la_cuenta_de_admin_usernames_sigue_siendo_admin_al_reiniciar[roles4]» |
+| el arranque suma admin aunque ya lo tenga | «FAILED tests/test_permisos2.py::test_la_cuenta_de_admin_usernames_sigue_siendo_admin_al_reiniciar[roles2]» |
 
-`cobro_mp2.sh`, en una copia enfocada (el entero tardaba demasiado), sobre `0fb991c`: `BASE  | en verde`, `BASE  | los cruces en Postgres, en verde`, 87 `ROJO`, ninguno sin rojo, `sabotajes con falla: 0`, salida 0. El script entero lo corriste vos sobre `ca84c5f`.
+`cobro_mp4.sh` sobre `2c0f73e`: `BASE  | en verde`, 9 `ROJO`, `sabotajes con falla: 0`, salida 0. El nuevo:
+
+| Sabotaje | El rojo dice |
+|---|---|
+| el desempate pone primero a quien pide, antes que a la que paga | «FAILED tests/test_cobro_mp2.py::test_si_falla_la_suya_la_duena_no_concilia_ni_toca_la_que_paga» |
+
+Los sabotajes de admin de piezas anteriores, porque esta pieza cambia la línea que rompían:
+
+- `admin2.sh` sobre `2082647`: 4 `ROJO`, `sabotajes con falla: 0`.
+- `aislamiento2.sh`, sólo el ataque de admin, sobre `ae8d844`: «ROJO  | admin: cualquier usuario es administrador: «FUGA  | Beto en GET /api/admin/stats/summary»», `sabotajes con falla: 0`, salida 0.
 
 ### Pruebas
 
-**El rojo de los casos nuevos.** Los casos de `0fb991c` contra el producto de `3be86b7` (`main.py` y `models.py` de la base): `11 failed, 110 deselected`.
-
-- Cinco fallan por la regla: `assert 200 == 403`, el miembro concilia con `{"success":true,"billing_status":"canceled",...}`. Son `test_un_miembro_sin_la_marca_no_concilia[cancelada]`, `[404_en_mp]` y `[marca_de_otra]`, y `test_la_marca_de_otra_cuenta_no_concilia[abrio-miembro]` y `[duena-abrio]`.
-- Seis fallan sólo porque falta la columna (`AttributeError: 'User' object has no attribute 'cancelar_sin_confirmar'`): los tres de `test_si_mp_cancelo_sin_confirmar_el_reintento_concilia`, `[sin_sid]`, `test_conciliar_borra_las_marcas_de_todo_el_estudio` y `test_el_reintento_que_falla_en_otra_deja_la_suya_para_volver_a_conciliar`. Ese rojo no distingue la regla; lo que la distingue son los sabotajes de arriba, que dejan la columna y rompen una línea por vez. `[sin_sid]` no tiene sabotaje propio: con o sin el arreglo da 403.
-
-| Prueba, sobre `0fb991c` | Resultado |
-|---|---|
-| suites de cobro: `tests/test_cobro_*.py`, `test_billing_checkout`, `test_billing_ola4`, `test_billing_autoservicio`, `test_api_clientes_billing`, `test_g7_cobro`, `test_g7_3_corte_active`, `test_mp_webhook_signature`, `test_webhook_ipn`, `test_migration_import` | `508 passed in 282.70s (0:04:42)` |
-| D124, local, con `xlwt 1.3.0`: `-rs tests/test_excel2d.py tests/test_excel3.py` | `984 passed in 32.07s`, ninguna línea `SKIPPED` |
-| `cobro_mp4_postgres.py` en un Postgres 16 descartable | 8 `OK`, `fallas: 0` |
+| Puerta | Sobre | Resultado |
+|---|---|---|
+| suite completa (`pytest -q --no-cov --timeout=120`) | el código de `a1db966` (corrió sobre `f6d62cc`; `a1db966` sólo suma `docs/pm`) | «4702 passed, 110 skipped, 3 xfailed in 745.02s (0:12:25)», salida 0 |
+| `python -m compileall -q proyecto_maria` | `a1db966` | salida 0 |
+| `ataque_aislamiento.sh` | `f6d62cc` | «Bloqueado: 47   ·   Fugas: 0   ·   Sin probar: 0» y «✅ PUERTA G3 PASADA. Ningún despachante ve datos de otro.» |
 
 ### chequeo-6
 
 ```
-chequeo-6 3be86b7..0fb991c: avisos para mirar, no un veredicto
-producto +14/−6
-arnés +336/−8
+chequeo-6 bc5d6b4..a1db966: avisos para mirar, no un veredicto
+producto +15/−15
+arnés +227/−28
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/database/models.py: 570 → 573
-  proyecto_maria/main.py: 11372 → 11377
+  proyecto_maria/main.py: 11377 → 11377
 avisos: 0
 ```
 
@@ -95,50 +91,48 @@ avisos: 0
 
 | Revisión | Modelo y esfuerzo | Encontró | Qué hice |
 |---|---|---|---|
-| `adversario-opus-alto` | Opus, alto | No encontró cómo un miembro sin la marca concilie. Riesgos: si el proceso muere o falla el commit entre el 503 y la marca, no queda marca; la migración sin `lock_timeout` y con la excepción tragada (de antes); la vuelta atrás no sirve en SQLite; el texto del 403 confunde; la marca no vence | Van a «Riesgos». Producción es Postgres; el CHANGELOG no aclara que en SQLite la vuelta atrás no corre |
-| `/code-review high` | el de la sesión | Baja: un segundo 503 pisa la marca. El caso `sin_sid` no distingue el defecto (con o sin el arreglo da 403). Repetición en el arnés | La marca pisada queda como supuesto. `sin_sid` queda porque la tarea lo pide en la familia; los otros tres sí distinguen (abajo, el rojo) |
-| `/security-review` (subagente general) | Opus, alto; sólo leyó código | Nada con confianza 8 o más. Endurecimiento opcional: borrar la marca al sacar a un miembro | A «Riesgos»: la marca de quien salió no coincide con nada, porque al sacarlo se borra su suscripción |
+| `adversario-opus-alto` | Opus, alto | No encontró cómo entrar como admin sin el rol. Riesgos: el arranque es ahora la única vía y sus errores se tragan; una cuenta con un nombre de la lista registrada antes de esta pieza sigue recibiendo el rol; el 400 deja ver qué nombres están en la lista | Van a «Riesgos» |
+| `/code-review high` | el de la sesión | Dos sabotajes rotos: `aislamiento2.sh` buscaba la línea de `_es_admin` que saqué y `admin2.sh` un caso que cambié. El arranque traga los errores y un commit que falla saltea los nombres que siguen. El nombre tomado antes de esta pieza. El ataque no miraba si se creó el administrador. El caso del 400 no miraba el texto. Repetición de ayudantes en el arnés y diez arranques más en la suite | Los sabotajes, en `3076947`; el ataque, en `f6d62cc`; el texto del 400, en `3076947`. Lo del arranque y el nombre tomado, a «Riesgos». Los ayudantes y los arranques quedan: son pocos y el caso tiene que mostrar el arranque entero |
+| `/security-review` (subagente general) | Opus, alto; sólo leyó código | Nada con confianza 8 o más | — |
 
 ### Riesgos
 
-- **La marca no vence.** Queda hasta que alguien concilie. Sólo sirve mientras su suscripción siga anotada en el estudio.
-- **Sin marca si se corta en el medio.** Si el proceso muere o falla el commit entre el 503 y la marca, quien pidió no queda anotado y su reintento recibe 403. La dueña igual puede conciliar.
-- **Sacar a un miembro no borra su marca.** Al sacarlo se borra su suscripción, y los sid de MP no se repiten, así que esa marca no coincide con nada.
-- **La vuelta atrás pierde las marcas pendientes.** `drop column if exists` es de Postgres; en SQLite da error de sintaxis.
-- **La migración** sigue sin `lock_timeout` y traga la excepción, como las columnas de antes en la misma lista.
-- **El 403** de un miembro sin la marca dice lo mismo que antes; no explica que puede conciliar quien recibió el 503.
+- **Si falla el arranque, Emi puede quedar sin admin.** El rol lo pone sólo el arranque, dentro del mismo `try` de los usuarios de prueba, que traga el error y escribe «⚠️ Error creando usuarios demo»; si falla un commit, los nombres que siguen no se procesan. Pasa sólo en el primer arranque después de esta pieza, si la cuenta de Emi todavía no tiene el rol guardado: ahí recibiría 403. Una vez guardado, el rol queda. Antes de publicar conviene mirar en la base que su cuenta tenga `admin` en `roles`, o mirar el log del primer arranque («promovido a admin via ADMIN_USERNAMES»).
+- **Un nombre de la lista registrado por otro antes de esta pieza** sigue recibiendo el rol en cada arranque. Esta pieza sólo frena los registros nuevos. Conviene mirar que cada nombre de `ADMIN_USERNAMES` en producción sea una cuenta conocida.
+- **Sacar un nombre de la lista no le saca el rol.** Hay que sacarlo de `roles` a mano.
+- **El 400 deja ver qué nombres están en la lista**: registrar uno da «Usuario ya existe» aunque nadie lo tenga. Es el mismo texto que un nombre tomado.
+- **El chequeo compara el nombre tal cual llega.** Un nombre con espacios o un salto de línea no coincide con el de la lista; tampoco lo encontraría el arranque, así que no da admin.
+- **Los usuarios de prueba** (sólo fuera de producción) siguen con su propio chequeo de roles, que no pasa por `roles_de`.
 
 ### Lo que no se corrió
 
-- **La CI de GitHub no corrió.** Se dispara con `main` y con PR, y esta rama no tiene PR. Lo de D124 en la CI (los `.xls` corriendo, no salteados) no lo pude mostrar ahí: lo mostré local, con el mismo `xlwt==1.3.0`. Queda para cuando corra la CI.
-- **La suite completa** no corrió; sí las suites de cobro (arriba).
-- **`cobro_mp2.sh` entero** no corrió: corrí una copia enfocada (arriba). Vos lo corriste entero sobre `ca84c5f`.
-- **flake8** no corrió.
-- **`smoke_friccion.sh` y `ataque_aislamiento.sh`** no corrieron: la pieza no toca pantallas ni aislamiento de datos.
+- **`aislamiento2.sh` entero** no corrió: sólo el ataque de admin, que es el que toca esta pieza.
+- **`cobro_mp2.sh`** no corrió: el caso nuevo vive en `test_cobro_mp2.py` y su sabotaje está en `cobro_mp4.sh`.
+- **La CI de GitHub** no corrió: esta rama no tiene PR.
+- **flake8** y **`smoke_friccion.sh`** no corrieron.
 
 ### Para reproducir
 
 ```bash
-git fetch origin claude/dev-tecnica && git checkout --detach 0fb991c
+git fetch origin claude/dev-tecnica && git checkout --detach a1db966
 export DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
 
-# Los 8 sabotajes de esta pieza: «sabotajes con falla: 0» y 8 ROJO (el último, la migración en Postgres)
-PY=$(command -v python) scripts/testing/sabotajes/cobro_mp4.sh 0fb991c
+# Los 7 sabotajes de esta pieza: 7 ROJO y «sabotajes con falla: 0»
+PY=$(command -v python) scripts/testing/sabotajes/permisos2.sh a1db966
 
-# La migración contra un Postgres 16 descartable: «fallas: 0»
-PY=python scripts/testing/con_pg16.sh bash -c '"$0" scripts/testing/cobro_mp4_postgres.py "$BACKUP1A_PG_URL"' python
+# El caso de cobro y su sabotaje: 9 ROJO, el de «el desempate pone primero a quien pide»
+PY=$(command -v python) scripts/testing/sabotajes/cobro_mp4.sh a1db966
 
 # Los casos nuevos: todos passed
 DATABASE_URL=sqlite+aiosqlite:///./t.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
-  python -m pytest -q --no-cov tests/test_cobro_mp2.py -k "cancelo_sin_confirmar or sin_la_marca or marca_de_otra or conciliar_borra or reintento_que_falla"
+  python -m pytest -q --no-cov tests/test_permisos2.py tests/test_admin_solo_admin.py \
+  "tests/test_cobro_mp2.py::test_si_falla_la_suya_la_duena_no_concilia_ni_toca_la_que_paga"
 
-# D124: con xlwt instalado, ningún caso de .xls salteado (sin «SKIPPED ... xlwt»)
-pip install xlwt==1.3.0
-DATABASE_URL=sqlite+aiosqlite:///./t.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
-  python -m pytest -q --no-cov -rs tests/test_excel2d.py tests/test_excel3.py
+# Ningún despachante ve datos de otro: «Fugas: 0» y «PUERTA G3 PASADA»
+PUERTO=8790 scripts/testing/ataque_aislamiento.sh
 
-# Los números de §6: la salida de abajo
-python docs/pm/herramientas/chequeo-6.py 3be86b7 0fb991c
+# Los números de §6: la salida de arriba
+python docs/pm/herramientas/chequeo-6.py bc5d6b4 a1db966
 ```
 
-/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. EXCEL-2d aceptada en 84fd9f2; ca84c5f aceptada. COBRO-MP-4 (con D124) entregada en 0fb991c (informe en el commit de arriba). D119, D120, D121 y D124 contestadas. Sigue PERMISOS-2; frenar 2026-11-08 15:50 UTC. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.
+/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. COBRO-MP-4 aceptada en 0fb991c; SEGURO-2 aceptada en d160738. PERMISOS-2 (con el caso de cobro del punto 1) entregada en a1db966 (informe en el commit de arriba). Próxima D libre: D127. Frenar 2026-11-08 15:50 UTC. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.
