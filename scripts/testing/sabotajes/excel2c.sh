@@ -111,6 +111,10 @@ sabotaje $F "una referencia que no se lee vuelve a quedar en el carril liviano" 
   '                fila = math.inf' \
   '                pass' \
   "FAILED $T::test_una_referencia_que_no_se_lee_va_al_carril_pesado[fila]"
+sabotaje $F "una fila infinita vuelve a cortar la validación" \
+  '            except (TypeError, ValueError, OverflowError):' \
+  '            except (TypeError, ValueError):' \
+  "FAILED $T::test_una_referencia_que_no_se_lee_va_al_carril_pesado[fila infinita]"
 
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]

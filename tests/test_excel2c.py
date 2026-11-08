@@ -112,9 +112,10 @@ def test_muchos_textos_van_al_carril_pesado():
 
 @pytest.mark.parametrize("libro", [
     lambda: _con_filas('<row r="x"/>'),
+    lambda: _con_filas('<row r="inf"/>'),
     lambda: _con_filas('<row r="3"><c r="1A"/></row>'),
     lambda: _con_dimension("x!"),
-], ids=["fila", "celda", "dimension"])
+], ids=["fila", "fila infinita", "celda", "dimension"])
 def test_una_referencia_que_no_se_lee_va_al_carril_pesado(libro):
     """No se rechaza por eso: la lectura dirá si el libro sirve."""
     assert fs._abrir_excel(libro(), ".xlsx") == (1, True)
