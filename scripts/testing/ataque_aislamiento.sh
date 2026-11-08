@@ -281,12 +281,12 @@ cuerpo() { echo "$1" | head -n -1; }
 cod()    { echo "$1" | tail -1; }
 resumir() { cuerpo "$1" | tr -d '\n' | head -c 160; }
 
-# atacar_como COOKIE NOMBRE CÓDIGO args...: 200 es fuga; el código esperado
+# atacar_como COOKIE NOMBRE CÓDIGO args...: un 2xx es fuga; el código esperado
 # es bloqueo; cualquier otro, sin probar.
 atacar_como() {
     local CK="$1" NOMBRE="$2" ESPERA="$3"; shift 3
     local R C; R=$(pedir "$CK" "$@"); C=$(cod "$R")
-    if [ "$C" = "200" ]; then pierde "$NOMBRE" "devolvió 200 · $(resumir "$R")"
+    if [[ "$C" == 2?? ]]; then pierde "$NOMBRE" "devolvió $C · $(resumir "$R")"
     elif [ "$C" = "$ESPERA" ]; then gana "$NOMBRE ($C)"
     else duda "$NOMBRE" "devolvió $C y se esperaba $ESPERA · $(resumir "$R")"; fi
 }
@@ -314,8 +314,10 @@ sql() {
         psql -h 127.0.0.1 -p 5434 -U cdi -d cdi -tAc "$1"
     else
         "$PY" -c 'import sqlite3, sys
-for r in sqlite3.connect(sys.argv[1]).execute(sys.argv[2]):
-    print("|".join("" if v is None else str(v) for v in r))' "$TMP/aisl.db" "$1"
+con = sqlite3.connect(sys.argv[1])
+for r in con.execute(sys.argv[2]).fetchall():
+    print("|".join("" if v is None else str(v) for v in r))
+con.commit()' "$TMP/aisl.db" "$1"
     fi
 }
 
@@ -368,10 +370,8 @@ operaciones() {
 presupuestos() {
     paso "10· Compartir el presupuesto de una operación de Ana"
     [ -n "${OP_ANA:-}" ] || { duda "Presupuestos" "Ana no tiene operación (falló el paso 9)"; return; }
-    # Con configuración de producción el cálculo de aranceles no tiene fuente
-    # sin internet (el modo simulado está prohibido ahí) y da 503. Alcanza:
-    # quien pasa el control de dueño llega al cálculo, con 200 o con ese 503;
-    # quien no, recibe 404 antes. Ana tiene que llegar; Beto, no.
+    # Sin internet el cálculo de aranceles da 503 en producción: pasar el control
+    # de dueño es llegar al cálculo (200 o 503); no pasarlo, un 404 antes.
     local R CA CB
     R=$(pedir "$COOKIE_A" -X POST "${BASE}/api/quotes/share" -H 'Content-Type: application/json' -d "{\"operation_id\":\"${OP_ANA}\"}")
     CA=$(cod "$R")
@@ -414,8 +414,8 @@ estudios() {
     # Generar con el estudio de Ana: el TXT de Beto saldría con el CUIT de Ana.
     R=$(pedir "$COOKIE_B" -X POST "${BASE}/generate_maria" -H 'Content-Type: application/json' \
         -d "{\"operation_id\":\"FAC_0001-00099999\",\"estudio_id\":\"${EST}\",\"comprador_nombre\":\"Importadora de Beto SA\",\"comprador_cuit\":\"${CUIT_ANA}\",\"moneda\":\"DOL\",\"incoterm\":\"FOB\",\"fecha_emision\":\"18/07/2025\",\"sbt_sufijo_valor\":\"AA(DEMO)-AB(DEMO)-CA00-\",\"items\":[{\"pieza\":\"1\",\"descripcion\":\"MERCADERIA DE BETO\",\"ncm\":\"84713000900R\",\"cantidad\":1,\"valor_unitario\":100,\"peso_kg\":1,\"origen\":\"310\",\"unidad\":\"01\"}]}")
-    if [ "$(cod "$R")" = "200" ]; then
-        pierde "Generar un TXT con el estudio de Ana" "devolvió 200 · $(resumir "$R")"
+    if [[ "$(cod "$R")" == 2?? ]]; then
+        pierde "Generar un TXT con el estudio de Ana" "devolvió $(cod "$R") · $(resumir "$R")"
     elif [ "$(cod "$R")" = "400" ] && cuerpo "$R" | grep -qF "no está en tu cuenta"; then
         gana "Generar un TXT con el estudio de Ana (400, no está en su cuenta)"
     else
@@ -470,7 +470,7 @@ administrador() {
     paso "14· Un despachante común no entra a lo de administrador"
     local CK_J="$TMP/jefe.txt" RUTA METODO
     registrar "$JEFE" "$CK_J" >/dev/null
-    for RUTA in "GET /api/admin/stats/summary" "GET /api/admin/logs/recent/5" "POST /api/admin/errors/clear-old" \
+    for RUTA in "GET /api/admin/stats/summary" "GET /api/admin/logs/recent/5" "GET /api/admin/errors/insights" \
                 "GET /api/dev/stats" "GET /dev/dashboard"; do
         METODO="${RUTA%% *}"; RUTA="${RUTA#* }"
         # El administrador entra: la ruta existe y el 403 de Beto es por no serlo.

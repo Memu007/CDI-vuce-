@@ -233,6 +233,25 @@ ataques() {
     'select(Estudio).where(Estudio.id == estudio_id, Estudio.owner_username == user["username"])' \
     'select(Estudio).where(Estudio.id == estudio_id)' \
     "Borrar el estudio de Ana" "El estudio de Ana quedó intacto"
+  # Un 204 también es fuga: el ataque no puede contar sólo el 200.
+  ataque $M "estudios: borrar no mira el dueño y contesta 204" \
+    'select(Estudio).where(Estudio.id == estudio_id, Estudio.owner_username == user["username"])
+    )
+    estudio = result.scalars().first()
+    if estudio is None:
+        raise HTTPException(status_code=404, detail="Estudio no encontrado")
+    await db.delete(estudio)
+    await db.commit()
+    return {"success": True}' \
+    'select(Estudio).where(Estudio.id == estudio_id)
+    )
+    estudio = result.scalars().first()
+    if estudio is None:
+        raise HTTPException(status_code=404, detail="Estudio no encontrado")
+    await db.delete(estudio)
+    await db.commit()
+    return Response(status_code=204)' \
+    "Borrar el estudio de Ana"
   ataque $M "estudios: generar acepta el estudio de otro" \
     'select(Estudio).where(Estudio.id == estudio_id, Estudio.owner_username == username)' \
     'select(Estudio).where(Estudio.id == estudio_id)' \
