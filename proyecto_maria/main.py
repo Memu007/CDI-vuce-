@@ -7967,6 +7967,14 @@ def _tiene_no_finito(valor):
     return False
 
 
+async def _json_guardable(request: Request):
+    # Lo que no sea una columna conocida va crudo a un JSON, que en Postgres no acepta NaN.
+    data = await request.json()
+    if _tiene_no_finito(data):
+        raise HTTPException(status_code=400, detail="Hay un número que no es válido.")
+    return _sin_nul(data)
+
+
 def _sin_nul(valor):
     """Saca el carácter NUL de todos los textos de un JSON: Postgres no lo
     acepta en un texto y tiraba abajo el guardado entero (GUARDAR-1)."""
@@ -8014,7 +8022,7 @@ async def save_client_operation(
     from proyecto_maria.services.client_memory import tiene_digito_no_ascii, tiene_medio_par
 
     try:
-        data = _sin_nul(await request.json())
+        data = await _json_guardable(request)
         if not isinstance(data, dict):
             raise HTTPException(status_code=400, detail=_AVISO_NO_ES_OBJETO)
         # Faltar o venir en null es lo mismo que vacío; otro tipo es un error.
@@ -8029,8 +8037,6 @@ async def save_client_operation(
         # Lo que el historial rechazaría se rechaza antes de guardar nada.
         if tiene_medio_par(data):
             raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
-        if _tiene_no_finito(data):
-            raise HTTPException(status_code=400, detail="Hay un número que no es válido.")
         if any(tiene_digito_no_ascii(str(item.get("ncm") or item.get("pieza") or "")) for item in items):
             raise HTTPException(status_code=400, detail=_AVISO_DIGITOS)
 
