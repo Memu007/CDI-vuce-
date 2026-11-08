@@ -157,7 +157,7 @@ sabotaje $G "un guion después de una palabra se toma como menos" \
   'return signo and digito_despues and not antes[-1:].isalnum()' 'return signo and digito_despues' \
   "test_lo_que_no_cambia_un_numero_sale_como_antes[AA(ROJO - 5)--AA(ROJO   5)-]"
 sabotaje $G "una fecha frena" \
-  'r"[0-9]{1,2}([./-])[0-9]{1,2}\1[0-9]{2,4}"' 'r"(?!)"' \
+  'r"(?:0?[1-9]|[12][0-9]|3[01])([./-])(?:0?[1-9]|1[0-2])\1(?:[0-9]{2}|[0-9]{4})"' 'r"(?!)"' \
   "test_lo_que_no_cambia_un_numero_sale_como_antes[AR(31/12/2026)--AR(31 12 2026)-]" \
   "test_lo_que_no_cambia_un_numero_sale_como_antes[AR(31.12.2026)--AR(31 12 2026)-]"
 sabotaje $G "un código de números con guion frena" \
@@ -171,6 +171,10 @@ sabotaje $G "un código con letras acepta cualquier signo después de un dígito
   '(?!.*[0-9][^A-Za-z0-9.°-])' '' \
   "test_un_numero_que_cambiaria_no_se_genera[AA(100%ALGODON)-]" \
   "test_un_numero_que_cambiaria_no_se_genera[AJ(5/KG)-]"
+sabotaje $G "cada carácter que cambia vuelve a mirar la palabra entera" \
+  'lru_cache(maxsize=None)(_SE_LEE_IGUAL.fullmatch)' '_SE_LEE_IGUAL.fullmatch' \
+  "test_cada_palabra_se_mira_una_vez[puntos]" \
+  "test_cada_palabra_se_mira_una_vez[guiones]"
 sabotaje $A "los miles se toman como decimales" \
   'return bool(decimales) and len(decimales) == 3 and entero.lstrip("0") != ""' 'return False' \
   "test_un_numero_que_cambiaria_no_se_genera[AJ(ROLLO 1.500 M)-]"

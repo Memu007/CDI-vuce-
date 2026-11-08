@@ -215,3 +215,23 @@ SIGUEN_IGUAL = [
 @pytest.mark.parametrize("entrada,limpio", SIGUEN_IGUAL)
 def test_lo_que_no_cambia_un_numero_sale_como_antes(entrada, limpio):
     assert mg.limpiar_sufijo(entrada)[0] == limpio
+
+
+@pytest.mark.parametrize("largo", ["a." * 2000, "a1-" * 1500, "X-1.A " * 400],
+                         ids=["puntos", "guiones", "muchas palabras"])
+def test_cada_palabra_se_mira_una_vez(monkeypatch, largo):
+    # Mirar la palabra entera por cada carácter que cambia hace que un sufijo
+    # largo tarde segundos.
+    vistas = []
+    original = mg._SE_LEE_IGUAL
+
+    class Contada:
+        def fullmatch(self, texto):
+            vistas.append(texto)
+            return original.fullmatch(texto)
+
+    monkeypatch.setattr(mg, "_SE_LEE_IGUAL", Contada())
+    with pytest.raises(ValueError, match="no puede superar los 120"):
+        mg.limpiar_sufijo(f"AJ({largo})-")
+    miradas, palabras = len(vistas), len(largo.split())
+    assert miradas <= palabras
