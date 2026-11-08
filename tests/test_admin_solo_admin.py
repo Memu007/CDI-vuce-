@@ -16,7 +16,7 @@ de un usuario común ni de alguien sin sesión (AISLAMIENTO-2).
 """
 import anyio
 import pytest
-from fastapi.routing import APIRoute, APIWebSocketRoute
+from fastapi.routing import APIRoute, APIWebSocketRoute, _iter_included_route_candidates
 from starlette.routing import Mount, Route, WebSocketRoute
 from fastapi.testclient import TestClient
 
@@ -42,6 +42,12 @@ USUARIO_ADMIN = {
 }
 
 
+def _rutas_de_la_app():
+    """Todas las rutas, también las de los routers incluidos: app.routes sólo
+    trae el primer nivel."""
+    return list(_iter_included_route_candidates(main.app.routes))
+
+
 def _rutas_de_admin():
     """(método, ruta) de cada ruta de admin o global, leídas de la app."""
     # El router de admin se monta al arrancar la app (lifespan): sin esto el
@@ -61,7 +67,7 @@ def _rutas_de_admin():
     # (include_in_schema=False) no aparecen arriba: se suman acá.
     # Lo mismo con las rutas crudas de Starlette (app.router.add_route), que no
     # pasan por las dependencias de FastAPI ni salen en el esquema (ADMIN-2).
-    for r in main.app.routes:
+    for r in _rutas_de_la_app():
         if isinstance(r, APIRoute) and not r.include_in_schema:
             if _es_de_admin(r.path) or "admin" in (r.tags or []):
                 rutas.update((m, r.path) for m in r.methods if m != "HEAD")
@@ -72,19 +78,16 @@ def _rutas_de_admin():
 
 
 def _websockets_de_admin():
-    """WebSockets bajo rutas de admin: no son Route y el recorrido de arriba
-    no los ve."""
+    """WebSockets bajo rutas de admin: el esquema no los trae."""
     return sorted(
-        r.path for r in main.app.routes
+        r.path for r in _rutas_de_la_app()
         if isinstance(r, (WebSocketRoute, APIWebSocketRoute)) and _es_de_admin(r.path)
     )
 
 
 def _acepta_websocket(ruta):
-    """True si la app manda websocket.accept. Se mira lo que manda la app y no
-    lo que ve un cliente de prueba: el de Starlette levanta el error de un
-    WebSocket que acepta y enseguida falla como si no lo hubiera aceptado.
-    Cerrarla, negarla o fallar antes de aceptar no es aceptar."""
+    """True si la app manda websocket.accept; el cliente de Starlette tomaría
+    por no aceptado a uno que acepta y enseguida falla."""
     concreta = _concreta(ruta)
     scope = {
         "type": "websocket", "asgi": {"version": "3.0"}, "scheme": "ws",
@@ -120,7 +123,7 @@ def _montajes_sobre_admin():
     Una app montada no hereda require_admin ni se puede recorrer desde afuera:
     bajo /api/admin/, /api/dev/ o /dev/ no tiene que haber ninguna."""
     malas = []
-    for r in main.app.routes:
+    for r in _rutas_de_la_app():
         if isinstance(r, Mount):
             base = r.path.rstrip("/") + "/"
             if any(base.startswith(p) or p.startswith(base) for p in PREFIJOS_ADMIN):
@@ -147,6 +150,8 @@ def rutas():
     assert ("POST", "/api/admin/errors/clear-old") in rutas, rutas
     assert ("POST", "/api/ncm/cache/refresh") in rutas, rutas
     assert ("GET", "/api/dev/stats") in rutas, rutas
+    # Lo mismo con el recorrido de los routers incluidos (WebSockets y ocultas).
+    assert "/api/admin/health/detailed" in {r.path for r in _rutas_de_la_app()}
     return rutas
 
 

@@ -4,6 +4,7 @@
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/aislamiento2.sh [prueba|ataque|todo] [SHA]
 #   prueba  pytest de admin y roles: WebSocket y ruta exacta sin control,
+#           también dentro de un router incluido;
 #           roles guardados como texto (un minuto)
 #   ataque  ataque_aislamiento.sh completo una vez por filtro saboteado:
 #           tiene que dar FUGA en el caso de ese filtro (unos 3 minutos cada
@@ -108,6 +109,20 @@ app.router.add_route("/dev", _dev_crudo)')" "$R_USUARIO" "$R_SIN"
   sabotaje $M "una ruta de FastAPI en /api/dev, sin barra final" "$ANCLA" "$(agregar '@app.get("/api/dev")
 async def _api_dev_exacto():
     return {"secreto": 1}')" "$R_USUARIO" "$R_SIN"
+  # Un router incluido sin require_admin: app.routes no muestra sus rutas.
+  sabotaje $M "un WebSocket abierto dentro de un router incluido en /api/dev" "$ANCLA" "$(agregar 'from fastapi import APIRouter as _AR
+_r_dev = _AR(prefix="/api/dev")
+@_r_dev.websocket("/ws")
+async def _ws_dev_abierto(websocket: WebSocket):
+    await websocket.accept()
+    await websocket.close()
+app.include_router(_r_dev)')" "$WS_USUARIO" "$WS_SIN" "/api/dev/ws"
+  sabotaje $M "una ruta oculta del esquema dentro de un router incluido en /api/dev" "$ANCLA" "$(agregar 'from fastapi import APIRouter as _AR
+_r_dev = _AR(prefix="/api/dev")
+@_r_dev.get("/oculta", include_in_schema=False)
+async def _dev_oculta():
+    return {"secreto": 1}
+app.include_router(_r_dev)')" "$R_USUARIO" "$R_SIN" "GET /api/dev/oculta"
   sabotaje $M "_es_admin vuelve a buscar «admin» dentro del texto de roles" \
     '"admin" in roles_de(user)' \
     '"admin" in (user.get("roles") or [])' \
