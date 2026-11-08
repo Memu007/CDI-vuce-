@@ -2,88 +2,79 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## PERMISOS-2, entregada en `a1db966` (informe en el commit de arriba)
+## PERMISOS-3, entregada en `9428e00` (informe en el commit de arriba)
 
-Base: `bc5d6b4`. El código está en `a1db966`, un merge de tu rama que trae `75942ce` y sólo toca `docs/pm`. El informe va en el commit de arriba.
+Base: `7078e3f` (merge de tu rama con PERMISOS-2 aceptada).
 
 | Commit | Qué |
 |---|---|
-| `0d65cc3` | producto: `_es_admin` mira sólo el rol, el registro y crear un estudio rechazan un nombre de la lista, el arranque lee los roles con `roles_de` |
-| `6fa309f` | casos: `tests/test_permisos2.py` y los de `test_admin_solo_admin.py` que esperaban lo de antes |
-| `052ec48` | `permisos2.sh` |
-| `2082647` | producto: el comentario de quién es admin cambia sólo lo que cambió |
-| `3076947` | `aislamiento2.sh` sigue la línea nueva de `_es_admin`; en `admin2.sh` sale un sabotaje que ya no distingue nada (abajo, «Decisiones»); el rechazo del registro exige su texto |
-| `ae8d844` | merge de tu rama (`docs/pm`) |
-| `2c0f73e` | el caso de cobro que pediste y su sabotaje en `cobro_mp4.sh` (punto 1 de la tarea; sin cambio de producto) |
-| `f6d62cc` | `ataque_aislamiento.sh` frena si no pudo crear al administrador |
-| `a1db966` | merge de tu rama (`docs/pm`) |
-
-COBRO-MP-4 (con D124): leí que la aceptaste sobre `0fb991c`, sin integrar. SEGURO-2, sobre `d160738`.
+| `37cd494` | producto: `_exigir_username_libre` mira también el formato con `re.fullmatch` y compara con la lista sin distinguir mayúsculas; el registro y crear un estudio lo llaman primero |
+| `323e6e1` | producto: `create_organization` ya no importa `re`, que quedó sin uso |
+| `a93b930` | casos: `test_un_nombre_que_se_ve_como_otro_no_se_registra` y tres sabotajes nuevos en `permisos2.sh` |
+| `9428e00` | casos: la fixture borra cada variante que el caso pudo crear |
 
 ### Resultado
 
-1. **El caso de cobro (punto 1).** `test_si_falla_la_suya_la_duena_no_concilia_ni_toca_la_que_paga`: la dueña con sid propio que no paga y otra cuenta autorizada; falla el PUT de la dueña, la respuesta es 503 y la que paga sigue `authorized`. Con el desempate invertido (`key=lambda c: (c is db_user, paga[c])`) da rojo (abajo). Para que distinga, el GET falla recién después del PUT: si falla antes, cancelar corta antes de ordenar y el caso queda verde con o sin el sabotaje.
-2. **PERMISOS-2.**
-   - `_es_admin` es `"admin" in roles_de(user)`. Estar en `ADMIN_USERNAMES` ya no alcanza.
-   - El registro (`/auth/register`) y crear un estudio (`/api/organizations/create`) rechazan un nombre de la lista con el mismo 400 «Usuario ya existe» que un nombre tomado. Los dos usan un solo chequeo, `_exigir_username_libre`, que reemplaza el de nombre repetido que tenía cada uno.
-   - **La cuenta que ya existe sigue siendo admin al reiniciar.** El arranque le pone el rol a la cuenta de la lista, como hasta ahora; ahora lee los roles con `roles_de`, así que también los arregla si estaban guardados como texto o como otro formato. El caso registra la cuenta sin la lista, comprueba 403, pone el nombre en la lista y levanta la app dos veces con el arranque entero (`with TestClient(main.app)`): da 200 las dos veces y `admin` queda una sola vez. Corre con roles `None`, `[]`, `["operador"]`, `"administrador"` y `{"admin": False}`.
-   - El CHANGELOG dice cómo sumar un admin nuevo: que se registre primero, después agregar su nombre a la lista y reiniciar.
-3. **Archivos de producto:**
-   - `proyecto_maria/main.py`: `_es_admin`, `_exigir_username_libre` (nueva), `register`, `create_organization` y el arranque (`lifespan`);
-   - `CHANGELOG.md`.
+1. **Un nombre con un carácter fuera del patrón da 400 sin crear nada**, por `/auth/register` y por `/api/organizations/create`. El patrón era `re.match(r'^…$')`, y en Python `$` acepta un `\n` final: `emi\n` pasaba el formato, no coincidía con `emi` de la lista y se creaba la cuenta. Ahora es `re.fullmatch`. El detalle es el del registro: «Username inválido. Solo se permiten letras, números, guiones y guiones bajos (3-30 caracteres)».
+2. **Un nombre de `ADMIN_USERNAMES` con otras mayúsculas da el mismo 400 «Usuario ya existe»**, en los dos sentidos: `EMI` contra la lista `emi`, y `emi` contra la lista `EMI`.
+3. **Un caso, la familia como datos** (`PARECIDOS` en `tests/test_permisos2.py`): `\n` final, `\r\n` final, `\n` inicial, espacio final, acento, el nombre en mayúsculas, la lista en mayúsculas y el `\n` final de un nombre de la lista. Corre por los dos caminos (16 combinaciones) y mira el 400, el comienzo del detalle y que no quede ninguna fila con el nombre pedido, el de la lista ni su versión en mayúsculas.
+4. **No cambia quién es admin.** El arranque sigue comparando el nombre exacto, y las cuentas que ya existen no se tocan.
+5. **Archivos de producto:** `proyecto_maria/main.py` (`_exigir_username_libre`, `register`, `create_organization`) y `CHANGELOG.md`.
 
-**producto +15/−15**.
+**producto +8/−12**.
 
 ### Decisiones
 
-Nada para decidir. Supuestos que se pueden revertir:
+**D127. ¿Los nombres de usuario se vuelven únicos sin distinguir mayúsculas para todas las cuentas?**
 
-- **En `admin2.sh` saqué el sabotaje «cohort-retention vuelve a pedir el rol».** Buscaba un caso que esta pieza cambió: antes, estar en la lista sin el rol tenía que entrar; ahora tiene que dar 403. Con la regla nueva ese sabotaje no distingue nada. Lo que cubría lo cubre ahora el primer sabotaje de `permisos2.sh`.
-- **`ataque_aislamiento.sh` frena si no pudo crear al administrador** (`f6d62cc`). Antes descartaba la respuesta del registro: si fallaba, el ataque seguía y daba sus resultados sin admin. La tarea no lo pedía.
-- **Que el arranque arregle roles guardados como texto u otro formato** tampoco lo pedía la tarea. Sin eso, una cuenta de la lista con `roles` guardado como `"administrador"` quedaba sin admin después de esta pieza, porque `roles_de` no ve `admin` ahí y el arranque de antes no lo sumaba.
+Hoy la reserva sin mayúsculas cubre sólo la lista. Una cuenta que es admin por rol y no está en `ADMIN_USERNAMES` (por ejemplo `emi`, si la sacaran de la lista) puede convivir con una `EMI` nueva. No da admin, pero en pantalla se leen igual.
+
+- (a) Dejarlo así. La tarea pedía la lista.
+- (b) Una pieza aparte: el chequeo de nombre tomado compara en minúsculas. Antes de eso hay que mirar en producción si ya hay dos cuentas que difieren sólo en mayúsculas, porque esas quedarían como están y el login seguiría exacto.
+
+Recomiendo (b) como pieza aparte, después de mirar la base. Es una línea de producto, pero cambia qué nombres se pueden registrar para todos y no se puede probar sin saber qué hay en producción.
+
+Supuestos que se pueden revertir:
+
+- **Crear un estudio muestra ahora el texto de formato del registro.** Antes tenía uno propio; los dos pasan por el mismo chequeo.
+- **El formato y la reserva se miran primero.** En el registro, antes del email: un nombre tomado con email inválido dice ahora «Usuario ya existe» y no el error del email. En crear un estudio, antes de la contraseña: un nombre tomado con contraseña corta dice ahora «Usuario ya existe».
+- **Las cuentas que ya existen no se tocan**, aunque tengan un nombre que hoy no pasaría el formato.
+- **El arranque sigue exacto.** Si `ADMIN_USERNAMES` dice `Emi` y la cuenta es `emi`, el arranque no la promueve, como antes. Bajarlo a minúsculas cambiaría quién es admin, y la tarea dice que no.
 
 ### Sabotajes
 
-`permisos2.sh` sobre `6fa309f`: 7 `ROJO`, `sabotajes con falla: 0`.
+`permisos2.sh` sobre `9428e00`: 10 `ROJO`, `sabotajes con falla: 0`, salida 0. Los tres nuevos:
 
 | Sabotaje | El rojo dice |
 |---|---|
-| ADMIN_USERNAMES vuelve a dar admin sin el rol | «FAILED tests/test_admin_solo_admin.py::test_en_admin_usernames_sin_el_rol_no_entra» |
-| el registro deja pasar un nombre de la lista | «FAILED tests/test_permisos2.py::test_un_nombre_de_admin_usernames_no_se_registra[solo-/auth/register]» |
-| crear un estudio deja pasar un nombre de la lista | «FAILED tests/test_permisos2.py::test_un_nombre_de_admin_usernames_no_se_registra[en_una_lista-/api/organizations/create]» |
-| el chequeo compartido no reserva la lista | «FAILED tests/test_permisos2.py::test_un_nombre_de_admin_usernames_no_se_registra[en_una_lista-/auth/register]» |
-| el arranque no pone el rol | «FAILED tests/test_permisos2.py::test_la_cuenta_de_admin_usernames_sigue_siendo_admin_al_reiniciar[None]» |
-| el arranque mira roles como texto o clave | «FAILED tests/test_permisos2.py::test_la_cuenta_de_admin_usernames_sigue_siendo_admin_al_reiniciar[roles4]» |
-| el arranque suma admin aunque ya lo tenga | «FAILED tests/test_permisos2.py::test_la_cuenta_de_admin_usernames_sigue_siendo_admin_al_reiniciar[roles2]» |
+| el formato acepta un salto de línea final | «FAILED tests/test_permisos2.py::test_un_nombre_que_se_ve_como_otro_no_se_registra[lf_final-/auth/register]» |
+| la reserva distingue las mayúsculas del pedido | «FAILED tests/test_permisos2.py::test_un_nombre_que_se_ve_como_otro_no_se_registra[mayusculas-/api/organizations/create]» |
+| la reserva distingue las mayúsculas de la lista | «FAILED tests/test_permisos2.py::test_un_nombre_que_se_ve_como_otro_no_se_registra[lista_en_mayusculas-/api/organizations/create]» |
 
-`cobro_mp4.sh` sobre `2c0f73e`: `BASE  | en verde`, 9 `ROJO`, `sabotajes con falla: 0`, salida 0. El nuevo:
+Cada uno exige además que no falle un caso ajeno: `acento` para el primero (sigue rojo por otro carácter, no por el `\n`), y para cada lado del `lower()` el caso del otro lado.
 
-| Sabotaje | El rojo dice |
-|---|---|
-| el desempate pone primero a quien pide, antes que a la que paga | «FAILED tests/test_cobro_mp2.py::test_si_falla_la_suya_la_duena_no_concilia_ni_toca_la_que_paga» |
-
-Los sabotajes de admin de piezas anteriores, porque esta pieza cambia la línea que rompían:
-
-- `admin2.sh` sobre `2082647`: 4 `ROJO`, `sabotajes con falla: 0`.
-- `aislamiento2.sh`, sólo el ataque de admin, sobre `ae8d844`: «ROJO  | admin: cualquier usuario es administrador: «FUGA  | Beto en GET /api/admin/stats/summary»», `sabotajes con falla: 0`, salida 0.
+Los siete de PERMISOS-2 siguen en `ROJO` con el mismo texto que en el informe anterior.
 
 ### Pruebas
 
 | Puerta | Sobre | Resultado |
 |---|---|---|
-| suite completa (`pytest -q --no-cov --timeout=120`) | el código de `a1db966` (corrió sobre `f6d62cc`; `a1db966` sólo suma `docs/pm`) | «4702 passed, 110 skipped, 3 xfailed in 745.02s (0:12:25)», salida 0 |
-| `python -m compileall -q proyecto_maria` | `a1db966` | salida 0 |
-| `ataque_aislamiento.sh` | `f6d62cc` | «Bloqueado: 47   ·   Fugas: 0   ·   Sin probar: 0» y «✅ PUERTA G3 PASADA. Ningún despachante ve datos de otro.» |
+| el caso nuevo con el producto de la base (`7078e3f`) | `7078e3f` + `tests/test_permisos2.py` de `9428e00` | «8 failed, 17 passed in 6.34s»: `lf_final`, `mayusculas`, `lista_en_mayusculas` y `lf_final_de_la_lista`, por los dos caminos |
+| la fixture vieja deja filas si el formato se afloja | copia descartable con el chequeo de formato apagado y un caso que cuenta filas al final | fixture de `a93b930`: «QUEDAN ['p2_123c944e\r\n', '\np2_f8a991be', '\np2_d7387f58', 'p2_70533628 ', 'p2_accb29deé']»; fixture de `9428e00`: «QUEDAN []» |
+| `tests/test_permisos2.py` y `tests/test_admin_solo_admin.py` | `9428e00` | 50 passed |
+| suite completa (`pytest -q --no-cov --timeout=120`), en worktree limpio | `9428e00` | «4718 passed, 110 skipped, 3 xfailed in 766.38s (0:12:46)», salida 0 |
+| `python -m compileall -q proyecto_maria` | `9428e00` | salida 0 |
+| `ataque_aislamiento.sh` | `9428e00` | «Bloqueado: 47   ·   Fugas: 0   ·   Sin probar: 0» y «✅ PUERTA G3 PASADA. Ningún despachante ve datos de otro.», salida 0 |
 
 ### chequeo-6
 
 ```
-chequeo-6 bc5d6b4..a1db966: avisos para mirar, no un veredicto
-producto +15/−15
-arnés +227/−28
+chequeo-6 7078e3f..9428e00: avisos para mirar, no un veredicto
+producto +8/−12
+arnés +43/−4
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/main.py: 11377 → 11377
+  proyecto_maria/main.py: 11377 → 11373
 avisos: 0
 ```
 
@@ -91,48 +82,47 @@ avisos: 0
 
 | Revisión | Modelo y esfuerzo | Encontró | Qué hice |
 |---|---|---|---|
-| `adversario-opus-alto` | Opus, alto | No encontró cómo entrar como admin sin el rol. Riesgos: el arranque es ahora la única vía y sus errores se tragan; una cuenta con un nombre de la lista registrada antes de esta pieza sigue recibiendo el rol; el 400 deja ver qué nombres están en la lista | Van a «Riesgos» |
-| `/code-review high` | el de la sesión | Dos sabotajes rotos: `aislamiento2.sh` buscaba la línea de `_es_admin` que saqué y `admin2.sh` un caso que cambié. El arranque traga los errores y un commit que falla saltea los nombres que siguen. El nombre tomado antes de esta pieza. El ataque no miraba si se creó el administrador. El caso del 400 no miraba el texto. Repetición de ayudantes en el arnés y diez arranques más en la suite | Los sabotajes, en `3076947`; el ataque, en `f6d62cc`; el texto del 400, en `3076947`. Lo del arranque y el nombre tomado, a «Riesgos». Los ayudantes y los arranques quedan: son pocos y el caso tiene que mostrar el arranque entero |
-| `/security-review` (subagente general) | Opus, alto; sólo leyó código | Nada con confianza 8 o más | — |
+| `adversario-sonnet-alto` | Sonnet, alto | No encontró cómo llegar a admin. Probó en vivo `boss`, `BOSS`, `Boss`, `chief` y `CHIEF` («Usuario ya existe») y `boss\n` y `chief ` («Username inválido»). Unicode no pasa: el patrón es ASCII. Con `fullmatch` cambiado por `match` el caso da 4 failed. Menores: la fixture borraba sólo tres variantes; el email del arnés es inválido para nombres con `\n` o espacio; el orden nuevo del registro | La fixture, en `9428e00`. El email: el caso igual distingue, porque mira el comienzo del detalle. El orden, a «Supuestos» |
+| `/code-review high` | el de la sesión | Ver «Riesgos» y D127. Además: el `import re` que quedó sin uso, la fixture, y el nombre del ayudante, que ya no dice que mira el formato | El import, en `323e6e1`; la fixture, en `9428e00`; el nombre queda. Rechacé bajar a minúsculas dentro de `_admin_usernames()`: cambiaría a quién promueve el arranque |
+| `/security-review` (subagente `adversario-sonnet-alto`) | Sonnet, alto; sobre `7078e3f..9428e00` | Nada con confianza 8 o más. Descartó: nombres que difieren en mayúsculas (D127, sin admin), cuentas viejas con `\n` (no escalan), enumeración (bajo) y la carrera entre chequeo e insert (de antes) | — |
 
 ### Riesgos
 
-- **Si falla el arranque, Emi puede quedar sin admin.** El rol lo pone sólo el arranque, dentro del mismo `try` de los usuarios de prueba, que traga el error y escribe «⚠️ Error creando usuarios demo»; si falla un commit, los nombres que siguen no se procesan. Pasa sólo en el primer arranque después de esta pieza, si la cuenta de Emi todavía no tiene el rol guardado: ahí recibiría 403. Una vez guardado, el rol queda. Antes de publicar conviene mirar en la base que su cuenta tenga `admin` en `roles`, o mirar el log del primer arranque («promovido a admin via ADMIN_USERNAMES»).
-- **Un nombre de la lista registrado por otro antes de esta pieza** sigue recibiendo el rol en cada arranque. Esta pieza sólo frena los registros nuevos. Conviene mirar que cada nombre de `ADMIN_USERNAMES` en producción sea una cuenta conocida.
-- **Sacar un nombre de la lista no le saca el rol.** Hay que sacarlo de `roles` a mano.
-- **El 400 deja ver qué nombres están en la lista**: registrar uno da «Usuario ya existe» aunque nadie lo tenga. Es el mismo texto que un nombre tomado.
-- **El chequeo compara el nombre tal cual llega.** Un nombre con espacios o un salto de línea no coincide con el de la lista; tampoco lo encontraría el arranque, así que no da admin.
-- **Los usuarios de prueba** (sólo fuera de producción) siguen con su propio chequeo de roles, que no pasa por `roles_de`.
+- **Fuera de la lista, los nombres siguen distinguiendo mayúsculas** (D127). No da admin.
+- **El arranque compara exacto y la reserva no.** Una lista con `Emi` y una cuenta `emi` no se promueve. Nadie nuevo puede registrar `Emi`, así que esa entrada de la lista no promueve a nadie hasta que se corrija a `emi`. Conviene mirar que cada nombre de `ADMIN_USERNAMES` en producción esté escrito igual que su cuenta.
+- **El registro revela un nombre tomado antes de validar el email.** Bajo: el mismo 400 ya lo revelaba con un email válido.
+- **Cuentas que ya existen con `\n`, espacios u otras mayúsculas** quedan como están. No se promueven porque el arranque compara exacto.
 
 ### Lo que no se corrió
 
-- **`aislamiento2.sh` entero** no corrió: sólo el ataque de admin, que es el que toca esta pieza.
-- **`cobro_mp2.sh`** no corrió: el caso nuevo vive en `test_cobro_mp2.py` y su sabotaje está en `cobro_mp4.sh`.
+- **`smoke_friccion.sh`** no corrió.
 - **La CI de GitHub** no corrió: esta rama no tiene PR.
-- **flake8** y **`smoke_friccion.sh`** no corrieron.
+- **flake8** no corrió.
 
 ### Para reproducir
 
 ```bash
-git fetch origin claude/dev-tecnica && git checkout --detach a1db966
+git fetch origin claude/dev-tecnica && git checkout --detach 9428e00
 export DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
 
-# Los 7 sabotajes de esta pieza: 7 ROJO y «sabotajes con falla: 0»
-PY=$(command -v python) scripts/testing/sabotajes/permisos2.sh a1db966
+# Los 10 sabotajes: 10 ROJO y «sabotajes con falla: 0»
+PY=$(command -v python) scripts/testing/sabotajes/permisos2.sh 9428e00
 
-# El caso de cobro y su sabotaje: 9 ROJO, el de «el desempate pone primero a quien pide»
-PY=$(command -v python) scripts/testing/sabotajes/cobro_mp4.sh a1db966
-
-# Los casos nuevos: todos passed
+# Los casos: 50 passed
 DATABASE_URL=sqlite+aiosqlite:///./t.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
-  python -m pytest -q --no-cov tests/test_permisos2.py tests/test_admin_solo_admin.py \
-  "tests/test_cobro_mp2.py::test_si_falla_la_suya_la_duena_no_concilia_ni_toca_la_que_paga"
+  python -m pytest -q --no-cov tests/test_permisos2.py tests/test_admin_solo_admin.py
+
+# El rojo de antes: 8 failed, 17 passed
+git checkout 7078e3f -- proyecto_maria/main.py
+DATABASE_URL=sqlite+aiosqlite:///./t.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
+  python -m pytest -q --no-cov tests/test_permisos2.py
+git checkout 9428e00 -- proyecto_maria/main.py
 
 # Ningún despachante ve datos de otro: «Fugas: 0» y «PUERTA G3 PASADA»
 PUERTO=8790 scripts/testing/ataque_aislamiento.sh
 
 # Los números de §6: la salida de arriba
-python docs/pm/herramientas/chequeo-6.py bc5d6b4 a1db966
+python docs/pm/herramientas/chequeo-6.py 7078e3f 9428e00
 ```
 
-/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. COBRO-MP-4 aceptada en 0fb991c; SEGURO-2 aceptada en d160738. PERMISOS-2 (con el caso de cobro del punto 1) entregada en a1db966 (informe en el commit de arriba). Próxima D libre: D127. Frenar 2026-11-08 15:50 UTC. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.
+/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. PERMISOS-2 aceptada en a1db966. PERMISOS-3 entregada en 9428e00 (informe en el commit de arriba), con D127 abierta. Próxima D libre: D128. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.
