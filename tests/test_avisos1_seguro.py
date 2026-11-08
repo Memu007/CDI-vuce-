@@ -46,6 +46,21 @@ def test_pasar_a_cif_marca_el_borrado_y_la_nota_lo_dice():
     assert _pantalla(op, pedido, {**VALOR_CIF, "seguro": 14.88}, salida_propia=True) is True
 
 
+def test_de_vuelta_a_fob_el_borrado_sigue_diciendo_lo_que_paso():
+    op = {"incoterm": "FOB", "seguro": "", "seguro_borrado": True, "campos_sin_leer": ["seguro"]}
+    nota = _pantalla(op, "", VALOR)["els"]["valorSeguroNota"]["textContent"]
+    assert NO_SE_LEYO not in nota.lower() and "se borró" in nota
+
+
+@pytest.mark.parametrize("borrado,dice", [(True, "se borró"), (False, "No pudimos leer el seguro")])
+def test_el_semaforo_dice_si_el_seguro_se_borro_o_no_se_leyo(borrado, dice):
+    fuente = (Path(__file__).parent.parent / "proyecto_maria/static/v2/screens/semaforo.js").read_text(encoding="utf-8")
+    nombres = "var NOMBRES_SIN_LEER = {" + fuente.split("var NOMBRES_SIN_LEER = {", 1)[1].split("};", 1)[0] + "};\n"
+    codigo = nombres + _funciones("semaforo.js", ["camposSinLeer"]) + "\nconsole.log(JSON.stringify(camposSinLeer()));"
+    [aviso] = _correr(codigo, {"seguro_borrado": borrado, "campos_sin_leer": ["seguro"]})
+    assert dice in aviso and "no pudimos leer" not in aviso.lower() if borrado else dice in aviso
+
+
 def test_un_seguro_que_no_se_leyo_sigue_diciendolo():
     op = {"incoterm": "CIF", "seguro": "", "campos_sin_leer": ["seguro"]}
     r = _pantalla(op, "", VALOR_CIF)
@@ -65,13 +80,21 @@ def test_la_marca_de_borrado_se_va(como):
     assert "seguro_borrado" not in r
 
 
+def test_vaciar_el_campo_deja_la_marca_de_borrado():
+    r = _correr(_stubs_de_la_revision() + (
+        "\nonFieldChange({target: {name: 'seguro', type: 'number', value: ''}});"
+        "\nconsole.log(JSON.stringify(CDI.state.operacion));"),
+        {"seguro": "", "seguro_borrado": True, "campos_sin_leer": ["seguro"]})
+    assert r["seguro_borrado"] is True
+
+
 # ------------------------------------- 2. el motivo, donde cae la persona
 
 
 def _form_de_la_revision():
     # El campo y su error, y la revisión que al entrar los vuelve a validar.
     return ("const campo = {classes: new Set(), classList: {add(c) { campo.classes.add(c); },"
-            " remove(c) { campo.classes.delete(c); }}};\n"
+            " remove(c) { campo.classes.delete(c); }}, scrollIntoView() { campo.visto = true; }};\n"
             "const errSeguro = {textContent: '', hidden: true};\n"
             "const form = {querySelector: s => s === '[name=\"seguro\"]' ? campo :"
             " s === '[data-error-for=\"seguro\"]' ? errSeguro : null};\n")
@@ -80,8 +103,8 @@ def _form_de_la_revision():
 def test_marcar_en_la_revision_pone_el_motivo_junto_al_campo():
     codigo = _form_de_la_revision() + _funciones("review.js", ["marcarEnLaRevision"]) + (
         "\nmarcarEnLaRevision('seguro', 'el motivo');"
-        "\nconsole.log(JSON.stringify([errSeguro.textContent, errSeguro.hidden, [...campo.classes]]));")
-    assert _correr(codigo, {}) == ["el motivo", False, ["is-error"]]
+        "\nconsole.log(JSON.stringify([errSeguro.textContent, errSeguro.hidden, [...campo.classes], !!campo.visto]));")
+    assert _correr(codigo, {}) == ["el motivo", False, ["is-error"], True]
 
 
 def test_la_revision_exporta_la_marca():

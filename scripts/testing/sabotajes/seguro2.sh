@@ -146,7 +146,7 @@ sabotaje $F "recalcularlo deja la marca" \
 ' \
   "FAILED $T::test_recalcularlo_ya_no_es_el_dejado"
 sabotaje $R "escribirlo a mano deja la marca" \
-  ' delete op.seguro_dejado; }' ' }' \
+  'delete op.seguro_calculado; delete op.seguro_dejado;' 'delete op.seguro_calculado;' \
   "FAILED $T::test_escribirlo_a_mano_ya_no_es_el_dejado"
 
 # 4. Con CIF, la nota dice que una factura sin seguro necesita un 0.

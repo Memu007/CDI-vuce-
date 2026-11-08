@@ -109,17 +109,31 @@ sabotaje $F "el pedido no dice que se borró" \
 ' '' \
   "FAILED $A::test_pasar_a_cif_marca_el_borrado_y_la_nota_lo_dice"
 sabotaje $F "la nota dice que no se leyó" \
-  'seguroSinLeer(op) && op.seguro_borrado ?' 'false ?' \
+  '(seguroSinLeer(op) ? (op.seguro_borrado ?' '(seguroSinLeer(op) ? (false ?' \
   "FAILED $A::test_pasar_a_cif_marca_el_borrado_y_la_nota_lo_dice"
+sabotaje $F "de vuelta a FOB la nota dice que no se leyó" \
+  'mostrar && seguroSinLeer(op) ? (op.seguro_borrado ?' 'mostrar && seguroSinLeer(op) ? (false ?' \
+  "FAILED $A::test_de_vuelta_a_fob_el_borrado_sigue_diciendo_lo_que_paso"
+sabotaje proyecto_maria/static/v2/screens/semaforo.js "el semáforo dice que no se leyó" \
+  "if (c === 'seguro' && op.seguro_borrado) {" 'if (false) {' \
+  "FAILED $A::test_el_semaforo_dice_si_el_seguro_se_borro_o_no_se_leyo[True"
 sabotaje $F "recalcularlo deja la marca de borrado" \
   '        delete op.seguro_borrado;
 ' '' \
   "FAILED $A::test_la_marca_de_borrado_se_va[recalcularlo]"
 sabotaje $R "escribirlo deja la marca de borrado" \
-  ' delete op.seguro_borrado; delete' ' delete' \
+  "            if (String(el.value).trim() !== '') delete op.seguro_borrado;
+" '' \
   "FAILED $A::test_la_marca_de_borrado_se_va[escribirlo]"
+sabotaje $R "vaciarlo borra la marca de borrado" \
+  "if (String(el.value).trim() !== '') delete op.seguro_borrado;" 'delete op.seguro_borrado;' \
+  "FAILED $A::test_vaciar_el_campo_deja_la_marca_de_borrado"
 sabotaje $R "marcar no muestra el motivo" \
   '{ errEl.textContent = texto; errEl.hidden = false; }' '{ errEl.textContent = texto; }' \
+  "FAILED $A::test_marcar_en_la_revision_pone_el_motivo_junto_al_campo"
+sabotaje $R "marcar no lleva el campo a la vista" \
+  "        if (el) { try { el.scrollIntoView({ block: 'center' }); } catch (_) {} }
+" '' \
   "FAILED $A::test_marcar_en_la_revision_pone_el_motivo_junto_al_campo"
 sabotaje $R "la revisión no exporta la marca" \
   '    CDI.marcarEnLaRevision = marcarEnLaRevision;
