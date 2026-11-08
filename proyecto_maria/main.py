@@ -7361,6 +7361,11 @@ async def undo_client_migration(
     return {"success": True, "status": "undone", **undo_result, "idempotent": False}
 
 
+def _textos_de_arriba_guardables(cuerpo):
+    # Lo anidado se guarda con str(), que ya escapa NUL y surrogates; recorrerlo no tiene tope de hondura.
+    return {clave: _guardable_en_pg(v) if isinstance(v, str) else v for clave, v in cuerpo.items()}
+
+
 @app.post("/api/clientes")
 @app.post("/api/clientes/public")
 async def create_cliente(
@@ -7369,7 +7374,7 @@ async def create_cliente(
     db: AsyncSession = Depends(get_db),
 ):
     """Crea un cliente asociado al usuario autenticado."""
-    client = _guardable_en_pg(client)
+    client = _textos_de_arriba_guardables(client)
     username = user["username"]
 
     # Límite de clientes por plan.
@@ -7469,7 +7474,7 @@ async def update_cliente(
     Sin html.escape() en storage (ver create_cliente). Truncamos al limite de
     cada VARCHAR para evitar 500s sobre input largo.
     """
-    client_data = _guardable_en_pg(client_data)
+    client_data = _textos_de_arriba_guardables(client_data)
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
     # Antes de tocar el cliente: con la fecha mala no se guarda nada.
@@ -7957,22 +7962,27 @@ def _entero_de_afuera(valor, que):
     return int(numero)
 
 
-def _tiene_no_finito(valor):
-    if isinstance(valor, float):
-        return not math.isfinite(valor)
-    if isinstance(valor, list):
-        return any(_tiene_no_finito(v) for v in valor)
-    if isinstance(valor, dict):
-        return any(_tiene_no_finito(v) for v in valor.values())
-    return False
+def _no_finito(_):
+    raise HTTPException(status_code=400, detail="Hay un número que no es válido.")
+
+
+def _float_finito(texto):
+    numero = float(texto)
+    return numero if math.isfinite(numero) else _no_finito(texto)
 
 
 async def _json_guardable(request: Request):
     # Lo que no sea una columna conocida va crudo a un JSON, que en Postgres no acepta NaN.
-    data = await request.json()
-    if _tiene_no_finito(data):
-        raise HTTPException(status_code=400, detail="Hay un número que no es válido.")
-    return _sin_nul(data)
+    from proyecto_maria.services.client_memory import tiene_medio_par
+
+    try:
+        data = _sin_nul(json.loads(await request.body(), parse_constant=_no_finito, parse_float=_float_finito))
+        # Lo que el historial rechazaría se rechaza antes de guardar nada.
+        if tiene_medio_par(data):
+            raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
+        return data
+    except (ValueError, RecursionError):
+        raise HTTPException(status_code=400, detail="Body JSON inválido")
 
 
 def _sin_nul(valor):
@@ -8019,7 +8029,7 @@ async def save_client_operation(
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
 
-    from proyecto_maria.services.client_memory import tiene_digito_no_ascii, tiene_medio_par
+    from proyecto_maria.services.client_memory import tiene_digito_no_ascii
 
     try:
         data = await _json_guardable(request)
@@ -8034,9 +8044,6 @@ async def save_client_operation(
         resumen = {} if resumen is None else resumen
         if not isinstance(resumen, dict):
             raise HTTPException(status_code=400, detail="El resumen tiene que ser un objeto.")
-        # Lo que el historial rechazaría se rechaza antes de guardar nada.
-        if tiene_medio_par(data):
-            raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
         if any(tiene_digito_no_ascii(str(item.get("ncm") or item.get("pieza") or "")) for item in items):
             raise HTTPException(status_code=400, detail=_AVISO_DIGITOS)
 
@@ -8054,7 +8061,8 @@ async def save_client_operation(
         campos = dict(
             client_id=client_id,
             source=str(data.get("source") or "manual")[:50],
-            total_items=_entero_de_afuera(resumen.get("items", len(items)), "La cantidad de ítems"),
+            total_items=_entero_de_afuera(
+                len(items) if resumen.get("items") is None else resumen["items"], "La cantidad de ítems"),
             total_value=_numero_de_afuera(resumen.get("valor_total"), "El valor total"),
             currency=str(data.get("currency") or "USD")[:3],
         )
@@ -8244,6 +8252,8 @@ async def agrupar_items(
     )
     max_grupo = max_grupo_result.scalar()
     nuevo_grupo_id = (max_grupo or 0) + 1
+    if nuevo_grupo_id >= 2**31:
+        raise HTTPException(status_code=409, detail="No quedan números de grupo libres.")
 
     for it in items:
         it.grupo_id = nuevo_grupo_id

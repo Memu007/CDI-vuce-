@@ -10,6 +10,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - La operación manual y guardar una operación al cliente con un número que no es número (`NaN`, infinito, texto, un total que desborda) o un ítem que no es objeto dan 400 y no guardan nada. Un nulo o un carácter inválido en un texto se guarda como «�», una pieza de más de 20 caracteres se corta y un grupo fuera de rango queda vacío.
 - Un carácter nulo en la ruta da 404. Editar un cliente con el email de otro da 409. Agrupar acepta hasta 10000 ítems. El alta de estudio pide la misma clave que el registro: 8 caracteres y un número o símbolo.
+- Guardar al cliente con un cuerpo roto, vacío o demasiado anidado da 400; un campo anidado del cliente se guarda; agrupar cuando no quedan números de grupo da 409.
 
 ## 2026-11-08 · fix: un dato mal cargado se explica en castellano en login, registro, reset y el panel (FRONT-422)
 
