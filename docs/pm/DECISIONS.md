@@ -495,3 +495,7 @@ ENTORNO-4 aceptada sobre `44b9759`, sin integrar. Publicarla pide `FRONTEND_URL`
 ### 2026-11-08 07:52 UTC (PM principal)
 
 ENTRADAS-4 aceptada sobre `6baddb5`, sin integrar. Supuesto de la Dev aceptado: un `cliente_id` con NUL se trata como cliente inexistente (200 sin mapeo), no 422.
+
+### 2026-11-08 08:59 UTC (PM principal)
+
+EXCEL-2c aceptada sobre `c2b84f1`, sin integrar. D122 (a), decidido por la PM bajo «arreglos chicos de seguridad» (Emi): pieza EXCEL-2d, tope al `formatCode` antes de abrir; lleva también el sabotaje de `excel2.sh` que dejó sin patrón EXCEL-3b (`522e082`). Próxima D libre: D123.
