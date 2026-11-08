@@ -47,12 +47,24 @@ async def _poner_roles(username, roles):
         await s.commit()
 
 
+PARECIDOS = [
+    ("{n}\n", "", "Username inválido"),
+    ("{n}\r\n", "", "Username inválido"),
+    ("\n{n}", "", "Username inválido"),
+    ("{n} ", "", "Username inválido"),
+    ("{n}é", "", "Username inválido"),
+    ("{N}", "{n}", "Usuario ya existe"),
+    ("{n}", "{N}", "Usuario ya existe"),
+    ("{n}\n", "{n}", "Username inválido"),
+]
+
+
 @pytest.fixture
 def nombre():
     limiter.enabled = False
     n = f"p2_{uuid.uuid4().hex[:8]}"
     yield n
-    for variante in (n, n.upper(), n + "\n"):
+    for variante in {n, n.upper()} | {pedido.format(n=n, N=n.upper()) for pedido, _, _ in PARECIDOS}:
         _run(_borrar(variante))
 
 
@@ -98,16 +110,7 @@ def test_la_cuenta_de_admin_usernames_sigue_siendo_admin_al_reiniciar(monkeypatc
 
 
 @pytest.mark.parametrize("ruta", ["/auth/register", "/api/organizations/create"])
-@pytest.mark.parametrize("pedido,lista,detalle", [
-    ("{n}\n", "", "Username inválido"),
-    ("{n}\r\n", "", "Username inválido"),
-    ("\n{n}", "", "Username inválido"),
-    ("{n} ", "", "Username inválido"),
-    ("{n}é", "", "Username inválido"),
-    ("{N}", "{n}", "Usuario ya existe"),
-    ("{n}", "{N}", "Usuario ya existe"),
-    ("{n}\n", "{n}", "Username inválido"),
-], ids=["lf_final", "crlf_final", "lf_inicial", "espacio", "acento",
+@pytest.mark.parametrize("pedido,lista,detalle", PARECIDOS, ids=["lf_final", "crlf_final", "lf_inicial", "espacio", "acento",
         "mayusculas", "lista_en_mayusculas", "lf_final_de_la_lista"])
 def test_un_nombre_que_se_ve_como_otro_no_se_registra(monkeypatch, nombre, ruta, pedido, lista, detalle):
     monkeypatch.setenv("ADMIN_USERNAMES", lista.format(n=nombre, N=nombre.upper()))
