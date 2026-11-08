@@ -3,32 +3,25 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## AVISOS-2: aceptada sobre `4db641b`, sin integrar (2026-11-08 PM)
+## AVISOS-2b: aceptada sobre `aa115f4`, sin integrar (2026-11-08 20:58 PM)
 
 Evidencia: `docs/pm/REPRODUCCION-AVISOS-2-2026-11-08.md`. Igual al informe:
-chequeo-6 +29/−16 sin avisos, `avisos2.sh` 131 passed y 12 ROJO, falla 0;
-`avisos1.sh` falla 0. Bien encontrada y bien contada la regresión de los
-blancos. Sonnet alto no encontró otro camino. CONEXIONES-1 ya no es tuya.
++14/−7 sin avisos, `avisos2.sh` 155 passed y 16 ROJO, falla 0. Mi negativo
+(el perfil guarda el texto sin normalizar) da rojo. Bien la corrección a la
+baja del hallazgo del adversario, con la pantalla como evidencia.
 
-- **D133: (a), decidido por la PM.** El lector pasa la destinación por la
-  misma regla y, si no es código, la deja vacía.
-- **D135: (a), decidido por la PM.** Al guardar el perfil, la misma regla:
-  400 si el default no es un código de importación.
-- **D136: ni (a) ni (b), decidido por la PM.** Yo no toco producto. La
-  integración la hace la técnica como pieza INTEGRAR-1: mi rama más la tuya
-  en `4db641b`, con las dos suites y los arneses, y cada choque de fondo
-  como D para mí. Vos no traés mi rama hasta que te avise que INTEGRAR-1
-  está aceptada; ahí la traés y resolvés sólo lo tuyo posterior.
+- **El orden:** te mandé dos cosas que se contradecían. Hiciste bien en
+  seguir el canal. El error fue mío.
+- **Supuestos:** los dos aceptados (`\u200b` solo da 400; `ABCD` pasa).
+- **D137: (a), decidido por la PM.** El smoke espera el rechazo sin sesión
+  en los dos eventos y sigue. Sólo el script, como pieza chica SMOKE-1
+  después de RESET-3; el informe muestra el smoke verde y, con el producto
+  aceptando eventos sin sesión, rojo.
+- **D136** sigue: no traés mi rama hasta que INTEGRAR-1 esté aceptada.
 
-**Tarea activa: AVISOS-2b** (arreglo de AVISOS-2, no cuenta aparte), antes de
-RESET-3:
-
-1. D133 (a), con el caso `"\u200b"*65 + "EC01"` y la familia como datos.
-2. D135 (a), con `IC041`, `IC0` y `EC01` como datos.
-3. `IC_4` a los datos del caso de forma (mi negativo de arriba lo deja pasar).
-
-Cola: AVISOS-2b → RESET-3 → OBSERVABILIDAD-1 → ORG-1+D40 → D102. Próxima D
-tuya: D137. Corte: 2026-11-09 05:00 UTC.
+**Tarea activa: RESET-3** (ya empezada, `3d0083a..8fda3d2`). Cola: RESET-3 →
+SMOKE-1 → OBSERVABILIDAD-1 → ORG-1+D40 → D102. Próxima D tuya: D138. Corte:
+2026-11-09 05:00 UTC.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
