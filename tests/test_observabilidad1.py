@@ -21,6 +21,13 @@ from proyecto_maria import main
 from proyecto_maria.database import connection
 from proyecto_maria.database.models import APILog, Base
 
+FALLA_COLUMNA = "no se pudo agregar api_logs.owner_username"
+FALLA_INDICE = "no se pudo crear el índice ix_api_logs_owner_username"
+
+
+def registros_con(caplog, texto):
+    return [r for r in caplog.records if texto in r.getMessage()]
+
 # api_logs como la dejó una versión vieja: todas las columnas menos el dueño.
 TABLA_VIEJA = """
 CREATE TABLE api_logs (
@@ -167,7 +174,7 @@ def test_sin_tabla_no_crea_nada_ni_se_queja(base, caplog):
     caplog.set_level(logging.WARNING)
     migrar()
     assert esquema(sql) == []
-    assert not [r for r in caplog.records if "OBSERVABILIDAD-1" in r.getMessage()], caplog.text
+    assert not registros_con(caplog, FALLA_COLUMNA) + registros_con(caplog, FALLA_INDICE), caplog.text
 
 
 def test_si_falla_no_levanta_y_deja_el_motivo_en_el_log(base, caplog):
@@ -177,7 +184,7 @@ def test_si_falla_no_levanta_y_deja_el_motivo_en_el_log(base, caplog):
         "CREATE VIEW api_logs AS SELECT id, endpoint FROM logs_reales")
     caplog.set_level(logging.WARNING)
     migrar()  # no levanta
-    registros = [r for r in caplog.records if "OBSERVABILIDAD-1" in r.getMessage()]
+    registros = registros_con(caplog, FALLA_COLUMNA)
     assert registros, f"la falla no quedó en el log: {caplog.text!r}"
     assert registros[0].levelno >= logging.WARNING
     assert registros[0].exc_info, "el log tiene que traer el motivo (la excepción)"
@@ -194,7 +201,9 @@ def test_si_falla_el_indice_la_columna_queda_y_el_log_lo_dice(base, caplog, caps
     assert indices_del_dueno(sql) == []
     assert "agregada columna api_logs.owner_username" in impreso, impreso
     assert "agregado indice" not in impreso, f"anunció un índice que no se creó: {impreso!r}"
-    assert [r for r in caplog.records if "OBSERVABILIDAD-1" in r.getMessage()], caplog.text
+    registros = registros_con(caplog, FALLA_INDICE)
+    assert registros and registros[0].exc_info, f"el log no dice que falló el índice: {caplog.text!r}"
+    assert not registros_con(caplog, FALLA_COLUMNA), f"el log culpa a la columna: {caplog.text!r}"
 
 
 VALOR_DE_EJEMPLO = {"integer": "7", "number": "7.5"}
@@ -219,6 +228,7 @@ def _camino_de_ejemplo(molde, operaciones):
 def test_la_metrica_guarda_el_molde_de_la_ruta_y_no_el_camino(monkeypatch):
     # El camino crudo lleva tokens, hashes, CUIT y nombres de archivo; la
     # métrica sólo tiene que decir qué ruta se pidió.
+    from fastapi.routing import APIRoute
     from fastapi.testclient import TestClient
     grabados = []
 
@@ -229,8 +239,14 @@ def test_la_metrica_guarda_el_molde_de_la_ruta_y_no_el_camino(monkeypatch):
 
     with TestClient(main.app, raise_server_exceptions=False) as cliente:
         # Después del arranque: ahí se suman los routers de admin y quotes.
+        # Un router incluido no deja sus rutas sueltas en app.routes; el
+        # openapi recién armado sí las recorre.
+        main.app.openapi_schema = None
         rutas = main.app.openapi()["paths"]
         moldes = sorted(m for m in rutas if "{" in m)
+        sueltas = {r.path_format for r in main.app.routes
+                   if isinstance(r, APIRoute) and "{" in r.path_format}
+        assert sueltas <= set(moldes), sorted(sueltas - set(moldes))
         assert {"/api/quotes/public/{hash}", "/api/admin/errors/top/{limit}"} <= set(moldes), moldes
         monkeypatch.setattr(main, "APILog", APILogFalso)
         monkeypatch.delenv("PYTEST_CURRENT_TEST")

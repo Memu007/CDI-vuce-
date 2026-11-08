@@ -284,8 +284,19 @@ def base_vieja(b):
     chequear(b.esquema() == esquema1, "el segundo arranque no cambia el esquema de api_logs")
     chequear(b.sql("select * from api_logs order by id") == filas1, "ni sus filas")
     chequear("api_logs.owner_username" not in app.texto(), "ni dice que agregó algo")
-    chequear("[OBSERVABILIDAD-1]" not in app.texto(),
+    chequear(FALLA_COLUMNA not in app.texto() and FALLA_INDICE not in app.texto(),
              "ni falla" + (" con una lectura abierta sobre la tabla" if lectura is not None else ""))
+
+
+FALLA_COLUMNA = "no se pudo agregar api_logs.owner_username"
+FALLA_INDICE = "no se pudo crear el índice ix_api_logs_owner_username"
+
+
+def dice_falla_de(app, paso):
+    """El log nombra el paso que falló y no el otro."""
+    falla, otra = (FALLA_INDICE, FALLA_COLUMNA) if paso == "índice" else (FALLA_COLUMNA, FALLA_INDICE)
+    chequear(esperar(lambda: falla in app.texto(), 5), f"y el log dice que falló {'el' if paso == 'índice' else 'la'} {paso}")
+    chequear(otra not in app.texto(), f"y no dice que falló otra cosa: {otra!r}")
 
 
 def base_con_falla(b, con_columna=False):
@@ -306,8 +317,7 @@ def base_con_falla(b, con_columna=False):
         chequear(app.arranco, f"la app arranca igual{' con la columna ya puesta' if con_columna else ''} "
                               f"({time.monotonic() - inicio:.1f} s)")
         if app.arranco:
-            chequear(esperar(lambda: "[OBSERVABILIDAD-1] no se pudo agregar api_logs.owner_username" in app.texto(), 5),
-                     "y lo dice en el log")
+            dice_falla_de(app, "índice" if con_columna else "columna")
             r = app.pedir("/robots.txt")
             chequear(r[0] == 200, f"los pedidos responden aunque la métrica no se grabe: {r[0]}")
     finally:
@@ -344,8 +354,7 @@ def falla_al_confirmar(tag, objeto, queda_columna):
         app = App(b, "confirma")
         try:
             chequear(app.arranco, "la app arranca igual")
-            chequear(esperar(lambda: "[OBSERVABILIDAD-1] no se pudo agregar api_logs.owner_username" in app.texto(), 5),
-                     "y lo dice en el log")
+            dice_falla_de(app, "índice" if queda_columna else "columna")
         finally:
             app.parar()
         dice = "agregada columna api_logs.owner_username" in app.texto()

@@ -153,13 +153,13 @@ sabotaje arranque_sqlite "la falla frena el arranque" 1 \
   $'"la app arranca igual, pero las métricas no se graban hasta que exista"\n        )\n        raise\n' \
   "FALLA | la app arranca igual"
 sabotaje pytest_o1 "la falla no va al log" 1 \
-  $'        logging.exception(\n            "[OBSERVABILIDAD-1]' $'        (lambda *a: None)(\n            "[OBSERVABILIDAD-1]' \
+  $'        logging.exception(\n            "no se pudo agregar' $'        (lambda *a: None)(\n            "no se pudo agregar' \
   "FAILED $T::test_si_falla_no_levanta_y_deja_el_motivo_en_el_log" "la falla no quedó en el log"
 sabotaje pytest_o1 "la falla va al log sin el motivo" 1 \
-  $'        logging.exception(\n            "[OBSERVABILIDAD-1]' $'        logging.error(\n            "[OBSERVABILIDAD-1]' \
+  $'        logging.exception(\n            "no se pudo agregar' $'        logging.error(\n            "no se pudo agregar' \
   "FAILED $T::test_si_falla_no_levanta_y_deja_el_motivo_en_el_log" "el log tiene que traer el motivo"
 sabotaje arranque_pg "en Postgres espera el lock sin límite" 1 \
-  $'            await conn.exec_driver_sql("SET LOCAL lock_timeout = \'5s\'")' $'            pass' \
+  $'            await conn.exec_driver_sql("SET LOCAL lock_timeout = \'5s\'")\n        await conn.exec_driver_sql(sql)' $'        await conn.exec_driver_sql(sql)' \
   "FALLA | la app arranca igual ("
 sabotaje arranque_pg "en Postgres el índice espera el lock sin límite" 1 \
   $'                await ddl(conn,\n                    "CREATE INDEX' $'                await conn.exec_driver_sql(\n                    "CREATE INDEX' \
@@ -171,16 +171,24 @@ sabotaje arranque_pg "columna e índice en una sola transacción" 3 \
   $'        conn = await engine.connect()\n        await conn.begin()\n        if True:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA table_info' \
   $'        async with engine.begin() as conn:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA index_list' \
   $'        if True:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA index_list' \
-  $'        if not tiene_indice:\n            print(' $'        await conn.commit()\n        if not tiene_indice:\n            print(' \
+  $'    if not tiene_indice:\n        print(' $'    await conn.commit()\n    if not tiene_indice:\n        print(' \
   "FALLA | la columna queda: None"
-sabotaje arranque_pg "anuncia la columna antes de confirmarla" 1 \
-  $'VARCHAR(50)"\n                )\n        if agrega_columna:' \
-  $'VARCHAR(50)"\n                )\n                print("✅ Migracion: agregada columna api_logs.owner_username")\n        if False:' \
+sabotaje arranque_pg "anuncia la columna antes de confirmarla" 2 \
+  $'VARCHAR(50)"\n                )\n    except' \
+  $'VARCHAR(50)"\n                )\n                print("✅ Migracion: agregada columna api_logs.owner_username")\n    except' \
+  $'    if agrega_columna:\n        print(' $'    if False:\n        print(' \
   "FALLA | y el log no dice que la agregó"
-sabotaje arranque_pg "anuncia el índice antes de confirmarlo" 1 \
-  $'"ON api_logs (owner_username)"\n                )\n        if not tiene_indice:' \
-  $'"ON api_logs (owner_username)"\n                )\n                print("✅ Migracion: agregado indice ix_api_logs_owner_username")\n        if False:' \
+sabotaje arranque_pg "anuncia el índice antes de confirmarlo" 2 \
+  $'"ON api_logs (owner_username)"\n                )\n    except' \
+  $'"ON api_logs (owner_username)"\n                )\n                print("✅ Migracion: agregado indice ix_api_logs_owner_username")\n    except' \
+  $'    if not tiene_indice:\n        print(' $'    if False:\n        print(' \
   "FALLA | y el log no lo anuncia"
+sabotaje pytest_o1 "la falla del índice dice que falta la columna" 1 \
+  '"no se pudo crear el índice ix_api_logs_owner_username; "' '"no se pudo agregar api_logs.owner_username; "' \
+  "FAILED $T::test_si_falla_el_indice_la_columna_queda_y_el_log_lo_dice" "el log no dice que falló el índice"
+sabotaje arranque_pg "en Postgres la falla del índice dice que falta la columna" 1 \
+  '"no se pudo crear el índice ix_api_logs_owner_username; "' '"no se pudo agregar api_logs.owner_username; "' \
+  "FALLA | y el log dice que falló el índice"
 
 # --- la métrica guarda el molde de la ruta
 sabotaje pytest_o1 "la métrica guarda el camino crudo" 1 \
