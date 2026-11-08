@@ -10,7 +10,7 @@ PROD='os.getenv("ENVIRONMENT", "development") == "production"'
 SM=proyecto_maria/security/security_middleware.py
 
 sabotaje $M "el link de los emails cae a localhost salvo en producción" \
-  $'    if not _es_desarrollo():\n        # Fail fast' $'    if IS_PRODUCTION:\n        # Fail fast' \
+  $'        return url\n    if not _es_desarrollo():' $'        return url\n    if IS_PRODUCTION:' \
   "$C[frontend_en_localhost]" "frontend_en_localhost $VIEJO"
 sabotaje $M "sin ALLOWED_ORIGINS arranca salvo en producción" \
   'elif not _es_desarrollo():' 'elif IS_PRODUCTION:' \
