@@ -156,6 +156,10 @@ sabotaje $G "la coma o el punto que cierra un número frena" \
 sabotaje $G "un menos separado del número pasa" \
   'return signo and digito_despues and not antes[-1:].isalnum()' 'return False' \
   "test_un_numero_que_cambiaria_no_se_genera[AF(- 5)-]"
+sabotaje $G "un más o un menos matemático separado del número pasa" \
+  'in ("Pd", "Sm")' 'in ("Pd",)' \
+  "test_un_numero_que_cambiaria_no_se_genera[AF(+ 5)-]" \
+  "test_un_numero_que_cambiaria_no_se_genera[AF(\u2212 5)-]"
 sabotaje $G "un guion después de una palabra se toma como menos" \
   'return signo and digito_despues and not antes[-1:].isalnum()' 'return signo and digito_despues' \
   "test_lo_que_no_cambia_un_numero_sale_como_antes[AA(ROJO - 5)--AA(ROJO   5)-]"

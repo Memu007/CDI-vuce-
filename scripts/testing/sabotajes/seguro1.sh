@@ -75,9 +75,9 @@ sabotaje $G "DPU fuera de la lista" \
 sabotaje $G "el incoterm sin normalizar" \
   'return str(incoterm or "").strip().upper() in INCOTERMS_CON_SEGURO' 'return str(incoterm or "") in INCOTERMS_CON_SEGURO' \
   "test_mayusculas_minusculas_y_espacios_dan_lo_mismo"
-sabotaje $M "los avisos no normalizan el incoterm" \
+sabotaje $M "generar no normaliza el incoterm antes del TXT" \
   'request.incoterm = (request.incoterm or "").strip().upper()' 'request.incoterm = request.incoterm or ""' \
-  "test_los_avisos_traen_la_regla_del_servidor[cif_con_espacios]"
+  "test_una_operacion_cif_lleva_su_seguro_en_el_txt[cif ]"
 
 # 2. La regla vive en el servidor, no sólo en la pantalla.
 sabotaje $M "el servidor no le pasa el incoterm a las cuentas" \
