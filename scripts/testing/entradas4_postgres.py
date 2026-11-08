@@ -1,9 +1,9 @@
 """ENTRADAS-4 contra un Postgres de verdad: un NUL en un campo de formulario de
 texto no da 500. SQLite lo acepta y Postgres no, así que tests/ no lo mide.
 Comprueba que:
-1. los campos `Form` de texto de la app son los de CAMPOS (uno nuevo hace fallar
-   hasta que se agrega acá);
-2. cada uno, con un NUL, responde sin 500.
+1. los campos `Form` de texto de la app son los de CAMPOS (la búsqueda es la de
+   tests/test_entradas4.py: uno nuevo hace fallar hasta que se agrega acá);
+2. cada uno, con un NUL, responde 200.
 
 uso (con un Postgres local y descartable, nunca el de producción; el usuario
 tiene que poder crear bases):
@@ -12,7 +12,6 @@ tiene que poder crear bases):
 import io
 import os
 import sys
-import typing
 import uuid
 from urllib.parse import urlparse
 
@@ -34,8 +33,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import openpyxl  # noqa: E402
 import psycopg2  # noqa: E402
-from fastapi.params import Form  # noqa: E402
-from fastapi.routing import APIRoute  # noqa: E402
 
 FALLAS = []
 CLAVE = "Clave-sintetica-1!"
@@ -75,40 +72,28 @@ CAMPOS = {
 }
 
 
-def es_texto(tipo):
-    if typing.get_origin(tipo) is typing.Annotated:
-        return es_texto(typing.get_args(tipo)[0])
-    return tipo is str or any(es_texto(t) for t in typing.get_args(tipo))
-
-
-def campos_form_de_texto(app):
-    for ruta in app.routes:
-        if not isinstance(ruta, APIRoute):
-            continue
-        for campo in ruta.dependant.body_params:
-            if isinstance(campo.field_info, Form) and es_texto(campo.field_info.annotation):
-                yield ruta.path, campo.alias
-
-
 try:
     admin(f'create database "{BASE}"')
     from fastapi.testclient import TestClient  # noqa: E402
     import proyecto_maria.main as main_mod  # noqa: E402
     from proyecto_maria.core.rate_limit import limiter  # noqa: E402
+    from tests.test_entradas4 import campos_form_de_texto  # noqa: E402
     limiter.enabled = False
 
-    encontrados = set(campos_form_de_texto(main_mod.app))
+    encontrados = {(ruta, campo) for ruta, campo, _ in campos_form_de_texto(main_mod.app.routes)}
     chequear(encontrados == set(CAMPOS), f"campos Form de texto: {sorted(encontrados)}")
 
     with TestClient(main_mod.app, raise_server_exceptions=False) as c:
         u = "e4_" + uuid.uuid4().hex[:10]
         r = c.post("/auth/register", json={"username": u, "password": CLAVE,
                                            "email": f"{u}@example.com", "name": "E"})
-        assert r.status_code == 200, r.text
+        if r.status_code != 200:
+            sys.exit(f"FALLA | no se pudo registrar el usuario: {r.status_code} {r.text[:200]}")
         sesion = {"Authorization": f"Bearer {r.json()['access_token']}"}
         for (ruta, campo), resto in CAMPOS.items():
             r = c.post(ruta, headers=sesion, data={campo: NUL}, **resto)
-            chequear(r.status_code < 500, f"NUL en {campo} de {ruta}: {r.status_code} {r.text[:80]}")
+            # 200 y no sólo «menos de 500»: un 4xx antes de leer el campo no prueba nada.
+            chequear(r.status_code == 200, f"NUL en {campo} de {ruta}: {r.status_code} {r.text[:80]}")
 finally:
     try:
         admin(f'drop database if exists "{BASE}" with (force)')
