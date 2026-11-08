@@ -130,18 +130,18 @@ sabotaje $M "el alta de estudio busca el duplicado tal cual" \
   '    existing_email = await db.execute(select(User).where(User.email == clean_email))' \
   "FAILED tests/test_email1.py::test_alta_de_estudio_no_crea_un_email_existente"
 sabotaje $M "la invitación busca al miembro tal cual" \
-  '        select(User).where(func.lower(User.email) == clean_email, User.organization_id == org.id)' \
-  '        select(User).where(User.email == clean_email, User.organization_id == org.id)' \
+  '    existing = await db.execute(select(User.username).where(func.lower(User.email) == clean_email))' \
+  '    existing = await db.execute(select(User.username).where(User.email == clean_email))' \
   "FAILED tests/test_email1.py::test_invitacion_a_un_miembro_con_otras_mayusculas"
 sabotaje $M "el registro con reemplazo archiva sólo una cuenta" \
   '                for existing_email_user in existing_email_users:' \
   '                for existing_email_user in existing_email_users[:1]:' \
   "FAILED tests/test_email1.py::test_registro_de_prueba_con_reemplazo_archiva_todo_el_par"
-# El registro pasa el email a minúsculas dos veces (al validar y al buscar el
-# duplicado): sacar una sola no es un defecto, el sabotaje saca las dos.
+# El registro pasa el email a minúsculas dos veces (en _email_valido y al buscar
+# el duplicado): sacar una sola no es un defecto, el sabotaje saca las dos.
 git checkout -q -- proyecto_maria/
-if aplicar $M '    clean_email = (request.email or "").strip().lower()' \
-              '    clean_email = (request.email or "").strip()' &&
+if aplicar $M '    limpio = (email or "").strip().lower()' \
+              '    limpio = (email or "").strip()' &&
    aplicar $M '        clean_email = request.email.strip().lower()' \
               '        clean_email = request.email.strip()'; then
   salida="$(pytest_e1)"; codigo=$?
