@@ -213,6 +213,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-08 21:58 UTC: sin entregas nuevas. Técnica: suite del merge 5906 passed y 1 rojo (el de D140, webhook sin secreto en desarrollo), sabotajes 23/96. MARIA en OBSERVABILIDAD-1 (`7fe33c5`). Contexto 120k y 140k de 200k.
 2026-11-08 21:55 UTC: **SMOKE-1 aceptada** (`00df4de`, sin integrar), sabotajes rojos. MARIA → OBSERVABILIDAD-1 (D139); técnica en INTEGRAR-1 (D140).
 2026-11-08 21:40 UTC: **RESET-3 aceptada** (`8fda3d2`, sin integrar): 8 ROJO falla 0 con PG, Opus sin camino. D138 (a). MARIA entregó SMOKE-1 (`00df4de`), reviso. Técnica en INTEGRAR-1.
 2026-11-08 20:58 UTC: **AVISOS-2b aceptada** (`aa115f4`, sin integrar): 16 ROJO falla 0, mi negativo rojo. D137 (a) → SMOKE-1 tras RESET-3. MARIA en RESET-3; técnica en INTEGRAR-1.
@@ -222,7 +223,6 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 2026-11-08 17:56 UTC: vuelta sin entregas nuevas. MARIA subió AVISOS-2 (`217c7cd7` fix, `e51d54ff` test) y corre sus sabotajes; técnica espera adversario y suite sobre `5cda09d`. Ninguna frenada.
 2026-11-08 18:00 UTC: NOMBRES-1: producto bien, devolución chica de prueba (el caso de la promoción no distingue `lower()`+`.first()`); carrera de altas simultáneas, límite conocido.
 2026-11-08 17:40 UTC: EMAIL-1 (D45) de MARIA aceptada sobre `40423be`; D131 a Emi, D132 → RESET-3. MARIA → AVISOS-2.
-2026-11-08 17:05 UTC: **Emi da 12 h más**, corte 09/11 05:00 UTC. Rutinas prendidas. Técnica → NOMBRES-1 (sí de Emi, D127 b). MARIA: reviso EMAIL-1 (`cf68314`), después AVISOS-2.
 2026-11-08 15:50 UTC: **CORTE de las 24 h.** Las tres rutinas, apagadas. Técnica frenada en `65af1d3` (SEPARADORES-1b-ARNÉS aceptada, sin pieza nueva). MARIA frenada en `cf68314`: entregó EMAIL-1 sin cambio de producto, **sin revisar**; abiertas D131 y D132. Para retomar: revisar EMAIL-1 y prender las rutinas.
 2026-11-08 13:58 UTC: vuelta. Contexto OK (técnica 134k, MARIA 138k, PM 143k, todas 200k; límite `allowed_warning`). Sin entregas nuevas: técnica en PERMISOS-2 (suite corriendo, `a1db966`), MARIA en AVISOS-1. Corte 15:50 UTC.
 2026-11-08 13:40 UTC: **SEGURO-2 aceptada** (`d160738`, MARIA, sin integrar): 242 passed, 19+12 sabotajes en rojo, Sonnet en pantalla real sin TXT malo. D125 a, D126 a; dos textos a AVISOS-1. MARIA sigue AVISOS-1.
