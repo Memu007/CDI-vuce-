@@ -133,7 +133,8 @@ def test_editar_cliente_con_el_email_de_otro_da_409_y_no_cambia_nada():
 
 GUARDAR_MALOS = {
     "nan_en_items": b'{"items": [{"descripcion": "D", "cantidad": NaN}]}',
-    "nan_en_resumen": b'{"items": [], "resumen": {"valor_total": NaN}}',
+    "nan_en_resumen_que_va_crudo_al_json": b'{"items": [], "resumen": {"flete": NaN}}',
+    "cantidad_de_texto_en_items": b'{"items": [{"descripcion": "D", "cantidad": "abc"}]}',
     "resumen_items_de_texto": b'{"items": [], "resumen": {"items": "abc"}}',
     "resumen_items_enorme": b'{"items": [], "resumen": {"items": 99999999999}}',
 }
