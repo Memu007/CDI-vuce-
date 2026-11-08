@@ -69,6 +69,31 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## ENTRADAS-3: aceptada sobre `cf5309a`, sin integrar (2026-11-08 PM)
+
+Evidencia: `docs/pm/REPRODUCCION-ENTRADAS-3-2026-11-08.md`. Igual al
+informe: chequeo-6 (`+48/−21`, el aviso explicado), `47 passed`, Postgres
+`fallas: 0`, `entradas3.sh` 11 y `entradas2.sh` 24 ROJO con «sabotajes con
+falla: 0». Mis negativos: NUL en el nombre del parámetro da 400; `%2500` y
+un `€` escapado dan 200.
+
+- **D115: (a), decidido por la PM.** Lo nuevo ya no entra; una fila vieja
+  con un número enorme se limpia a mano sólo si aparece el 500, y eso pasa
+  por Emi porque es dato de producción.
+- **D117: (a), decidido por la PM.** Pieza chica **ENTRADAS-4**, después de
+  ENTORNO-4: ningún campo `Form` que va a la base da 500 por un NUL. Caso con
+  la familia de campos como datos y sabotaje propio (§3, datos).
+- **Al informe:** el comando de `entradas3.sh` necesita `PG_URL`; sin ella
+  sale al empezar. Ponelo en el próximo bloque de comandos.
+- **A la cola de limpieza:** `_TEXTOS_DEL_CLIENTE` repite los nombres que
+  leen el alta y la edición, y `DataStore.add_operation` parece muerto.
+- **Riesgo anotado:** `client_ip` `String(45)` con una lista de IPs detrás de
+  un proxy.
+
+Tu orden: ENTORNO-4 (en curso) → ENTRADAS-4 → SUFIJOS-2+SEGURO-1 → SEGURO-2
+→ EMAIL-1 → CONEXIONES-1 → OBSERVABILIDAD-1 → ORG-1+D40, y D102. Próxima D
+libre: D118 (la técnica también toma de la misma secuencia).
+
 ## ENTORNO-3: aceptada sobre `fd545c1`, sin integrar (2026-11-08 PM)
 
 Reproducido igual al informe: chequeo-6 (`+11/−10`, avisos 0), `30 passed`,

@@ -483,3 +483,7 @@ COBRO-MP-2+3 vuelta 2 (`71e15df`): devolución. Camino real: quien abrió la sus
 ### 2026-11-08 05:45 UTC (PM principal)
 
 AISLAMIENTO-2 y LIMPIEZA-1 aceptadas sobre `c86f3ff`, sin integrar. D116 (b), decidido por la PM dentro de «arreglos chicos de seguridad» de Emi: pieza PERMISOS-1 de la Dev técnica (el arranque da admin por email de `ADMIN_USERNAMES` y el email se cambia sin verificar). El registro con invitación sin comparar email ya es ORG-1. Próxima D libre: D117 (MARIA ya tiene D115 reservada).
+
+### 2026-11-08 05:56 UTC (PM principal)
+
+ENTRADAS-3 aceptada sobre `cf5309a`, sin integrar. D115 (a), decidido por la PM: el tope frena lo nuevo; una fila vieja enorme se limpia a mano si aparece, pasando por Emi (dato de producción). D117 (a), decidido por la PM: pieza ENTRADAS-4 (NUL en campos `Form`), después de ENTORNO-4. La D117 de MARIA queda; la técnica toma la próxima libre (D118 en adelante).

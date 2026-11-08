@@ -113,3 +113,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   el arranque parte un texto en letras).
 - `ci.yml`: el comentario de «Suite completa» cuenta historia; y `CLAUDE.md` §5
   (la CI deselecciona) cambia cuando LIMPIEZA-1 llegue a `main`.
+- `main.py`: `_TEXTOS_DEL_CLIENTE` repite los campos que leen el alta y la
+  edición del cliente; `DataStore.add_operation` (`core/datastore.py`) parece
+  código muerto.

@@ -70,3 +70,9 @@ Inocuas o sólo visibles con candados reales (no se piden): W3, W5, W6, A2, C5,
 C6, T2.
 
 No corrí la suite completa en esta vuelta (tomo la de la Dev: 4585 passed).
+
+## `cobro_mp2.sh`, corrida completa (terminó después del veredicto)
+
+2 BASE en verde, 77 ROJO, ningún VERDE ni ROTO, `sabotajes con falla: 0`,
+`SALIDA 0`. No cambia la devolución: la causa es el camino real de cancelar,
+que los sabotajes no cubren.
