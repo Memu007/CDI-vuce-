@@ -503,3 +503,7 @@ EXCEL-2c aceptada sobre `c2b84f1`, sin integrar. D122 (a), decidido por la PM ba
 ### 2026-11-08 10:10 UTC (PM principal)
 
 SUFIJOS-2+SEGURO-1 aceptada sobre `ad2d0f8`, sin integrar. Decidida por la PM: D123 (a), pieza chica AVISOS-1 de MARIA después de SEGURO-2 (el rechazo de exportación después de limpiar los textos, en avisos y en generar). Riesgos sin tocar: `31/02/2026` pasa como fecha; `٥` frena con el mensaje de «vacío». Próxima D libre: D124.
+
+### 2026-11-08 11:55 UTC (PM principal)
+
+Decididas por la PM sobre el informe de `ca84c5f` (técnica): D119 (b) → pieza COBRO-MP-4 (anotar quién recibió el 503 de cancelar; migración); D120 (b) → pieza PERMISOS-2 después (sólo roles guardados dan admin; el registro rechaza nombres de `ADMIN_USERNAMES`; la cuenta de Emi sigue admin tras reiniciar); D121 (a) → cola de limpieza, y Emi revisa los roles admin guardados en producción. El veredicto de `ca84c5f` espera sus sabotajes.
