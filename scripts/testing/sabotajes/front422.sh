@@ -78,6 +78,12 @@ sabotaje $E "un JSON roto se dice en genérico" "$L[landing-no_es_json]" \
   "case 'json_invalid': return 'Los datos enviados no son JSON válido.';" ""
 sabotaje $E "un cuerpo que no es objeto se dice en genérico" "$L[reset-no_es_objeto]" \
   "case 'model_attributes_type': case 'dict_type': return 'Los datos enviados tienen que ser un objeto.';" ""
+sabotaje $E "un número equivocado se dice en genérico" "$L[api-no_es_numero]" \
+  "case 'int_type': case 'int_parsing': case 'int_from_float': return mayuscula(c) + ' tiene que ser un número entero.';" ""
+sabotaje $E "dos ítems de una lista se leen como uno" "$L[landing-item_de_lista]" \
+  "return indice === undefined ? texto :" "return true ? texto :"
+sabotaje $E "un motivo sin texto propio se dice sin concordar" "$L[reset-sin_texto_propio]" \
+  "return 'Revisá ' + c + '.';" "return mayuscula(c) + ' no es válido.';"
 
 # --- Un detail de texto no se toca
 sabotaje $E "un detail de texto se reemplaza por el genérico" "$D[landing]" \

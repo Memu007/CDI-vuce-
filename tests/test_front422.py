@@ -11,13 +11,14 @@ import subprocess
 
 import pytest
 
-from tests.test_entradas1 import CLAVES_MALAS, _post
+from tests.test_entradas1 import CLAVES_MALAS, _bearer, _login, _post, _usuario
 
 ARNES = pathlib.Path(__file__).with_name("front422_pantalla.js")
 PANTALLAS = ("api", "reset", "landing")
 EN_INGLES = ("Field required", "should", "Value error", "Input", "JSON decode", "object Object", "Expecting")
 
-# entrada → (ruta, cuerpo, lo que la persona tiene que leer)
+# entrada → (ruta, cuerpo, lo que la persona tiene que leer); las del panel van con sesión
+GRUPO = "/api/operacion/no-existe/"
 ENTRADAS = {
     "falta_campo": ("/auth/login", b"{}", "Falta"),
     "no_es_json": ("/auth/login", b"nope", "JSON"),
@@ -27,6 +28,9 @@ ENTRADAS = {
                                         "email": "a@example.com", "name": "n" * 101}, "100"),
     "clave_73_bytes": ("/auth/reset-password", {"token": "t", "new_password": CLAVES_MALAS["73_bytes"]},
                        "72 bytes"),
+    "no_es_numero": (GRUPO + "desagrupar", {"grupo_id": "x"}, "número"),
+    "sin_texto_propio": (GRUPO + "desagrupar", {"grupo_id": 2**40}, "Revisá el campo «grupo_id»."),
+    "item_de_lista": (GRUPO + "agrupar", {"item_ids": ["a", 2, 3]}, "ítem 3"),
 }
 
 
@@ -41,7 +45,7 @@ def _pantalla(modo, status, cuerpo):
 @pytest.mark.parametrize("modo", PANTALLAS)
 def test_el_422_de_pydantic_se_lee_en_castellano(modo, entrada):
     ruta, cuerpo, esperado = ENTRADAS[entrada]
-    r = _post(ruta, cuerpo)
+    r = _post(ruta, cuerpo, _bearer(_login(_usuario()[0])) if ruta.startswith(GRUPO) else None)
     assert r.status_code == 422 and isinstance(r.json()["detail"], list), r.text
     texto = _pantalla(modo, 422, r.text)["texto"]
     assert isinstance(texto, str), texto
