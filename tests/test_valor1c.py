@@ -104,10 +104,10 @@ def test_con_las_cuentas_en_error_tambien_se_puede_dejar():
     assert r["els"]["valorDejarSeguro"]["hidden"] is False
 
 
-def test_dejarlo_saca_la_marca_y_pide_las_cuentas_de_nuevo():
+def test_dejarlo_lo_marca_como_dejado_y_pide_las_cuentas_de_nuevo():
     r = _pantalla({"seguro": 14.88, "seguro_calculado": True}, "dejarSeguro();",
                   {**VALOR, "seguro": 14.88})
-    assert r["op"] == {"seguro": 14.88}
+    assert r["op"] == {"seguro": 14.88, "seguro_dejado": True}
     assert r["refrescos"] == 1
     assert r["els"]["valorDejarSeguro"]["hidden"] is True
 

@@ -184,7 +184,7 @@ def test_con_cif_y_un_seguro_sin_leer_la_nota_lo_pide():
     r = _pantalla({"incoterm": "CIF", "campos_sin_leer": ["seguro"]}, "", VALOR_CIF)
     assert r["els"]["valorSeguroNota"]["textContent"] == (
         "Con CIF el seguro ya está en el precio: el sistema no lo calcula. "
-        "No pudimos leerlo de la factura: completalo en la revisión.")
+        "No pudimos leerlo de la factura: completalo en la revisión; si no trae seguro, escribí 0.")
 
 
 @pytest.mark.parametrize("valor", [

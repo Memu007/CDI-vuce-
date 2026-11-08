@@ -107,7 +107,7 @@ sabotaje $M "el calculado sobrevive en el servidor" \
   "test_un_seguro_calculado_con_cif_no_genera" \
   "test_el_cambio_de_incoterm_con_el_seguro_calculado[cfr_a_cif]"
 sabotaje $F "se borra también el escrito" \
-  '!valor.seguro_en_el_precio || !op.seguro_calculado) return false;' '!valor.seguro_en_el_precio) return false;' \
+  '!valor.seguro_en_el_precio || !(op.seguro_calculado || op.seguro_dejado)) return false;' '!valor.seguro_en_el_precio) return false;' \
   "test_el_seguro_escrito_no_se_toca_al_pasar_a_cif"
 sabotaje $F "se borra con cuentas de otro pedido" \
   'if (!firma || firma !== ahora) return false;' '' \

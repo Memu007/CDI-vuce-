@@ -108,7 +108,7 @@ caso "flete_solo_numero" "assert 422 == 400"
 
 # 8. /generate_maria no pasa los importes a número
 reemplazar $M '        _importes_como_numeros(request)
-        _viejo =' '        _viejo ='
+        _por_corregir =' '        _por_corregir ='
 caso "generar_sin_normalizar" "FAILED $T::test_un_importe_vacio_cuenta_como_cero"
 
 # 9. los avisos no miran los importes
