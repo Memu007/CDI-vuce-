@@ -2114,7 +2114,7 @@ async def cancel_billing(
             # Una cancelada en Mercado Pago no vuelve: anotada, el perfil diría que renueva.
             await db.commit()
             raise HTTPException(status_code=503, detail=no_se_pudo)
-        cuenta.mp_preapproval_id = None
+        cuenta.mp_preapproval_id = cuenta.cancelar_sin_confirmar = None
     db_user.cancelar_sin_confirmar = None
 
     ahora = datetime.now(timezone.utc)

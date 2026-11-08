@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-08 · fix: en un estudio, sólo quien recibió el 503 de cancelar o la dueña concilian el reintento (COBRO-MP-4)
 
-- **fix(cobro):** si Mercado Pago canceló sin confirmarlo, el 503 queda anotado en la cuenta que lo recibió (columna nueva `users.cancelar_sin_confirmar`, la agrega el arranque) y la marca se borra al conciliar. Un miembro sin esa marca recibe 403 y no cambia nada. Volver atrás: `alter table users drop column if exists cancelar_sin_confirmar` (se pierden las marcas pendientes).
+- **fix(cobro):** si Mercado Pago canceló sin confirmarlo, el 503 queda anotado en la cuenta que lo recibió (columna nueva `users.cancelar_sin_confirmar`, la agrega el arranque) y la marca se borra al conciliar. Un miembro sin esa marca recibe 403 y no cambia nada. Volver atrás: primero el código anterior y después `alter table users drop column if exists cancelar_sin_confirmar` (se pierden las marcas pendientes).
 
 ## 2026-11-08 · fix: un Excel chico armado para costar segundos ya no traba el servidor (EXCEL-2d)
 
