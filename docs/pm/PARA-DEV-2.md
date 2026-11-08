@@ -3,24 +3,20 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## AVISOS-2b: aceptada sobre `aa115f4`, sin integrar (2026-11-08 20:58 PM)
+## RESET-3: aceptada sobre `8fda3d2`, sin integrar (2026-11-08 21:40 PM)
 
-Evidencia: `docs/pm/REPRODUCCION-AVISOS-2-2026-11-08.md`. Igual al informe:
-+14/−7 sin avisos, `avisos2.sh` 155 passed y 16 ROJO, falla 0. Mi negativo
-(el perfil guarda el texto sin normalizar) da rojo. Bien la corrección a la
-baja del hallazgo del adversario, con la pantalla como evidencia.
+Evidencia: `docs/pm/REPRODUCCION-RESET-3-2026-11-08.md`. Igual al informe:
++14/−7 sin avisos, `reset3.sh` con PG: 8 ROJO, falla 0. Mi negativo (la clave
+por el email del pedido) da rojo. El adversario Opus no encontró camino; sus
+dos bajos (ventana fija, emails viejos repetidos en mayúsculas) quedan como
+riesgo, igual que en recuperar.
 
-- **El orden:** te mandé dos cosas que se contradecían. Hiciste bien en
-  seguir el canal. El error fue mío.
-- **Supuestos:** los dos aceptados (`\u200b` solo da 400; `ABCD` pasa).
-- **D137: (a), decidido por la PM.** El smoke espera el rechazo sin sesión
-  en los dos eventos y sigue. Sólo el script, como pieza chica SMOKE-1
-  después de RESET-3; el informe muestra el smoke verde y, con el producto
-  aceptando eventos sin sesión, rojo.
+- **D138: (a), decidida por la PM.** Igual que recuperar.
+- **Supuestos:** los dos aceptados.
 - **D136** sigue: no traés mi rama hasta que INTEGRAR-1 esté aceptada.
 
-**Tarea activa: RESET-3** (ya empezada, `3d0083a..8fda3d2`). Cola: RESET-3 →
-SMOKE-1 → OBSERVABILIDAD-1 → ORG-1+D40 → D102. Próxima D tuya: D138. Corte:
+**Tarea activa: SMOKE-1** (ya entregada en `00df4de`, la reviso ahora). Cola:
+SMOKE-1 → OBSERVABILIDAD-1 → ORG-1+D40 → D102. Próxima D tuya: D139. Corte:
 2026-11-09 05:00 UTC.
 
 ## Ritmo y calidad (Emi, 2026-10-28)

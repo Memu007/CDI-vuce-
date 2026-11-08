@@ -127,3 +127,5 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   la destinación por `destinacion_del_txt` (sólo lo hace el endpoint), y el
   de importación chequea en el endpoint y en el generador. El chequeo, una
   vez, en los dos generadores.
+- `tests/test_abuso1.py`: el caso del tope de reset casi copia el de
+  recuperar; un caso con las dos rutas como datos.

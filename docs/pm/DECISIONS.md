@@ -559,3 +559,7 @@ AVISOS-2 aceptada sobre `4db641b`, sin integrar. D133 (a) y D135 (a) → AVISOS-
 ### 2026-11-08 20:58 UTC (PM principal)
 
 AVISOS-2b aceptada sobre `aa115f4`, sin integrar (D136). D137 (a): el smoke quedó viejo desde ABUSO-1; se ajusta el script a que los eventos sin sesión se rechazan (pieza chica SMOKE-1 de MARIA, después de RESET-3). Escape mío: le mandé a MARIA por mensaje un orden distinto del canal; manda el canal.
+
+### 2026-11-08 21:40 UTC (PM principal)
+
+RESET-3 aceptada sobre `8fda3d2`, sin integrar (D136). D138 (a), decidida por la PM: el tope por cuenta puede dejar a la cuenta sin links una hora, igual que recuperar. Riesgos bajos del adversario (ventana fija, emails viejos repetidos en mayúsculas) quedan anotados en el acta. MARIA ya entregó SMOKE-1.

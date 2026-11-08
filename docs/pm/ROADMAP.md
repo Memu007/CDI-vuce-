@@ -111,7 +111,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | 8 | ✅ SEGURO-2 | Sumada por Emi el 04/11 (D30 b): lo que SEGURO-1 sólo avisa frena la generación hasta que se corrija, también el 1 % mandado sin calcular | respuesta del despachante del 28/10 |
 | 9 | ✅ AVISOS-1 | D123: los avisos rechazan una exportación igual que generar, aunque el código traiga un invisible o un espacio adelante | caso de la familia, sin dato externo |
 | 10 | ✅ AVISOS-2 | D130 (decidida por la PM): sólo destinaciones con forma de código entran al TXT (homoglifos y basura adelante frenan); un texto enorme no traba; el 400 del seguro borrado dice lo que pasó también en FOB; la exportación no acepta una destinación de importación | caso de la familia, sin dato externo |
-| 11 | ⏳ RESET-3 | D132 (decidida por la PM, «arreglos chicos de seguridad»): pedir el reset de contraseña tiene tope por cuenta, como recuperar usuario; cambiar de IP no llena el correo de una cuenta | rojo con IPs distintas, sabotaje propio |
+| 11 | ✅ RESET-3 | D132 (decidida por la PM, «arreglos chicos de seguridad»): pedir el reset de contraseña tiene tope por cuenta, como recuperar usuario; cambiar de IP no llena el correo de una cuenta | rojo con IPs distintas, sabotaje propio |
 
 **Dev técnica:**
 
