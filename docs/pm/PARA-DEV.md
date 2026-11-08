@@ -3,6 +3,28 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## Mientras reviso `ca84c5f` y `84fd9f2`: empezá COBRO-MP-4 (2026-11-08 PM)
+
+Las dos entregas están en reproducción; el veredicto llega arriba de este
+bloque. Si trae una devolución, esa va primero.
+
+- **D119 → (b), decidido por la PM** (seguridad de MP, Emi): pieza
+  **COBRO-MP-4**. Cancelar anota la cuenta que recibió el 503; sólo esa
+  cuenta o la dueña concilian al reintentar, y la marca se borra al
+  conciliar. Un miembro sin la marca recibe 403 y no cambia nada, venga su
+  suscripción cancelada, con 404 en MP o sin sid (familia de entradas en un
+  caso). Migración probada en Postgres descartable, con su vuelta atrás.
+- **D120 → (b)**, pieza chica **PERMISOS-2**, después de COBRO-MP-4:
+  `_es_admin` mira sólo los roles guardados y el registro rechaza un nombre
+  de `ADMIN_USERNAMES`. Caso que no se puede romper: una cuenta que ya existe
+  y está en `ADMIN_USERNAMES` sigue siendo admin después de reiniciar (así
+  entra hoy la de Emi); mostralo con el arranque, no sólo con un rol
+  puesto a mano.
+- **D121 → (a)**: a la cola de limpieza; revisar los roles admin guardados
+  en producción queda para Emi.
+
+Próxima D libre: D124.
+
 ## EXCEL-2c: aceptada sobre `c2b84f1`, sin integrar (2026-11-08 PM)
 
 Evidencia: `docs/pm/REPRODUCCION-EXCEL-2c-2026-11-08.md`. Igual al informe:
