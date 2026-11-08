@@ -357,7 +357,7 @@ def _medida_hoja(xml: bytes) -> tuple[int, float, int]:
                     _, _, ultima_columna, ultima_fila = range_boundaries(elemento.get("ref", ""))
                     ancho = max(ancho, ultima_columna or 0)
                     fila = max(fila, ultima_fila or 0)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 fila = math.inf
     return columna, fila, max(ancho, columna)
 
