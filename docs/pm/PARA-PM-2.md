@@ -2,168 +2,148 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ENTRADAS-3 (D109 a, D110 a): **entregada** en `cf5309a` (2026-11-08)
+## ENTORNO-4 (D112 c, D113 b): **entregada** en `44b9759` (2026-11-08)
 
-Base `0f09bd8` (producto igual a `fd545c1`). Ninguno de estos da 500 ni se guarda:
+Base `4a6fdcd`. Fuera de `development`, `test` o `testing`, sin `FRONTEND_URL`
+la app no arranca, igual que sin `ALLOWED_ORIGINS`. Una `FRONTEND_URL` con
+sólo espacios cuenta como vacía. La vuelta de los dos cobros de Mercado Pago
+(plan y recarga) usa la misma URL que los emails y ya no cae a localhost.
 
-- un cuerpo más hondo que la pila en aprender productos, guardar despacho y
-  editar producto (400 «Body JSON inválido»);
-- un NUL en la consulta (400 «La consulta tiene un carácter nulo.»);
-- un campo del cliente que no es texto, en el alta o en la edición (400
-  «<campo> tiene que ser texto.»).
+`get_frontend_url` vive ahora una sola vez, en `config.py`. Salieron las dos
+copias: la de `main.py` y la de `billing_service.py`, que caía a
+`127.0.0.1:8000` sin avisar. `main.py` la llama al arrancar, después del
+bloque de CORS.
 
-Un número de más de 1e15 en valor absoluto, en la operación manual o al
-guardar al cliente, da 400 «… es demasiado grande.». Con eso, el listado y las
-métricas del cliente ya no revientan en Postgres por datos nuevos.
-
-El registro de pedidos (`api_logs`) ahora guarda un pedido con NUL en la ruta o
-con una ruta de más de 200 caracteres: antes se perdía en Postgres.
-
-`tiene_medio_par` y `_sin_nul` se recorren dentro del `try` en un solo lugar,
-`_cuerpo_guardable`. El aviso de medio par se levanta afuera del `try`.
+`docker-compose.yml` no levanta sin `FRONTEND_URL`, y `preflight_env.sh` avisa
+si falta o si no es https.
 
 | SHA | qué |
 |---|---|
-| `02ad156` | fix: cuerpo hondo, NUL en la consulta, campo no texto, número enorme, `api_logs` + CHANGELOG |
-| `c7fa1f8` | test: casos, sabotajes (`entradas3.sh`, ajuste de `entradas2.sh`) y chequeo en Postgres |
-| `0fc85a0` | fix: un nombre null en el cliente da 400 (hallazgo del adversario, abajo) |
-| `cf5309a` | test: nombre null, campo desconocido muy anidado, sabotaje del «None» reescrito |
+| `eefa383` | fix: sin `FRONTEND_URL` fuera de desarrollo no arranca; el cobro usa la misma URL + CHANGELOG |
+| `07f3ab4` | test: la sonda mide el arranque sin `FRONTEND_URL` y la URL del cobro |
+| `dfc1a13` | test: el arnés de ENTORNO exporta `FRONTEND_URL` |
+| `7b64a54` | test: la sonda mide la vuelta de los dos cobros y la URL con sólo espacios |
+| `a943321` | fix: URL con sólo espacios cuenta como vacía; compose y preflight la traen |
+| `c127943` | test: sabotaje de la URL con sólo espacios |
+| `907069a` | fix: el chequeo va después de CORS; compose la exige; preflight recorta sólo los bordes |
+| `44b9759` | test: la sonda cuenta como rechazo sólo el error de `FRONTEND_URL` |
 
-`producto +48/−21`. Pasa de 20 netas porque son cinco reglas separadas más la
-del nombre, cada una en un solo lugar. Las reglas son: NUL en la consulta,
-`api_logs`, campo no texto, tope numérico y el recorrido dentro del `try`. No
-encontré código para sacar: las tres rutas de catálogo pierden su propio
-`tiene_medio_par`.
+`producto +19/−26`: resta, porque unifiqué tres copias en una.
 
-## Decisiones
+**Nada para decidir.** Supuestos reversibles, fuera de lo pedido al pie de la letra:
 
-- **D115: filas ya guardadas con un número enorme.** El tope frena lo nuevo,
-  pero una fila que ya tenga `total_value` 1e308 sigue desbordando la suma en
-  Postgres. El listado y las métricas de ese cliente dan 500. No sé si hay
-  alguna en producción: no la miro.
-  - (a) Dejarlo. Si aparece un 500 de ese cliente, se limpia esa fila a mano.
-  - (b) Pieza chica: la lectura suma con tope (`LEAST`/`GREATEST` o en Python),
-    así una fila vieja no tumba la pantalla.
-  - (c) Migración que corrija las filas fuera de rango.
+- `compose` y `preflight_env.sh`. La tarea nombra la app y `billing_service`;
+  los toqué porque si no, `docker compose up` levantaba una app que aborta
+  sola.
+- La caída de desarrollo del cobro pasa de `:8000` a `:8010`, la misma que ya
+  usaban los emails. Es consecuencia de usar una sola URL.
 
-  **Recomiendo (a).** El dato sólo pudo entrar a mano por la API, no desde la
-  pantalla, y (c) toca datos de producción. Si querés red de seguridad, (b),
-  que no toca datos.
-- **D117: un NUL en un campo de formulario multipart da 500 en Postgres.**
-  En `/upload_excel_v2/`, el `cliente_id` (~9082/9101) da
-  `CharacterNotInRepertoireError`. Lo encontró el adversario y lo reproduje.
-  La sonda está en mi scratchpad. Es otra vía de entrada, fuera de D109/D110.
-  - (a) Pieza chica: el mismo `_guardable_en_pg` en los campos `Form` que van a la base.
-  - (b) Que `_RutaSinNul` mire también el cuerpo multipart: lo rechaza todo,
-    pero lee el cuerpo en el middleware.
-  - (c) Cola de limpieza.
-
-  **Recomiendo (a)**: es el patrón que ya usamos y no lee cuerpos en un middleware.
+D115 (a) y D117 (a): las tomé como decididas (`194603c`). D117 (a) es
+ENTRADAS-4, que sigue.
 
 ## Lo que hay que saber
 
-- El tope es **1e15**, el mismo de `validate_numeric`
-  (`security/input_validation.py:206`). Es distinto de `_MAX_VALOR = 1e12`
-  (`client_memory.py:39`), que es el tope del promedio del historial. No los
-  unifiqué: son reglas distintas y unificar no está en la pieza.
-- El tope va sobre cada número. En la operación manual también va sobre el
-  total, que se calcula. Al guardar al cliente, el total es el
-  `resumen.valor_total` que manda el cliente. Así, ítems de valor 1e15 por
-  cantidad 1e15 se guardan con total 0. Eso no desborda nada: la suma que
-  revienta es la de `total_value`. Lo dejo como estaba; lo encontró el
-  adversario.
-- Cambios visibles fuera de lo pedido, todos consecuencia de las reglas:
-  - un `cuit` numérico (sin comillas) ahora da 400;
-  - `/health?x=%00` da 400;
-  - en aprender productos, si un cuerpo trae a la vez un medio par y un NUL,
-    el mensaje puede cambiar de orden;
-  - `divisa` ahora pasa por la limpieza de NUL.
-- Un null en un texto del cliente (salvo el nombre) queda vacío, no «None».
-  Un nombre null da 400. Un nombre `""` en la edición se acepta, igual que
-  antes: no lo cambié.
+- **Railway necesita `FRONTEND_URL` antes de publicar este SHA.** Si no la
+  tiene, el deploy no arranca. Antes arrancaba y el link del reset salía
+  roto al mandarlo.
+- Con `FRONTEND_URL` y `ALLOWED_ORIGINS` faltando a la vez, el primer
+  arranque fallido nombra `ALLOWED_ORIGINS`. Hacen falta dos intentos para
+  ver las dos. `preflight_env.sh` nombra las dos de una vez.
+- El chequeo no mira el esquema: `FRONTEND_URL=cdi.com` arranca. `preflight`
+  avisa si no es https, pero no frena.
 
 ## Riesgos
 
-- `client_ip` es `String(45)`. Detrás de un proxy, si llega una lista de IPs,
-  el registro de ese pedido puede perderse, como antes con la ruta. No lo vi
-  pasar y no lo toqué.
-- La guarda es por ruta, no en el parseo general: una ruta nueva que lea JSON
-  a mano tiene que pasar por `_cuerpo_guardable` o `_json_guardable`.
-- `_TEXTOS_DEL_CLIENTE` repite los nombres que el alta y la edición leen más
-  abajo. Va a la cola de limpieza si querés.
-- `DataStore.add_operation` (`core/datastore.py`) parece código muerto. No lo toqué.
+- Sin validación de esquema en la app (arriba). Riesgo bajo: lo pone quien
+  despliega.
+- `docker-compose.yml:61` ya tenía, desde antes, el mismo error con
+  `JWT_SECRET_KEY`. El mensaje de `:?` lleva «:» adentro y compose lo corta.
+  En `FRONTEND_URL` lo evité con «p.ej.». El de `JWT_SECRET_KEY` no lo toqué:
+  está fuera de la pieza.
+- La ruta de suscripción (preapproval) no se mide por separado. Usa el mismo
+  `base_url` que el plan, que sí se mide.
 
 ## Hallazgos de la autorrevisión
 
 | quién | modelo y esfuerzo | hallazgo | qué hice |
 |---|---|---|---|
-| adversario | Sonnet alto | NUL en un campo multipart da 500 en Postgres | D117 |
-| adversario | Sonnet alto | nombre null en la edición dejaba al cliente sin nombre | `0fc85a0` + caso en `cf5309a` |
-| adversario | Sonnet alto | al guardar al cliente, ítems enormes con `resumen.valor_total` 0 se guardan (sin desborde) | informativo, arriba |
-| `/code-review` | high | sin hallazgos confirmados dentro de la pieza; riesgos ya listados | — |
-| `/security-review` | — | sin hallazgos ≥8 | — |
-| yo | — | el sabotaje del «None» no producía el defecto | reescrito en `cf5309a` |
-| yo | — | se había perdido el caso del campo desconocido muy anidado | vuelto en `cf5309a` |
+| adversario | Sonnet alto | `FRONTEND_URL` con sólo espacios pasaba como URL | `a943321` + sabotaje `c127943` |
+| adversario | Sonnet alto | compose y preflight no la traían | `a943321` |
+| adversario | Sonnet alto | `planes_y_cobros.md` decía «No» obligatoria y `:8000` | `a943321` |
+| adversario | Sonnet alto | un sabotaje dependía de una variable puesta en línea | `7b64a54` |
+| `/code-review` | high | compose tenía localhost fijo | `907069a` |
+| `/code-review` | high | la sonda tomaba cualquier `RuntimeError` como rechazo | `44b9759` |
+| `/code-review` | high | preflight sacaba también los espacios de adentro | `907069a` |
+| `/code-review` | high | el chequeo partía el bloque de CORS | `907069a` |
+| `/code-review` | high | comentario viejo con `8000` | `44b9759` |
+| `/code-review` | high | no valida esquema | riesgo, arriba |
+| `/code-review` | high | la cabecera de preflight no nombraba `FRONTEND_URL` | `907069a` |
+| `/code-review` | high | preapproval no se mide | no: comparte `base_url` con lo medido |
+| `/code-review` | high | la sonda suma un subproceso | no: ~22 s en total |
 
 ## Puertas
 
-Todas sobre `cf5309a`, desde worktree limpio, una a la vez; logs en el scratchpad.
+Todas sobre `44b9759`, desde worktree limpio, una a la vez; logs en el scratchpad.
 
 | puerta | salida exacta |
 |---|---|
-| suite (env de `/entregar`, SQLite) | `5212 passed, 335 skipped, 3 xfailed, 97 warnings in 1038.00s`; salida 0 |
-| suite como la CI (`env -u DATABASE_URL ENVIRONMENT=testing …`) | `5212 passed, 335 skipped, 3 xfailed, 96 warnings in 1005.40s`; salida 0 |
-| `compileall -q proyecto_maria` | salida 0 |
-| `entradas3_postgres.py` en `cf5309a` | 16 `OK`, `fallas: 0`, salida 0; última: `OK | NUL en la consulta: 400 {"detail":"La consulta tiene un carácter nulo."}` |
-| `entradas3_postgres.py` en `fd545c1` (producto de antes, arnés nuevo) | `fallas: 11`, salida 1 (abajo) |
-| `entradas3.sh cf5309a` | BASE en verde, 11 `ROJO`, `sabotajes con falla: 0` |
-| `entradas2.sh cf5309a` | BASE en verde, 24 `ROJO`, `sabotajes con falla: 0` |
+| `compileall -q proyecto_maria` | `compileall 0` |
+| suite, SQLite (`ENVIRONMENT=test`, `--timeout=300`) | `5214 passed, 335 skipped, 3 xfailed, 96 warnings in 1004.96s (0:16:44)`, `SALIDA suite_mia 0` |
+| suite como la CI (`ENVIRONMENT=testing`, sin `DATABASE_URL`) | `5214 passed, 335 skipped, 3 xfailed, 93 warnings in 981.84s (0:16:21)`, `SALIDA suite_ci 0` |
+| `test_entorno1.py` + `test_billing_checkout.py` | `36 passed, 3 warnings in 22.15s` |
+| sabotajes `entorno1.sh` · `entorno2.sh` · `entorno3.sh` · `entorno4.sh` | 10 · 8 · 4 · 4 `ROJO`; cada uno `sabotajes sin rojo: 0`, `salida 0` |
+| grep de historia de §6 | vacío |
 
-Rojos de Postgres sin el arreglo, copiados del log:
+Rojo del caso nuevo con el producto sin el arreglo. Son las pruebas de
+`44b9759` con `proyecto_maria/` de `4a6fdcd`, copiado del log:
 
 ```
-FALLA | NUL en la ruta: 404; en api_logs: 0
-FALLA | ruta de 300 caracteres: 404; en api_logs: 0
-FALLA | 1e308: manual 200, guardar al cliente 200
-FALLA | 1e308: manual 200, guardar al cliente 200
-FALLA | después de 1e308: listado 500, métricas 500
-FALLA | -1e308: manual 200, guardar al cliente 200
-FALLA | -1e308: manual 200, guardar al cliente 200
-FALLA | después de -1e308: listado 500, métricas 500
-FALLA | 1e16: manual 200, guardar al cliente 200
-FALLA | 1e16: manual 200, guardar al cliente 200
-FALLA | NUL en la consulta: 500 {"detail":"No pudimos procesar tu solicitud. Probá de nuevo en unos segundos. Si
+FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[frontend_en_localhost]
+FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[arranca_sin_frontend_url]
+FAILED tests/test_entorno1.py::test_puerta_abierta_en_desarrollo[frontend_en_localhost]
+================== 3 failed, 33 passed, 5 warnings in 21.39s ===================
 ```
 
-No corrí `smoke_friccion.sh` ni `ataque_aislamiento.sh`: la pieza no toca sesión ni permisos, y lo que cambia (400 en entradas) lo cubren la suite, el arnés de Postgres y los sabotajes. Queda para la PM si lo quiere antes de publicar.
+`arranca_sin_frontend_url` daba `'abierta'` en los ocho valores de
+`ENVIRONMENT` de fuera de desarrollo. `frontend_en_localhost` daba
+`'sin medir'`: el cobro no pasaba por `get_frontend_url`.
+
+No corrí `smoke_friccion.sh` ni `ataque_aislamiento.sh`. La pieza no toca
+rutas, sesión ni permisos: toca el arranque, y eso lo mide la sonda en un
+proceso aparte.
 
 chequeo-6, entero:
 
 ```
-chequeo-6 0f09bd8..cf5309a: avisos para mirar, no un veredicto
-producto +48/−21
-  AVISO producto suma 27 líneas netas: el informe dice por qué (§6: más de 20)
-arnés +389/−25
+chequeo-6 4a6fdcd..44b9759: avisos para mirar, no un veredicto
+producto +19/−26
+arnés +76/−10
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/main.py: 12048 → 12075
-avisos: 1
+  proyecto_maria/config.py: 51 → 64
+  proyecto_maria/main.py: 12075 → 12060
+  proyecto_maria/services/billing_service.py: 412 → 407
+avisos: 0
 ```
 
 ## Comandos
 
 ```bash
-git fetch origin claude/dev-maria && git checkout cf5309a
-PY=<venv>/bin/python scripts/testing/sabotajes/entradas3.sh cf5309a   # BASE en verde, 11 ROJO, «sabotajes con falla: 0»
-PY=<venv>/bin/python scripts/testing/sabotajes/entradas2.sh cf5309a   # BASE en verde, 24 ROJO, «sabotajes con falla: 0»
-<venv>/bin/python scripts/testing/entradas3_postgres.py postgresql://cdi@127.0.0.1:55432/postgres   # «fallas: 0»
-PY=<venv>/bin/python -m pytest -q --no-cov tests/test_entradas3.py tests/test_entradas2.py   # verde
+git fetch origin claude/dev-maria && git checkout 44b9759
+PY=<venv>/bin/python scripts/testing/sabotajes/entorno4.sh 44b9759   # 4 ROJO, «sabotajes sin rojo: 0»
+PY=<venv>/bin/python scripts/testing/sabotajes/entorno3.sh 44b9759   # 4 ROJO, «sabotajes sin rojo: 0»
+<venv>/bin/python -m pytest -q --no-cov tests/test_entorno1.py tests/test_billing_checkout.py   # 36 passed
+# ENTRADAS-3 necesita un Postgres local; sin PG_URL sale al empezar:
+PY=<venv>/bin/python PG_URL=postgresql://cdi@127.0.0.1:55432/postgres scripts/testing/sabotajes/entradas3.sh
 ```
 
 ## Archivos de producto tocados
 
-`proyecto_maria/main.py`, `CHANGELOG.md`.
+`proyecto_maria/config.py`, `proyecto_maria/main.py`,
+`proyecto_maria/services/billing_service.py`, `docker-compose.yml`,
+`scripts/deployment/preflight_env.sh`, `docs/billing/planes_y_cobros.md`,
+`CHANGELOG.md`.
 
-Sigo con ENTORNO-4 (D112 c + D113 b).
+Sigo con ENTRADAS-4 (D117 a).
 
-/compact conservar: Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi), rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM session_01B7FVQspcEHF7PqNv797wNM con send_message next. ENTRADAS-3 (D109 a, D110 a) entregada en cf5309a (base 0f09bd8); D115 y D117 abiertas (mías; D116 es de la técnica: PERMISOS-1), D114 también de la técnica, próxima D libre D118. ENTORNO-3 aceptada; D111 a, D112 c + D113 b decididas. Sigue ENTORNO-4, después SUFIJOS-2+SEGURO-1, el resto y D102 (fijar bcrypt). Corte de rutinas 2026-11-08 15:50 UTC. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; TXT y proforma reales nunca en el repo.
+/compact conservar: Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi), rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM session_01B7FVQspcEHF7PqNv797wNM con send_message next. ENTORNO-4 entregada en 44b9759 (base 4a6fdcd). D115 a y D117 a decididas; próxima D libre D118. Sigue ENTRADAS-4 (producto en main.py:9068 TextoCodificable en cliente_id; arnés entradas4_postgres.py + sabotajes/entradas4.sh, verdes en el commit temporal 8d2e45e), después SUFIJOS-2+SEGURO-1, SEGURO-2, EMAIL-1, CONEXIONES-1, OBSERVABILIDAD-1, ORG-1+D40 y D102. Corte de rutinas 2026-11-08 15:50 UTC. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; TXT y proforma reales nunca en el repo.
