@@ -75,8 +75,8 @@ La sonda arranca con `ENABLE_SIMULATE_CHARGE=true`. Así, una lectura de la band
 | `tests/test_entorno1.py` | `22 passed, 3 warnings in 13.20s` |
 | `entorno1.sh bf92bf9` | 10 `ROJO`, `sabotajes sin rojo: 0` |
 | `entorno2.sh bf92bf9` | 8 `ROJO`, `sabotajes sin rojo: 0` |
-| Suite completa, la mía (`ENVIRONMENT=test`, SQLite), worktree limpio | corriendo sobre `bf92bf9`, sin resultado todavía: no entregado |
-| Suite completa, la de CI (`env -u DATABASE_URL ENVIRONMENT=testing …`), worktree limpio | corriendo sobre `bf92bf9` después de la mía, sin resultado todavía: no entregado |
+| Suite completa, la mía (`ENVIRONMENT=test`, SQLite), worktree limpio | `bf92bf9`: `5124 passed, 335 skipped, 3 xfailed, 96 warnings in 819.82s (0:13:39)`, `SALIDA suite_mia 0` |
+| Suite completa, la de CI (`env -u DATABASE_URL ENVIRONMENT=testing …`), worktree limpio | `bf92bf9`: `5124 passed, 335 skipped, 3 xfailed, 93 warnings in 806.27s (0:13:26)`, `SALIDA suite_ci 0` |
 | `chequeo-6.py 1e1f60d bf92bf9` | abajo, `avisos: 0` |
 | grep de historia de §6 | vacío |
 | `/code-review high` y `/security-review` | abajo |
