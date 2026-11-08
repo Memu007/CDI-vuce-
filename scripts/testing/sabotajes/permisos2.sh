@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Negativos de PERMISOS-2: admin es sólo el rol guardado, el arranque se lo pone
-# a la cuenta de ADMIN_USERNAMES y nadie registra un nombre de la lista.
+# Negativos de PERMISOS-2 y PERMISOS-3: admin es sólo el rol guardado, el arranque se lo pone
+# a la cuenta de ADMIN_USERNAMES y nadie registra un nombre de la lista ni uno que se lea igual.
 # Cada sabotaje rompe una de esas reglas y la prueba tiene que ponerse roja por ese caso.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/permisos2.sh [SHA]
@@ -64,7 +64,7 @@ sabotaje "crear un estudio deja pasar un nombre de la lista" "$LLAMADA_ESTUDIO" 
   "$LLAMADA_ESTUDIO if req.username not in _admin_usernames() else None" \
   "$T1[en_una_lista-/api/organizations/create]" "$T1[solo-/auth/register]"
 sabotaje "el chequeo compartido no reserva la lista" \
-  '    if username in _admin_usernames() or (' '    if (' \
+  '    if username.lower() in {u.lower() for u in _admin_usernames()} or (' '    if (' \
   "$T1[en_una_lista-/auth/register]"
 sabotaje "el arranque no pone el rol" "$COMPARA" '                if False:' "$T2[None]"
 sabotaje "el arranque mira roles como texto o clave" \
@@ -72,6 +72,18 @@ sabotaje "el arranque mira roles como texto o clave" \
   '                roles = (user.roles or []) if user else []' \
   "$T2[roles4]" "$T2[roles2]"
 sabotaje "el arranque suma admin aunque ya lo tenga" "$COMPARA" '                if user:' "$T2[roles2]"
+
+T3='FAILED tests/test_permisos2.py::test_un_nombre_que_se_ve_como_otro_no_se_registra'
+sabotaje "el formato acepta un salto de línea final" \
+  '    if not re.fullmatch(r"[a-zA-Z0-9_-]{3,30}", username):' \
+  '    if not re.match(r"^[a-zA-Z0-9_-]{3,30}$", username):' \
+  "$T3[lf_final-/auth/register]" "$T3[acento-/auth/register]"
+sabotaje "la reserva distingue las mayúsculas del pedido" \
+  '    if username.lower() in {u.lower()' '    if username in {u.lower()' \
+  "$T3[mayusculas-/api/organizations/create]" "$T3[lista_en_mayusculas-/auth/register]"
+sabotaje "la reserva distingue las mayúsculas de la lista" \
+  'in {u.lower() for u in _admin_usernames()}' 'in _admin_usernames()' \
+  "$T3[lista_en_mayusculas-/api/organizations/create]" "$T3[mayusculas-/auth/register]"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"

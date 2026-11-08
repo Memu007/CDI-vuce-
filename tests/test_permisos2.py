@@ -52,7 +52,8 @@ def nombre():
     limiter.enabled = False
     n = f"p2_{uuid.uuid4().hex[:8]}"
     yield n
-    _run(_borrar(n))
+    for variante in (n, n.upper(), n + "\n"):
+        _run(_borrar(variante))
 
 
 def _registrar(c, ruta, username):
@@ -94,3 +95,26 @@ def test_la_cuenta_de_admin_usernames_sigue_siendo_admin_al_reiniciar(monkeypatc
         with TestClient(main.app) as reiniciada:
             assert _como(reiniciada, token).status_code == 200
     assert main.roles_de({"roles": _run(_fila(nombre)).roles}).count("admin") == 1
+
+
+@pytest.mark.parametrize("ruta", ["/auth/register", "/api/organizations/create"])
+@pytest.mark.parametrize("pedido,lista,detalle", [
+    ("{n}\n", "", "Username inválido"),
+    ("{n}\r\n", "", "Username inválido"),
+    ("\n{n}", "", "Username inválido"),
+    ("{n} ", "", "Username inválido"),
+    ("{n}é", "", "Username inválido"),
+    ("{N}", "{n}", "Usuario ya existe"),
+    ("{n}", "{N}", "Usuario ya existe"),
+    ("{n}\n", "{n}", "Username inválido"),
+], ids=["lf_final", "crlf_final", "lf_inicial", "espacio", "acento",
+        "mayusculas", "lista_en_mayusculas", "lf_final_de_la_lista"])
+def test_un_nombre_que_se_ve_como_otro_no_se_registra(monkeypatch, nombre, ruta, pedido, lista, detalle):
+    monkeypatch.setenv("ADMIN_USERNAMES", lista.format(n=nombre, N=nombre.upper()))
+    username = pedido.format(n=nombre, N=nombre.upper())
+    c = TestClient(main.app)
+    r = _registrar(c, ruta, username)
+    assert r.status_code == 400, r.text[:200]
+    assert r.json()["detail"].startswith(detalle)
+    for variante in {username, nombre, nombre.upper()}:
+        assert _run(_fila(variante)) is None
