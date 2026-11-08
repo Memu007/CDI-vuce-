@@ -15,6 +15,7 @@ import math
 import os
 import re
 import unicodedata
+from urllib.parse import unquote_to_bytes
 import csv
 import io
 import smtplib
@@ -432,7 +433,7 @@ else:
 
 
 class _RutaSinNul:
-    """Un NUL en la ruta llega a la base como parámetro y Postgres no lo acepta."""
+    """Un NUL en la ruta o la consulta llega a la base como parámetro y Postgres no lo acepta."""
 
     def __init__(self, app):
         self.app = app
@@ -440,6 +441,9 @@ class _RutaSinNul:
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http" and "\x00" in scope.get("path", ""):
             await JSONResponse({"detail": "Not Found"}, status_code=404)(scope, receive, send)
+            return
+        if scope["type"] == "http" and b"\x00" in unquote_to_bytes(scope.get("query_string", b"")):
+            await JSONResponse({"detail": "La consulta tiene un carácter nulo."}, status_code=400)(scope, receive, send)
             return
         await self.app(scope, receive, send)
 
@@ -1965,13 +1969,14 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                 ):
                     try:
                         async for session in get_async_session():
+                            # Postgres no guarda NUL ni pasa el largo de la columna: sin esto el registro del pedido se pierde.
                             log_entry = APILog(
-                                endpoint=endpoint,
-                                method=method,
+                                endpoint=_guardable_en_pg(endpoint)[:200],
+                                method=method[:10],
                                 client_ip=client_ip,
                                 status_code=status_code,
                                 response_time_ms=int(time_ms),
-                                error_message=error
+                                error_message=_guardable_en_pg(error) if error else error
                             )
                             session.add(log_entry)
                             await session.commit()
@@ -7362,9 +7367,19 @@ async def undo_client_migration(
     return {"success": True, "status": "undone", **undo_result, "idempotent": False}
 
 
+_TEXTOS_DEL_CLIENTE = ("nombre", "email", "telefono", "cuit", "direccion", "notas", "default_origin", "preferred_currency")
+
+
 def _textos_de_arriba_guardables(cuerpo):
-    # Lo anidado se guarda con str(), que ya escapa NUL y surrogates; recorrerlo no tiene tope de hondura.
-    return {clave: _guardable_en_pg(v) if isinstance(v, str) else v for clave, v in cuerpo.items()}
+    # Un null queda vacío: el alta y la edición lo pasan por str(), que lo volvería «None».
+    limpio = {}
+    for clave, valor in cuerpo.items():
+        if clave in _TEXTOS_DEL_CLIENTE and valor is None:
+            valor = ""
+        elif clave in _TEXTOS_DEL_CLIENTE and not isinstance(valor, str):
+            raise HTTPException(status_code=400, detail=f"{clave} tiene que ser texto.")
+        limpio[clave] = _guardable_en_pg(valor) if isinstance(valor, str) else valor
+    return limpio
 
 
 @app.post("/api/clientes")
@@ -7953,6 +7968,9 @@ def _numero_de_afuera(valor, que):
         numero = math.nan
     if not math.isfinite(numero):
         raise HTTPException(status_code=400, detail=f"{que} tiene que ser un número.")
+    # Uno finito enorme se guarda, pero sumado a otros da infinito y el listado no se puede mandar.
+    if abs(numero) > 1e15:
+        raise HTTPException(status_code=400, detail=f"{que} es demasiado grande.")
     return numero
 
 
@@ -7974,16 +7992,26 @@ def _float_finito(texto):
 
 async def _json_guardable(request: Request):
     # Lo que no sea una columna conocida va crudo a un JSON, que en Postgres no acepta NaN.
+    try:
+        data = json.loads(await request.body(), parse_constant=_no_finito, parse_float=_float_finito)
+    except (ValueError, RecursionError):
+        raise HTTPException(status_code=400, detail="Body JSON inválido")
+    return _cuerpo_guardable(data)
+
+
+def _cuerpo_guardable(data, rechazar_medio_par=True):
+    """Sin NUL y, salvo que la ruta lo explique renglón por renglón, sin medio par.
+    El parseo del cuerpo acepta más anidamiento que la pila: recorrerlo va dentro del try."""
     from proyecto_maria.services.client_memory import tiene_medio_par
 
     try:
-        data = _sin_nul(json.loads(await request.body(), parse_constant=_no_finito, parse_float=_float_finito))
-        # Lo que el historial rechazaría se rechaza antes de guardar nada.
-        if tiene_medio_par(data):
-            raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
-        return data
-    except (ValueError, RecursionError):
+        data = _sin_nul(data)
+        medio_par = rechazar_medio_par and tiene_medio_par(data)
+    except RecursionError:
         raise HTTPException(status_code=400, detail="Body JSON inválido")
+    if medio_par:
+        raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
+    return data
 
 
 def _sin_nul(valor):
@@ -8723,7 +8751,8 @@ async def learn_client_catalogo_productos(
     username = user["username"]
     await _get_owned_client(db, client_id, username)
 
-    items = _sin_nul(body.get("items")) if isinstance(body, dict) else None
+    body = _cuerpo_guardable(body)
+    items = body.get("items") if isinstance(body, dict) else None
     if not isinstance(items, list):
         raise HTTPException(status_code=400, detail="Se requiere body.items como lista")
     if len(items) > 500:
@@ -8732,10 +8761,8 @@ async def learn_client_catalogo_productos(
         raise HTTPException(status_code=400, detail=_AVISO_NO_ES_OBJETO)
 
     from proyecto_maria.services.client_memory import (
-        orden_de_escritura, tiene_digito_no_ascii, tiene_medio_par, upsert_client_product_history,
+        orden_de_escritura, tiene_digito_no_ascii, upsert_client_product_history,
     )
-    if tiene_medio_par(body):
-        raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
     if any(tiene_digito_no_ascii(str(item.get("ncm") or item.get("pieza") or "")) for item in items):
         raise HTTPException(status_code=400, detail=_AVISO_DIGITOS)
 
@@ -8823,7 +8850,8 @@ async def guardar_despacho_en_catalogo(
     from proyecto_maria.core.despacho_lector import MAX_RENGLONES, renglon_para_catalogo
     from proyecto_maria.services.client_memory import upsert_client_product_history
 
-    renglones = _sin_nul(body.get("renglones")) if isinstance(body, dict) else None
+    body = _cuerpo_guardable(body, rechazar_medio_par=False)
+    renglones = body.get("renglones") if isinstance(body, dict) else None
     if not isinstance(renglones, list) or not renglones:
         raise HTTPException(status_code=400, detail="Se requiere body.renglones con al menos un producto.")
     if len(renglones) > MAX_RENGLONES:
@@ -8883,14 +8911,12 @@ async def update_client_catalogo_producto(
     if not row:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    body = _sin_nul(body) if isinstance(body, dict) else {}
+    body = _cuerpo_guardable(body) if isinstance(body, dict) else {}
     from proyecto_maria.core.despacho_lector import origen_para_catalogo
     from proyecto_maria.services.client_memory import (
         descripcion_del_producto, identidad_del_producto, ncm_para_historial,
-        tiene_digito_no_ascii, tiene_medio_par, valor_para_promedio,
+        tiene_digito_no_ascii, valor_para_promedio,
     )
-    if tiene_medio_par(body):
-        raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
     if "ncm" in body:
         if tiene_digito_no_ascii(str(body["ncm"])):
             raise HTTPException(status_code=400, detail=_AVISO_DIGITOS)

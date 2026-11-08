@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: un cuerpo muy hondo, un NUL en la consulta, un campo del cliente que no es texto o un número enorme no dan 500 (ENTRADAS-3)
+
+- Aprender productos, guardar el despacho y editar un producto con un cuerpo más hondo que la pila dan 400. Un carácter nulo en la consulta da 400. Un pedido con NUL o una ruta de más de 200 caracteres queda en el registro de pedidos.
+- Un campo de texto del cliente que llega como lista, objeto, número o booleano da 400; en null queda vacío. Un número de más de 1e15 en la operación manual o al guardar al cliente da 400, y el listado y las métricas no revientan al sumar.
+
 ## 2026-11-08 · fix: sin ENVIRONMENT o con un valor desconocido, FRONTEND_URL, ALLOWED_ORIGINS y HSTS van como en producción (ENTORNO-3)
 
 - Fuera de `development`, `test` o `testing`: sin `FRONTEND_URL` el link de los emails no sale a localhost, sin `ALLOWED_ORIGINS` la app no arranca, y toda respuesta lleva HSTS.
