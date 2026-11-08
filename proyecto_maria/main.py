@@ -220,7 +220,7 @@ def get_frontend_url() -> str:
     url = (os.getenv("FRONTEND_URL") or "").rstrip("/")
     if url:
         return url
-    if IS_PRODUCTION:
+    if not _es_desarrollo():
         # Fail fast: mandar un email con link a localhost es un bug silencioso
         # que vuelve el reset de password inutil.
         raise RuntimeError(
@@ -410,7 +410,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
 if _raw_origins and _raw_origins != "*":
     allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
-elif IS_PRODUCTION:
+elif not _es_desarrollo():
     # En prod sin ALLOWED_ORIGINS explicito, fallamos fuerte: es una mala
     # config que dejaria el sistema inaccesible o inseguro.
     raise ValueError(

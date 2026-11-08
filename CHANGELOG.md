@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: sin ENVIRONMENT o con un valor desconocido, FRONTEND_URL, ALLOWED_ORIGINS y HSTS van como en producción (ENTORNO-3)
+
+- Fuera de `development`, `test` o `testing`: sin `FRONTEND_URL` el link de los emails no sale a localhost, sin `ALLOWED_ORIGINS` la app no arranca, y toda respuesta lleva HSTS.
+- El limitador por tipo de ruta no deja pasar a 127.0.0.1 fuera de desarrollo (hoy no está montado en la app).
+
 ## 2026-11-08 · fix: un número, un texto o una ruta rara no da 500 en la operación manual, los clientes ni agrupar (ENTRADAS-2)
 
 - La operación manual y guardar una operación al cliente con un número que no es número (`NaN`, infinito, texto, un total que desborda) o un ítem que no es objeto dan 400 y no guardan nada. Un nulo o un carácter inválido en un texto se guarda como «�», una pieza de más de 20 caracteres se corta y un grupo fuera de rango queda vacío.
