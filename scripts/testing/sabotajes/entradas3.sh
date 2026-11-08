@@ -91,10 +91,12 @@ sabotaje $M "un número enorme se guarda" "FAILED $T::test_numero_enorme_da_400_
 
 CORRER=postgres_
 # --- Lo que sólo se ve en Postgres
-sabotaje $M "la ruta con NUL no queda en api_logs" "FALLA | NUL en la ruta" \
-  "endpoint=_guardable_en_pg(endpoint)[:200]," "endpoint=endpoint[:200],"
-sabotaje $M "la ruta larga no queda en api_logs" "FALLA | ruta de 300 caracteres" \
+sabotaje $M "un pedido sin molde guarda el camino" "FALLA | NUL en la ruta" \
+  'or "<sin ruta>",' 'or request.url.path,'
+sabotaje $M "un molde largo no queda en api_logs" "FALLA | molde de 300 caracteres" \
   "endpoint=_guardable_en_pg(endpoint)[:200]," "endpoint=_guardable_en_pg(endpoint),"
+sabotaje $M "una excepción con NUL no queda en api_logs" "FALLA | excepción con NUL en el mensaje" \
+  "error_message=_guardable_en_pg(error) if error else error" "error_message=error"
 sabotaje $M "un número enorme revienta el listado en Postgres" "FALLA | después de 1e308" \
   "    if abs(numero) > 1e15:" "    if False:"
 
