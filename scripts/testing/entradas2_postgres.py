@@ -4,9 +4,10 @@ tests/test_entradas2.py (que conftest ata a SQLite) no lo mide. Comprueba que:
 1. la operación manual con un número no finito, un texto no guardable o un
    grupo_id fuera de rango no da 500, y después la lista de operaciones sigue;
 2. alta y edición de cliente con un texto no guardable no dan 500;
-3. guardar una operación al cliente con NaN no da 500;
+3. guardar una operación al cliente con NaN o infinito, también anidado, no da 500;
 4. un NUL en un parámetro de ruta no da 500;
-5. agrupar con más ítems de los que el driver acepta no da 500;
+5. agrupar con más ítems de los que el driver acepta, o cuando el número de
+   grupo siguiente no entra en la columna, no da 500;
 6. el alta de estudio pide la misma clave que el registro.
 
 uso (con un Postgres local y descartable, nunca el de producción; el usuario
@@ -45,12 +46,13 @@ def chequear(ok, que):
         FALLAS.append(que)
 
 
-def admin(consulta):
-    con = psycopg2.connect(URL)
+def admin(consulta, url=URL):
+    con = psycopg2.connect(url)
     con.autocommit = True
     try:
         with con.cursor() as cur:
             cur.execute(consulta)
+            return cur.fetchall() if cur.description else None
     finally:
         con.close()
 
@@ -115,6 +117,8 @@ try:
         for nombre, cuerpo in [
             ("NaN en items", '{"items": [{"descripcion": "D", "cantidad": NaN}]}'),
             ("NaN en resumen", '{"items": [], "resumen": {"valor_total": NaN}}'),
+            ("NaN anidado en resumen", '{"items": [], "resumen": {"a": [[1, NaN]]}}'),
+            ("1e999 en resumen", '{"items": [], "resumen": {"a": 1e999}}'),
             ("resumen.items de texto", '{"items": [], "resumen": {"items": "abc"}}'),
             ("surrogate en descripcion", '{"items": [{"descripcion": "D\\ud800"}]}'),
         ]:
@@ -140,6 +144,16 @@ try:
         r = c.post("/api/operacion/no-existe/agrupar", headers=sesion,
                    json={"item_ids": [str(i) for i in range(40000)]})
         chequear(r.status_code < 500, f"agrupar con 40000 ítems: {r.status_code} {r.text[:80]}")
+        tope = '{"descripcion": "Tope", "cantidad": 1, "grupo_id": 2147483647}'
+        libres = '{"descripcion": "A", "cantidad": 1}, {"descripcion": "B", "cantidad": 1}'
+        r = pedir("POST", "/api/operations/manual", sesion,
+                  f'{{"client_id": "{cliente(sesion)}", "items": [{tope}, {libres}]}}')
+        op_id = r.json()["operation_id"]
+        ids = [fila[0] for fila in admin(
+            f"select id from operation_items where operation_id = '{op_id}' and grupo_id is null", URL_BASE)]
+        r = c.post(f"/api/operacion/{op_id}/agrupar", headers=sesion, json={"item_ids": ids})
+        chequear(r.status_code < 500 and len(ids) == 2,
+                 f"agrupar con el grupo 2147483647 ocupado: {r.status_code} {r.text[:80]}")
 
         # 6. clave del alta de estudio
         u = "e2_" + uuid.uuid4().hex[:10]
