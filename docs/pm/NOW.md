@@ -213,6 +213,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-08 01:58 UTC: vuelta sin entrega nueva. MARIA trabaja en ENTRADAS-2. La técnica quieta desde 01:15 esperando sus sabotajes de COBRO-MP-2/3 (`71e15df`); le pedí que mire si siguen vivos y, si no, los relance. Contextos bajo 140k.
 2026-11-08 01:54 UTC: **FRONT-422 aceptada** (`4dbdb0b`, MARIA, sin integrar): 33 passed, 17 sabotajes en rojo, negativos míos en node bien; D108 (a). MARIA sigue con ENTRADAS-2.
 2026-11-08 01:12 UTC: **ENTORNO-2 aceptada** (`bf92bf9`, MARIA, sin integrar): 22 passed, 18 sabotajes en rojo, 4 negativos míos cerrados, Opus alto nada abierto, suite `5124 passed`. D107 (a): ENTORNO-3 después de ENTRADAS-2. Riesgo para publicar: confirmar `ENVIRONMENT=production` en Railway (D99).
 2026-11-08 00:10 UTC: **ABUSO-2 aceptada** (`1f79a8e`, MARIA, sólo pruebas, sin integrar): las cinco mutaciones en rojo, 20 ROJO (también el de Postgres), `fallas: 0`; mi `n − 1` cae, un `delete` por prefijo queda verde como riesgo. Técnica sin entrega nueva (espera sus sabotajes de COBRO). Contextos bajo 145k.
@@ -224,7 +225,6 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 2026-11-07 18:15 UTC: **ABUSO-1 aceptada** (`55bf408`, MARIA, sin integrar por `e0b8626`): 72 passed, PG OK, 35 sabotajes en rojo, Opus y Sonnet alto sin nada serio introducido; suite `1 failed, 5004 passed`, el rojo es de `despacho1b` (pasa solo y con su archivo; a la cola). D94-96 (a); piezas nuevas ENTRADAS-1 y ABUSO-2 tras ENTORNO-1.
 2026-11-07 22:10 UTC: **COBRO-MP-2+3 devolución de pruebas** (técnica, `cb740f3`): producto como el informe; cinco mutaciones verdes (firma sin secreto y truncada, sacar de otro estudio, plazo por llamada, reactivar) y el texto «tu plan sigue igual» con PUT abandonado. Para Emi: D64, secreto de Webhooks en MP y Railway antes de publicar.
 2026-11-07 15:52 UTC: **RETOMADO por 24 h** (Emi, sabiendo que pasó el 50 %): tres rutinas prendidas, Devs despertadas (MARIA ABUSO-1; técnica devolución de COBRO-MP-2 y VALIDACION-1). Corte el 08/11 15:50 UTC por `trig_01QwEeyuXBFBx6LErxqapwRh`: lo en curso se termina.
-2026-11-06 11:40 UTC: **COBRO-MP-2 vuelve con devolución** (`4f1822f`): una sola cuenta aguanta (55 passed, Postgres sin fallas, Opus y Sonnet sin cobro doble ni días perdidos). Vuelve por el estudio: reactivar sin permiso, checkout que cancela la pausada que paga, no se puede sacar a quien dejó una pendiente, «Próximo cobro» según quién mira, espera sin tope con MP caído. D62 (a).
 
 2026-11-06 11:20 UTC: **COBRO-CORTE-1 aceptada** (`ca50916`, técnica, sin integrar por `e0b8626`): 98 passed, 88 sabotajes en rojo sin falla, suite `4284 passed` rc=0, chequeo-6 con sus 3 avisos explicados; Opus y Sonnet alto sin doble cobro. Cuatro bajas a la cola. Para Emi: la validación de 60 s cruza cargas (de antes), pieza nueva. Técnica entregó COBRO-MP-2 (`4f1822f`, D62): reviso con Opus y Sonnet alto.
 
