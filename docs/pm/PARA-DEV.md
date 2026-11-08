@@ -3,29 +3,47 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Tarea activa: NOMBRES-1 (sí de Emi, 2026-11-08 17:05 UTC)
+## NOMBRES-1: devolución chica de pruebas, sobre `ccded98` (2026-11-08 PM)
 
-Emi dio 12 h más: hasta el **2026-11-09 05:00 UTC**. Ahí cortás como hoy:
-terminás el paso, commit y push, anotás dónde quedaste y frenás.
+El producto queda como está (+4/−2): no lo toques. Corte, como antes: el
+**2026-11-09 a las 05:00 UTC**.
 
-**Qué tiene que pasar** (sale de tu D127 b): nadie puede registrarse, ni
-cambiar su nombre, con uno que ya existe escrito con otras mayúsculas
-(`emi` existe → `Emi`, `EMI`, `eMi` dan «Usuario ya existe», igual que hoy
-el nombre exacto). Vale para todas las cuentas, no sólo las de
-`ADMIN_USERNAMES`.
+Evidencia en `docs/pm/REPRODUCCION-NOMBRES-1-2026-11-08.md`. Mis corridas dan
+igual que tu informe:
 
-**Sin mirar producción:** no tenés acceso y no hace falta. Lo que ya existe
-queda como está: si en la base hay dos cuentas que difieren sólo en
-mayúsculas, las dos siguen entrando con su nombre exacto, el arranque no
-cambia a quién promueve y nada se migra ni se borra. Por eso no va un índice
-único nuevo; si creés que hace falta, es una D.
+- verde: 38 passed, en SQLite y en PG 16;
+- rojo: 8 failed, 5 passed;
+- `nombres1.sh`: 5 ROJO, con falla 0;
+- chequeo-6: 0 avisos.
 
-**Prueba:** un caso con la familia como datos (otras mayúsculas, la cuenta
-de la lista y una que no está, el cambio de nombre si existe esa ruta) que
-dé rojo con el chequeo de hoy; otro con dos cuentas viejas que difieren en
-mayúsculas, sembradas directo en la base, que siguen entrando cada una con
-su clave. En SQLite y en Postgres 16 descartable. Es permisos: revisión
-fuerte (§3), con guion de sabotaje propio. Próxima D libre: D128.
+El adversario (Opus alto) no encontró otro camino que cree o renombre
+cuentas, ni confusión de identidad.
+
+**Devolución.** Causa: el caso de las cuentas viejas pone en
+`ADMIN_USERNAMES` la cuenta que se sembró primero. Si el arranque pasa a
+buscar con `func.lower(...)` y `.first()`, encuentra justo esa y el caso sigue
+verde: en una copia dio `13 passed`. Tu sabotaje da rojo sólo porque agrega
+`.order_by(User.username)`.
+
+Lo que pido: que el caso dé rojo con un `lower()` + `.first()`, encuentre la
+base la fila que encuentre. Por ejemplo, que cada una de las dos cuentas sea
+la de la lista, como datos. El sabotaje queda sin `order_by`. Producto sin
+cambio.
+
+**Riesgo que tu informe tiene que corregir.** La carrera sí se reproduce: con
+uvicorn sobre PG 16 y 4 altas a la vez, que alternan las dos rutas, entraron
+las 4 (`rc69a854`, `RC69A854`, `Rc69a854`, `rc69A854`). Dejá en el informe que
+se reproduce. Que quede así, sin índice, lo decido yo (abajo): no lo cierres.
+
+- Hace falta que las altas lleguen al mismo tiempo. Contra una cuenta que ya
+  existe, el chequeo frena siempre.
+- Las cuentas duplicadas son del mismo que las pidió.
+- La reserva de `ADMIN_USERNAMES` se chequea en memoria y no tiene esta
+  carrera.
+- Ya pasaba antes: dos altas con el mismo nombre exacto dan 500, no 400.
+
+Queda como límite conocido. Un índice sobre `lower(username)` exige mirar
+antes si producción ya tiene nombres repetidos: es para después, con Emi.
 
 ## PERMISOS-3: aceptada sobre `9428e00`, sin integrar (2026-11-08 PM)
 
