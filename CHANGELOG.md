@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: nadie registra un nombre que se lea como el de una admin (PERMISOS-3)
+
+- **fix(seguridad):** el registro y crear un estudio rechazan con 400 un nombre de usuario con un salto de línea u otro carácter fuera de letras, números, `_` y `-`, y un nombre de `ADMIN_USERNAMES` escrito con otras mayúsculas («Usuario ya existe»).
+
 ## 2026-11-08 · fix(permisos): ADMIN_USERNAMES ya no da admin por sí solo (PERMISOS-2)
 
 - **fix(permisos):** admin es sólo quien tiene el rol guardado. Al arrancar, la cuenta que ya existe con un nombre de `ADMIN_USERNAMES` recibe el rol (aunque sus roles estuvieran guardados como texto u otro formato), y nadie puede registrar ni crear un estudio con un nombre de la lista. Para sumar un admin nuevo: que se registre primero y después agregar su nombre a la lista y reiniciar.

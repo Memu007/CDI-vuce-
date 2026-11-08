@@ -1746,8 +1746,11 @@ def _es_admin(user) -> bool:
 
 
 async def _exigir_username_libre(db: AsyncSession, username: str):
-    """Un nombre de ADMIN_USERNAMES se reserva: el arranque le daría admin a quien lo registre."""
-    if username in _admin_usernames() or (
+    """Un nombre de ADMIN_USERNAMES se reserva: el arranque le daría admin a quien lo registre.
+    Sin distinguir mayúsculas, para que nadie registre uno que se lea igual."""
+    if not re.fullmatch(r"[a-zA-Z0-9_-]{3,30}", username):
+        raise HTTPException(status_code=400, detail="Username inválido. Solo se permiten letras, números, guiones y guiones bajos (3-30 caracteres)")
+    if username.lower() in {u.lower() for u in _admin_usernames()} or (
             await db.execute(select(User).where(User.username == username))).scalars().first():
         raise HTTPException(status_code=400, detail="Usuario ya existe")
 
@@ -2936,17 +2939,13 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
     """
     import re
 
-    # Validar username (solo alfanuméricos, guiones y guiones bajos)
-    if not re.match(r'^[a-zA-Z0-9_-]{3,30}$', request.username):
-        raise HTTPException(status_code=400, detail="Username inválido. Solo se permiten letras, números, guiones y guiones bajos (3-30 caracteres)")
+    await _exigir_username_libre(db, request.username)
 
     # Validar formato de email
     clean_email = (request.email or "").strip().lower()
     if not clean_email or not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', clean_email):
         raise HTTPException(status_code=400, detail="Email no válido. Debe tener formato usuario@dominio.com")
     request.email = clean_email
-
-    await _exigir_username_libre(db, request.username)
 
     # Verificar si el email ya existe (solo si se proporciona email)
     if request.email:
@@ -9797,12 +9796,9 @@ async def create_organization(
 
     if not req.name or not req.name.strip():
         raise HTTPException(status_code=400, detail="El nombre del estudio es obligatorio")
-    if not re.match(r'^[a-zA-Z0-9_-]{3,30}$', req.username):
-        raise HTTPException(status_code=400, detail="Username inválido (3-30 chars alfanuméricos)")
+    await _exigir_username_libre(db, req.username)
     if len(req.password) < 8:
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
-
-    await _exigir_username_libre(db, req.username)
 
     # Validar email duplicado
     clean_email = req.email.strip().lower()
