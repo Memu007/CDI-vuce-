@@ -77,7 +77,9 @@ def _frontend_por_defecto():
 def _url_o_rechazo(medir):
     try:
         return medir()
-    except RuntimeError:
+    except RuntimeError as e:
+        if "FRONTEND_URL no esta seteada" not in str(e):
+            raise
         return "rechaza"
 
 
