@@ -1390,10 +1390,9 @@ async def lifespan(app: FastAPI):
             for identifier in _admin_usernames():
                 result = await session.execute(select(User).where(User.username == identifier))
                 user = result.scalars().first()
-                if user and "admin" not in (user.roles or []):
-                    new_roles = list(user.roles) if user.roles else []
-                    new_roles.append("admin")
-                    user.roles = new_roles
+                roles = roles_de({"roles": user.roles}) if user else []
+                if user and "admin" not in roles:
+                    user.roles = roles + ["admin"]
                     await session.commit()
                     logging.info(f"✅ {user.username} promovido a admin via ADMIN_USERNAMES")
         except Exception as e:
@@ -1732,18 +1731,26 @@ async def current_user_info(user=Depends(get_current_user)):
 
 
 # --- ADMIN DEPENDENCY ---
-# Un user es admin si su username esta en ADMIN_USERNAMES (env, separado por
-# comas) o si tiene "admin" en roles. Protege /api/dev/*, /dev/*, /api/admin/*
-# y las funciones globales (las que no actúan sobre un estudio), que además
-# llevan tags=["admin"]. tests/test_admin_solo_admin.py recorre las rutas y
-# falla si alguna de esas deja pasar a un usuario común.
+# Un user es admin sólo si tiene "admin" en sus roles guardados; el arranque se
+# lo pone a la cuenta de ADMIN_USERNAMES (env, separado por comas). Protege
+# /api/dev/*, /dev/*, /api/admin/* y las funciones globales (las que no actúan
+# sobre un estudio), que además llevan tags=["admin"].
+# tests/test_admin_solo_admin.py recorre las rutas y falla si alguna de esas
+# deja pasar a un usuario común.
 def _admin_usernames() -> set:
     raw = os.getenv("ADMIN_USERNAMES", "")
     return {u.strip() for u in raw.split(",") if u.strip()}
 
 
 def _es_admin(user) -> bool:
-    return user["username"] in _admin_usernames() or "admin" in roles_de(user)
+    return "admin" in roles_de(user)
+
+
+async def _exigir_username_libre(db: AsyncSession, username: str):
+    """Un nombre de ADMIN_USERNAMES se reserva: el arranque le daría admin a quien lo registre."""
+    if username in _admin_usernames() or (
+            await db.execute(select(User).where(User.username == username))).scalars().first():
+        raise HTTPException(status_code=400, detail="Usuario ya existe")
 
 
 async def require_admin(user=Depends(get_current_user)):
@@ -2940,10 +2947,7 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
         raise HTTPException(status_code=400, detail="Email no válido. Debe tener formato usuario@dominio.com")
     request.email = clean_email
 
-    # Verificar si el username ya existe
-    result = await db.execute(select(User).where(User.username == request.username))
-    if result.scalars().first():
-        raise HTTPException(status_code=400, detail="Usuario ya existe")
+    await _exigir_username_libre(db, request.username)
 
     # Verificar si el email ya existe (solo si se proporciona email)
     if request.email:
@@ -9799,10 +9803,7 @@ async def create_organization(
     if len(req.password) < 8:
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
 
-    # Validar username duplicado
-    existing = await db.execute(select(User).where(User.username == req.username))
-    if existing.scalars().first():
-        raise HTTPException(status_code=400, detail="Usuario ya existe")
+    await _exigir_username_libre(db, req.username)
 
     # Validar email duplicado
     clean_email = req.email.strip().lower()

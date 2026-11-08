@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix(permisos): ADMIN_USERNAMES ya no da admin por sí solo (PERMISOS-2)
+
+- **fix(permisos):** admin es sólo quien tiene el rol guardado. Al arrancar, la cuenta que ya existe con un nombre de `ADMIN_USERNAMES` recibe el rol (aunque sus roles estuvieran guardados como texto u otro formato), y nadie puede registrar ni crear un estudio con un nombre de la lista. Para sumar un admin nuevo: que se registre primero y después agregar su nombre a la lista y reiniciar.
+
 ## 2026-11-08 · fix: en un estudio, sólo quien recibió el 503 de cancelar o la dueña concilian el reintento (COBRO-MP-4)
 
 - **fix(cobro):** si Mercado Pago canceló sin confirmarlo, el 503 queda anotado en la cuenta que lo recibió (columna nueva `users.cancelar_sin_confirmar`, la agrega el arranque) y la marca se borra al conciliar. Un miembro sin esa marca recibe 403 y no cambia nada. Volver atrás: primero el código anterior y después `alter table users drop column if exists cancelar_sin_confirmar` (se pierden las marcas pendientes).
