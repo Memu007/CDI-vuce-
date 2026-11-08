@@ -4839,9 +4839,8 @@ SEGURO_PARA_COMPLETAR = ("Seguro: no pudimos leerlo de la factura. Completalo en
 
 
 def _seguro_por_corregir(request: MariaRequest, valor: dict) -> str | None:
-    """Lo que frena la generación hasta que se corrija el seguro. El 1 % no
-    entra al TXT sin que la persona lo elija, y con un incoterm que ya lleva
-    el seguro en el precio no hay 1 % que elegir: va el de la factura."""
+    """Lo que frena la generación por el seguro. El 1 % no entra sin que la persona
+    lo elija, y con el seguro en el precio no hay 1 % que elegir: va el de la factura."""
     if request.seguro_para_completar:
         return SEGURO_PARA_COMPLETAR
     if not (request.seguro_calculado or request.seguro_dejado):
