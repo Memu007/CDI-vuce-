@@ -4867,6 +4867,23 @@ def _rechazar_exportacion_en_importacion(request: MariaRequest) -> None:
         raise HTTPException(status_code=400, detail="Una destinación de exportación (EC*) no puede generar un TXT de importación.")
 
 
+def _textos_como_van_al_txt(request: MariaRequest) -> None:
+    """Los textos como los lleva el TXT, para que los avisos y la generación
+    miren lo mismo: sin saltos de línea ni «=», moneda e incoterm en
+    mayúsculas y sin espacios, el CUIT sin guiones."""
+    from proyecto_maria.core.controles_maria import CAMPOS_DE_TEXTO, CAMPOS_DE_TEXTO_DEL_ITEM, limpiar_texto
+    for campo in CAMPOS_DE_TEXTO:
+        setattr(request, campo, limpiar_texto(getattr(request, campo)))
+    request.moneda = (request.moneda or "").strip().upper()
+    request.incoterm = (request.incoterm or "").strip().upper()
+    request.comprador_cuit = "".join((request.comprador_cuit or "").replace("-", "").split())
+    request.items = [
+        {k: (limpiar_texto(v) if k in CAMPOS_DE_TEXTO_DEL_ITEM else v) for k, v in it.items()}
+        if isinstance(it, dict) else it
+        for it in (request.items or [])
+    ]
+
+
 @app.post("/generate_maria/avisos")
 async def avisos_maria_endpoint(
     request: MariaRequest,
@@ -4877,6 +4894,7 @@ async def avisos_maria_endpoint(
     pantalla los muestra junto al botón. No genera ni guarda nada."""
     _rechazar_exportacion_en_importacion(request)
     estudio = await _estudio_elegido(db, request.estudio_id, user["username"])
+    _textos_como_van_al_txt(request)
     items = _items_con_procedencia(request)
     try:
         gastos = gastos_fob_para_el_txt(request.incoterm, request.gastos_fob, request.gastos_anteriores_fob)
@@ -4966,22 +4984,8 @@ async def generate_maria_endpoint(
     if not request.items:
         raise HTTPException(status_code=400, detail=SIN_PRODUCTOS)
     try:
-        from proyecto_maria.core.controles_maria import (
-            CAMPOS_DE_TEXTO, CAMPOS_DE_TEXTO_DEL_ITEM, controles_antes_de_generar, limpiar_texto,
-        )
-        # Ningún texto mete saltos de línea ni «=» en el TXT (MARIA-1b, M10).
-        for _campo in CAMPOS_DE_TEXTO:
-            setattr(request, _campo, limpiar_texto(getattr(request, _campo)))
-        # El TXT lleva lo mismo que se controla: moneda e incoterm en
-        # mayúsculas y sin espacios, el CUIT sin guiones (MARIA-1b).
-        request.moneda = (request.moneda or "").strip().upper()
-        request.incoterm = (request.incoterm or "").strip().upper()
-        request.comprador_cuit = "".join((request.comprador_cuit or "").replace("-", "").split())
-        request.items = [
-            {k: (limpiar_texto(v) if k in CAMPOS_DE_TEXTO_DEL_ITEM else v) for k, v in it.items()}
-            if isinstance(it, dict) else it
-            for it in (request.items or [])
-        ]
+        from proyecto_maria.core.controles_maria import controles_antes_de_generar
+        _textos_como_van_al_txt(request)
         # NCM en el nomenclador, moneda, incoterm, CUIT del importador y
         # montos de la cabecera: lo que impide un TXT válido no deja generar
         # (MARIA-1b). Se juntan con los demás errores para mostrarlos todos.

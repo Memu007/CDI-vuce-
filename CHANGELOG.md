@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: los avisos leen el incoterm igual que la generación (SEGURO-1, agregado)
+
+- Antes de generar, los avisos limpian los textos como el TXT: con un incoterm `CIF` que trae un carácter invisible ya no ofrecen el 1 % que la generación después rechaza.
+
 ## 2026-11-08 · fix: un sufijo frena cuando el número que va al TXT no es el que se escribió (SUFIJOS-2, segunda revisión)
 
 - Se compara lo escrito con lo que sale al TXT: un menos o una raya, una fracción, un exponente, dígitos de ancho completo o de otra escritura, un `%` o un apóstrofo de miles que el MARIA cambiaría frenan con el aviso de siempre. Las fechas `31/12/2026`, `31.12.2026` y `31-12-2026` salen `31 12 2026` sin frenar.
