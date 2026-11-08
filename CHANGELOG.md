@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: un NUL en el cliente elegido al subir un Excel no da 500 (ENTRADAS-4)
+
+- El campo `cliente_id` de `/upload_excel_v2/` recibe el mismo trato que los demás textos que van a la base: un NUL o un carácter inválido se cambia por «�», no se encuentra el cliente y el Excel se lee sin su mapeo, en vez de dar 500 en Postgres.
+
 ## 2026-11-08 · fix: fuera de desarrollo, sin FRONTEND_URL la app no arranca (ENTORNO-4)
 
 - Como con `ALLOWED_ORIGINS`: sin `FRONTEND_URL`, y con `ENVIRONMENT` distinto de `development`, `test` o `testing`, la app no arranca; una `FRONTEND_URL` con sólo espacios cuenta como vacía. La vuelta del cobro de Mercado Pago usa la misma URL que los emails y ya no cae a localhost.

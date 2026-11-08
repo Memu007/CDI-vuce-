@@ -9065,7 +9065,7 @@ async def plantilla_avg_blanco(user=Depends(get_current_user)):
 async def upload_excel_v2(
     request: Request,
     file: UploadFile = File(...),
-    cliente_id: str | None = Form(default=None),
+    cliente_id: TextoCodificable | None = Form(default=None),
     use_mapping: bool = Form(default=True),
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
