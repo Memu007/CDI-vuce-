@@ -47,14 +47,20 @@ def _vuce_simulado():
 
 
 def _frontend_por_defecto():
+    from proyecto_maria.services import billing_service
     guardada = os.environ.pop("FRONTEND_URL", None)
     try:
-        return m.get_frontend_url()
-    except RuntimeError:
-        return "rechaza"
+        return [_url_o_rechazo(f) for f in (m.get_frontend_url, billing_service.get_frontend_url)]
     finally:
         if guardada is not None:
             os.environ["FRONTEND_URL"] = guardada
+
+
+def _url_o_rechazo(get_frontend_url):
+    try:
+        return get_frontend_url()
+    except RuntimeError:
+        return "rechaza"
 
 
 async def _limite_desde_127():

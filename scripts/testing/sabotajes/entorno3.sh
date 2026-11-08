@@ -9,8 +9,8 @@ source "$(dirname "$0")/_entorno_comun.sh"
 PROD='os.getenv("ENVIRONMENT", "development") == "production"'
 SM=proyecto_maria/security/security_middleware.py
 
-sabotaje $M "el link de los emails cae a localhost salvo en producción" \
-  $'        return url\n    if not _es_desarrollo():' $'        return url\n    if IS_PRODUCTION:' \
+sabotaje proyecto_maria/config.py "el link de los emails cae a localhost salvo en producción" \
+  $'        return url\n    if not es_desarrollo():' $'        return url\n    if '"$PROD"':' \
   "$C[frontend_en_localhost]" "frontend_en_localhost $VIEJO"
 sabotaje $M "sin ALLOWED_ORIGINS arranca salvo en producción" \
   'elif not _es_desarrollo():' 'elif IS_PRODUCTION:' \
