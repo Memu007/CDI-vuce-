@@ -1069,6 +1069,16 @@ def _item_de_los_renglones(renglones: list, renglones_de: dict, lugar: dict) -> 
     return item
 
 
+EXPORTACION_EN_IMPORTACION = "Una destinación de exportación (EC*) no puede generar un TXT de importación."
+
+
+def es_exportacion(tipo_destinacion) -> bool:
+    # Lo que no es letra o número ASCII adelante (un espacio, un control, un
+    # invisible, un relleno) no la vuelve de importación.
+    texto = unicodedata.normalize("NFKC", str(tipo_destinacion or "")).upper()
+    return re.match(r"[^A-Z0-9]*EC", texto) is not None
+
+
 def generate_maria_txt(operation_id: str, items: list, 
                        moneda: str = "DOL", 
                        incoterm: str = "FOB",
@@ -1156,8 +1166,8 @@ def generate_maria_txt(operation_id: str, items: list,
     # === [DDT] Cabecera ===
     # Normalizamos config de aduana/destinacion con defaults seguros (Ezeiza IC04)
     aduana_codigo = (str(aduana_codigo or "").strip() or "001")[:3]
-    if str(tipo_destinacion or "").strip().upper().startswith("EC"):
-        raise ValueError("Una destinación de exportación (EC*) no puede generar un TXT de importación.")
+    if es_exportacion(tipo_destinacion):
+        raise ValueError(EXPORTACION_EN_IMPORTACION)
     tipo_destinacion = (str(tipo_destinacion or "").strip().upper() or "IC04")[:4]
 
     lines.append("[DDT]")

@@ -6,9 +6,9 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
-## 2026-11-08 · fix: un espacio, un control o un invisible delante de EC no deja pasar una exportación a un TXT de importación (AVISOS-1)
+## 2026-11-08 · fix: lo que va delante de EC no deja pasar una exportación como importación (AVISOS-1)
 
-- Generar y los avisos rechazan `EC*` aunque llegue con un carácter nulo, un espacio de ancho cero o una marca de orden de bytes adelante; antes esos generaban el TXT de importación.
+- Generar, los avisos y el generador rechazan `EC*` con cualquier cosa que no sea letra o número adelante (un nulo, un invisible, un relleno, un guion) o escrito en ancho completo; antes no la reconocían como exportación.
 
 ## 2026-11-08 · fix: un seguro sin completar o el 1 % dejado con CIF frenan la generación (SEGURO-2)
 

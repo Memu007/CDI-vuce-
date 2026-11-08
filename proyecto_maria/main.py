@@ -76,7 +76,7 @@ from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
 from proyecto_maria.services.fecha_inic_activ import fecha_del_alta
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, seguro_en_el_precio, importe_escrito, usa_el_sufijo_de_la_operacion, fecha_inicio_actividad
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, seguro_en_el_precio, importe_escrito, usa_el_sufijo_de_la_operacion, fecha_inicio_actividad, es_exportacion, EXPORTACION_EN_IMPORTACION
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     DocumentoNoAdmitido,
@@ -4872,9 +4872,8 @@ def _importes_como_numeros(request: MariaRequest) -> None:
 
 
 def _rechazar_exportacion_en_importacion(request: MariaRequest) -> None:
-    # Un espacio, un control o un invisible adelante no la vuelve de importación.
-    if re.match(r"[\W_]*EC", request.tipo_destinacion or "", re.IGNORECASE):
-        raise HTTPException(status_code=400, detail="Una destinación de exportación (EC*) no puede generar un TXT de importación.")
+    if es_exportacion(request.tipo_destinacion):
+        raise HTTPException(status_code=400, detail=EXPORTACION_EN_IMPORTACION)
 
 
 def _textos_como_van_al_txt(request: MariaRequest) -> None:
