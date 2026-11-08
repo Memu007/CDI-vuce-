@@ -11,6 +11,7 @@ prueba. El arranque entero (uvicorn, en SQLite y en Postgres 16) está en
 """
 import asyncio
 import logging
+import time
 
 import pytest
 from sqlalchemy import text
@@ -180,3 +181,68 @@ def test_si_falla_no_levanta_y_deja_el_motivo_en_el_log(base, caplog):
     assert registros, f"la falla no quedó en el log: {caplog.text!r}"
     assert registros[0].levelno >= logging.WARNING
     assert registros[0].exc_info, "el log tiene que traer el motivo (la excepción)"
+
+
+def test_si_falla_el_indice_la_columna_queda_y_el_log_lo_dice(base, caplog, capsys):
+    # Una tabla con el nombre del índice hace fallar sólo el CREATE INDEX.
+    _, sql = base
+    sql(TABLA_VIEJA, FILAS_VIEJAS, "CREATE TABLE ix_api_logs_owner_username (id INTEGER)")
+    caplog.set_level(logging.WARNING)
+    migrar()
+    impreso = capsys.readouterr().out
+    assert "owner_username" in columnas(sql), "la falla del índice deshizo la columna"
+    assert indices_del_dueno(sql) == []
+    assert "agregada columna api_logs.owner_username" in impreso, impreso
+    assert "agregado indice" not in impreso, f"anunció un índice que no se creó: {impreso!r}"
+    assert [r for r in caplog.records if "OBSERVABILIDAD-1" in r.getMessage()], caplog.text
+
+
+VALOR_DE_EJEMPLO = {"integer": "7", "number": "7.5"}
+UUID_DE_EJEMPLO = "6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b"
+
+
+def _camino_de_ejemplo(molde, operaciones):
+    """Reemplaza cada {parámetro} del molde por un valor que su tipo acepta."""
+    tipos = {p["name"]: p.get("schema", {})
+             for op in operaciones.values() if isinstance(op, dict)
+             for p in op.get("parameters", []) if p.get("in") == "path"}
+    camino = molde
+    for nombre, esquema_param in tipos.items():
+        if esquema_param.get("format") == "uuid":
+            valor = UUID_DE_EJEMPLO
+        else:
+            valor = VALOR_DE_EJEMPLO.get(esquema_param.get("type"), "zq9")
+        camino = camino.replace("{" + nombre + "}", valor)
+    return camino
+
+
+def test_la_metrica_guarda_el_molde_de_la_ruta_y_no_el_camino(monkeypatch):
+    # El camino crudo lleva tokens, hashes, CUIT y nombres de archivo; la
+    # métrica sólo tiene que decir qué ruta se pidió.
+    from fastapi.testclient import TestClient
+    grabados = []
+
+    class APILogFalso:
+        # Anota lo que se iba a grabar; el add que falla después no importa.
+        def __init__(self, **campos):
+            grabados.append(campos["endpoint"])
+
+    with TestClient(main.app, raise_server_exceptions=False) as cliente:
+        # Después del arranque: ahí se suman los routers de admin y quotes.
+        rutas = main.app.openapi()["paths"]
+        moldes = sorted(m for m in rutas if "{" in m)
+        assert {"/api/quotes/public/{hash}", "/api/admin/errors/top/{limit}"} <= set(moldes), moldes
+        monkeypatch.setattr(main, "APILog", APILogFalso)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST")
+        esperado = {}
+        for molde in moldes:
+            esperado[_camino_de_ejemplo(molde, rutas[molde])] = molde
+        esperado["/no-existe-zq9"] = "<sin ruta>"
+        for camino in esperado:
+            cliente.get(camino)
+        plazo = time.monotonic() + 10
+        while len(grabados) < len(esperado) and time.monotonic() < plazo:
+            time.sleep(0.01)
+    assert sorted(grabados) == sorted(esperado.values()), (
+        "la métrica guardó otra cosa que el molde: "
+        f"{sorted(set(grabados) - set(esperado.values()))[:10]}")
