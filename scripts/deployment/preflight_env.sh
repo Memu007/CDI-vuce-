@@ -9,7 +9,7 @@
 #
 # Uso suelto (para revisar a mano):
 #   ENVIRONMENT=production JWT_SECRET_KEY=... ALLOWED_ORIGINS=... \
-#   DATABASE_URL=... ./scripts/deployment/preflight_env.sh
+#   FRONTEND_URL=... DATABASE_URL=... ./scripts/deployment/preflight_env.sh
 #
 # Uso desde un script de deploy:
 #   source ./scripts/deployment/preflight_env.sh   # o llamarlo directo
@@ -74,7 +74,8 @@ else
 fi
 
 # ---------------------------------------------------------------- FRONTEND_URL
-FRONT="$(printf '%s' "${FRONTEND_URL:-}" | tr -d '[:space:]')"
+FRONT="${FRONTEND_URL:-}"
+FRONT="${FRONT#"${FRONT%%[![:space:]]*}"}"; FRONT="${FRONT%"${FRONT##*[![:space:]]}"}"
 if [ -z "$FRONT" ]; then
     err "Falta FRONTEND_URL. La app aborta el arranque en producción."
     echo "   Poné la URL pública de la app, ej: https://cdi.tu-dominio.com"

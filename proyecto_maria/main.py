@@ -391,8 +391,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 # Default de dev: permitir localhost + 127.0.0.1 en puertos comunes.
 # Prod: ALLOWED_ORIGINS debe venir del .env con la URL real del frontend.
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
-# Fuera de desarrollo, sin FRONTEND_URL no arranca: los links saldrían rotos recién al mandarlos.
-get_frontend_url()
 if _raw_origins and _raw_origins != "*":
     allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 elif not _es_desarrollo():
@@ -414,6 +412,9 @@ else:
         "http://localhost:5555", "http://127.0.0.1:5555",
         "http://localhost:5500", "http://127.0.0.1:5500",
     ]
+
+# Fuera de desarrollo, sin FRONTEND_URL no arranca: los links saldrían rotos recién al mandarlos.
+get_frontend_url()
 
 
 class _RutaSinNul:
