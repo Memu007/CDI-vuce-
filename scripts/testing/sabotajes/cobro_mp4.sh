@@ -68,7 +68,7 @@ SIN_MARCA="FAILED $T::test_un_miembro_sin_la_marca_no_concilia"
 sabotaje $M "el 503 de cancelar no anota quién lo recibió" "$CONCILIA[abrio" \
   "            db_user.cancelar_sin_confirmar = cuenta.mp_preapproval_id
 " ""
-sabotaje $M "conciliar no borra la marca" "$CONCILIA[abrio" \
+sabotaje $M "conciliar no borra la marca de la dueña" "$CONCILIA[duena" \
   "    db_user.cancelar_sin_confirmar = None
 " ""
 sabotaje $M "un miembro sin la marca concilia" "$SIN_MARCA[cancelada]" \
@@ -77,6 +77,13 @@ sabotaje $M "un miembro sin la marca concilia" "$SIN_MARCA[cancelada]" \
 sabotaje $M "una marca de una suscripción que ya no está concilia" "$SIN_MARCA[marca_de_otra]" \
   "db_user.cancelar_sin_confirmar in {c.mp_preapproval_id for c in con_sid})" \
   "db_user.cancelar_sin_confirmar is not None)"
+sabotaje $M "conciliar deja las marcas de las otras cuentas" \
+  "FAILED $T::test_conciliar_borra_las_marcas_de_todo_el_estudio" \
+  "cuenta.mp_preapproval_id = cuenta.cancelar_sin_confirmar = None" "cuenta.mp_preapproval_id = None"
+sabotaje $M "la marca de otra cuenta del estudio concilia" \
+  "FAILED $T::test_la_marca_de_otra_cuenta_no_concilia[abrio-miembro]" \
+  "db_user.cancelar_sin_confirmar in {c.mp_preapproval_id for c in con_sid})" \
+  "any(c.cancelar_sin_confirmar in {d.mp_preapproval_id for d in con_sid} for c in con_sid))"
 sabotaje $M "cancelar empieza por la suscripción de quien pide" \
   "FAILED $T::test_el_reintento_que_falla_en_otra_deja_la_suya_para_volver_a_conciliar" \
   "key=lambda c: (paga[c], c is db_user)" "key=paga.get"

@@ -144,7 +144,8 @@ def _leer(username: str) -> dict:
         async for db in get_async_session():
             u = (await db.execute(select(User).where(User.username == username))).scalars().first()
             return {"billing_status": u.billing_status, "trial_ends_at": u.trial_ends_at,
-                    "mp_preapproval_id": u.mp_preapproval_id, "organization_id": u.organization_id}
+                    "mp_preapproval_id": u.mp_preapproval_id, "organization_id": u.organization_id,
+                    "cancelar_sin_confirmar": u.cancelar_sin_confirmar}
     return asyncio.new_event_loop().run_until_complete(_run())
 
 
@@ -799,24 +800,17 @@ def test_si_mp_cancelo_sin_confirmar_el_reintento_concilia(client, quien, otra_p
     if otra_paga:
         SUS["sus-otra"] = "authorized"
         _set_user(nombres["miembro"], mp_preapproval_id="sus-otra")
-    assert _marca(nombres[quien]) == sid
+    assert _leer(nombres[quien])["cancelar_sin_confirmar"] == sid
     r2 = client.post("/api/billing/cancel")
     assert r2.status_code == codigo, r2.text
     if codigo == 200:
         assert _leer_org(org_id)["billing_status"] == "canceled"
         assert _leer(nombres["abrio"])["mp_preapproval_id"] is None
         assert client.get("/api/billing/me").json()["renueva"] is False
-        assert _marca(nombres[quien]) is None
+        assert _leer(nombres[quien])["cancelar_sin_confirmar"] is None
     else:
         assert _leer_org(org_id)["billing_status"] == "active" and SUS["sus-otra"] == "authorized"
         assert _leer(nombres["abrio"])["mp_preapproval_id"] == sid
-
-
-def _marca(username: str):
-    async def _run():
-        async for db in get_async_session():
-            return (await db.execute(select(User.cancelar_sin_confirmar).where(User.username == username))).scalar()
-    return asyncio.new_event_loop().run_until_complete(_run())
 
 
 # Cómo está la suscripción de quien abrió y qué marca tiene, sin haber recibido el 503 de esa.
@@ -835,7 +829,34 @@ def test_un_miembro_sin_la_marca_no_concilia(client, suya, marca):
     assert r.status_code == 403, r.text
     assert not [p for p in PEDIDOS if p.method == "PUT"]
     assert _leer_org(org_id)["billing_status"] == "active"
-    assert _leer(nombres["abrio"])["mp_preapproval_id"] == queda and _marca(nombres["abrio"]) == marca
+    assert _leer(nombres["abrio"])["mp_preapproval_id"] == queda and _leer(nombres["abrio"])["cancelar_sin_confirmar"] == marca
+
+
+# Quién tiene la marca y quién pide: la de otra cuenta no le sirve a quien pide.
+@pytest.mark.parametrize("tiene, pide", [("abrio", "miembro"), ("duena", "abrio")])
+def test_la_marca_de_otra_cuenta_no_concilia(client, tiene, pide):
+    from tests.test_cobro_mp1 import _leer_org
+    nombres, sid, org_id, _ = _org_con_suscripcion(client, pide)
+    SUS[sid] = SUS["sus-m"] = "cancelled"
+    _set_user(nombres["miembro"], mp_preapproval_id="sus-m")
+    _set_user(nombres[tiene], cancelar_sin_confirmar=sid)
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == 403, r.text
+    assert not [p for p in PEDIDOS if p.method == "PUT"]
+    assert _leer_org(org_id)["billing_status"] == "active"
+    assert _leer(nombres[tiene])["cancelar_sin_confirmar"] == sid
+
+
+def test_conciliar_borra_las_marcas_de_todo_el_estudio(client):
+    from tests.test_cobro_mp1 import _leer_org
+    nombres, sid, org_id, _ = _org_con_suscripcion(client, "duena")
+    SUS[sid] = SUS["sus-m"] = "cancelled"
+    _set_user(nombres["abrio"], cancelar_sin_confirmar=sid)
+    _set_user(nombres["miembro"], mp_preapproval_id="sus-m", cancelar_sin_confirmar="sus-m")
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == 200, r.text
+    assert _leer_org(org_id)["billing_status"] == "canceled"
+    assert [_leer(nombres[k])["cancelar_sin_confirmar"] for k in ("abrio", "miembro")] == [None, None]
 
 
 def test_el_reintento_que_falla_en_otra_deja_la_suya_para_volver_a_conciliar(client):
@@ -854,10 +875,10 @@ def test_el_reintento_que_falla_en_otra_deja_la_suya_para_volver_a_conciliar(cli
     FALLA["PUT"] = _falla_la_del_miembro
     assert client.post("/api/billing/cancel").status_code == 503
     FALLA.clear()
-    assert _leer(nombres["abrio"])["mp_preapproval_id"] == sid and _marca(nombres["abrio"]) == "sus-m"
+    assert _leer(nombres["abrio"])["mp_preapproval_id"] == sid and _leer(nombres["abrio"])["cancelar_sin_confirmar"] == "sus-m"
     r = client.post("/api/billing/cancel")
     assert r.status_code == 200, r.text
-    assert _leer_org(org_id)["billing_status"] == "canceled" and _marca(nombres["abrio"]) is None
+    assert _leer_org(org_id)["billing_status"] == "canceled" and _leer(nombres["abrio"])["cancelar_sin_confirmar"] is None
 
 
 class _NoContesta:
@@ -893,7 +914,7 @@ def test_un_miembro_con_una_cancelada_no_toca_el_plan_del_estudio(client, suya, 
     _leer_org(org_id, billing_status=estado_org)
     _set_user(nombres["abrio"], mp_preapproval_id=de_abrio and sid)
     SUS[sid], SUS["vieja-m"] = de_abrio, suya
-    _set_user(nombres["miembro"], mp_preapproval_id="vieja-m")
+    _set_user(nombres["miembro"], mp_preapproval_id="vieja-m", cancelar_sin_confirmar="vieja-m")
     r = getattr(client, pedido[0])(pedido[1])
     assert r.status_code == 403, r.text
     assert SUS[sid] == de_abrio and SUS["vieja-m"] == suya, dict(SUS)

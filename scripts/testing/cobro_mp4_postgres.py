@@ -11,6 +11,7 @@ La base tiene que estar vacía: el script crea las tablas.
 """
 import os
 import sys
+from contextlib import closing
 import types
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -58,7 +59,8 @@ def chequear(ok, que):
 
 
 def sql(consulta, *args):
-    with psycopg2.connect(URL) as con, con.cursor() as cur:
+    # El «with» de psycopg2 cierra la transacción, no la conexión.
+    with closing(psycopg2.connect(URL)) as con, con, con.cursor() as cur:
         cur.execute(consulta, args)
         return cur.fetchall() if cur.description else None
 
@@ -66,7 +68,7 @@ def sql(consulta, *args):
 def columnas():
     return {nombre: (tipo, largo, nula) for nombre, tipo, largo, nula in sql(
         "select column_name, data_type, character_maximum_length, is_nullable from information_schema.columns "
-        "where table_name = 'users'")}
+        "where table_schema = current_schema() and table_name = 'users'")}
 
 
 def filas():
