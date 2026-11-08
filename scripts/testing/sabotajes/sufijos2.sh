@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Negativos de SUFIJOS-2: cada sabotaje deshace una regla de los sufijos de
-# valor (la coma de un número, los Z sin decimales, ninguno vacío, un
-# número que cambiaría de valor) y
+# valor (la coma de un número, los Z sólo con dígitos, ninguno vacío, un
+# número que cambiaría de valor al limpiarlo) y
 # tests/test_sufijos2.py tiene que fallar por ese motivo.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/sufijos2.sh [SHA]
@@ -81,16 +81,20 @@ sabotaje $A "un número con dígitos que no son ASCII entra al TXT" \
   '_DECIMAL = r"(?<!\d)(?<!\d[.,])(\d+)[.,](\d+)(?![.,]?\d)"' \
   "test_un_numero_que_no_es_ascii_no_entra_al_txt"
 
-# 2. Un sufijo que pide número, sin decimales.
-sabotaje $G "un Z con decimales pasa" \
-  'if pide_numero and ("," in valor or cambiaria):' 'if False:' \
+# 2. Un sufijo que pide número: sólo dígitos ASCII.
+Z='if codigo.upper().startswith(PIDE_NUMERO) and not re.fullmatch(r"[0-9]+", valor):'
+sabotaje $G "un Z con decimales o signos pasa" \
+  "$Z" 'if False:' \
   "test_un_sufijo_que_pide_numero_no_acepta_decimales" \
   "test_los_decimales_no_generan_y_dicen_donde" \
-  "test_el_error_llega_como_400"
-sabotaje $G "un Z con decimales se redondea en silencio" \
-  'if pide_numero and ("," in valor or cambiaria):' \
-  'if pide_numero and ("," in valor or cambiaria) and not (valor := valor.split(",")[0]):' \
-  "test_un_sufijo_que_pide_numero_no_acepta_decimales"
+  "test_el_error_llega_como_400" \
+  "test_un_sufijo_que_pide_numero_no_acepta_signos[ZA(1 500)-]"
+sabotaje $G "un Z acepta dígitos que no son ASCII" \
+  'not re.fullmatch(r"[0-9]+", valor)' 'not re.fullmatch(r"\d+", valor)' \
+  "test_un_sufijo_que_pide_numero_no_acepta_signos[ZA(\uff11\uff16)-]"
+sabotaje $G "un z en minúscula no pide número" \
+  'if codigo.upper().startswith(PIDE_NUMERO)' 'if codigo.startswith(PIDE_NUMERO)' \
+  "test_un_sufijo_que_pide_numero_no_acepta_signos[za(2.5)-]"
 sabotaje $G "también los A piden número" \
   'PIDE_NUMERO = ("Z",)' 'PIDE_NUMERO = ("Z", "A")' \
   "test_un_numero_con_decimales_en_un_sufijo_libre_sale_con_coma" \
@@ -101,42 +105,71 @@ sabotaje $G "el error de los decimales no dice dónde" \
 
 # 3. Ninguno vacío.
 sabotaje $G "un sufijo vacío pasa" \
-  'if not valor.strip():' 'if False:' \
+  'if not limpio.strip():' 'if False:' \
   "test_un_sufijo_vacio_no_se_genera" \
   "test_un_sufijo_vacio_no_genera_y_dice_donde"
 sabotaje $G "sólo se mira el vacío como vino, no después de limpiar" \
-  'if not valor.strip():' 'if not uno[2]:' \
+  'if not limpio.strip():' 'if not uno[2]:' \
   "test_un_sufijo_vacio_no_se_genera[AA(   )-]" \
   "test_un_sufijo_vacio_no_se_genera[AA(--)-]"
 
-# 4. Un número que cambiaría de valor no se adivina (revisión de SUFIJOS-2).
+# 4. Un número que cambiaría de valor al limpiarlo no se genera.
 sabotaje $G "un número que cambiaría sale igual en un libre" \
   'if cambiaria:' 'if False:' \
   "test_un_numero_que_cambiaria_no_se_genera" \
   "test_el_numero_que_cambiaria_no_genera_y_dice_donde"
-sabotaje $G "un Z con signo o barra pasa" \
-  'signo = _SIGNO_JUNTO_A_NUMERO.search(valor)' 'signo = None' \
-  "test_un_sufijo_que_pide_numero_no_acepta_signos[ZA(-5)-]" \
-  "test_un_sufijo_que_pide_numero_no_acepta_signos[ZA(1/2)-]"
-sabotaje $G "el signo de un número se pierde en un libre" \
-  'signo = _SIGNO_DE_UN_NUMERO.search(valor)' 'signo = None' \
-  "test_un_numero_que_cambiaria_no_se_genera[AF(-5)-]" \
+sabotaje $G "un dígito que no es ASCII pasa" \
+  'if c.isdecimal() or not de_unidad or valor[i + 1:i + 2].isnumeric():' 'if False:' \
+  "test_un_numero_que_cambiaria_no_se_genera[AF(1.5\xb2)-]" \
+  "test_un_numero_que_cambiaria_no_se_genera[AJ(10\u207b\xb3)-]"
+sabotaje $G "todo ² o \xb3 se toma como de una unidad" \
+  'de_unidad = i > 0 and valor[i - 1].isascii() and valor[i - 1].isalpha()' 'de_unidad = True' \
+  "test_un_numero_que_cambiaria_no_se_genera[AF(1.5\xb2)-]"
+sabotaje $G "ningún ² o \xb3 se toma como de una unidad" \
+  'de_unidad = i > 0 and valor[i - 1].isascii() and valor[i - 1].isalpha()' 'de_unidad = False' \
+  "test_lo_que_no_cambia_un_numero_sale_como_antes[AJ(1,5 M\xb2)--AJ(1,5 M2)-]"
+sabotaje $G "un dígito que no es ASCII y queda espacio pasa" \
+  'if antes.isnumeric() or ' 'if ' \
+  "test_un_numero_que_cambiaria_no_se_genera[AF(2.5 X\u0663.\u0665)-]"
+sabotaje $G "un signo suelto entre dos números pasa" \
+  'if digito_antes and digito_despues:' 'if False:' \
+  "test_un_numero_que_cambiaria_no_se_genera[AJ(1 - 2)-]"
+sabotaje $G "el signo pegado a un número pasa" \
+  'if t[i + 1:i + 2].isdigit():' 'if False:' \
   "test_un_numero_que_cambiaria_no_se_genera[AJ(ROLLO .5 M)-]"
-sabotaje $G "una fracción sale con espacio en un libre" \
-  'if "/" in separadores or ' 'if ' \
-  "test_un_numero_que_cambiaria_no_se_genera[AF(1/2)-]"
+sabotaje $G "lo que sigue a un número sale espacio sin frenar" \
+  'return not (t[i] in ",.;:-" and t[i + 1:i + 2] in ("", " "))' 'return False' \
+  "test_un_numero_que_cambiaria_no_se_genera[AJ(10 %)-]"
+sabotaje $G "la coma o el punto que cierra un número frena" \
+  'return not (t[i] in ",.;:-" and t[i + 1:i + 2] in ("", " "))' 'return True' \
+  "test_lo_que_no_cambia_un_numero_sale_como_antes[AA(TALLE 5, AZUL)--AA(TALLE 5  AZUL)-]"
+sabotaje $G "un menos separado del número pasa" \
+  'return signo and digito_despues and not antes[-1:].isalnum()' 'return False' \
+  "test_un_numero_que_cambiaria_no_se_genera[AF(- 5)-]"
+sabotaje $G "un guion después de una palabra se toma como menos" \
+  'return signo and digito_despues and not antes[-1:].isalnum()' 'return signo and digito_despues' \
+  "test_lo_que_no_cambia_un_numero_sale_como_antes[AA(ROJO - 5)--AA(ROJO   5)-]"
+sabotaje $G "una fecha frena" \
+  'r"[0-9]{1,2}([./-])[0-9]{1,2}\1[0-9]{2,4}"' 'r"(?!)"' \
+  "test_lo_que_no_cambia_un_numero_sale_como_antes[AR(31/12/2026)--AR(31 12 2026)-]" \
+  "test_lo_que_no_cambia_un_numero_sale_como_antes[AR(31.12.2026)--AR(31 12 2026)-]"
+sabotaje $G "un código de números con guion frena" \
+  'r"|[0-9]+(?:-[0-9]+)+"' 'r"|(?!)"' \
+  "test_lo_que_no_cambia_un_numero_sale_como_antes[AI(123-456)--AI(123 456)-]"
+sabotaje $G "un exponente dentro de un código pasa" \
+  '(?!.*[0-9][Ee][^A-Za-z0-9][0-9])' '' \
+  "test_un_numero_que_cambiaria_no_se_genera[AJ(1E-3)-]" \
+  "test_un_numero_que_cambiaria_no_se_genera[AJ(1E+3)-]"
+sabotaje $G "un código con letras acepta cualquier signo después de un dígito" \
+  '(?!.*[0-9][^A-Za-z0-9.°-])' '' \
+  "test_un_numero_que_cambiaria_no_se_genera[AA(100%ALGODON)-]" \
+  "test_un_numero_que_cambiaria_no_se_genera[AJ(5/KG)-]"
 sabotaje $A "los miles se toman como decimales" \
   'return bool(decimales) and len(decimales) == 3 and entero.lstrip("0") != ""' 'return False' \
   "test_un_numero_que_cambiaria_no_se_genera[AJ(ROLLO 1.500 M)-]"
 sabotaje $A "un cero adelante también se toma como miles" \
   'and entero.lstrip("0") != ""' '' \
   "test_lo_que_no_cambia_un_numero_sale_como_antes[AJ(0.750)--AJ(0,750)-]"
-sabotaje $G "un dígito que no es ASCII junto a un número pasa" \
-  'if _junto_a_un_digito_que_no_es_ascii(valor):' 'if False:' \
-  "test_un_numero_que_cambiaria_no_se_genera[AF(1\xbd)-]"
-sabotaje $G "un dígito que no es ASCII junto a un punto se toma como pegado a un número" \
-  'v in "0123456789" for v in' 'v in "0123456789.," for v in' \
-  "test_lo_que_no_cambia_un_numero_sale_como_antes[AF(2.5 X\u0663.\u0665)--AF(2,5 X   )-]"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

@@ -60,8 +60,9 @@ def test_un_codigo_con_varios_puntos_no_se_toma_como_numero():
 
 
 def test_un_numero_que_no_es_ascii_no_entra_al_txt():
-    # «٣.٥» son dígitos para Python, no para el MARIA: salen espacio, como antes.
-    assert mg.limpiar_sufijo("AF(2.5 X\u0663.\u0665)-")[0] == "AF(2,5 X   )-"
+    # «٣.٥» son dígitos para Python, no para el MARIA: saldrían espacio.
+    with pytest.raises(ValueError, match="cambiaría de valor"):
+        mg.limpiar_sufijo("AF(2.5 X\u0663.\u0665)-")
 
 
 def test_el_aviso_dice_que_el_numero_sale_con_coma():
@@ -155,22 +156,28 @@ def test_por_el_endpoint_la_coma_llega_al_txt(client):
 # a un número da otro número; no sale al TXT, se dice dónde y no se genera).
 
 CAMBIA_EN_UN_Z = ["ZA(.5)-", "ZA(-5)-", "ZA(+5)-", "ZA(1/2)-", "ZA(1,000.50)-",
-                  "ZA(16.384.000)-", "ZA(2-5)-", "ZA(1½)-"]
+                  "ZA(16.384.000)-", "ZA(2-5)-", "ZA(1½)-", "ZA(\u22125)-", "ZA(- 5)-",
+                  "ZA(10%)-", "ZA(1 500)-", "ZA(\uff11\uff16)-", "ZA(5 KG)-", "za(2.5)-"]
 
 
 @pytest.mark.parametrize("malo", CAMBIA_EN_UN_Z)
 def test_un_sufijo_que_pide_numero_no_acepta_signos(malo):
-    with pytest.raises(ValueError, match=r"del ítem 3: «ZA\(.*pide un número sin decimales.*no se genera"):
+    with pytest.raises(ValueError, match=r"del ítem 3: «[Zz][Aa]\(.*pide un número sin decimales.*no se genera"):
         mg.limpiar_sufijo(malo, " del ítem 3")
 
 
 CAMBIA_EN_UNO_LIBRE = ["AF(-2.5)-", "AF(-5)-", "AJ(ROLLO .5 M)-", "AJ(ROLLO 1.500 M)-",
-                       "AF(1,000.50)-", "AF(16.384.000)-", "AF(1/2)-", "AF(1½)-", "AF(1.5²)-"]
+                       "AF(1,000.50)-", "AF(16.384.000)-", "AF(1/2)-", "AF(1½)-", "AF(1.5²)-",
+                       "AJ(\u20135)-", "AJ(\uff0d\uff15)-", "AJ(\uff11.\uff15\uff10\uff10)-",
+                       "AJ(½)-", "AJ(1\u20442)-", "AJ(1 / 2)-", "AJ(1E-3)-", "AJ(1E+3)-",
+                       "AJ(10\u207b\u00b3)-", "AJ(1'500)-", "AJ(1/2 KG)-", "AJ(2.5-3.5)-",
+                       "AF(- 5)-", "AJ(10 %)-", "AF(2.5 X\u0663.\u0665)-", "AI(1.2.3)-",
+                       "AA(100%ALGODON)-", "AJ(5/KG)-", "AJ(1 - 2)-"]
 
 
 @pytest.mark.parametrize("malo", CAMBIA_EN_UNO_LIBRE)
 def test_un_numero_que_cambiaria_no_se_genera(malo):
-    with pytest.raises(ValueError, match=r"del ítem 3: en «A[FJ]\(.*cambiaría de valor.*no se genera"):
+    with pytest.raises(ValueError, match=r"del ítem 3: en «A[A-Z]\(.*cambiaría de valor.*no se genera"):
         mg.limpiar_sufijo(malo, " del ítem 3")
 
 
@@ -189,7 +196,16 @@ SIGUEN_IGUAL = [
     ("AI(123-456)-", "AI(123 456)-"),             # código de pieza en un libre
     ("AI(V1.2.3)-", "AI(V1 2 3)-"),
     ("AJ(1,5 M²)-", "AJ(1,5 M2)-"),          # el ² de una unidad
-    ("AF(2.5 X٣.٥)-", "AF(2,5 X   )-"),
+    ("AJ(1.5000)-", "AJ(1,5000)-"),               # cuatro decimales no son miles
+    ("AJ(00.500)-", "AJ(00,500)-"),               # con ceros adelante tampoco
+    ("AR(31/12/2026)-", "AR(31 12 2026)-"),       # una fecha no es un número
+    ("AR(31.12.2026)-", "AR(31 12 2026)-"),
+    ("AR(31-12-2026)-", "AR(31 12 2026)-"),
+    ("AB(X-5)-", "AB(X 5)-"),
+    ("AA(TALLE 5, AZUL)-", "AA(TALLE 5  AZUL)-"),
+    ("AA(ROJO - 5)-", "AA(ROJO   5)-"),
+    ("AA(5°C)-", "AA(5 C)-"),
+    ("AB(5KG/M2)-", "AB(5KG M2)-"),
 ]
 
 
