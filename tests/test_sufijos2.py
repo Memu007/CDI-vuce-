@@ -175,7 +175,8 @@ CAMBIA_EN_UNO_LIBRE = ["AF(-2.5)-", "AF(-5)-", "AJ(ROLLO .5 M)-", "AJ(ROLLO 1.50
                        "AF(- 5)-", "AJ(10 %)-", "AF(2.5 X\u0663.\u0665)-", "AI(1.2.3)-",
                        "AA(100%ALGODON)-", "AJ(5/KG)-", "AJ(1 - 2)-", "AJ(X\u3007)-",
                        "AJ(2.500KG)-", "AJ(16.384.000KG)-", "AJ(ROLLO 1.500M)-", "AJ(1.500x5)-",
-                       "AJ(AB-1.500)-", "AR(12.50.2026)-", "AR(1.50.000)-", "AR(32/12/2026)-"]
+                       "AJ(AB-1.500)-", "AR(12.50.2026)-", "AR(1.50.000)-", "AR(32/12/2026)-",
+                       "AJ(M²5)-"]
 
 
 @pytest.mark.parametrize("malo", CAMBIA_EN_UNO_LIBRE)

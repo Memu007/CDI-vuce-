@@ -124,6 +124,9 @@ sabotaje $G "un dígito que no es ASCII pasa" \
 sabotaje $G "todo ² o \xb3 se toma como de una unidad" \
   'de_unidad = i > 0 and valor[i - 1].isascii() and valor[i - 1].isalpha()' 'de_unidad = True' \
   "test_un_numero_que_cambiaria_no_se_genera[AF(1.5\xb2)-]"
+sabotaje $G "el ² de una unidad pegado a un número pasa" \
+  ' or valor[i + 1:i + 2].isnumeric():' ':' \
+  "test_un_numero_que_cambiaria_no_se_genera[AJ(M\xb25)-]"
 sabotaje $G "ningún ² o \xb3 se toma como de una unidad" \
   'de_unidad = i > 0 and valor[i - 1].isascii() and valor[i - 1].isalpha()' 'de_unidad = False' \
   "test_lo_que_no_cambia_un_numero_sale_como_antes[AJ(1,5 M\xb2)--AJ(1,5 M2)-]"
