@@ -8,8 +8,12 @@
     };
 
     function campo(loc) {
-        const nombre = (Array.isArray(loc) ? loc : []).filter((p) => typeof p === 'string' && p !== 'body').pop();
-        return nombre ? (CAMPOS[nombre] || 'el campo «' + nombre + '»') : 'el dato enviado';
+        const partes = Array.isArray(loc) ? loc : [];
+        const nombre = partes.filter((p) => typeof p === 'string' && p !== 'body').pop();
+        const indice = partes.filter((p) => typeof p === 'number').pop();
+        const texto = nombre ? (CAMPOS[nombre] || 'el campo «' + nombre + '»') : 'el dato enviado';
+        // Sin el número, los errores de dos ítems de una lista se leen como uno solo.
+        return indice === undefined ? texto : texto + ' (ítem ' + (indice + 1) + ')';
     }
 
     function mayuscula(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
@@ -23,6 +27,8 @@
             case 'json_invalid': return 'Los datos enviados no son JSON válido.';
             case 'model_attributes_type': case 'dict_type': return 'Los datos enviados tienen que ser un objeto.';
             case 'string_type': return mayuscula(c) + ' tiene que ser texto.';
+            case 'int_type': case 'int_parsing': case 'int_from_float': return mayuscula(c) + ' tiene que ser un número entero.';
+            case 'float_type': case 'float_parsing': return mayuscula(c) + ' tiene que ser un número.';
             case 'too_long': case 'string_too_long':
                 if (tope) return mayuscula(c) + ' puede tener hasta ' + tope + ' caracteres.';
                 break;
@@ -31,7 +37,7 @@
                 if (typeof e.msg === 'string') return e.msg.replace(/^Value error, /, '').replace(/\.?$/, '.');
                 break;
         }
-        return mayuscula(c) + ' no es válido.';
+        return 'Revisá ' + c + '.';
     }
 
     global.textoDeError = function (detail, fallback) {
