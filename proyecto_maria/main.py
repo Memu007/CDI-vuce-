@@ -9792,7 +9792,7 @@ async def create_organization(
     completa nombre del estudio + sus datos personales, y se crea todo junto.
     El admin queda con organization_id apuntando a la org nueva.
     """
-    import re, uuid as _uuid
+    import uuid as _uuid
 
     if not req.name or not req.name.strip():
         raise HTTPException(status_code=400, detail="El nombre del estudio es obligatorio")
