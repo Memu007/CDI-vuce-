@@ -123,3 +123,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `tests/conftest.py:19`: pisa `DATABASE_URL` con SQLite sin avisar, así que
   un `pytest` con la URL de Postgres corre en SQLite. Hoy se esquiva con
   `--noconftest -p pg_nullpool`; que avise o que respete una URL de PG pedida.
+- `core/maria_generator_export.py:114`: el generador de exportación no pasa
+  la destinación por `destinacion_del_txt` (sólo lo hace el endpoint), y el
+  de importación chequea en el endpoint y en el generador. El chequeo, una
+  vez, en los dos generadores.
