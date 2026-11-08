@@ -1,6 +1,6 @@
 # admin_router imported at line 58
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request, Response, BackgroundTasks, Query
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -338,6 +338,13 @@ def _clave_hasheable(clave):
 ClaveNueva = Annotated[str, AfterValidator(_clave_hasheable)]
 
 
+def _exigir_politica_de_clave(clave):
+    if not clave or len(clave) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
+    if not re.search(r'[\d\W_]', clave):
+        raise HTTPException(status_code=400, detail="La contraseña debe incluir al menos un número o símbolo")
+
+
 def _email_valido(email):
     """El email limpio, o 400 si no tiene la forma usuario@dominio.com o no
     entra en la columna."""
@@ -422,6 +429,21 @@ else:
         "http://localhost:5500", "http://127.0.0.1:5500",
     ]
 
+
+class _RutaSinNul:
+    """Un NUL en la ruta llega a la base como parámetro y Postgres no lo acepta."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and "\x00" in scope.get("path", ""):
+            await JSONResponse({"detail": "Not Found"}, status_code=404)(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(_RutaSinNul)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -445,7 +467,6 @@ app.add_exception_handler(RateLimitExceeded, _limite_por_minuto_excedido)
 # ----- Handlers globales: dejar mensaje amigable al user en 5xx,
 # registrar el detalle tecnico en logs para Railway. Errores 4xx
 # (validaciones, auth, conflictos) se devuelven tal cual.
-from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 
@@ -1891,10 +1912,7 @@ async def reset_password(request: Request, data: PasswordResetConfirm, db: Async
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
     # 3. Validar password policy
-    if not data.new_password or len(data.new_password) < 8:
-        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
-    if not re.search(r'[\d\W_]', data.new_password):
-        raise HTTPException(status_code=400, detail="La contraseña debe incluir al menos un número o símbolo")
+    _exigir_politica_de_clave(data.new_password)
 
     # 4. Actualizar contraseña y revocar todas las sesiones (nunca NULL: aceptaría a todas)
     if not await guardar_si_la_clave_sigue(db, user.username, user.password, consumir=data.token,
@@ -2475,10 +2493,7 @@ async def change_password(
       - Mínimo 8 chars en la nueva.
       - Hashing en threadpool (bcrypt CPU-bound).
     """
-    if not body.new_password or len(body.new_password) < 8:
-        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 8 caracteres")
-    if not re.search(r'[\d\W_]', body.new_password):
-        raise HTTPException(status_code=400, detail="La contraseña debe incluir al menos un número o símbolo")
+    _exigir_politica_de_clave(body.new_password)
     if body.new_password == body.current_password:
         raise HTTPException(status_code=400, detail="La nueva contraseña no puede ser igual a la actual")
 
@@ -3431,10 +3446,7 @@ async def register(request: RegisterRequest, req: Request, background_tasks: Bac
             raise HTTPException(status_code=400, detail=str(ce))
 
     # Validar password (mínimo 8 caracteres, al menos 1 número o símbolo)
-    if not request.password or len(request.password) < 8:
-        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
-    if not re.search(r'[\d\W_]', request.password):
-        raise HTTPException(status_code=400, detail="La contraseña debe incluir al menos un número o símbolo")
+    _exigir_politica_de_clave(request.password)
 
     # Hash en threadpool para no bloquear el event loop (bcrypt es CPU-bound).
     hashed_password = await run_in_threadpool(hash_password, request.password)
@@ -3724,13 +3736,30 @@ async def create_manual_operation(
     except Exception:
         raise HTTPException(status_code=400, detail="Body JSON inválido")
 
-    client_id = str(data.get("client_id") or "").strip()
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail=_AVISO_NO_ES_OBJETO)
+    client_id = _guardable_en_pg(str(data.get("client_id") or "")).strip()
     items_raw = data.get("items", [])
 
     if not client_id:
         raise HTTPException(status_code=400, detail="Falta client_id")
     if not items_raw or not isinstance(items_raw, list):
         raise HTTPException(status_code=400, detail="Falta lista de items")
+    if not all(isinstance(it, dict) for it in items_raw):
+        raise HTTPException(status_code=400, detail=_AVISO_NO_ES_OBJETO)
+    items = [dict(
+        pieza=_guardable_en_pg(str(it.get("pieza", "") or ""))[:20],
+        descripcion=_guardable_en_pg(str(it.get("descripcion", "") or "")),
+        origen=_guardable_en_pg(str(it.get("origen", "") or "XX")).upper()[:3],
+        cantidad=_numero_de_afuera(it.get("cantidad"), "La cantidad"),
+        valor_unitario=_numero_de_afuera(it.get("valor_unitario"), "El valor unitario"),
+        peso_unitario=_numero_de_afuera(it.get("peso_unitario"), "El peso unitario"),
+        grupo_id=_grupo_id_o_none(it.get("grupo_id")),
+        unidad=_guardable_en_pg(str(it.get("unidad") or ""))[:10] or None,
+    ) for it in items_raw]
+    total_items = len(items)
+    total_value = _numero_de_afuera(sum(it["valor_unitario"] * it["cantidad"] for it in items), "El valor total")
+    total_weight = _numero_de_afuera(sum(it["peso_unitario"] * it["cantidad"] for it in items), "El peso total")
 
     username = user["username"]
 
@@ -3741,11 +3770,6 @@ async def create_manual_operation(
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
 
     operation_id = f"MANUAL_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
-
-    # Calcular totales
-    total_items = len(items_raw)
-    total_value = sum(float(it.get("valor_unitario", 0) or 0) * float(it.get("cantidad", 0) or 0) for it in items_raw)
-    total_weight = sum(float(it.get("peso_unitario", 0) or 0) * float(it.get("cantidad", 0) or 0) for it in items_raw)
 
     # Contar, calcular el op_code y crear la operación con la cuenta bloqueada,
     # en un solo commit.
@@ -3765,20 +3789,8 @@ async def create_manual_operation(
     db.add(operation)
     await db.flush()
 
-    # Crear items
-    for idx, it in enumerate(items_raw):
-        item = OperationItemModel(
-            operation_id=operation_id,
-            pieza=str(it.get("pieza", "") or ""),
-            descripcion=str(it.get("descripcion", "") or ""),
-            origen=str(it.get("origen", "") or "XX").upper()[:3],
-            cantidad=float(it.get("cantidad", 0) or 0),
-            valor_unitario=float(it.get("valor_unitario", 0) or 0),
-            peso_unitario=float(it.get("peso_unitario", 0) or 0),
-            grupo_id=it.get("grupo_id"),
-            unidad=str(it.get("unidad") or "")[:10] or None,
-        )
-        db.add(item)
+    for it in items:
+        db.add(OperationItemModel(operation_id=operation_id, **it))
 
     await db.commit()
 
@@ -3787,7 +3799,7 @@ async def create_manual_operation(
         "operation_id": operation_id,
         "client_id": client_id,
         "total_items": total_items,
-        "items": items_raw,
+        "items": items,
     }
 
 
@@ -7357,6 +7369,7 @@ async def create_cliente(
     db: AsyncSession = Depends(get_db),
 ):
     """Crea un cliente asociado al usuario autenticado."""
+    client = _guardable_en_pg(client)
     username = user["username"]
 
     # Límite de clientes por plan.
@@ -7456,6 +7469,7 @@ async def update_cliente(
     Sin html.escape() en storage (ver create_cliente). Truncamos al limite de
     cada VARCHAR para evitar 500s sobre input largo.
     """
+    client_data = _guardable_en_pg(client_data)
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
     # Antes de tocar el cliente: con la fecha mala no se guarda nada.
@@ -7486,7 +7500,13 @@ async def update_cliente(
         client.auto_ncm_enabled = bool(client_data.get("auto_ncm_enabled"))
     if "fecha_inic_activ" in client_data:
         client.fecha_inic_activ = fecha_inic_activ
-    await db.commit()
+    email = client.email
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        # El único dato único que se edita acá es el email (owner, email), activo o no.
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Ya tenés un cliente con el email {email}") from e
     await db.refresh(client)
     return {"success": True, "cliente": _client_to_dict(client)}
 
@@ -7918,6 +7938,35 @@ def _grupo_id_o_none(valor):
     return numero if numero is not None and -2**31 <= numero < 2**31 else None
 
 
+def _numero_de_afuera(valor, que):
+    """El JSON trae NaN, Infinity o 1e999 sin quejarse; la respuesta (allow_nan)
+    y una columna json de Postgres no los aceptan."""
+    try:
+        numero = float(valor or 0)
+    except (TypeError, ValueError, OverflowError):
+        numero = math.nan
+    if not math.isfinite(numero):
+        raise HTTPException(status_code=400, detail=f"{que} tiene que ser un número.")
+    return numero
+
+
+def _entero_de_afuera(valor, que):
+    numero = _numero_de_afuera(valor, que)
+    if not -2**31 <= numero < 2**31:
+        raise HTTPException(status_code=400, detail=f"{que} es demasiado grande.")
+    return int(numero)
+
+
+def _tiene_no_finito(valor):
+    if isinstance(valor, float):
+        return not math.isfinite(valor)
+    if isinstance(valor, list):
+        return any(_tiene_no_finito(v) for v in valor)
+    if isinstance(valor, dict):
+        return any(_tiene_no_finito(v) for v in valor.values())
+    return False
+
+
 def _sin_nul(valor):
     """Saca el carácter NUL de todos los textos de un JSON: Postgres no lo
     acepta en un texto y tiraba abajo el guardado entero (GUARDAR-1)."""
@@ -7980,6 +8029,8 @@ async def save_client_operation(
         # Lo que el historial rechazaría se rechaza antes de guardar nada.
         if tiene_medio_par(data):
             raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
+        if _tiene_no_finito(data):
+            raise HTTPException(status_code=400, detail="Hay un número que no es válido.")
         if any(tiene_digito_no_ascii(str(item.get("ncm") or item.get("pieza") or "")) for item in items):
             raise HTTPException(status_code=400, detail=_AVISO_DIGITOS)
 
@@ -7997,8 +8048,8 @@ async def save_client_operation(
         campos = dict(
             client_id=client_id,
             source=str(data.get("source") or "manual")[:50],
-            total_items=int(resumen.get("items", len(items))),
-            total_value=float(resumen.get("valor_total", 0) or 0),
+            total_items=_entero_de_afuera(resumen.get("items", len(items)), "La cantidad de ítems"),
+            total_value=_numero_de_afuera(resumen.get("valor_total"), "El valor total"),
             currency=str(data.get("currency") or "USD")[:3],
         )
         if operation is not None:
@@ -8048,9 +8099,9 @@ async def save_client_operation(
                     # Lo que falta queda vacío (0 o ""): nada de cantidad 1,
                     # peso 0,5 ni origen «XX» inventados (MARIA-1b, D6 Dev 2).
                     origen=str(item.get("origen") or "")[:3],
-                    cantidad=float(item.get("cantidad") or 0),
-                    valor_unitario=float(item.get("valor_unitario") or 0),
-                    peso_unitario=float(item.get("peso_unitario") or 0),
+                    cantidad=_numero_de_afuera(item.get("cantidad"), "La cantidad"),
+                    valor_unitario=_numero_de_afuera(item.get("valor_unitario"), "El valor unitario"),
+                    peso_unitario=_numero_de_afuera(item.get("peso_unitario"), "El peso unitario"),
                     grupo_id=_grupo_id_o_none(item.get("grupo_id")),
                     unidad=str(item.get("unidad") or "")[:10] or None,
                 )
@@ -8115,7 +8166,7 @@ async def save_client_operation(
 
 
 class AgruparRequest(BaseModel):
-    item_ids: list[TextoCodificable] = []
+    item_ids: list[TextoCodificable] = Field(default=[], max_length=10000)
 
 
 class DesagruparRequest(BaseModel):
@@ -10537,8 +10588,7 @@ async def create_organization(
         raise HTTPException(status_code=400, detail="El nombre del estudio es obligatorio")
     if not re.match(r'^[a-zA-Z0-9_-]{3,30}$', req.username):
         raise HTTPException(status_code=400, detail="Username inválido (3-30 chars alfanuméricos)")
-    if len(req.password) < 8:
-        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
+    _exigir_politica_de_clave(req.password)
 
     # Validar username duplicado
     existing = await db.execute(select(User).where(User.username == req.username))
