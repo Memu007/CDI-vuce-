@@ -71,7 +71,7 @@ sabotaje "el login busca sin distinguir mayúsculas" \
 sabotaje "el arranque promueve sin distinguir mayúsculas" \
   'select(User).where(User.username == identifier))' \
   'select(User).where(func.lower(User.username) == identifier.lower()))' \
-  "$V" "$T[mayusculas-/auth/register]"
+  'assert roles.count("admin") == (1 if username == admin else 0)' "$T[mayusculas-/auth/register]"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"

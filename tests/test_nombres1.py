@@ -94,7 +94,7 @@ def _entrar(c, username, clave):
 
 # Cada una de las dos cuentas es la de la lista: el arranque tiene que promover la exacta
 # aunque la base devuelva primero la otra.
-@pytest.mark.parametrize("de_la_lista", ["n", "N"], ids=["minusculas", "mayusculas"])
+@pytest.mark.parametrize("de_la_lista", [str.lower, str.upper], ids=["minusculas", "mayusculas"])
 def test_dos_cuentas_viejas_que_difieren_en_mayusculas_siguen_entrando(monkeypatch, nombre, de_la_lista):
     claves = {nombre: "Minus#123", nombre.upper(): "Mayus#456"}
     for username, clave in claves.items():
@@ -108,10 +108,10 @@ def test_dos_cuentas_viejas_que_difieren_en_mayusculas_siguen_entrando(monkeypat
         assert me.json()["username"] == username
     assert _entrar(c, nombre, claves[nombre.upper()]).status_code == 401
 
-    admin = _formas(nombre)[de_la_lista]
+    admin = de_la_lista(nombre)
     monkeypatch.setenv("ADMIN_USERNAMES", admin)
     with TestClient(main.app):
         pass
     for username in claves:
         roles = main.roles_de({"roles": _run(_fila(username)).roles})
-        assert roles.count("admin") == (username == admin), (username, roles)
+        assert roles.count("admin") == (1 if username == admin else 0), (username, roles)
