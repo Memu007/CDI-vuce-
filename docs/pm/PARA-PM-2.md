@@ -2,16 +2,17 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## OBSERVABILIDAD-1, vuelta de la devolución: **borrador, todavía no entregada** (faltan suite, compileall, smoke y arranque SQLite sobre `694f183`), base `0231eee`
+## OBSERVABILIDAD-1, vuelta de la devolución: **entregada** en `694f183` (2026-11-08), base `0231eee`
 
 | SHA | qué |
 |---|---|
 | `df59756` | fix: la métrica guarda el molde de la ruta, y la migración confirma la columna y el índice por separado |
 | `7fe33c5` | test: caso del molde para cada ruta con parámetro, fallas al confirmar en Postgres y sus sabotajes |
-| `42dd9a6` | fix: el log nombra el paso de la migración que falló, más CHANGELOG |
+| `42dd9a6` | fix: el log nombra el paso de la migración que falló |
 | `d7a57ac` | test: los moldes salen del openapi y la falla del índice se distingue |
 | `2c52c83` | test: arreglos de la revisión de código en pruebas y sabotajes |
 | `694f183` | test: dos sabotajes de Postgres vuelven a aplicar y a esperar el texto vigente |
+| `328458d` | docs: borrador del informe, sin entregar |
 | este commit | docs: el informe |
 
 **Producto +35/−15** (sólo `proyecto_maria/main.py`). **Arnés +215/−25.** Suma
@@ -91,10 +92,10 @@ git show 0231eee:proyecto_maria/main.py > /tmp/main-base.py   # y ponerlo en lug
 
 | corrida | SHA | salida exacta |
 |---|---|---|
-| suite completa | `694f183` | SUITE |
-| `compileall -q proyecto_maria` | `694f183` | COMPILE |
-| smoke_friccion | `694f183` | SMOKE |
-| arranque SQLite | `694f183` | ARRSQLITE |
+| suite completa | `694f183` | `5434 passed, 335 skipped, 3 xfailed, 111 warnings in 1038.99s (0:17:18)`, salida 0 |
+| `compileall -q proyecto_maria` | `694f183` | sin salida, salida 0 |
+| smoke_friccion | `694f183` | `==> OK · telemetría y alias session/state rechazan sin sesión + by-cuit protegido`, salida 0 |
+| arranque SQLite | `694f183` | 19 `OK`, `fallas 0`, salida 0 |
 | arranque Postgres 16 | `2c52c83` (desde ahí cambió sólo el script de sabotajes) | 60 `OK`, `fallas 0` |
 | sabotajes | `694f183` | 24 `ROJO`, `sabotajes sin rojo: 0; no corridos: 0`, salida 0 |
 | sabotajes | `2c52c83` | 23 `ROJO`, 1 `ROJO?` y 1 `ROTO`: `sabotajes sin rojo: 2; no corridos: 0` (ver abajo) |
