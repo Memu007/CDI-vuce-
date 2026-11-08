@@ -127,10 +127,10 @@ sabotaje $X "el lector sólo saca lo que saca strip" \
   "FAILED $A::test_el_lector_rechaza_la_exportacion_con_lo_invisible_adelante"'[documento-\u200bEC01-'
 LEE='clase["destinacion"] = codigo_de_destinacion(documento.get("destinacion"))'
 sabotaje $X "el lector pasa la destinación sin mirar la forma" \
-  "$LEE" 'clase["destinacion"] = clase["destinacion"].upper()' \
+  "$LEE" 'clase["destinacion"] = str(documento.get("destinacion") or "").strip().upper()' \
   "FAILED $LECTOR[IC_4--pymupdf]" "FAILED $LECTOR[IC-04--pdf_directo]"
 sabotaje $X "el lector mira la forma del texto ya en minúsculas" \
-  "$LEE" 'clase["destinacion"] = codigo_de_destinacion(clase["destinacion"])' \
+  "$LEE" 'clase["destinacion"] = codigo_de_destinacion(str(documento.get("destinacion") or "").lower())' \
   "FAILED $LECTOR"'[\u212aC04--pymupdf]'
 PERFIL_RE='_destinacion_o_400(destinacion) if destinacion else None'
 sabotaje $M "el perfil guarda el default sin mirar la forma" \
