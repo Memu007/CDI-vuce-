@@ -2098,7 +2098,7 @@ async def cancel_billing(
     plazo = anyio.current_time() + _TOPE_MP
     entidad = org or db_user
     no_se_pudo = "No se pudo confirmar la cancelación en Mercado Pago. Probá de nuevo en unos minutos."
-    paga = await _quien_toca_el_plan(db_user, org, con_sid, "cancelar el plan", no_se_pudo, plazo)
+    paga = await _quien_toca_el_plan(db_user, org, con_sid, "cancelar el plan", no_se_pudo, plazo, cancelar=True)
 
     if entidad.billing_status not in ("trial", "active", "past_due") and not con_sid:
         raise HTTPException(
@@ -10647,8 +10647,11 @@ def _verify_mp_webhook_signature(request: Request, raw_body: bytes) -> bool:
     if not sig_header or not req_id:
         return False
 
-    # Parsear ts=...,v1=...
-    parts = dict(p.strip().split("=", 1) for p in sig_header.split(",") if "=" in p)
+    pares = [p.strip().split("=", 1) for p in sig_header.split(",") if "=" in p]
+    parts = dict(pares)
+    # Con una clave repetida no se sabe cuál firmó Mercado Pago.
+    if len(parts) != len(pares):
+        return False
     ts = parts.get("ts", "")
     received_v1 = parts.get("v1", "")
     if not ts or not received_v1:
@@ -10927,7 +10930,8 @@ async def _cuenta_con_suscripciones(db: AsyncSession, username: str):
 _NO_SE_CONFIRMA_SUSCRIPCION = "No pudimos confirmar tu suscripción actual con Mercado Pago. Probá de nuevo en unos minutos."
 
 
-async def _quien_toca_el_plan(db_user, org, con_sid, accion: str, no_se_pudo: str, plazo: float) -> dict:
+async def _quien_toca_el_plan(db_user, org, con_sid, accion: str, no_se_pudo: str, plazo: float,
+                              cancelar: bool = False) -> dict:
     """Cancelar o reactivar el plan de un estudio: la dueña, o quien abrió la
     suscripción que lo paga. Devuelve, por cuenta con suscripción, si es la que paga."""
     sin_permiso = HTTPException(status_code=403, detail="Sólo quien administra el estudio o quien abrió "
@@ -10936,12 +10940,15 @@ async def _quien_toca_el_plan(db_user, org, con_sid, accion: str, no_se_pudo: st
     if miembro and db_user not in con_sid:
         raise sin_permiso
     try:
-        paga = {cuenta: await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)
-                in _ESTADOS_QUE_PAGAN for cuenta in con_sid}
+        estados = {cuenta: await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)
+                   for cuenta in con_sid}
     except _SuscripcionMPError as e:
         print(f"⚠️ {db_user.username} no pudo {accion}: {e}")
         raise HTTPException(status_code=503, detail=no_se_pudo)
-    if miembro and not paga[db_user]:
+    paga = {cuenta: estado in _ESTADOS_QUE_PAGAN for cuenta, estado in estados.items()}
+    # Si Mercado Pago canceló sin confirmarlo, la suya ya no paga: el reintento concilia.
+    reintento = cancelar and estados.get(db_user) == "cancelled" and not any(paga.values())
+    if miembro and not (paga[db_user] or reintento):
         raise sin_permiso
     return paga
 

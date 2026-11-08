@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: cancelar se puede reintentar si Mercado Pago canceló sin confirmarlo, y el aviso con la firma repetida da 401 (COBRO-MP-2, COBRO-MP-3)
+
+- **fix(cobro):** si Mercado Pago canceló la suscripción pero CDI no lo supo (503), quien la abrió puede volver a cancelar y CDI queda igual que Mercado Pago, mientras ninguna otra suscripción del estudio pague.
+- **fix(cobro):** un aviso de pago con una clave repetida en la firma (dos `v1=`) se rechaza con 401 sin consultar a Mercado Pago.
+
 ## 2026-11-08 · fix: la copia de la base no da por buena una base vacía ni deja restos al cortarse (BACKUP-1a)
 
 - **fix(datos):** una copia sin filas sale con error y no queda verificada. Copiar o verificar, si pasan `COPIA_PLAZO_S` (por defecto, una hora) o reciben una señal que no se ignoró a propósito (como con nohup), borran la base descartable, cortan pg_dump o pg_restore y salen con error. La copia, su huella y su marca sólo las lee quien corre el script.
