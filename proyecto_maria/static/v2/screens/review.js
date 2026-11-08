@@ -271,6 +271,14 @@
         return String(val);
     }
 
+    // Un monto que la factura traía y no se leyó quedó en 0: se ve vacío, porque
+    // un 0 a la vista parece leído y escribir el mismo 0 no lo completaría.
+    function valorEnLaRevision(name, op) {
+        const sinLeer = MONTOS.includes(name) && Array.isArray(op.campos_sin_leer) && op.campos_sin_leer.includes(name) &&
+            !(Array.isArray(op.campos_completados) && op.campos_completados.includes(name));
+        return sinLeer ? '' : normalizeValueForField(name, op[name]);
+    }
+
     let fieldsFromUserDefaults = {};
     function applyUserDefaults(op) {
         // Si el despachante guardo en su perfil un puerto/aduana/tipo destinacion
@@ -302,7 +310,7 @@
         FIELDS.forEach(key => {
             const el = form.querySelector('[name="' + key + '"]');
             if (!el) return;
-            const normalized = normalizeValueForField(key, op[key]);
+            const normalized = valorEnLaRevision(key, op);
             el.value = normalized;
             // Si el valor viene del default del perfil (no del PDF), NO lo
             // marcamos como "Detectado del PDF" porque seria mentira.

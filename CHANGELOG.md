@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-08 · fix: un seguro sin completar o el 1 % dejado con CIF frenan la generación (SEGURO-2)
 
-- Si la factura traía seguro y no se pudo leer, no se genera hasta completarlo en la revisión; si la factura no trae seguro, se escribe 0 y genera.
+- Si la factura traía seguro y no se pudo leer, no se genera hasta completarlo en la revisión; si la factura no trae seguro, se escribe 0 y genera. En la revisión ese campo se ve vacío, y si el servidor lo frena la pantalla vuelve ahí.
 - El 1 % que se dejó como estaba también frena con un incoterm que ya lleva el seguro en el precio; con otro incoterm sigue generando.
 
 ## 2026-11-08 · fix: los avisos leen el incoterm igual que la generación (SEGURO-1, agregado)

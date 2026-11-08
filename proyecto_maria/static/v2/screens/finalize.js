@@ -736,6 +736,10 @@
                     CDI.goTo('validating');
                     throw new Error(detail);
                 }
+                if (typeof detail === 'string' && detail.startsWith('Seguro: no pudimos leerlo')) {
+                    CDI.goTo('review');
+                    throw new Error(detail);
+                }
                 // Los controles de antes de generar llegan como {errors: [...]};
                 // el tope de regeneraciones de un mismo id, como {code, message}.
                 const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ')
