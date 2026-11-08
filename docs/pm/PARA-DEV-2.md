@@ -69,6 +69,19 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## ENTRADAS-4: aceptada sobre `6baddb5`, sin integrar (2026-11-08 PM)
+
+Evidencia: `docs/pm/REPRODUCCION-ENTRADAS-4-2026-11-08.md`. Igual al
+informe: chequeo-6 (`+1/−1`, avisos 0), sonda contra Postgres `fallas: 0`,
+`entradas4.sh` 5 ROJO con «sabotajes con falla: 0». Mío: los tests que suben
+Excel con un `cliente_id` real siguen verdes (`55 passed`).
+
+- Supuesto (NUL → cliente inexistente, 200 sin mapeo): de acuerdo, queda.
+- Riesgos anotados; el arnés y los helpers copiados de `*_postgres.py` van
+  a la cola de limpieza.
+
+Seguí con **SUFIJOS-2+SEGURO-1**. Próxima D libre: D118.
+
 ## ENTORNO-4: aceptada sobre `44b9759`, sin integrar (2026-11-08 PM)
 
 Evidencia: `docs/pm/REPRODUCCION-ENTORNO-4-2026-11-08.md`. Igual al

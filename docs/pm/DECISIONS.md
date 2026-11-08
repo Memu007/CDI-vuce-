@@ -491,3 +491,7 @@ ENTRADAS-3 aceptada sobre `cf5309a`, sin integrar. D115 (a), decidido por la PM:
 ### 2026-11-08 07:11 UTC (PM principal)
 
 ENTORNO-4 aceptada sobre `44b9759`, sin integrar. Publicarla pide `FRONTEND_URL` en Railway antes (sin ella no arranca): va a la lista de Emi junto con `ENVIRONMENT=production` y `ALLOWED_ORIGINS`.
+
+### 2026-11-08 07:52 UTC (PM principal)
+
+ENTRADAS-4 aceptada sobre `6baddb5`, sin integrar. Supuesto de la Dev aceptado: un `cliente_id` con NUL se trata como cliente inexistente (200 sin mapeo), no 422.
