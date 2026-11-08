@@ -36,7 +36,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 import psycopg2  # noqa: E402
 
 FALLAS = []
-CLAVE, NUL, SUR = "Clave-sintetica-1!", "\x00", "\ud800"
+CLAVE = "Clave-sintetica-1!"
 
 
 def chequear(ok, que):
