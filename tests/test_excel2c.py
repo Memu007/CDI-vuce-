@@ -115,7 +115,8 @@ def test_muchos_textos_van_al_carril_pesado():
     lambda: _con_filas('<row r="inf"/>'),
     lambda: _con_filas('<row r="3"><c r="1A"/></row>'),
     lambda: _con_dimension("x!"),
-], ids=["fila", "fila infinita", "celda", "dimension"])
+    lambda: _con_filas('<row r="3">' + "<c/>" * 200 + '</row><row r="x">' + "<c/>" * 100 + "</row>"),
+], ids=["fila", "fila infinita", "celda", "dimension", "fila que no se lee empieza en la columna 1"])
 def test_una_referencia_que_no_se_lee_va_al_carril_pesado(libro):
     """No se rechaza por eso: la lectura dirá si el libro sirve."""
     assert fs._abrir_excel(libro(), ".xlsx") == (1, True)
@@ -151,19 +152,28 @@ def test_el_tope_se_lee_del_entorno(monkeypatch, variable):
     assert fs._abrir_excel(libro(), ".xlsx") == (1, True)
 
 
+# Para cada tope, un libro justo pasado su valor por defecto.
+_PASADOS = {
+    "EXCEL_LIVIANO_FILAS": FORMAS["fila con r"][1],
+    "EXCEL_LIVIANO_COLUMNAS": FORMAS["columna con r"][1],
+    "EXCEL_LIVIANO_ESTILOS": lambda: _con_estilos(5_000),
+    "EXCEL_LIVIANO_TEXTOS": lambda: _con_textos(20_000),
+}
+
+
 @pytest.mark.parametrize("valor", ["1e-9", "0.5", "inf", "nan", "-0", "0", "-3", "x"])
 @pytest.mark.parametrize("variable", list(_TOPES))
 def test_un_tope_que_no_sirve_vale_el_de_defecto(monkeypatch, variable, valor):
     _, libro = _TOPES[variable]
     monkeypatch.setenv(variable, valor)
     assert fs._abrir_excel(libro(), ".xlsx") == (1, False)
-    assert fs._abrir_excel(FORMAS["fila con r"][1](), ".xlsx") == (1, True)
+    assert fs._abrir_excel(_PASADOS[variable](), ".xlsx") == (1, True)
 
 
 # ------------------------------------------------- de punta a punta: los hilos
 
 def test_la_subida_con_una_fila_lejana_lee_en_los_hilos_pesados(hilos):  # noqa: F811
-    _subir(FORMAS["fila con r"][1]())
+    assert _subir(FORMAS["fila con r"][1]()).status_code == 200
     assert [q for q, _ in hilos] == ["validar", "leer"], hilos
     assert hilos[0][1].startswith("validar-excel-liviano"), hilos
     assert hilos[1][1].startswith("lectura-excel_"), hilos

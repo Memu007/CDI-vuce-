@@ -66,12 +66,12 @@ sabotaje $F "muchas columnas vuelven a quedar en el carril liviano" \
   '                or False' \
   "FAILED $T::test_la_forma_del_libro_decide_el_carril[columna con r]"
 sabotaje $F "muchos estilos vuelven a quedar en el carril liviano" \
-  '                and _mas_elementos_que(z, ARC_STYLE, tope_de_entorno("EXCEL_LIVIANO_ESTILOS", 5_000))' \
-  '                and False' \
+  '                    and _mas_elementos_que(z, ARC_STYLE, tope_de_entorno("EXCEL_LIVIANO_ESTILOS", 5_000)))' \
+  '                    and False)' \
   "FAILED $T::test_muchos_estilos_van_al_carril_pesado"
 sabotaje $F "muchos textos vuelven a quedar en el carril liviano" \
-  '                and _mas_elementos_que(z, textos, tope_de_entorno("EXCEL_LIVIANO_TEXTOS", 40_000)))' \
-  '                and False)' \
+  '                    and _mas_elementos_que(z, textos, tope_de_entorno("EXCEL_LIVIANO_TEXTOS", 40_000))))' \
+  '                    and False))' \
   "FAILED $T::test_muchos_textos_van_al_carril_pesado"
 sabotaje $F "un libro caro vuelve a leerse en los hilos livianos" \
   '            liviano = liviano and not caro' \
@@ -115,6 +115,10 @@ sabotaje $F "una fila infinita vuelve a cortar la validación" \
   '            except (TypeError, ValueError, OverflowError):' \
   '            except (TypeError, ValueError):' \
   "FAILED $T::test_una_referencia_que_no_se_lee_va_al_carril_pesado[fila infinita]"
+sabotaje $F "una fila que no se lee vuelve a seguir la cuenta de columnas de la anterior" \
+  $'                    columna_actual = 0\n                    r = elemento.get("r")\n                    fila_actual = fila_actual + 1 if r is None else int(float(r))\n' \
+  $'                    r = elemento.get("r")\n                    fila_actual = fila_actual + 1 if r is None else int(float(r))\n                    columna_actual = 0\n' \
+  "FAILED $T::test_una_referencia_que_no_se_lee_va_al_carril_pesado[fila que no se lee empieza en la columna 1]"
 
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]
