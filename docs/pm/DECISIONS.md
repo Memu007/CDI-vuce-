@@ -523,3 +523,7 @@ COBRO-MP-4 (con D124) aceptada sobre `0fb991c`, sin integrar (`REPRODUCCION-COBR
 ### 2026-11-08 13:40 UTC (PM principal)
 
 SEGURO-2 aceptada sobre `d160738`, sin integrar (`REPRODUCCION-SEGURO-2-2026-11-08.md`). Decididas por la PM: D125 (a), D126 (a); AVISOS-1 suma el texto falso de «no pudimos leerlo» tras calcular y pasar a CIF, y el motivo del 400 que no se ve en la revisión.
+
+### 2026-11-08 14:10 UTC (PM principal)
+
+PERMISOS-2 aceptada sobre `a1db966`, sin integrar (`REPRODUCCION-PERMISOS-2-2026-11-08.md`). Decidido por la PM: PERMISOS-3 (el `\n` final y las mayúsculas que esquivan la reserva de `ADMIN_USERNAMES`) sigue en la técnica. La cuenta demo admin fuera de `ENVIRONMENT=production` refuerza la D99 para Emi.
