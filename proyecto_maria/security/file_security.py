@@ -381,9 +381,8 @@ def _medida_hoja(xml: bytes) -> tuple[int, float, int]:
                 elemento.clear()
                 continue
             etiqueta = elemento.tag.rsplit("}", 1)[-1]
-            # openpyxl arma un objeto por rango de cada sqref (formato condicional,
-            # validación, selección), combinada o vínculo: 640 000 rangos o
-            # 300 000 combinadas en 1.4 MB tardan 3-4 s al leer.
+            # openpyxl arma un objeto por rango de cada sqref (formato condicional, validación,
+            # selección), combinada o vínculo: 300 000 en 1.4 MB tardan segundos al abrir.
             rangos += len(elemento.get("sqref", "").split(None, _EXCEL_MAX_RANGOS))
             rangos += etiqueta in ("mergeCell", "hyperlink")
             if rangos > _EXCEL_MAX_RANGOS:
