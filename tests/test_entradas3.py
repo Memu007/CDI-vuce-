@@ -86,13 +86,19 @@ def test_campo_del_cliente_que_no_es_texto_da_400_y_no_guarda(via):
 
 
 @pytest.mark.parametrize("via", ["alta", "edicion"])
-def test_campo_del_cliente_en_null_queda_vacio(via):
+def test_campo_del_cliente_en_null_queda_vacio_salvo_el_nombre(via):
     _, sesion = _sesion()
-    cuerpo = {"nombre": "N", "email": None, "notas": None}
-    if via == "alta":
-        r = _post("/api/clientes", cuerpo, sesion)
-    else:
-        r = _post(f"/api/clientes/{_cliente(sesion, notas='x')}", cuerpo, sesion, metodo="PUT")
+    cid = _cliente(sesion, notas="x")
+
+    def mandar(cuerpo):
+        if via == "alta":
+            return _post("/api/clientes", cuerpo, sesion)
+        return _post(f"/api/clientes/{cid}", cuerpo, sesion, metodo="PUT")
+
+    r = mandar({"nombre": None})
+    assert (r.status_code, r.json()["detail"]) == (400, "nombre tiene que ser texto."), r.text
+    assert _cliente_guardado(cid).name == "C"
+    r = mandar({"nombre": "N", "email": None, "notas": None})
     assert r.status_code == 200, r.text
     guardado = _cliente_guardado(r.json()["cliente"]["id"])
     assert (guardado.email or "", guardado.notes or "") == ("", "")

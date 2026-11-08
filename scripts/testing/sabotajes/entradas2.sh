@@ -90,6 +90,10 @@ sabotaje $M "la edición no limpia los textos" "$CLI[edicion-nul]" \
 sabotaje $M "el email repetido en la edición no da 409" \
   "FAILED $T::test_editar_cliente_con_el_email_de_otro_da_409_y_no_cambia_nada" \
   'raise HTTPException(status_code=409, detail=f"Ya tenés un cliente con el email {email}") from e' 'raise'
+sabotaje $M "el cliente se limpia entero sin cuidar la pila" \
+  "FAILED $T::test_cliente_con_un_campo_desconocido_muy_anidado_se_guarda[alta" \
+  "        limpio[clave] = _guardable_en_pg(valor) if isinstance(valor, str) else valor" \
+  "        limpio[clave] = _sin_nul(valor)"
 
 # --- Guardar al cliente
 sabotaje $M "un NaN fuera de los números leídos pasa" "$SAV[nan_anidado_en_una_lista]" \

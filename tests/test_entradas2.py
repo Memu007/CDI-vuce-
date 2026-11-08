@@ -120,6 +120,21 @@ def test_texto_del_cliente_que_no_se_puede_guardar_queda_con_reemplazo(via, text
     assert (guardado.name, guardado.notes) == ("x�y", "x�y")
 
 
+@pytest.mark.parametrize("via", ["alta", "edicion"])
+def test_cliente_con_un_campo_desconocido_muy_anidado_se_guarda(via):
+    _, sesion = _sesion()
+    anidado = "{}"
+    for _ in range(2000):
+        anidado = '{"a": %s}' % anidado
+    cuerpo = ('{"nombre": "N", "otro": %s}' % anidado).encode()
+    if via == "alta":
+        r = _post("/api/clientes", cuerpo, sesion)
+    else:
+        r = _post(f"/api/clientes/{_cliente(sesion)}", cuerpo, sesion, metodo="PUT")
+    assert r.status_code == 200, r.text
+    assert _cliente_guardado(r.json()["cliente"]["id"]).name == "N"
+
+
 def test_editar_cliente_con_el_email_de_otro_da_409_y_no_cambia_nada():
     _, sesion = _sesion()
     _cliente(sesion, email="otro@example.com")

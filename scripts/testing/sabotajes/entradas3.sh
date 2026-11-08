@@ -79,10 +79,13 @@ sabotaje $M "un NUL en la consulta pasa" "FAILED $T::test_nul_en_la_consulta_da_
 sabotaje $M "un campo del cliente que no es texto pasa" \
   "FAILED $T::test_campo_del_cliente_que_no_es_texto_da_400_y_no_guarda[alta" \
   "elif clave in _TEXTOS_DEL_CLIENTE and not isinstance(valor, str):" "elif False:"
-sabotaje $M "un null del cliente se guarda como «None»" "FAILED $T::test_campo_del_cliente_en_null_queda_vacio[alta" \
-  "        if clave in _TEXTOS_DEL_CLIENTE and valor is None:
-            valor = \"\"
-        elif" "        if"
+NUL_="FAILED $T::test_campo_del_cliente_en_null_queda_vacio_salvo_el_nombre"
+sabotaje $M "un null del cliente se guarda como «None»" "$NUL_[alta" \
+  "            valor = \"\"
+        elif" "            valor = str(valor)
+        elif"
+sabotaje $M "un nombre null deja al cliente sin nombre" "$NUL_[edicion" \
+  'clave != "nombre" and valor is None:' 'valor is None:'
 sabotaje $M "un número enorme se guarda" "FAILED $T::test_numero_enorme_da_400_y_no_guarda[1e16" \
   "    if abs(numero) > 1e15:" "    if False:"
 
