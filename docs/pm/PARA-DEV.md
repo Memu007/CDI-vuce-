@@ -3,33 +3,27 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## PERMISOS-2: aceptada sobre `a1db966`, sin integrar (2026-11-08 PM)
+## PERMISOS-3: aceptada sobre `9428e00`, sin integrar (2026-11-08 PM)
 
-Evidencia: `docs/pm/REPRODUCCION-PERMISOS-2-2026-11-08.md`. Igual al informe:
-chequeo-6 `+15/−15` sin avisos; `permisos2.sh` 7 ROJO y `cobro_mp4.sh` 9 ROJO,
-falla 0; `35 passed`; ataque `47 · 0 · 0`. Tus supuestos (sacar el sabotaje de
-`admin2.sh`, que el ataque frene sin admin, que el arranque arregle roles con
-otro formato) quedan como están.
+Evidencia: `docs/pm/REPRODUCCION-PERMISOS-3-2026-11-08.md`. Igual al informe:
+chequeo-6 `+8/−12` sin avisos; `permisos2.sh` 10 ROJO, falla 0; `60 passed`;
+ataque `47 · 0 · 0`. Sonnet alto: ninguna variante se registra (Unicode,
+`\n`, `\x00`, mayúsculas), sin 500 y sin cambio en el front ni en el login.
+Tus supuestos quedan como están.
 
-Adversario Opus alto: ningún camino a admin sin el rol. Dos bajas sin permisos,
-que van a la pieza siguiente.
+- **D127: (b), decidido por la PM.** Nombres únicos sin mayúsculas para todas
+  las cuentas es una pieza aparte, y antes hay que mirar producción: se la
+  propongo a Emi. Sin su sí no entra.
 
-## Seguí con PERMISOS-3 (2026-11-08 PM, decidido por la PM)
+## Seguí con SEPARADORES-1b-ARNÉS (2026-11-08 PM, de la cola de limpieza)
 
-«Arreglos chicos de seguridad» (Emi). Hoy se puede registrar un nombre que se
-ve igual que el de una admin:
-
-- `'emi\n'` da 200 en `/auth/register` y en `/api/organizations/create`
-  (`re.match(r'^…$')` acepta un `\n` final) y se guarda con el `\n`;
-- con `jefe` en `ADMIN_USERNAMES`, `Jefe` y `JEFE` se registran.
-
-Pedido: en los dos caminos, un nombre con cualquier carácter fuera de la regex
-(el `\n` final incluido) da 400 sin crear nada, y un nombre de la lista con
-otras mayúsculas da el mismo 400 «Usuario ya existe». La familia va como datos
-en un caso. No cambia quién es admin ni las cuentas que ya existen.
+`scripts/testing/sabotajes/separadores1b.sh`: el patrón 3 no encuentra su
+ancla desde `4f2045f` y el guion da salida 1 también en la base
+(`COLA-LIMPIEZA.md`). Pedido: que el guion vuelva a dar base en verde y todos
+sus sabotajes en rojo sobre tu cabeza, sin tocar producto. El ancla es código.
 
 Corte: hoy 15:50 UTC se apagan las rutinas. Si no llegás, commit y push de lo
-que tengas y anotá en `PARA-PM.md` dónde quedaste. Próxima D libre: D127.
+que tengas y anotá en `PARA-PM.md` dónde quedaste. Próxima D libre: D128.
 
 ## AISLAMIENTO-2 y LIMPIEZA-1: aceptadas sobre `c86f3ff`, sin integrar (2026-11-08 PM)
 
