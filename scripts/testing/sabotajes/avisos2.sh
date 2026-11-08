@@ -80,7 +80,7 @@ sabotaje $G "acepta de 3 a 5" \
   "FAILED $FORMA[IC041-/generate_maria/avisos]" "FAILED $FORMA[IC0-/generate_maria]"
 sabotaje $G "acepta letras y números de cualquier alfabeto" \
   "$FORMA_RE" 'if not re.fullmatch(r"\w{4}", codigo):' \
-  "FAILED $FORMA[ＩＣ０４-/generate_maria]" "FAILED $FORMA[ıc04-/generate_maria/avisos]"
+  "FAILED $FORMA"'[\uff29\uff23\uff10\uff14-/generate_maria]' "FAILED $FORMA"'[\u0131c04-/generate_maria/avisos]'
 sabotaje $G "la exportación acepta una de importación" \
   'if es_exportacion(tipo_destinacion) != exportacion:' 'if es_exportacion(tipo_destinacion) and not exportacion:' \
   "FAILED $EXP[IC04-400]" "FAILED $EXP[TRAN-400]"
@@ -113,7 +113,7 @@ sabotaje $M "el seguro borrado vuelve a decir que está en el precio" \
 sabotaje proyecto_maria/pdf_extractor.py "el lector sólo saca lo que saca strip" \
   'or any(es_exportacion(destinacion) for destinacion in (' \
   'or any(str(destinacion or "").strip().upper().startswith("EC") for destinacion in (' \
-  "FAILED $A::test_el_lector_rechaza_la_exportacion_con_lo_invisible_adelante[documento-​EC01-"
+  "FAILED $A::test_el_lector_rechaza_la_exportacion_con_lo_invisible_adelante"'[documento-\u200bEC01-'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
