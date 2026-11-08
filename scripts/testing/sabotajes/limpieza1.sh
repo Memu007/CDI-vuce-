@@ -81,19 +81,19 @@ echo "== sin sabotaje"
 salida="$(correr)" && echo "VERDE | base" || { echo "ROJO  | base: la prueba no pasa sin sabotaje"; echo "$salida" | tail -5; exit 1; }
 
 echo "== la CI vuelve a sacar pruebas"
-sabotaje "un --deselect en la suite" "la CI saca pruebas de la suite: ['--deselect'" \
+sabotaje "un --deselect en la suite" "la suite corre con algo fuera de lo permitido: ['--deselect'" \
   reemplazar $CI "$RUN" "$RUN --deselect tests/test_csrf.py::test_enforce_no_afecta_bearer_sin_cookie"
-sabotaje "un -k en la suite" "la CI saca pruebas de la suite: ['-k', 'not quote']" \
+sabotaje "un -k en la suite" "la suite corre con algo fuera de lo permitido: ['-k', 'not quote']" \
   reemplazar $CI "$RUN" "$RUN -k 'not quote'"
-sabotaje "un -m en la suite" "la CI saca pruebas de la suite: ['-m', 'not slow']" \
+sabotaje "un -m en la suite" "la suite corre con algo fuera de lo permitido: ['-m', 'not slow']" \
   reemplazar $CI "$RUN" "$RUN -m 'not slow'"
-sabotaje "una ruta: corre sólo ese archivo" "la CI saca pruebas de la suite: ['tests/test_csrf.py']" \
+sabotaje "una ruta: corre sólo ese archivo" "la suite corre con algo fuera de lo permitido: ['tests/test_csrf.py']" \
   reemplazar $CI "$RUN" "$RUN tests/test_csrf.py"
-sabotaje "un --ignore= en la suite" "la CI saca pruebas de la suite: ['--ignore=tests/test_pilar_b_quotes.py']" \
+sabotaje "un --ignore= en la suite" "la suite corre con algo fuera de lo permitido: ['--ignore=tests/test_pilar_b_quotes.py']" \
   reemplazar $CI "$RUN" "$RUN --ignore=tests/test_pilar_b_quotes.py"
-sabotaje "un --lf en la suite" "la CI saca pruebas de la suite: ['--lf']" \
+sabotaje "un --lf en la suite" "la suite corre con algo fuera de lo permitido: ['--lf']" \
   reemplazar $CI "$RUN" "$RUN --lf"
-sabotaje "el run en bloque, con el --deselect en otra línea" "la CI saca pruebas de la suite: ['--deselect'" \
+sabotaje "el run en bloque, con el --deselect en otra línea" "la suite corre con algo fuera de lo permitido: ['--deselect'" \
   reemplazar $CI "$RUN" "        run: >-
           python -m pytest --no-cov
           --deselect tests/test_csrf.py::test_enforce_no_afecta_bearer_sin_cookie"
@@ -106,18 +106,26 @@ sabotaje "un -k por PYTEST_ADDOPTS" "ci.yml le pasa opciones a pytest por PYTEST
   reemplazar $CI '          EMAIL_VERIFICATION_REQUIRED: "false"' '          EMAIL_VERIFICATION_REQUIRED: "false"
           PYTEST_ADDOPTS: "-k not quote"'
 
-sabotaje "un -k dentro de un grupo de cortas" "la CI saca pruebas de la suite: ['-vknot quotes']" \
+sabotaje "un -k dentro de un grupo de cortas" "la suite corre con algo fuera de lo permitido: ['-vknot quotes']" \
   reemplazar $CI "$RUN" "$RUN -vk\"not quotes\""
-sabotaje "un --co: junta las pruebas y no las corre" "la CI saca pruebas de la suite: ['--co']" \
+sabotaje "un --co: junta las pruebas y no las corre" "la suite corre con algo fuera de lo permitido: ['--co']" \
   reemplazar $CI "$RUN" "$RUN --co"
-sabotaje "un --setup-only" "la CI saca pruebas de la suite: ['--setup-only']" \
+sabotaje "un --setup-only" "la suite corre con algo fuera de lo permitido: ['--setup-only']" \
   reemplazar $CI "$RUN" "$RUN --setup-only"
-sabotaje "un --override-ini que cambia qué archivos junta" "la CI saca pruebas de la suite: ['--override-ini=python_files=test_l*.py']" \
+sabotaje "un --override-ini que cambia qué archivos junta" "la suite corre con algo fuera de lo permitido: ['--override-ini=python_files=test_l*.py']" \
   reemplazar $CI "$RUN" "$RUN --override-ini=python_files=test_l*.py"
-sabotaje "un -o que borra addopts" "la CI saca pruebas de la suite: ['-o', 'addopts=']" \
+sabotaje "un -o que borra addopts" "la suite corre con algo fuera de lo permitido: ['-o', 'addopts=']" \
   reemplazar $CI "$RUN" "$RUN -o addopts="
-sabotaje "un || true que tapa el rojo" "la CI saca pruebas de la suite: ['||']" \
+sabotaje "un || true que tapa el rojo" "la suite corre con algo fuera de lo permitido: ['||', 'true']" \
   reemplazar $CI "$RUN" "$RUN||true"
+sabotaje "un --version: no corre las pruebas" "la suite corre con algo fuera de lo permitido: ['--version']" \
+  reemplazar $CI "$RUN" "$RUN --version"
+sabotaje "un --noconftest: corre sin la configuración de las pruebas" "la suite corre con algo fuera de lo permitido: ['--noconftest']" \
+  reemplazar $CI "$RUN" "$RUN --noconftest"
+sabotaje "un -p: carga o saca un plugin" "la suite corre con algo fuera de lo permitido: ['-p', 'no:cacheprovider']" \
+  reemplazar $CI "$RUN" "$RUN -p no:cacheprovider"
+sabotaje "un cd antes de pytest: junta otra carpeta" "la suite no arranca con «python -m pytest»: ['cd', 'scripts', '&&'" \
+  reemplazar $CI "$RUN" "        run: cd scripts && python -m pytest --no-cov"
 sabotaje "el paso con continue-on-error" "la CI puede esconder el resultado de la suite: ['continue-on-error: true']" \
   reemplazar $CI "      - name: Suite completa" "      - name: Suite completa
         continue-on-error: true"
@@ -132,12 +140,15 @@ sabotaje "el paso corre en otra carpeta" "la CI puede esconder el resultado de l
         working-directory: proyecto_maria"
 
 echo "== pytest.ini vuelve a sacar pruebas"
-sabotaje "un --deselect en addopts" "pytest.ini saca pruebas en addopts: ['--deselect=tests/test_pilar_b_quotes.py::test_share_quote_valid']" \
+sabotaje "un --deselect en addopts" "pytest.ini suma en addopts algo fuera de lo permitido: ['--deselect=tests/test_pilar_b_quotes.py::test_share_quote_valid']" \
   reemplazar pytest.ini "addopts =" "addopts =
     --deselect=tests/test_pilar_b_quotes.py::test_share_quote_valid"
-sabotaje "un -k en addopts" "pytest.ini saca pruebas en addopts: ['-k', 'not quotes']" \
+sabotaje "un -k en addopts" "pytest.ini suma en addopts algo fuera de lo permitido: ['-k', 'not quotes']" \
   reemplazar pytest.ini "addopts =" "addopts =
     -k \"not quotes\""
+sabotaje "un --version en addopts" "pytest.ini suma en addopts algo fuera de lo permitido: ['--version']" \
+  reemplazar pytest.ini "addopts =" "addopts =
+    --version"
 sabotaje "testpaths más chico" "pytest.ini cambia qué pruebas junta" \
   reemplazar pytest.ini "testpaths = tests" "testpaths = tests/unit"
 
@@ -155,8 +166,7 @@ sabotaje "un archivo setup_gcp.sh sin gcloud adentro" "queda un camino a Google 
 
 echo "== controles"
 control "un .md que nombra gcloud" nuevo docs/deployment/NOTAS.md 'Antes se usaba gcloud run deploy.'
-control "la suite con -q y --timeout" reemplazar $CI "$RUN" "$RUN -q --timeout=120"
-control "la suite con -p, -W y -rA, que toman valor y no filtran" reemplazar $CI "$RUN" "$RUN -p no:cacheprovider -W ignore -rA"
+control "la suite con -q, --timeout y --tb" reemplazar $CI "$RUN" "$RUN -q --timeout=120 --tb=line"
 
 limpiar
 echo "sabotajes con falla: $FALLAS"
