@@ -2,186 +2,246 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## VALIDACION-1, entregada en `c24a266` (producto `0bd4b6c`; informe en el commit de arriba)
+## COBRO-MP-2+3, devolución de pruebas, entregada en `71e15df` (informe en el commit de arriba)
 
-COBRO-MP-2 (vuelta) y COBRO-MP-3 siguen en su informe, `a06c0c8`; **D64 y D66 siguen abiertas ahí**. Este informe no las cubre.
-
-### Decisiones
-
-Nada para decidir. Hay una propuesta de pieza aparte en «Riesgos» (el historial con el validador caído), por si la querés.
-
-Supuesto reversible: **una validación en curso ya no impide validar la carga que se ve.** Antes, `validatingInFlight` cortaba la segunda validación si la primera no había terminado; así, la carga B se quedaba sin validar o con la de A. Ahora cada validación toma un turno (`turnoValidacion`) y sólo la más reciente pinta la pantalla. Las viejas siguen hasta el final y su resultado se descarta (riesgo 3).
+Base de la devolución: `cb740f3` (tu veredicto). Base de esta vuelta: `64770b9` (merge de tu rama antes de empezar).
 
 ### Resultado
 
-Lo que se muestra, lo que se guarda en el historial y lo que habilita «Generar» salen de la carga que se ve:
+Los cinco mutantes que dejaste verdes ahora dan rojo, y cada punto de la devolución tiene su caso y su sabotaje:
 
-- **El caché de 60 s se usa sólo si el pedido es el mismo** (`lastValidationPedido`, la cabecera y los ítems en JSON). Con otra carga se valida de nuevo, y el resultado anterior se descarta antes de pedir.
-- **Una respuesta que llega después de que otra carga pidió no pinta ni guarda nada** (`turnoValidacion`).
-- **Con el validador caído:**
-  - si es otra carga, el panel queda sin la validación de la anterior y «Generar» no frena por errores ajenos;
-  - si es la misma carga, se vuelve a mostrar su resultado, y «Generar» sigue frenando por sus propios errores.
-- **Salir de «Listo»** ya no borra la validación (`db31e0e`): toda validación nueva limpia la anterior o reusa la del mismo pedido.
+1. **Firma:** con clave vacía y sin secreto, con los 8 primeros caracteres reales, con el último cambiado, más corta y más larga, el aviso da 401 y no se consulta a Mercado Pago (`LLAMADAS == []`). El estado de la cuenta queda igual.
+2. **Quién toca a quién:** si la dueña de otro estudio intenta sacar a un miembro, da 404; el miembro sigue en su estudio y su suscripción en Mercado Pago no cambia. Quien abrió la que paga puede reactivar con el sid anotado: 200.
+3. **Plazo único:** caso nuevo `test_el_tope_es_uno_para_todos_los_pedidos_a_mp`, con una fila por fase. Las llamadas anteriores consumen casi todo el tope, y la fase de la fila, que por sí sola entra en el tope, lo pasa. Da 503 dentro del tope. Cada fase con un plazo propio da rojo en su fila.
+4. **Texto falso:** cancelar decía «No se pudo cancelar en Mercado Pago; tu plan sigue igual.» Ahora dice «No se pudo confirmar la cancelación en Mercado Pago. Probá de nuevo en unos minutos.» El caso compara el texto exacto. **Sacar y el checkout no tenían esa frase**, así que no los cambié:
+   - sacar dice «No se pudo confirmar en Mercado Pago la suscripción de {username}; sigue en el estudio.». Es cierto: el 503 sale antes de `member.organization_id = None`, y el caso compara el estado antes y después.
+   - el checkout dice «No pudimos confirmar tu suscripción actual con Mercado Pago.» No afirma nada del plan.
 
-Archivo de producto tocado: `proyecto_maria/static/v2/screens/finalize.js` (`runValidation` y el estado del módulo). Además, `CHANGELOG.md`.
+Archivo de producto tocado: `proyecto_maria/main.py` (`cancel_billing`: el texto, el docstring y un comentario). Además, `CHANGELOG.md`. **producto +3/−3** contra `64770b9`.
+
+### Decisiones
+
+- **D64 (a)** y **D66 (a)**, registradas como las contestaste:
+  - D64: lo hace Emi antes de publicar; se lo aviso yo.
+  - D66: un cambio de `core/rate_limit.py` sería otra pieza.
+- **D112** (los pares son míos, pero a MARIA le diste la D108 y la D110 en FRONT-422 y ENTRADAS-2; salto a la próxima par libre para no chocar). **Después de un 503 por el tope, Mercado Pago pudo haber aplicado el cambio, pero CDI no lo anota.**
+  - **El caso:** cancelar no recibe a tiempo la respuesta del PUT, pero Mercado Pago sí lo canceló. CDI deja `billing_status` y `mp_preapproval_id` como estaban.
+  - **Si se reintenta, se concilia:** `_cancelar_suscripcion_mp` lee el estado, ve «cancelled» y sigue (`test_si_mp_ya_la_tenia_cancelada_cancelar_sigue`). El texto nuevo pide reintentar.
+  - **Sin reintento, no lo verifiqué:** no sé qué muestra el perfil ni qué hace el corte.
+  - **Opciones:**
+    - (a) dejarlo como riesgo;
+    - (b) pieza aparte: conciliar con la próxima lectura o con el aviso de Mercado Pago.
+  - **Recomiendo (b):** es plata. Esta devolución era sólo de pruebas, y meterlo acá agranda el producto sin que lo pidieras.
 
 ### SHAs
 
 | SHA | qué |
 |---|---|
-| `18f2928` | base |
-| `e59ae3c` | trabajo en curso al corte |
-| `e4c79a1` | producto |
-| `60023d6` | arnés: `pantalla_validacion1.js` y `sabotajes/validacion1.sh` |
-| `0b9d476` | arnés: el caso del validador caído corta la carga que se ve y mira la generación real |
-| `db31e0e` | producto: salir de «Listo» ya no borra la validación |
-| `193c65d` | merge de tu rama |
-| `0bd4b6c` | producto: volver a validar la misma carga con el validador caído conserva su resultado |
-| `591f301` | arnés: caso «botón, falla al volver a validar la misma» y espera por respuesta leída |
-| `c24a266` | arnés: la misma carga reusa su validación; misma carga con otra cabecera vuelve a pedir |
+| `64770b9` | base: merge de tu rama |
+| `08bab23` | producto: el texto de cancelar y `CHANGELOG.md` |
+| `3726c53` | arnés: un caso por causa para firma, quién toca a quién y plazo único |
+| `67413fe` | producto: el comentario de cancelar ya no cita el texto viejo |
+| `247c081` | arnés: el 503 de cancelar no dice que el plan sigue igual; la firma rota conserva su ts |
+| `8abdc48` | merge de tu rama (`e29ec1d`) |
+| `10d9389` | arnés: el tope se prueba fase por fase y se compara el texto exacto |
+| `71e15df` | arnés: los sabotajes de MP-2 prueban el plazo único fase por fase |
+| `a4bb6d6` | merge de tu rama (`c73e0ea`), sólo `docs/pm` |
+| `4e082ab` | merge de tu rama (`ff88333`), sólo `docs/pm` |
+| `921c069` | merge de tu rama (`ba3289f`), sólo `docs/pm` |
 
-### Rojo antes que verde
+### Cada punto con su rojo
 
-**Base (`18f2928`, `finalize.js` de la base con el arnés de `c24a266`):**
+**1. Firma** (`tests/test_cobro_mp3.py`, `_SIN_FIRMA` y `test_un_aviso_sin_firma_verificable_no_cambia_nada`, sabotajes en `cobro_mp3.sh`):
 
 ```
-OK | panel, misma carga sin cambios
-FALLA: panel: muestra 1, $1.387,5, 465 kg; la carga que se ve da 1, $20, 0,4 kg
-FALLA: panel, la anterior contesta después: no mostró la validación de la que se ve
-FALLA: botón, error sólo en la que se ve: deja generar con el peso en cero
-FALLA: botón, error sólo en la anterior: no deja generar por el error de la anterior
-FALLA: botón, falla el validador: no deja generar por el error de la anterior
-FALLA: botón, falla al volver a validar la misma: deja generar con el peso en cero
-FALLA: cabecera distinta, mismos ítems: no volvió a validar con la cabecera cambiada
-FALLA: historial: guardó valor 1387.5 y peso 465; la carga que se ve da 20 y 0.4
-salida=1
+ROJO  | el límite cuenta también los avisos sin firma: dice «FAILED tests/test_cobro_mp3.py::test_el_aviso_de_pago_tiene_limite_de_pedidos»
+ROJO  | sin clave, en desarrollo, el aviso pasa sin verificar: dice «FAILED tests/test_cobro_mp3.py::test_un_aviso_sin_firma_verificable_no_cambia_nada[sin-secreto-dev]»
+ROJO  | se atiende un IPN por la URL, sin firma: dice «('ipn', 200»
+ROJO  | un cuerpo que no es un objeto rompe la verificación: dice «'cuerpo que no es un objeto'»
+ROJO  | un data que no es un objeto rompe la verificación: dice «'data que no es un objeto'»
+ROJO  | la firma se compara como texto: dice «'firma con letras no ascii'»
+ROJO  | sin clave configurada, se verifica con la clave vacía: dice «('firmado con clave vacía', 200»
+ROJO  | la firma se compara a medias (sólo los primeros caracteres): dice «('sólo los primeros caracteres', 200»
+ROJO  | la firma se compara a medias (firma más corta): dice «('firma más corta', 200»
+ROJO  | la firma se compara a medias (firma más larga): dice «('firma más larga', 200»
+ROJO  | la firma se compara a medias (el último carácter cambiado): dice «('el último carácter cambiado', 200»
 ```
 
-«panel, misma carga sin cambios» pasa en la base a propósito: es el reuso legítimo, que la pieza tiene que conservar; su sabotaje está abajo.
+**2. Quién toca a quién** (`test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan`, sabotajes en `cobro_mp2.sh`):
 
-**El caso que vino del code-review** (producto `db31e0e`, arnés `591f301`, antes de las dos filas nuevas): pasan 6 casos y falla uno, `FALLA: botón, falla al volver a validar la misma: deja generar con el peso en cero`, salida=1.
+```
+ROJO  | en una org, cualquier miembro cancela el plan: dice «FAILED tests/test_cobro_mp2.py::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[cancelar-miembro]»
+ROJO  | reactivar no mira quién toca el plan: dice «FAILED tests/test_cobro_mp2.py::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[reactivar-miembro]»
+ROJO  | al sacar a un miembro no se mira su suscripción: dice «FAILED tests/test_cobro_mp2.py::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[sacar_con_pendiente-duena]»
+ROJO  | se saca del estudio a quien abrió la que paga: dice «FAILED tests/test_cobro_mp2.py::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[sacar_a_la_que_paga-duena]»
+ROJO  | se saca del estudio a quien tiene la pausada: dice «FAILED tests/test_cobro_mp2.py::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[sacar_a_la_pausada-duena]»
+ROJO  | al sacar, la ya cancelada se vuelve a cancelar: dice «FAILED tests/test_cobro_mp2.py::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[sacar_con_cancelada-duena]»
+ROJO  | al sacar, si Mercado Pago no contesta se saca igual: dice «FAILED tests/test_cobro_mp2.py::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[sacar_sin_mp-duena]»
+ROJO  | al sacar, la suscripción cancelada sigue anotada: dice «FAILED tests/test_cobro_mp2.py::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[sacar_con_pendiente-duena]»
+ROJO  | la dueña de un estudio saca a un miembro de otro: dice «FAILED tests/test_cobro_mp2.py::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[sacar_con_pendiente-duena_de_otro]»
+ROJO  | reactivar no mira la suscripción de quien la abrió: dice «FAILED tests/test_cobro_mp2.py::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[reactivar_con_la_suya-abrio]»
+```
 
-**Verde (`0bd4b6c` con `c24a266`):** el BASE del guion de sabotajes de abajo, que exige los 9 OK y `pantalla VALIDACION-1: OK`.
+**3. Plazo único.** Mutantes a mano, uno por fase: el pedido de esa fase con `hasta=anyio.current_time() + _TOPE_MP`. Cada mutante corrió contra el caso viejo (el de `cb740f3`) y contra el nuevo (`-k tope`):
 
-El caso es uno solo, `pantalla_validacion1.js`, con clics en la pantalla real: dos cargas distintas en menos de 60 s. La familia va como datos: panel, la anterior contesta después, botón (error sólo en la que se ve, error sólo en la anterior, falla el validador, falla al volver a validar la misma), historial, la misma carga sin cambios (no vuelve a pedir) y los mismos ítems con otra cabecera (vuelve a pedir).
+| Mutante | Caso viejo | Caso nuevo |
+|---|---|---|
+| lectura de `_quien_toca_el_plan` | `11 passed` | `2 failed`: `[cancelar_lee]`, `[reactivar_lee]` |
+| checkout: PUT de la vieja | `11 passed` | `1 failed`: `[checkout_cancela]` |
+| checkout: create | `11 passed` | `1 failed`: `[checkout_crea]` |
+| checkout: relectura | `11 passed` | `1 failed`: `[checkout_relee]` |
+| cancelar: PUT | `11 passed` | `1 failed`: `[cancelar_cancela]` |
+| sacar: PUT | `1 failed` `[sacar]` | `1 failed`: `[sacar_cancela]` |
+| reactivar: plazo `+1e9` | `11 passed` | `1 failed`: `[reactivar_lee]` |
+| sin mutar | | `15 passed, 91 deselected in 34.30s` |
 
-### Lo que corregí en el camino
+El caso viejo dejaba verdes seis de siete. Los mismos mutantes quedaron como sabotajes en `cobro_mp2.sh`:
 
-- **`0b9d476`, el arnés no distinguía el defecto.** El simulador elegía qué pedido cortar por su número de orden, y la comprobación de que se generó aceptaba `/generate_maria/avisos` como si fuera la generación. Con el resultado de la anterior retenido, el caso «falla el validador» daba OK. Ahora el simulador corta según la carga del pedido, y la comprobación espera exactamente `/generate_maria`.
-- **`db31e0e`, saqué las dos líneas de `onLeave`** que borraban la validación. Sobraban: a «Listo» sólo se llega desde la validación.
-- **`c24a266`, dos huecos del arnés que encontró el adversario:** todos los casos usaban la misma cabecera, así que sacar la cabecera del pedido no se veía; y ningún caso miraba el reuso legítimo, así que deshacer el caché entero tampoco. Ahora hay una fila para cada uno, con su sabotaje.
-- **`0bd4b6c`, regresión mía que encontró el code-review** (hallazgo 3): con el validador caído, volver a validar la misma carga borraba su resultado y dejaba generar con errores ya conocidos. En el mismo commit, el armado del pedido (`cabeceraParaValidar`) vuelve adentro del `try` y el turno se toma primero, como en la base (hallazgo 1).
+```
+ROJO  | cada pedido a Mercado Pago tiene su propio tope: dice «FAILED tests/test_cobro_mp2.py::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[cancelar_lee]»
+ROJO  | un pedido a Mercado Pago con su propio plazo (cancelar_lee): dice «FAILED tests/test_cobro_mp2.py::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[cancelar_lee]»
+ROJO  | un pedido a Mercado Pago con su propio plazo (cancelar_cancela): dice «FAILED tests/test_cobro_mp2.py::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[cancelar_cancela]»
+ROJO  | un pedido a Mercado Pago con su propio plazo (checkout_relee): dice «FAILED tests/test_cobro_mp2.py::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[checkout_relee]»
+ROJO  | un pedido a Mercado Pago con su propio plazo (checkout_cancela): dice «FAILED tests/test_cobro_mp2.py::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[checkout_cancela]»
+ROJO  | un pedido a Mercado Pago con su propio plazo (checkout_crea): dice «FAILED tests/test_cobro_mp2.py::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[checkout_crea]»
+ROJO  | un pedido a Mercado Pago con su propio plazo (sacar_cancela): dice «FAILED tests/test_cobro_mp2.py::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[sacar_cancela]»
+ROJO  | reactivar no tiene tope: dice «FAILED tests/test_cobro_mp2.py::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[reactivar_lee]»
+```
 
-### Sabotajes, `scripts/testing/sabotajes/validacion1.sh c24a266`
+**4. Texto.** Mutante T2: el texto de cancelar cambiado a «No se pudo confirmar la cancelación. Tu plan sigue activo y no se cobrará de más. Probá…». Corrió con `-k "sin_contestar or a_medias"`.
+
+| | Resultado |
+|---|---|
+| caso viejo | `12 passed, 90 deselected in 17.28s` |
+| caso nuevo | `2 failed, 10 passed, 94 deselected in 17.28s` |
+
+Los dos rojos del caso nuevo:
+
+- `FAILED tests/test_cobro_mp2.py::test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope[cancelar_lee]`
+- `FAILED tests/test_cobro_mp2.py::test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope[cancelar_cancela]`
+
+En el script:
+
+```
+ROJO  | si Mercado Pago no contesta, cancelar dice que el plan sigue igual: dice «FAILED tests/test_cobro_mp2.py::test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope[cancelar_lee]»
+```
+
+### Sabotajes, sobre `71e15df`
+
+| Script | ROJO | Fallas | Salida |
+|---|---|---|---|
+| `cobro_mp2.sh 71e15df` | 77 de 77 | `sabotajes con falla: 0` | `salida 0` |
+| `cobro_mp3.sh 71e15df` | 18 de 18 | `sabotajes con falla: 0` | `salida 0` |
+
+Las líneas de base, copiadas:
 
 ```
 BASE  | en verde
-ROJO  | el caché no mira de qué carga es: dice «FALLA: panel: muestra»
-ROJO  | la respuesta de la anterior pinta la que se ve: dice «FALLA: panel, la anterior contesta después: muestra»
-ROJO  | con el validador caído queda el resultado de la anterior: dice «FALLA: botón, falla el validador: el botón está habilitado pero el clic no genera»
-ROJO  | volver a validar la misma con el validador caído borra su resultado: dice «FALLA: botón, falla al volver a validar la misma: deja generar con el peso en cero»
-ROJO  | con una validación en curso, la que se ve no valida: dice «FALLA: panel, la anterior contesta después: no mostró la validación de la que se ve»
-ROJO  | el caché no mira la cabecera: dice «FALLA: cabecera distinta, mismos ítems: no volvió a validar con la cabecera cambiada»
-ROJO  | sin caché: siempre vuelve a pedir: dice «FALLA: panel, misma carga sin cambios: volvió a pedir la validación de la misma carga»
-FALLAS=0
-salida=0
+BASE  | los cruces en Postgres, en verde
+BASE  | tests/test_cobro_mp3.py en verde
 ```
 
-### Puertas, sobre `0bd4b6c` (producto) y `c24a266` (arnés)
+Ninguna línea `ROJO?`, `VERDE`, `TRABA` ni `ROTO`. Los 77 de MP-2 incluyen 6 sobre Postgres 16 descartable (candados y tope desde el candado).
 
-| puerta | resultado |
+**Cómo corrió MP-2.** Tardó ~2 min por sabotaje (~2 h 20 min en total), cuando la corrida anterior hizo 61 en 30 min. Cada pytest ocupaba ~99 % de un núcleo y la carga de la máquina era ~1 sobre 4 núcleos. No diagnostiqué la causa de la lentitud.
+- La primera corrida se cortó por el tope de 30 min de mi espera.
+- La segunda, por el tope de 2 h de los trabajos en segundo plano, a los 62 sabotajes, todos ROJO y sin `salida`. No la cuento.
+- La que vale es una tercera, desacoplada de ese tope y lanzada antes de que se cortara la segunda: la de la tabla.
+
+MP-3 corrió aparte, también sobre `71e15df`.
+
+### Puertas, sobre `71e15df`
+
+| Puerta | Salida |
 |---|---|
-| suite completa (`pytest -q --no-cov --timeout=120`) | `4570 passed, 101 skipped, 3 xfailed in 721.36s`, 0 failed, sobre `0bd4b6c`. Después sólo cambió `scripts/testing/`, que pytest no corre |
-| `compileall -q proyecto_maria` | salida 0 |
-| pantalla `pantalla_validacion1.js` | 9 OK, `pantalla VALIDACION-1: OK` (BASE del guion) |
-| sabotajes | 7 ROJO, `FALLAS=0` |
-| chequeo-6 | abajo, 2 AVISO con su porqué |
-| `/code-review high` (Opus, alto) | 9 hallazgos, tabla abajo |
-| `/security-review` (Sonnet alto) | sin hallazgos de confianza 8 o más |
-| adversario de comportamiento (Sonnet alto) | sin caminos que muestren, guarden o habiliten con lo de otra carga; 3 pre-existentes (riesgos); 2 huecos del arnés arreglados en `c24a266` |
+| suite completa, desde worktree limpio | `4585 passed, 101 skipped, 3 xfailed in 744.40s (0:12:24)`, salida 0 |
+| `python -m compileall -q proyecto_maria` | salida 0, sin texto |
+| chequeo-6 | abajo, entero |
+| `/code-review high` y `/security-review` | en «Revisión» |
 
-**`/code-review high`, Opus alto, sobre `18f2928..db31e0e`**
+La suite deja 714 líneas `Task was destroyed but it is pending!` al cerrar. No es nuevo: la corrida sobre `8abdc48` dejó 690, y una anterior, 630. No lo diagnostiqué en esta pieza.
 
-| # | hallazgo | qué hice |
-|---|---|---|
-| 1 | `cabeceraParaValidar` quedó afuera del `try` y antes del turno | arreglado en `0bd4b6c`. Sin rojo: no encontré un camino real que la haga fallar |
-| 2 | con el validador caído y sin validación previa, el historial guarda 0 | ya pasaba en la base; riesgo 1 |
-| 3 | volver a validar la misma carga con el validador caído borraba su resultado | arreglado en `0bd4b6c`, con su rojo (arriba) y su sabotaje |
-| 4 | espera fija (`setTimeout(0)`) en el arnés | arreglado en `591f301`: espera a que se lean las respuestas |
-| 5 | el arnés no miraba la validación de la anterior | arreglado en `591f301` |
-| 6 | las respuestas descartadas no llegan a `console.error` ni a la telemetría `validation_error` | riesgo 2 |
-| 7 | las validaciones viejas no se cancelan: siguen hasta el final y se descartan | riesgo 3 |
-| 8 | el resultado sigue siendo estado del módulo (tres variables) y no de la carga | riesgo 4 |
-| 9 | el comentario de `onLeave` habla de limpiar el caché | queda: ahora se refiere al caché de `lastMaria`, que sí se limpia |
-
-**`/security-review`:** sin hallazgos de confianza 8 o más. Miró la caché por pestaña, `logout` con recarga, el XSS (todo pasa por `CDI.escapeHtml` y el diff no agrega `innerHTML`), la telemetría (sólo contadores) y la inyección (`JSON.stringify`). Dejó una observación de confianza 3, que es de corrección y no de seguridad: el pedido que se compara no lleva todos los campos que el servidor podría usar en el futuro.
-
-**Adversario de comportamiento, Sonnet alto, sobre `0bd4b6c`**
-
-| # | hallazgo | qué hice |
-|---|---|---|
-| 1 | con el validador caído y sin validación previa, el historial guarda 0 y «Listo» dice «$0 USD» | ya pasaba en la base; riesgo 1, ahora con «Listo» |
-| 2 | «Calcular seguro» cambia el seguro después de validar y «Generar» no vuelve a comparar el pedido | ya pasaba en la base; riesgo 6 |
-| 3 | el pedido que se compara no lleva el vendedor, los gastos anteriores ni los subítems, que sí mira el control de antes de generar | ya pasaba en la base; según el adversario, los frena `/generate_maria` con 400; riesgo 5 |
-| 4 | huecos del arnés: una sola cabecera para todos los casos y ningún caso de reuso legítimo | arreglado en `c24a266`, con dos sabotajes |
-
-El adversario no encontró un camino en el que el panel, «Generar» o el historial usen la validación de otra carga.
-
-### chequeo-6, `18f2928 0bd4b6c`
+### chequeo-6, `64770b9 a4bb6d6`
 
 ```
-chequeo-6 18f2928..0bd4b6c: avisos para mirar, no un veredicto
-producto +66/−3383
-arnés +257/−929
+chequeo-6 64770b9..a4bb6d6: avisos para mirar, no un veredicto
+producto +3/−3
+arnés +154/−22
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/core/controles_maria.py: 270 → 270
-  proyecto_maria/core/ncm_catalog.py: 381 → 380
-  proyecto_maria/core/validations.py: 331 → 331
-  proyecto_maria/routers/admin_router.py: 403 → 403
-  proyecto_maria/services/fecha_inic_activ.py: 27 → 27
-  AVISO comentario nuevo de 3 líneas: proyecto_maria/services/fecha_inic_activ.py:1 (§6: una o dos)
-  proyecto_maria/services/migration_service.py: 681 → 681
-  proyecto_maria/static/v2/montos_ar.js: 91 → 91
-  proyecto_maria/static/v2/screens/despachante.js: 498 → 498
-  proyecto_maria/static/v2/screens/estudios.js: 238 → 238
-  proyecto_maria/static/v2/screens/finalize.js: 1387 → 1391
-  AVISO creció una función de más de 150: proyecto_maria/static/v2/screens/finalize.js:9 <anónima> 1379 → 1383, 1 en su propio cuerpo (§6: lo nuevo va aparte)
-avisos: 2
-salida=0
+  proyecto_maria/main.py: 11358 → 11358
+avisos: 0
 ```
 
-- **Lo propio de la pieza es `producto +36/−32`, en `finalize.js`** (`git diff --numstat 18f2928 0bd4b6c`), más `CHANGELOG.md` +6/−2. El resto del +66/−3383, y los demás archivos, vienen de tus merges: el borrado de `proyecto_maria/tests/` y tu limpieza.
-- **AVISO de `fecha_inic_activ.py`:** no es de esta pieza. Entró con un merge.
-- **AVISO de `finalize.js:9`:** es la función anónima que envuelve toda la pantalla, y el estado del módulo vive ahí. No hay forma de sumar estado sin que crezca. Partirla va a la cola de limpieza.
+Contra tu base, `cb740f3 a4bb6d6`:
+
+```
+chequeo-6 cb740f3..a4bb6d6: avisos para mirar, no un veredicto
+producto +17/−12
+arnés +214/−39
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/main.py: 11358 → 11358
+  proyecto_maria/static/v2/screens/finalize.js: 1386 → 1391
+avisos: 0
+```
+
+`finalize.js` entra por el merge de VALIDACION-1; no es de esta pieza.
+
+### Revisión
+
+**`/code-review high`**, sobre `cb740f3..10d9389`:
+
+| N.º | Dónde | Qué | Qué hice |
+|---|---|---|---|
+| 1, 2 | `finalize.js:133` y `:110` | VALIDACION-1 | Ya está en sus riesgos. Fuera de esta pieza |
+| 3 | `main.py:2109` | El comentario citaba el texto viejo | Arreglado en `67413fe` |
+| 4 | `CHANGELOG.md` | — | Falso positivo: la línea existe y describe el cambio |
+| 5 | `test_cobro_mp2.py:824` | El texto se miraba por partes | Ahora se compara exacto (`10d9389`) |
+| 6, 9 | `pantalla_validacion1.js:110` y `:102` | VALIDACION-1 | Ya está en sus riesgos. Fuera de esta pieza |
+| 7 | `test_cobro_mp2.py:860` | `_Lenta` simula la demora | Es una entrada simulada a propósito. El tope real lo cubre el caso fase por fase |
+| 8 | `test_cobro_mp3.py:40` | La firma rota perdía su ts | Arreglado en `247c081` |
+
+**Adversario:** uno solo, `adversario-sonnet-alto` (Sonnet, esfuerzo alto), sobre `3726c53`.
+
+| Hallazgo | Severidad | Reproducido | Qué hice |
+|---|---|---|---|
+| Tres rojos propios en el arnés (ver «Error propio») | Alta | Sí | Arreglado en `247c081` |
+| El texto T2 pasaba el caso | Media | Sí, mutante T2 | El caso compara el texto exacto |
+| Un plazo por fase pasaba el caso | Media | Sí, tabla de mutantes | Caso fase por fase y sabotajes |
+| Quitar `or not req_id`, o cambiar `compare_digest` por `==`, no da rojo | — | No lo reproduje | Riesgo 1 |
+| La firma no mira la frescura del ts | — | Por código | Riesgo 2 |
+| El hilo de cancelar puede durar hasta 20 s con un tope de 15 s | — | Por código | Riesgo 3 |
+
+El adversario vio rojo con el caso viejo en el mutante de la relectura del checkout. En mi corrida, el caso viejo da `11 passed`. Va en la tabla como lo corrí.
+
+**`/security-review`:** subagente general-purpose (Sonnet, esfuerzo alto), sobre todo lo que cambió la rama. Sin hallazgos de severidad media o alta. Anotó, como menor, que la firma usa el `data.id` del cuerpo y no el de la query: viene de antes de este rango (riesgo 4).
+
+### Error propio
+
+`08bab23` dejó en rojo `test_si_mp_no_cancela_no_se_cancela_a_medias`: el caso todavía esperaba el texto viejo. Lo vi al correr el arnés y quedó arreglado en `247c081`. `08bab23` no se entrega solo.
 
 ### Riesgos
 
-1. **El historial con el validador caído y sin validación previa guarda 0** en valor y peso, y «Listo» muestra «$0 USD». Ya pasaba en la base. Propuesta, como pieza aparte: calcular los totales desde los ítems de la carga cuando no hay validación.
-2. **Las respuestas descartadas no se registran.** Si una validación vieja falla después de que otra carga pidió, no llega a `console.error` ni a `CDI.track('validation_error')`, así que la telemetría cuenta de menos las caídas del validador.
-3. **Las validaciones viejas no se cancelan.** Siguen en el servidor hasta el final y su resultado se descarta. Se podría cortar con un `AbortController` al tomar un turno nuevo; no lo hice porque la tarea no lo pide.
-4. **El resultado sigue siendo estado del módulo** (`lastValidation`, `lastValidationPedido`, `turnoValidacion`), y no de la carga. Hoy cada lector pasa por el pedido o por el turno. Guardarlo en la carga lo haría vacío por construcción en una carga nueva; eso va a la cola de limpieza.
-5. **El pedido que se compara** es la cabecera y los ítems que se mandan al validador. Hoy `/api/validate/smart` mira sólo eso (`main.py`, `controles_antes_de_generar(items_data, operacion)` con la cabecera que va en el pedido), así que el mismo pedido da el mismo resultado. Según el adversario, el control de `/generate_maria` mira además el vendedor, los gastos anteriores y los subítems; eso no pasa por el panel y lo frena el servidor con 400. Si el validador un día usa otro dato que no va en el pedido, dos cargas con el mismo pedido compartirían resultado.
-6. **«Calcular seguro» después de validar** cambia el seguro sin volver a validar, y «Generar» usa la validación de antes. Es la misma carga y ya pasaba en la base.
+1. **La firma tiene dos variantes sin rojo:** sin el `x-request-id` y con `compare_digest` cambiado por `==`. Una comparación con `==` filtra tiempo pero no acepta firmas falsas. No agregué casos: no son de esta devolución.
+2. **La firma no mira la frescura del ts:** un aviso firmado se puede repetir. Hoy repetir un pago ya anotado no cambia nada. Es una pieza aparte si la querés.
+3. **El hilo abandonado sigue hasta 20 s** (`timeout=10` del cliente por PUT + GET). La respuesta sale a los 15 s, y el hilo ocupa uno de los 8 cupos hasta que termina.
+4. **Hallazgo menor de `/security-review`:** la firma usa el `data.id` del cuerpo. Viene de antes de este rango.
+5. **D112.**
 
 ### Lo que no se corrió
 
-- La pantalla en otros navegadores: sólo Chromium.
-- Contra el validador real con IA: el arnés simula `/api/validate/smart`.
-- El adversario de comportamiento no pudo correr Playwright (a su entorno le faltaba fastapi) y probó con un simulador en Node. Los huecos del arnés (hallazgo 4) los reproduje con sus dos sabotajes; los hallazgos 1 a 3 son lectura de código, no los reproduje.
+- La suite de Postgres fuera de los sabotajes: sus escenarios corrieron como base de `cobro_mp2.sh` (en verde).
+- Los sabotajes de piezas anteriores: los corrés vos antes de publicar.
+- Nada contra Mercado Pago real.
 
 ### Para reproducir
 
 ```bash
-git checkout c24a266
-# 1. BASE en verde (los 9 casos), 7 ROJO, «FALLAS=0», «salida=0»
-PY=$(which python) scripts/testing/sabotajes/validacion1.sh c24a266
-# 2. «avisos: 2», los dos explicados arriba
-python docs/pm/herramientas/chequeo-6.py 18f2928 0bd4b6c
-# 3. sólo finalize.js: «36	32»
-git diff --numstat 18f2928 0bd4b6c -- proyecto_maria/static/v2/screens/finalize.js
+scripts/testing/sabotajes/cobro_mp2.sh 71e15df   # cada línea «ROJO …» y al final «sabotajes con falla: 0»
+scripts/testing/sabotajes/cobro_mp3.sh 71e15df   # lo mismo
+python -m pytest -q --no-cov tests/test_cobro_mp2.py -k tope   # «15 passed»
+docs/pm/herramientas/chequeo-6.py 64770b9 71e15df   # «producto +3/−3», «avisos: 0»
 ```
 
----
-
-/compact conservar: Dev 1, rama claude/dev-tecnica. VALIDACION-1 entregada en c24a266 más el commit del informe (producto 0bd4b6c), nada para decidir. COBRO-MP-2 vuelta y COBRO-MP-3 en a06c0c8 con D64 y D66 abiertas. Sigue: COBRO-MP-3 si vuelve, AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. Nada se publica sin el «dale» de Emi; nunca main.
+/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. COBRO-MP-2+3 devolución entregada en 71e15df (informe en el commit de arriba). Abierta D112 (recomiendo b). Sigue AISLAMIENTO-2 / LIMPIEZA-1, después BACKUP-1a y EXCEL-2c; frenar 2026-11-08 15:50 UTC. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.
