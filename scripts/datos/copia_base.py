@@ -23,7 +23,8 @@ sino en PGPASSWORD, y ningún error la muestra.
     COPIA_DESTINO=/mnt/copias python scripts/datos/copia_base.py enviar /copias/cdi.dump
 
 COPIA_PG_BIN es la carpeta de pg_dump y pg_restore (por defecto, los del PATH).
-COPIA_PLAZO_S es cuántos segundos pueden durar copiar o verificar (por defecto, 3600).
+COPIA_PLAZO_S es cuántos segundos puede durar la orden entera (por defecto, 3600):
+en copiar, cuenta también la verificación.
 Correrlo contra producción lo decide Emi.
 """
 import argparse
@@ -47,6 +48,7 @@ from scripts.datos.clientes_fecha_inic_activ import _SEPARADORES, _tapar  # noqa
 FORMATO = "cdi-copia-1"
 ESQUEMAS = ("postgres://", "postgresql://", "postgresql+asyncpg://")
 VARIABLES = ("COPIA_ORIGEN_URL", "COPIA_PRUEBA_URL")
+TOPE_BORRADO_S = 60
 
 # La salida de un valor como texto depende de la sesión: se fija igual al
 # copiar y al restaurar, así la configuración de cada base no cambia la huella.
@@ -279,6 +281,34 @@ async def _correr(*args, env) -> tuple:
     return proc.returncode, err
 
 
+def _filas(tablas: dict) -> int:
+    """Una dirección equivocada o una base recién creada restauran «igual»."""
+    filas = sum(t["filas"] for t in tablas.values())
+    if not filas:
+        raise Falla(f"la copia está vacía: {len(tablas)} tablas, 0 filas")
+    return filas
+
+
+async def _borrar_restauracion(admin, base: str) -> None:
+    """Un corte no deja el borrado a medias: se termina, con su propio tope para
+    que un DROP colgado no espere para siempre, y después sigue el corte."""
+    async def borrar():
+        try:
+            await admin.execute(f'DROP DATABASE IF EXISTS "{base}" WITH (FORCE)')
+            await admin.close()
+        finally:
+            if not admin.is_closed():
+                admin.terminate()
+    tarea = asyncio.ensure_future(asyncio.wait_for(borrar(), TOPE_BORRADO_S))
+    try:
+        await asyncio.shield(tarea)
+    except asyncio.CancelledError:
+        await asyncio.gather(tarea, return_exceptions=True)
+        raise
+    except TimeoutError:
+        raise Falla(f"no se pudo borrar {base} en {TOPE_BORRADO_S} s: hay que borrarla a mano") from None
+
+
 def _resumen(err: str) -> str:
     lineas = [linea[:200] for linea in err.strip().splitlines()[:5]]
     return tapar("\n    ".join(lineas))
@@ -317,6 +347,7 @@ async def copiar(archivo: str) -> int:
             err = await volcado
             if proc.returncode != 0:
                 raise Falla(f"pg_dump falló (salida {proc.returncode}):\n    {_resumen(err)}")
+            _filas(tablas)
             datos = {
                 "formato": FORMATO,
                 "creada": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
@@ -345,10 +376,7 @@ async def verificar(archivo: str) -> int:
     datos = leer_huella(archivo)
     if not re.fullmatch(r"[A-Z0-9_]+", str(datos.get("codificacion", ""))):
         raise Falla(f"la huella {_de_huella(archivo)} no se entiende")
-    # Una dirección equivocada o una base recién creada restauran «igual».
-    filas = sum(t["filas"] for t in datos["tablas"].values())
-    if not filas:
-        raise Falla(f"la copia está vacía: {len(datos['tablas'])} tablas, 0 filas")
+    filas = _filas(datos["tablas"])
     prueba = Direccion("COPIA_PRUEBA_URL")
     suma = sha256_de(archivo)
     base = "cdi_restauracion_" + secrets.token_hex(8)
@@ -370,10 +398,7 @@ async def verificar(archivo: str) -> int:
             finally:
                 await restaurada.close()
     finally:
-        try:
-            await admin.execute(f'DROP DATABASE IF EXISTS "{base}" WITH (FORCE)')
-        finally:
-            await admin.close()
+        await _borrar_restauracion(admin, base)
     if problemas:
         print("LA COPIA NO SIRVE:\n  " + "\n  ".join(problemas), file=sys.stderr)
         return 1
