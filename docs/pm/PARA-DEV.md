@@ -3,9 +3,9 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Mientras reviso `ca84c5f` y `84fd9f2`: empezá COBRO-MP-4 (2026-11-08 PM)
+## Mientras reviso `ca84c5f`: empezá COBRO-MP-4 (2026-11-08 PM)
 
-Las dos entregas están en reproducción; el veredicto llega arriba de este
+`ca84c5f` está en reproducción; el veredicto llega arriba de este
 bloque. Si trae una devolución, esa va primero.
 
 - **D119 → (b), decidido por la PM** (seguridad de MP, Emi): pieza
@@ -23,33 +23,28 @@ bloque. Si trae una devolución, esa va primero.
 - **D121 → (a)**: a la cola de limpieza; revisar los roles admin guardados
   en producción queda para Emi.
 
-Próxima D libre: D124.
+Próxima D libre: D125.
 
-## EXCEL-2c: aceptada sobre `c2b84f1`, sin integrar (2026-11-08 PM)
+## EXCEL-2d: aceptada sobre `84fd9f2`, sin integrar (2026-11-08 PM)
 
-Evidencia: `docs/pm/REPRODUCCION-EXCEL-2c-2026-11-08.md`. Igual al informe:
-chequeo-6 (`+53/−29`, el AVISO tiene su porqué), `54 passed`, Excel y
-rendimiento `1354 passed`, `excel2c.sh` 16 ROJO. Mío: 500 y 19000 filas
-siguen livianos; 21000 filas y `r="1_000_000"` van al pesado.
+Evidencia: `docs/pm/REPRODUCCION-EXCEL-2d-2026-11-08.md`. Igual al informe:
+chequeo-6 (`+97/−6`, los 2 AVISOS con su porqué), `1210 passed, 245
+skipped`, `excel2.sh` 42 ROJO y `excel2d.sh` 20 ROJO, los dos con falla 0.
 
-- **D122 → (a), decidido por la PM** («arreglos chicos de seguridad»,
-  Emi): pieza **EXCEL-2d**. Un `formatCode` largo no traba el proceso:
-  antes de abrir, un tope al largo (o a los «[») de cada `formatCode`; si lo
-  pasa, rechazo claro. Caso: tu libro de 120 000 «[» en ~5 KB da el rechazo
-  en menos de 1 s, y otro pedido no queda parado. Como datos del mismo caso,
-  los otros dos del adversario (`mergeCells` en ~5000 filas y `sqref` de
-  640 000 rangos): medilos y, si cuestan más de unos segundos, el mismo
-  tratamiento; si no, una línea de por qué no.
-- **`excel2.sh`, «ROTO … la función de 3e6e63e»:** confirmado que no es tuyo
-  (el patrón se fue en `522e082`, EXCEL-3b). Va en EXCEL-2d: actualizá ese
-  sabotaje al código de hoy y que dé rojo.
-- Supuesto de la `<dimension>` ancha al carril pesado: de acuerdo.
-- Riesgos (`.xls` sin medir, memoria de iterparse con 1.7 M de filas):
-  anotados.
+Lo que encontré: sin `xlwt`, `excel2d.sh` da **falla 7**. Los 245 skipped
+son todos por `xlwt`, que no está en `requirements.txt`, y la CI instala
+sólo eso: en la CI, los casos `.xls` de esta pieza (y 234 de EXCEL-3) se
+saltean sin rojo.
 
-**Orden:** el informe de COBRO-MP-2+3 vuelta 3, PERMISOS-1 y BACKUP-1a
-(`ca84c5f`) apenas terminen sus sabotajes → **EXCEL-2d**. Próxima D libre:
-D123.
+- **D124 → (a), decidido por la PM:** en un commit aparte de tu entrega de
+  COBRO-MP-4, la CI instala `xlwt` para las pruebas (no lo que instala
+  producción). El informe muestra en la CI los casos `.xls` corriendo, no
+  salteados.
+- Riesgo anotado: el sabotaje «las celdas rellenadas vuelven a copiarse»
+  mide un tiempo y dio verde una vez con la máquina cargada.
+
+**Orden:** sin cambios. COBRO-MP-4 (con D124) → PERMISOS-2. El veredicto de
+`ca84c5f` llega cuando terminen mis sabotajes. Próxima D libre: D125.
 
 ## Veredicto de COBRO-MP-2+3, vuelta 2 (2026-11-08 PM): devolución
 

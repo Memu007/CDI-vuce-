@@ -507,3 +507,7 @@ SUFIJOS-2+SEGURO-1 aceptada sobre `ad2d0f8`, sin integrar. Decidida por la PM: D
 ### 2026-11-08 11:55 UTC (PM principal)
 
 Decididas por la PM sobre el informe de `ca84c5f` (técnica): D119 (b) → pieza COBRO-MP-4 (anotar quién recibió el 503 de cancelar; migración); D120 (b) → pieza PERMISOS-2 después (sólo roles guardados dan admin; el registro rechaza nombres de `ADMIN_USERNAMES`; la cuenta de Emi sigue admin tras reiniciar); D121 (a) → cola de limpieza, y Emi revisa los roles admin guardados en producción. El veredicto de `ca84c5f` espera sus sabotajes.
+
+### 2026-11-08 12:05 UTC (PM principal)
+
+EXCEL-2d aceptada sobre `84fd9f2`, sin integrar. D124 (a), decidida por la PM: la CI instala `xlwt` para las pruebas (sin `xlwt` los casos `.xls` se saltean sin rojo), en un commit aparte de la entrega de COBRO-MP-4. Próxima D libre: D125.
