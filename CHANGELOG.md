@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: un espacio, un control o un invisible delante de EC no deja pasar una exportación a un TXT de importación (AVISOS-1)
+
+- Generar y los avisos rechazan `EC*` aunque llegue con un carácter nulo, un espacio de ancho cero o una marca de orden de bytes adelante; antes esos generaban el TXT de importación.
+
 ## 2026-11-08 · fix: un seguro sin completar o el 1 % dejado con CIF frenan la generación (SEGURO-2)
 
 - Si la factura traía seguro y no se pudo leer, no se genera hasta completarlo en la revisión; si la factura no trae seguro, se escribe 0 y genera. En la revisión ese campo se ve vacío, y si el servidor lo frena la pantalla vuelve ahí.

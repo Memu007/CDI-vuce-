@@ -4872,7 +4872,8 @@ def _importes_como_numeros(request: MariaRequest) -> None:
 
 
 def _rechazar_exportacion_en_importacion(request: MariaRequest) -> None:
-    if (request.tipo_destinacion or "").strip().upper().startswith("EC"):
+    # Un espacio, un control o un invisible adelante no la vuelve de importación.
+    if re.match(r"[\W_]*EC", request.tipo_destinacion or "", re.IGNORECASE):
         raise HTTPException(status_code=400, detail="Una destinación de exportación (EC*) no puede generar un TXT de importación.")
 
 
