@@ -257,7 +257,8 @@ def _mas_elementos_que(z, parte: str, tope: int) -> bool:
 
 
 def _contar_hojas_xlsx(contents: bytes) -> tuple[int, bool]:
-    """Cuenta las hojas desde xl/workbook.xml y mira, antes de abrir el libro,
+    """Devuelve (hojas, caro): caro si la forma del libro pide el carril pesado.
+    Cuenta las hojas desde xl/workbook.xml y mira, antes de abrir el libro,
     cuánto pesan los textos compartidos y la primera hoja: openpyxl los lee
     enteros al abrir, y un libro armado (millones de textos vacíos, una hoja
     enorme) tardaba minutos y usaba gigas de memoria (D26 a, EXCEL-2)."""
