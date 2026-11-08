@@ -271,12 +271,10 @@
         return String(val);
     }
 
-    // Un monto que la factura traía y no se leyó quedó en 0: se ve vacío, porque
+    // El seguro que la factura traía y no se leyó quedó en 0: se ve vacío, porque
     // un 0 a la vista parece leído y escribir el mismo 0 no lo completaría.
     function valorEnLaRevision(name, op) {
-        const sinLeer = MONTOS.includes(name) && Array.isArray(op.campos_sin_leer) && op.campos_sin_leer.includes(name) &&
-            !(Array.isArray(op.campos_completados) && op.campos_completados.includes(name));
-        return sinLeer ? '' : normalizeValueForField(name, op[name]);
+        return name === 'seguro' && CDI.seguroSinLeer(op) ? '' : normalizeValueForField(name, op[name]);
     }
 
     let fieldsFromUserDefaults = {};
@@ -671,8 +669,7 @@
         }
         op[el.name] = value;
         // Un seguro escrito a mano deja de ser el calculado o el dejado.
-        if (el.name === 'seguro') delete op.seguro_calculado;
-        if (el.name === 'seguro') delete op.seguro_dejado;
+        if (el.name === 'seguro') { delete op.seguro_calculado; delete op.seguro_dejado; }
         // MARIA-1c: un campo que la factura traía sin poder leerse deja de
         // avisarse cuando la persona escribe un valor (0 incluido) y vuelve a
         // avisarse si lo borra. La lista del lector no se toca.

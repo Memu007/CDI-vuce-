@@ -1316,6 +1316,7 @@
 
     // Expongo para que el panel huérfano u otro lugar pueda forzar un reintento.
     CDI.saveOperationToHistory = saveOperationToHistory;
+    CDI.seguroSinLeer = seguroSinLeer;
 
     // true si aprendió o no había nada para aprender.
     async function saveCatalogLearn(items) {
