@@ -49,6 +49,8 @@ services:
 
       # CORS
       - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      # Base de los links de los emails y de la vuelta del cobro; sin ella no arranca.
+      - FRONTEND_URL=${FRONTEND_URL:?falta FRONTEND_URL - la URL pública de la app, p.ej. https://cdi.tu-dominio.com}
 
       # Seguridad
       - ENVIRONMENT=production

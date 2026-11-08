@@ -449,6 +449,7 @@
 </div>
 
 <script src="/static/csrf.js"></script>
+<script src="/static/errores.js"></script>
 <script>
 (function () {
     'use strict';
@@ -655,11 +656,8 @@
                     activate('verify');
                     return;
                 }
-                let msg = 'No pudimos autenticarte. Revisá los datos.';
-                if (typeof detail === 'string') msg = detail;
-                else if (detail && typeof detail.message === 'string') msg = detail.message;
-                else if (data && typeof data.message === 'string') msg = data.message;
-                errorEl.textContent = msg;
+                errorEl.textContent = textoDeError(detail, (data && typeof data.message === 'string')
+                    ? data.message : 'No pudimos autenticarte. Revisá los datos.');
                 errorEl.hidden = false;
                 try { errorEl.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {}
                 return;

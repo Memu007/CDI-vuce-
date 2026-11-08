@@ -42,17 +42,20 @@ def test_update_user_profile_cuit_vacio_limpia(auth_override, client):
     assert r.status_code == 200
 
 
-def test_update_user_profile_email_valido(auth_override, client):
-    """PUT con email válido lo actualiza."""
+def test_update_user_profile_email_sin_clave_400(auth_override, client):
+    """PUT con email válido pero sin la contraseña actual → 400 y no cambia
+    (SESION-1). El cambio con la contraseña está en tests/test_sesion1.py."""
     r = client.put("/api/user/profile", json={"email": "nuevo@test.com"})
-    assert r.status_code == 200
-    assert r.json()["profile"]["email"] == "nuevo@test.com"
+    assert r.status_code == 400
+    assert "contraseña" in r.json()["detail"]
+    assert client.get("/api/user/profile").json()["profile"]["email"] != "nuevo@test.com"
 
 
 def test_update_user_profile_email_invalido_400(auth_override, client):
     """PUT con email inválido → 400."""
     r = client.put("/api/user/profile", json={"email": "no-es-email"})
     assert r.status_code == 400
+    assert r.json()["detail"].startswith("Email no válido")
 
 
 def test_update_user_profile_defaults(auth_override, client):

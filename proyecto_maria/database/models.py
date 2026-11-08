@@ -191,6 +191,41 @@ class UsoCuitPerfil(Base):
     last_used_at = Column(DateTime(timezone=True), nullable=False)
 
 
+class NcmHistorial(Base):
+    """Historial de NCM confirmadas por dueño (DISCO-1): una fila por
+    descripción, tal cual se guardó, con su NCM y cuántas veces se confirmó.
+    Antes era `ncm_historial_<usuario>.json` en DATA_DIR, que en Railway se
+    borra con cada deploy. `clave` es el sha256 de la descripción: la
+    unicidad no depende del largo del texto. `id` conserva el orden en que
+    se agregaron, que es el orden en que se sugieren."""
+    __tablename__ = "ncm_historial"
+    __table_args__ = (
+        UniqueConstraint("owner_username", "clave", name="uq_ncm_historial_owner_clave"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    owner_username = Column(String(50), ForeignKey("users.username"), nullable=False)
+    clave = Column(String(64), nullable=False)
+    descripcion = Column(Text, nullable=False)
+    ncm = Column(Text, nullable=False)
+    count = Column(Integer, nullable=False, default=1)
+
+
+
+class LimiteAuth(Base):
+    """Contadores de intentos de login, recuperación y registro (ABUSO-1).
+    Antes vivían en un dict de cada proceso: se perdían con cada reinicio y
+    cada worker contaba por su lado. Una fila por clave (`login:<ip>`,
+    `reset:<ip>`, ...); los tiempos son epoch en segundos. Una fila con
+    `vence` pasado ya no cuenta y se borra en la próxima escritura."""
+    __tablename__ = "limites_auth"
+
+    clave = Column(String(120), primary_key=True)
+    cuenta = Column(Integer, nullable=False, default=0)
+    bloqueado_hasta = Column(Float, nullable=False, default=0.0)
+    vence = Column(Float, nullable=False, index=True)
+
+
 class Operation(Base):
     """Operación de importación procesada."""
     __tablename__ = "operations"
@@ -352,6 +387,7 @@ class ClientProductHistory(Base):
     __tablename__ = "client_product_history"
     __table_args__ = (
         Index("ix_cph_owner_client", "owner_username", "client_id"),
+        Index("ux_cph_owner_client_clave", "owner_username", "client_id", "clave", unique=True),
     )
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -366,13 +402,21 @@ class ClientProductHistory(Base):
     ncm = Column(String(10), nullable=False)
     descripcion = Column(Text, nullable=False)
     descripcion_normalizada = Column(String(200), nullable=True)
+    # El producto (NCM de 8 dígitos y descripción): una fila por cliente.
+    # Vacía en las filas que no son un producto.
+    clave = Column(String(64), nullable=True)
 
     peso_unitario_avg = Column(Float, default=0.0)
-    origen_frecuente = Column(String(3), default="XX")
+    origen_frecuente = Column(Text, default="XX")
     veces_usado = Column(Integer, default=1)
 
     valor_unitario_avg = Column(Float, nullable=True)
     cantidad_avg = Column(Float, nullable=True)
+    # Cuántos usos trajeron cada valor: el promedio cuenta sólo esos. En las
+    # filas de antes quedan vacíos y se toma veces_usado.
+    veces_peso = Column(Integer, nullable=True)
+    veces_valor = Column(Integer, nullable=True)
+    veces_cantidad = Column(Integer, nullable=True)
 
     primera_vez = Column(DateTime(timezone=True), server_default=func.now())
     ultima_vez = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -385,8 +429,8 @@ class VendorCatalogProduct(Base):
 
     Reemplaza `product_catalog.json` que se perdia con cada deploy. Tenant
     aislado por `owner_username`. Para el mismo vendor, cada combinacion
-    (owner, vendor_id, product_key) es unica. `product_key` es la
-    descripcion normalizada (ver `catalog_service._normalize`).
+    (owner, vendor_id, product_key) es unica. `product_key` es la clave
+    de identidad del producto (ver `catalog_service.clave_de_producto`).
     """
     __tablename__ = "vendor_catalog_products"
     __table_args__ = (
@@ -405,12 +449,12 @@ class VendorCatalogProduct(Base):
         nullable=False,
     )
     vendor_id = Column(String(100), nullable=False)
-    vendor_nombre = Column(String(200), nullable=True)
+    vendor_nombre = Column(Text, nullable=True)
 
-    product_key = Column(String(300), nullable=False)
-    descripcion = Column(String(500), nullable=True)
+    product_key = Column(Text, nullable=False)
+    descripcion = Column(Text, nullable=True)
     ncm = Column(String(20), nullable=True)
-    origen = Column(String(5), nullable=True)
+    origen = Column(Text, nullable=True)
     valor_unitario = Column(Float, nullable=True)
     peso_unitario = Column(Float, nullable=True)
 

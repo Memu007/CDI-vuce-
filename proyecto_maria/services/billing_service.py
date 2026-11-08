@@ -20,6 +20,8 @@ from typing import Any, Tuple
 import mercadopago
 from mercadopago.config import RequestOptions
 
+from proyecto_maria.config import get_frontend_url
+
 
 # Lectura dinámica de envs para que tests con monkeypatch funcionen sin recargar módulo.
 def _access_token() -> str:
@@ -28,13 +30,6 @@ def _access_token() -> str:
 
 def _is_sandbox() -> bool:
     return _access_token().startswith("TEST-") or os.environ.get("MP_SANDBOX", "true").lower() in ("1", "true", "yes")
-
-
-def get_frontend_url() -> str:
-    url = os.environ.get("FRONTEND_URL", "").rstrip("/")
-    if url:
-        return url
-    return "http://127.0.0.1:8000"
 
 
 def _preapproval_plan_id(plan_id: str) -> str | None:

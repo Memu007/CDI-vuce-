@@ -4,6 +4,7 @@ Este módulo maneja la conexión a PostgreSQL usando SQLAlchemy con async.
 """
 
 import os
+from proyecto_maria.config import es_desarrollo
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import text
@@ -20,12 +21,12 @@ logger = logging.getLogger(__name__)
 # Configuración de la base de datos
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    # En producción, NUNCA caer a SQLite: el disco del contenedor (Railway) es
+    # Fuera de desarrollo, NUNCA caer a SQLite: el disco del contenedor (Railway) es
     # efímero y se perdería la base de todos los estudios en cada deploy, con un
     # warning que nadie mira. Se corta ruidosamente y temprano.
-    if os.getenv("ENVIRONMENT", "development") == "production":
+    if not es_desarrollo():
         raise RuntimeError(
-            "DATABASE_URL no está definida y ENVIRONMENT=production. La app no "
+            "DATABASE_URL no está definida y ENVIRONMENT no es de desarrollo. La app no "
             "arranca sin base persistente: en Railway el disco es efímero y caer "
             "a SQLite perdería los datos en cada deploy. Definí DATABASE_URL "
             "(postgresql://...)."
@@ -40,9 +41,6 @@ if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 elif DATABASE_URL.startswith("postgresql://") and "+asyncpg" not in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
-
-# Determinar si estamos en producción
-IS_PRODUCTION = os.getenv("ENVIRONMENT", "development") == "production"
 
 # Detectar si es SQLite (no soporta connection pooling)
 IS_SQLITE = DATABASE_URL.startswith("sqlite")

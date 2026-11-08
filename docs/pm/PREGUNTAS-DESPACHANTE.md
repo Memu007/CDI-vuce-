@@ -240,6 +240,11 @@ quedan sólo fuera del repo. Lo que muestran, sin ningún dato real, está en
 >    Y en un `Z` de porcentaje, ppm o quilates promedio, ¿tampoco van
 >    decimales? Hoy el sistema frena cualquier `Z` con decimales hasta que
 >    se escriba entero.
+>
+> 11. Una fecha dentro de un sufijo (un vencimiento, por ejemplo), ¿cómo la
+>    escribís? El MARIA no acepta la barra ni el punto: hoy `31/12/2026`,
+>    `31.12.2026` y `31-12-2026` salen `31 12 2026`. ¿Así la acepta, o va
+>    de otra forma (`31122026`, `2026-12-31`)?
 
 ## El mensaje que se mandó (2026-10-06)
 

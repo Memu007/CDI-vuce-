@@ -326,22 +326,78 @@ def ref_de_la_factura(numero_factura: str) -> str:
 
 
 # Un sufijo es una serie de «CC(valor)-» y «CCNN-». Dentro del valor el
-# MARIA sólo acepta letras, números y espacios (24/10: rechazó guiones y
-# puntos). Entre un sufijo y otro va «-», como en el archivo aceptado; un
-# espacio, una coma o nada entre dos sufijos se toma como separación
+# MARIA sólo acepta letras, números, espacios y la coma de un número con
+# decimales (24/10: rechazó guiones y puntos; SUFIJOS-2). Entre un sufijo y
+# otro va «-», como en el archivo aceptado; un espacio, una coma o nada entre
+# dos sufijos se toma como separación
 # (devolución de MARIA-7: antes «AA(ROJO) AB(AZUL)» salía «AA(ROJO  AB AZUL)»).
 _UN_SUFIJO = re.compile(r"([A-Za-z]{2})(?:\(([^()]*)\)|([0-9]{2}))")
 _ENTRE_SUFIJOS = re.compile(r"[\s,;\-]*")
 SUFIJO_MAXIMO = 120  # el mismo tope que valida /generate_maria
+# Los códigos que piden un número (SUFIJOS-2, supuesto de la D29): en la tabla
+# de ARCA del 07/10/2026 los libres que empiezan con Z son todos magnitudes o
+# cantidades (peso, %, capacidad, cantidad…) y los que empiezan con A son
+# texto (marca, modelo, código); el archivo aceptado de 2026 los trae enteros.
+PIDE_NUMERO = ("Z",)
+# Un separador que el MARIA cambia por espacio deja la palabra igual sólo en una fecha, números con
+# guion o un código con letras sin punto de miles y con sólo «-», «.» o «°» después de un dígito.
+_PALABRA = re.compile(r"[A-Za-z0-9]+(?:[^A-Za-z0-9\s][A-Za-z0-9]+)*")
+_SE_LEE_IGUAL = re.compile(
+    r"(?:0?[1-9]|[12][0-9]|3[01])([./-])(?:0?[1-9]|1[0-2])\1(?:[0-9]{2}|[0-9]{4})"
+    r"|[0-9]+(?:-[0-9]+)+"
+    r"|(?=.*[A-Za-z])(?!.*[0-9][Ee][^A-Za-z0-9][0-9])(?!.*[0-9]\.[0-9]{3})"
+    r"(?!.*[0-9][^A-Za-z0-9.°-]).+")
+
+
+def _alrededor(texto: str, i: int) -> str:
+    return texto[max(i - 8, 0):i + 9].strip()
+
+
+def _signo_de_un_numero(t: str, i: int) -> bool:
+    """`t[i]`, fuera de una palabra, sale espacio: ¿era parte de un número?"""
+    antes, despues = t[:i].rstrip(), t[i + 1:].lstrip()
+    digito_antes, digito_despues = antes[-1:].isdigit(), despues[:1].isdigit()
+    if digito_antes and digito_despues:                 # «1 / 2»
+        return True
+    if t[i + 1:i + 2].isdigit():                        # «-5», «.5»
+        return True
+    if digito_antes:                                    # «10%», pero no «5, AZUL»
+        return not (t[i] in ",.;:-" and t[i + 1:i + 2] in ("", " "))
+    signo = unicodedata.category(t[i]) in ("Pd", "Sm")   # «+» es Sm y «-» es Pd
+    return signo and digito_despues and not antes[-1:].isalnum()   # «- 5»
+
+
+def _numero_que_cambiaria(valor: str) -> str:
+    """El pedazo de `valor` que, limpio para el MARIA, se leería como otro
+    número; '' si no hay."""
+    for i, c in enumerate(valor):
+        if c.isnumeric() and not "0" <= c <= "9":
+            # Sólo el ² o el ³ de una unidad (M²) es otra forma del mismo valor.
+            de_unidad = i > 0 and valor[i - 1].isascii() and valor[i - 1].isalpha()
+            if c.isdecimal() or not de_unidad or valor[i + 1:i + 2].isnumeric():
+                return _alrededor(valor, i)
+    t, limpio = sufijos_arca.sin_tildes(valor), sufijos_arca.caracteres_del_maria(valor)
+    palabra = {i: p for p in _PALABRA.finditer(t) for i in range(p.start(), p.end())}
+    se_lee_igual = lru_cache(maxsize=None)(_SE_LEE_IGUAL.fullmatch)   # una vez por palabra
+    for i, (antes, despues) in enumerate(zip(t, limpio)):
+        if antes == despues or despues != " ":
+            continue
+        p = palabra.get(i)
+        if antes.isnumeric() or (p is None and _signo_de_un_numero(t, i)) or (
+                p and not se_lee_igual(p[0])):
+            return p[0] if p else _alrededor(t, i)
+    return ""
 
 
 def limpiar_sufijo(sufijo: str, donde: str = "") -> tuple[str, bool]:
     """El sufijo partido en sus códigos, cada uno con su valor reducido a
-    letras, números y espacios (lo demás, espacio; una letra con tilde, sin
-    tilde) y separados con «-»; el «-» final, si vino. Devuelve también si
-    cambió algo, para avisarlo. Lo que no se puede partir en códigos (un
-    paréntesis sin cerrar, un «(» dentro del valor) no se adivina: error
-    con `donde` (qué producto y qué sufijo)."""
+    letras, números, espacios y la coma de un número con decimales (lo
+    demás, espacio; una letra con tilde, sin tilde) y separados con «-»; el
+    «-» final, si vino. Devuelve también si cambió algo, para avisarlo. Lo
+    que no se puede partir en códigos (un paréntesis sin cerrar, un «(»
+    dentro del valor), un valor vacío, un código que pide número sin un
+    número entero o un número que en el TXT cambiaría de valor no se
+    adivinan: error con `donde` (qué producto y qué sufijo)."""
     sufijo = str(sufijo or "")
     partes, pos = [], _ENTRE_SUFIJOS.match(sufijo).end()
     while pos < len(sufijo):
@@ -350,11 +406,34 @@ def limpiar_sufijo(sufijo: str, donde: str = "") -> tuple[str, bool]:
             raise ValueError(
                 f"Sufijo de valor{donde}: «{sufijo[:80]}» no se puede separar en códigos "
                 f"(cerca de «{sufijo[pos:pos + 20]}»). Cada uno va como AA(valor) o CA00, "
-                f"separados con un guion, y dentro del paréntesis van sólo letras, números "
-                f"y espacios. Así no se genera el TXT."
+                f"separados con un guion, y dentro del paréntesis van sólo letras, números, "
+                f"espacios y la coma de un número. Así no se genera el TXT."
             )
         codigo, valor, numero = uno.groups()
-        partes.append(codigo + (f"({sufijos_arca.solo_letras_numeros_espacios(valor)})" if numero is None else numero))
+        if numero is not None:
+            partes.append(codigo + numero)
+        else:
+            limpio = sufijos_arca.caracteres_del_maria(valor)
+            if not limpio.strip():
+                raise ValueError(
+                    f"Sufijo de valor{donde}: «{uno[0][:40]}» está vacío. Escribí el valor o "
+                    f"sacá el código. Así no se genera el TXT."
+                )
+            if codigo.upper().startswith(PIDE_NUMERO) and not re.fullmatch(r"[0-9]+", valor):
+                raise ValueError(
+                    f"Sufijo de valor{donde}: «{uno[0][:40]}» pide un número sin decimales y no "
+                    f"se redondea solo. Escribilo sólo con dígitos, sin punto, coma, signo, "
+                    f"espacio ni barra. Así no se genera el TXT."
+                )
+            cambiaria = _numero_que_cambiaria(valor)
+            if cambiaria:
+                raise ValueError(
+                    f"Sufijo de valor{donde}: en «{uno[0][:40]}», «{cambiaria[:20]}» cambiaría de "
+                    f"valor sin el signo, la barra o el punto, que el MARIA no acepta. Escribí "
+                    f"los decimales con coma, los miles sin separador (1500, no 1.500) y las "
+                    f"fechas como 31/12/2026. Así no se genera el TXT."
+                )
+            partes.append(f"{codigo}({limpio})")
         pos = _ENTRE_SUFIJOS.match(sufijo, uno.end()).end()
     final = "-" if partes and _ENTRE_SUFIJOS.fullmatch(sufijo[-1]) else ""
     limpio = "-".join(partes) + final
@@ -377,7 +456,8 @@ def _aviso_de_sufijo(donde: str, sufijo) -> list:
     if not cambio:
         return []
     return [f"Sufijo de valor{donde}: entre un código y otro va un guion y dentro de los "
-            f"paréntesis van sólo letras, números y espacios; sale «{limpio[:80]}»."]
+            f"paréntesis van sólo letras, números, espacios y la coma de un número; "
+            f"sale «{limpio[:80]}»."]
 
 
 def usa_el_sufijo_de_la_operacion(items) -> bool:
@@ -883,6 +963,14 @@ TASA_SEGURO_SUGERIDO = Decimal("0.01")
 # Para cambiarlo alcanza con esta línea: "fob_casillero".
 BASE_SEGURO_SUGERIDO = "fob_factura"
 NOMBRE_DEL_FOB = {"fob_casillero": "FOB casillero", "fob_factura": "FOB de la factura"}
+# Con estos incoterms el seguro ya está en el precio (SEGURO-1): no se sugiere
+# el 1 %. El seguro se sigue declarando, el de la factura o el que se escribe.
+INCOTERMS_CON_SEGURO = ("CIF", "CIP", "DPU", "DAP", "DDP")
+
+
+def seguro_en_el_precio(incoterm) -> bool:
+    """Si el incoterm lleva el seguro en el precio; vacío o desconocido, no."""
+    return str(incoterm or "").strip().upper() in INCOTERMS_CON_SEGURO
 
 
 def importe_escrito(valor) -> str:
@@ -921,14 +1009,16 @@ def _numeros_de_los_renglones(items: list):
                              f"no se pueden hacer las cuentas.")
 
 
-def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajustes_deducir=None) -> dict:
+def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajustes_deducir=None,
+                      incoterm=None) -> dict:
     """Las cuentas del valor que se muestran antes de generar (VALOR-1).
 
     FOB casillero = FOB de la factura (el MDDTFOB del TXT) + ajustes a incluir
     − ajustes a deducir. Los ajustes los carga la persona: el sistema no
     decide qué se descuenta. El seguro sugerido es el 1 % de (el FOB de
-    BASE_SEGURO_SUGERIDO + flete), al centavo. Nada de esto cambia el TXT (D12 de VALOR-1). Un
-    importe inválido o un FOB casillero negativo es un ValueError."""
+    BASE_SEGURO_SUGERIDO + flete), al centavo; con un incoterm que ya lleva el
+    seguro en el precio no hay sugerido (None). Nada de esto cambia el TXT (D12
+    de VALOR-1). Un importe inválido o un FOB casillero negativo es un ValueError."""
     _numeros_de_los_renglones(items)
     fob_factura = fob_total_del_txt(items)
     incluir = centavos(_ajuste(ajustes_incluir, "Ajustes a incluir") or 0)
@@ -942,6 +1032,7 @@ def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajus
             f"factura más los ajustes a incluir ({importe_escrito(fob_factura + incluir)})."
         )
     fob_base = {"fob_casillero": fob_casillero, "fob_factura": fob_factura}[BASE_SEGURO_SUGERIDO]
+    en_el_precio = seguro_en_el_precio(incoterm)
     return {
         "fob_factura": float(fob_factura),
         "ajustes_incluir": float(incluir),
@@ -949,8 +1040,9 @@ def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajus
         "fob_casillero": float(fob_casillero),
         "flete": float(flete_c),
         "seguro": float(seguro_c),
-        "seguro_sugerido": float(centavos(TASA_SEGURO_SUGERIDO * (fob_base + flete_c))),
+        "seguro_sugerido": None if en_el_precio else float(centavos(TASA_SEGURO_SUGERIDO * (fob_base + flete_c))),
         "base_seguro": NOMBRE_DEL_FOB[BASE_SEGURO_SUGERIDO],
+        "seguro_en_el_precio": en_el_precio,
     }
 
 
@@ -975,6 +1067,28 @@ def _item_de_los_renglones(renglones: list, renglones_de: dict, lugar: dict) -> 
     item['valor_unitario'] = (float(item['valor_total']) / item['cantidad']) if item['cantidad'] > 0 else 0
     renglones_de[id(item)] = (renglones, kilos)
     return item
+
+
+EXPORTACION_EN_IMPORTACION = "Una destinación de exportación (EC*) no puede generar un TXT de importación."
+IMPORTACION_EN_EXPORTACION = "Un TXT de exportación lleva una destinación EC*, como EC01."
+
+
+def es_exportacion(tipo_destinacion) -> bool:
+    # Lo que no es letra o número ASCII adelante no la vuelve de importación.
+    # Se corta después del strip: normalizar un texto enorme entero traba el proceso.
+    texto = unicodedata.normalize("NFKC", str(tipo_destinacion or "").strip()[:64]).upper()
+    return re.match(r"[^A-Z0-9]*EC", texto) is not None
+
+
+def destinacion_del_txt(tipo_destinacion, exportacion: bool = False) -> str:
+    """La destinación como va al ISTA: cuatro letras o números ASCII, o ValueError."""
+    if es_exportacion(tipo_destinacion) != exportacion:
+        raise ValueError(IMPORTACION_EN_EXPORTACION if exportacion else EXPORTACION_EN_IMPORTACION)
+    codigo = str(tipo_destinacion or "").strip() or ("" if exportacion else "IC04")
+    if not re.fullmatch(r"[A-Za-z0-9]{4}", codigo):
+        ejemplo = "EC01" if exportacion else "IC04"
+        raise ValueError(f"Destinación: va un código de 4 letras o números, como {ejemplo}.")
+    return codigo.upper()
 
 
 def generate_maria_txt(operation_id: str, items: list, 
@@ -1064,9 +1178,7 @@ def generate_maria_txt(operation_id: str, items: list,
     # === [DDT] Cabecera ===
     # Normalizamos config de aduana/destinacion con defaults seguros (Ezeiza IC04)
     aduana_codigo = (str(aduana_codigo or "").strip() or "001")[:3]
-    if str(tipo_destinacion or "").strip().upper().startswith("EC"):
-        raise ValueError("Una destinación de exportación (EC*) no puede generar un TXT de importación.")
-    tipo_destinacion = (str(tipo_destinacion or "").strip().upper() or "IC04")[:4]
+    tipo_destinacion = destinacion_del_txt(tipo_destinacion)
 
     lines.append("[DDT]")
     lines.append(f"ISTA={tipo_destinacion}")
@@ -1528,8 +1640,8 @@ def generate_maria_txt(operation_id: str, items: list,
         #
         # Referencia real con dos sub-ítems:
         # `tests/fixtures/maria_golden_subitems_anon.TXT`.
-        # Dentro de los valores, sólo letras, números y espacios (MARIA-7;
-        # los supuestos avisan lo que se cambió).
+        # Dentro de los valores, sólo letras, números, espacios y la coma de
+        # un número (MARIA-7, SUFIJOS-2; los supuestos avisan lo que se cambió).
         if renglones:
             # Un sub-ítem por renglón (MARIA-8), con lo de su renglón: el FOB
             # al centavo, el unitario y el sufijo propio o el de la operación.

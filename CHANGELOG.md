@@ -49,6 +49,64 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(datos):** una copia sin filas sale con error, no queda verificada y copiar no deja ni la copia ni su huella. Copiar o verificar, si pasan `COPIA_PLAZO_S` (por defecto, una hora) o reciben una señal que no se ignoró a propósito (como con nohup), borran la base descartable (aunque llegue otro corte; si la base no se puede borrar, o no termina en 60 s, lo avisan y verificar no marca la copia), cortan pg_dump o pg_restore y salen con error. La copia, su huella y su marca sólo las lee quien corre el script.
 
+## 2026-11-08 · fix: la destinación que llega al TXT es un código de 4 letras o números, y la exportación sólo genera con una EC (AVISOS-2)
+
+- Generar, los avisos y la exportación dan 400 con una destinación que no es de 4 letras o números ASCII (de más o de menos, con un invisible, de ancho completo, de otro alfabeto), en vez de cortarla o escribirla así en el ISTA; la exportación también da 400 con una de importación o vacía.
+- Con el seguro borrado y de vuelta a FOB, el motivo dice que se borró al cambiar el incoterm, sin decir que va en el precio. El lector de facturas rechaza la exportación con un invisible adelante en cualquiera de los tres lugares.
+
+## 2026-11-08 · fix: el seguro que se borró al pasar a CIF dice eso, y el motivo se ve junto al campo (AVISOS-1)
+
+- Pasar de FOB a un incoterm con el seguro en el precio borra el 1 % calculado; generar, los avisos, el semáforo y la nota (también de vuelta a FOB) ahora dicen que se borró, en vez de «no pudimos leerlo de la factura»; vaciar el campo no quita esa marca.
+- Cuando generar frena por el seguro y vuelve a la revisión, el motivo queda escrito debajo del campo, que se lleva a la vista, y la pista pide el 0 sólo si la factura no trae seguro.
+
+## 2026-11-08 · fix: lo que va delante de EC no deja pasar una exportación como importación (AVISOS-1)
+
+- Generar, los avisos y el generador rechazan `EC*` con cualquier cosa que no sea letra o número adelante (un nulo, un invisible, un relleno, un guion) o escrito en ancho completo; antes no la reconocían como exportación.
+
+## 2026-11-08 · fix: un seguro sin completar o el 1 % dejado con CIF frenan la generación (SEGURO-2)
+
+- Si la factura traía seguro y no se pudo leer, no se genera hasta completarlo en la revisión; si la factura no trae seguro, se escribe 0 y genera. En la revisión ese campo se ve vacío, y si el servidor lo frena la pantalla vuelve ahí.
+- El 1 % que se dejó como estaba también frena con un incoterm que ya lleva el seguro en el precio; con otro incoterm sigue generando.
+
+## 2026-11-08 · fix: los avisos leen el incoterm igual que la generación (SEGURO-1, agregado)
+
+- Antes de generar, los avisos limpian los textos como el TXT: con un incoterm `CIF` que trae un carácter invisible ya no ofrecen el 1 % que la generación después rechaza.
+
+## 2026-11-08 · fix: un sufijo frena cuando el número que va al TXT no es el que se escribió (SUFIJOS-2, segunda revisión)
+
+- Se compara lo escrito con lo que sale al TXT: un menos o una raya, una fracción, un exponente, dígitos de ancho completo o de otra escritura, un `%` o un apóstrofo de miles que el MARIA cambiaría frenan con el aviso de siempre. Las fechas `31/12/2026`, `31.12.2026` y `31-12-2026` salen `31 12 2026` sin frenar.
+- Un sufijo que pide número (Z) acepta sólo dígitos: `ZA(10%)`, `ZA(1 500)` o dígitos de ancho completo frenan.
+- Un punto de miles pegado a letras (`2.500KG`, `AB-1.500`) y una fecha con el día o el mes fuera de rango (`12.50.2026`) también frenan.
+
+## 2026-11-08 · fix: un NUL en el cliente elegido al subir un Excel no da 500 (ENTRADAS-4)
+
+- El campo `cliente_id` de `/upload_excel_v2/` recibe el mismo trato que los demás textos que van a la base: un NUL o un carácter inválido se cambia por «�», no se encuentra el cliente y el Excel se lee sin su mapeo, en vez de dar 500 en Postgres.
+
+## 2026-11-08 · fix: fuera de desarrollo, sin FRONTEND_URL la app no arranca (ENTORNO-4)
+
+- Como con `ALLOWED_ORIGINS`: sin `FRONTEND_URL`, y con `ENVIRONMENT` distinto de `development`, `test` o `testing`, la app no arranca; una `FRONTEND_URL` con sólo espacios cuenta como vacía. La vuelta del cobro de Mercado Pago usa la misma URL que los emails y ya no cae a localhost.
+- `docker-compose.yml` no levanta sin `FRONTEND_URL` y `preflight_env.sh` avisa si falta.
+
+## 2026-11-08 · fix: un cuerpo muy hondo, un NUL en la consulta, un campo del cliente que no es texto o un número enorme no dan 500 (ENTRADAS-3)
+
+- Aprender productos, guardar el despacho y editar un producto con un cuerpo más hondo que la pila dan 400. Un carácter nulo en la consulta da 400. Un pedido con NUL o una ruta de más de 200 caracteres queda en el registro de pedidos.
+- Un campo de texto del cliente que llega como lista, objeto, número o booleano da 400; en null queda vacío. Un número de más de 1e15 en la operación manual o al guardar al cliente da 400, y el listado y las métricas no revientan al sumar.
+
+## 2026-11-08 · fix: sin ENVIRONMENT o con un valor desconocido, FRONTEND_URL, ALLOWED_ORIGINS y HSTS van como en producción (ENTORNO-3)
+
+- Fuera de `development`, `test` o `testing`: sin `FRONTEND_URL` el link de los emails no sale a localhost, sin `ALLOWED_ORIGINS` la app no arranca, y toda respuesta lleva HSTS.
+- El limitador por tipo de ruta no deja pasar a 127.0.0.1 fuera de desarrollo (hoy no está montado en la app).
+
+## 2026-11-08 · fix: un número, un texto o una ruta rara no da 500 en la operación manual, los clientes ni agrupar (ENTRADAS-2)
+
+- La operación manual y guardar una operación al cliente con un número que no es número (`NaN`, infinito, texto, un total que desborda) o un ítem que no es objeto dan 400 y no guardan nada. Un nulo o un carácter inválido en un texto se guarda como «�», una pieza de más de 20 caracteres se corta y un grupo fuera de rango queda vacío.
+- Un carácter nulo en la ruta da 404. Editar un cliente con el email de otro da 409. Agrupar acepta hasta 10000 ítems. El alta de estudio pide la misma clave que el registro: 8 caracteres y un número o símbolo.
+- Guardar al cliente con un cuerpo roto, vacío o demasiado anidado da 400; un campo anidado del cliente se guarda; agrupar cuando el número de grupo más alto del usuario ya es el último da 409.
+
+## 2026-11-08 · fix: un dato mal cargado se explica en castellano en login, registro, reset y el panel (FRONT-422)
+
+- Cuando la API rechaza un dato (falta un campo, no es texto ni número, es demasiado largo, la clave pasa de 72 bytes), la pantalla dice cuál y por qué, con el número de ítem si viene de una lista; si el motivo no es uno de esos, pide revisar ese dato. Antes mostraba «[object Object]», un mensaje genérico o el texto en inglés.
+
 ## 2026-11-07 · fix: cancelar sin respuesta de Mercado Pago no afirma que el plan sigue igual (COBRO-MP-2)
 
 - **fix(cobro):** si Mercado Pago no contesta a tiempo al cancelar, el aviso dice que no se pudo confirmar la cancelación, sin afirmar que el plan sigue igual: Mercado Pago pudo haberla cancelado.
@@ -56,6 +114,32 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-07 · fix: la validación sale de la carga que se ve (VALIDACION-1)
 
 - **fix(validación):** al pasar de una carga a otra en menos de un minuto, el panel, el botón «Generar» y lo que se guarda en el historial ya no muestran ni usan la validación de la carga anterior, aunque ésa conteste después o el validador falle.
+
+## 2026-11-07 · fix: sin ENVIRONMENT o con un valor desconocido los controles de producción quedan puestos (ENTORNO-2)
+
+- Fuera de `development`, `test` o `testing`: el CSRF bloquea, las cookies van `Secure`, `/docs`, `/redoc` y `/openapi.json` dan 404, sin `DATABASE_URL` la app no arranca y el VUCE simulado no responde.
+- El cobro simulado da 404 fuera de desarrollo aunque esté `ENABLE_SIMULATE_CHARGE=true`: la variable ya no se lee.
+
+## 2026-11-07 · fix: un login correcto no perdona los fallos que la IP hizo con otras cuentas (ABUSO-2)
+
+- Entrar bien a la propia cuenta descuenta sólo los fallos con esa cuenta: los intentos de la misma IP contra otras cuentas o usuarios inexistentes siguen contando para el bloqueo, también después de que un bloqueo venció.
+- El tope de 3 mails por hora de recuperar usuario se cuenta por cuenta encontrada, así dos formas de escribir el mismo email que la base toma por igual no lo saltean.
+
+## 2026-11-07 · fix: una clave o un texto que no se puede guardar da 422 o 400, no 500 (ENTRADAS-1)
+
+- Una clave nueva (reset, cambio, registro, alta de estudio) de más de 72 bytes o con un carácter nulo o inválido da 422 y no cambia nada: el link de reset sigue sirviendo.
+- En los textos del registro, del alta de estudio y del perfil esos caracteres se cambian por «�»; un nombre o un email más largo que su columna da 400 o 422. El alta de estudio y el perfil validan el email como el registro.
+- Un error que repite texto ajeno y el 422 de un cuerpo raro (bytes que no son UTF-8, `NaN`, `1e999`) son JSON válido; el 422 no repite lo que llegó. Agrupar y desagrupar ítems con un cuerpo mal armado dan 422.
+
+## 2026-11-07 · fix: sin ENVIRONMENT o con un valor desconocido no se abre ninguna puerta de desarrollo (ENTORNO-1)
+
+- Sólo `development`, `test` o `testing` habilitan los usuarios demo, el login con la contraseña guardada tal cual, el webhook de Mercado Pago sin secreto, el link de reset por consola y el cobro simulado. Cualquier otro valor, o la variable ausente, se trata como producción para esas cinco puertas.
+- Fuera de esos tres valores la app no arranca con la clave JWT de desarrollo ni con una débil, como ya pasaba con `production`.
+
+## 2026-11-07 · fix: un carácter que no se puede guardar no da 500 en login ni en recuperar (ABUSO-1)
+
+- Un surrogate suelto o un NUL en el usuario o el email de login, recuperar contraseña y recuperar usuario se cambia por «�» y la respuesta es la de un dato que no existe, en vez de 500.
+- Lo mismo para el token de restablecer contraseña, y un pedido mal armado con uno de esos caracteres da 422 en cualquier ruta.
 
 ## 2026-11-06 · fix: en un estudio, una sola regla de quién toca la suscripción que paga (COBRO-MP-2)
 
@@ -80,6 +164,38 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(cobro):** antes de abrir una suscripción nueva se mira el estado de todas las de la organización; si una está autorizada se frena sin haber cancelado las pendientes. Si una no se puede cancelar, las que sí se cancelaron dejan de figurar como abiertas.
 
+## 2026-11-06 · fix: el token de reset vuelve en la respuesta sólo en el entorno de prueba (RESET-2)
+
+- El token de reset y el nombre de usuario sólo vuelven en la respuesta (como comodidad sin SMTP) en el entorno de prueba. Antes salían siempre que `ENVIRONMENT` no fuera «production», así que un despliegue con `ENVIRONMENT` sin poner podía filtrar el token de reset en la respuesta.
+
+## 2026-11-06 · fix: un PDF que pasa un tope propio de pypdf da «demasiado pesado» en castellano (PYPDF-1)
+
+- Con pypdf 6.21.4 (mínimo nuevo, trae arreglos de seguridad), un PDF con un árbol de hojas enorme da 400 «El PDF es demasiado pesado para abrirlo» en vez de «Invalid PDF file» con el mensaje de pypdf en inglés.
+
+## 2026-11-06 · fix: una entrada mala del catálogo da 400 sin perder el lote, y la fila vieja no se duplica (CATALOGO-LARGO-2, devolución)
+
+- Un campo que no es texto, con un carácter que no se puede guardar o un NCM de más de 20 caracteres da 400 con el motivo al guardar el catálogo, cambiar un producto o confirmar un NCM, y no se guarda nada del lote; el NUL se limpia, un nulo queda vacío y un precio no numérico, infinito o enorme se ignora.
+- Un producto guardado antes con una descripción sin letras latinas (china, emoji) recibe en el arranque la clave de hoy: volver a guardarlo no arma otra fila y la vieja sigue editable.
+- El arranque amplía las columnas de a una tabla por vez, sin trabarse con un guardado en curso, y avisa la migración recién cuando quedó guardada.
+
+## 2026-11-06 · fix: un link para restablecer la contraseña sirve una sola vez (RESET-1)
+
+- Cambiar la clave o el email, o restablecerla con otro link, deja sin uso los links pedidos antes.
+- El mismo link usado dos veces a la vez cambia la clave una sola vez; si la clave o el email cambian en el medio, el link da 400 «Token inválido o expirado».
+- Un link pedido mientras se cambia el email, o que vence entre que se valida y se guarda la clave nueva, tampoco sirve.
+
+## 2026-11-06 · fix: el origen se recuerda entero y proveedor u origen demasiado largos dan 400 (CATALOGO-LARGO-2)
+
+- La memoria del cliente guarda el origen entero («TAIWAN», «JAPON»): antes guardaba las tres primeras letras, y el TXT sugerido salía con otro país. El arranque amplía la columna en Postgres.
+- Un proveedor o un origen de más de 2000 caracteres da 400 con el motivo al guardar en el catálogo, cambiar un producto o confirmar un NCM, sin guardar nada; se cuentan igual que la descripción.
+- Aprender o cargar una operación con un origen así no lo guarda en la memoria del cliente (la operación avisa que no se guardó), y una fila sin descripción no frena el resto del catálogo por su origen.
+
+## 2026-11-06 · fix: lo que se valida con la clave actual no gana contra un cambio de clave en el medio, y contar intentos no traba la app (SESION-1, vuelta 2)
+
+- Cambiar la contraseña o el email después de validar la clave actual no guarda nada si la clave cambió mientras tanto (un reset del dueño gana): contesta 409 y no da un token. Dos cambios de clave a la vez: uno entra y el otro da 409.
+- Contar intentos fallidos usa la conexión del pedido, y revisar la sesión devuelve la suya antes de la ruta: muchos pedidos a la vez, con la clave mala o con sesión, ya no dejan a los demás sin entrar.
+- Los tokens se firman y se abren con la misma clave, y uno sin vencimiento no vale.
+
 ## 2026-11-05 · fix: lo que no se entrega no se cobra (COBRO-CORTE-1)
 
 - **fix(cobro):** generar cuenta la operación sólo si el archivo quedó escrito. Una respuesta que llega cuando ya empezó otra carga no le pone su operación a la nueva y, en v2, se guarda en el cliente de su carga. Un id de operación con caracteres que la base no guarda es una operación nueva, no un error. Borrar un cliente espera a la generación en curso de la cuenta, y su aviso dice que las operaciones quedan «Sin cliente».
@@ -102,6 +218,29 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(cobro):** guardar un MARIA ya generado completa la operación sólo si no tiene cliente o es del mismo; si es de otro cliente, se cuenta y se crea una nueva. El aviso de una cuenta cancelada que todavía tiene período y llegó al tope se titula «Llegaste al tope de tu plan».
 
+## 2026-11-05 · fix: el catálogo del proveedor guarda entero el origen y el nombre del proveedor (CATALOGO-LARGO-2)
+
+- Un origen como «TAIWAN» o un proveedor de más de 200 caracteres se guardan enteros en el catálogo, al cambiar un producto y al confirmar un NCM; antes, en Postgres, daban 500 o «guardado» sin guardar.
+- Una descripción sin letras latinas ni dígitos (por ejemplo «螺丝» o un emoji) se guarda con su propia clave, aunque tenga 2000 caracteres, y no se cruza con otra.
+- Confirmar un NCM cuenta el tope de 2000 caracteres de la descripción igual que el catálogo.
+
+## 2026-11-05 · fix: una sesión vale sólo si es la vigente, en todos lados (SESION-1, devolución)
+
+- Un solo lugar decide si un token es una sesión: lo usan las páginas, `/auth/me`, la telemetría y cerrar sesión. El link para verificar el email ya no abre sesión: después de verificar hay que entrar.
+- Cambiar la contraseña deja afuera toda otra copia del token y le da uno nuevo a quien la cambió; una clave actual equivocada da 400, y cinco seguidas (entre perfil y cambio de clave) bloquean 15 minutos. Un login que validó una clave que cambió en el medio no entra.
+- Cerrar sesión borra la cookie aunque la base no responda.
+
+## 2026-11-05 · fix: una letra que no es Unicode no borra el texto de la factura (RENDIMIENTO-1d, devolución)
+
+- Si una fuente del PDF dice que una letra es media letra Unicode, el texto que se saca aparte vuelve con «�» en su lugar en vez de perderse entero, y el vendedor se sigue adivinando.
+- Si el servidor corre con un idioma que no es UTF-8, una letra como «中» tampoco hace caer la lectura.
+
+## 2026-11-05 · fix: la operación se guarda sin esperar al catálogo (DESPACHO-1d)
+
+- Al generar, guardar la operación y aprender el catálogo van a la vez: si el catálogo no responde, la operación igual queda guardada y su aviso no se tapa. Red caída o plan vencido al confirmar un NCM o aprender el catálogo avisan como un error del servidor.
+- El id del proveedor se corta en 60 caracteres. Reintentar después de crear un cliente no crea otro. «Guardamos este NCM» sólo aparece si se guardó.
+
+
 ## 2026-11-05 · feat: se retira la interfaz vieja (v1)
 
 - **feat(ui):** `/dashboard` sirve siempre la v2. Se van `dashboard.html`, `static/app.js` y `app.css`; `?v=1` y la cookie `cdi_ui` ya no cambian la pantalla. Ninguna ruta de API cambia.
@@ -118,9 +257,146 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(seguridad):** si la sesión es válida y le falta la cookie `csrf_token`, la próxima lectura autenticada se la emite; la pantalla v2 ya la trae al abrir y escribe sin volver a entrar. Una sesión vencida, revocada o ausente no recibe nada, y un token que ya está no se cambia.
 
+## 2026-11-05 · fix: esperar para leer un despacho no le quita tiempo al PDF (RENDIMIENTO-1d, D55 b)
+
+- Si los dos lugares del lector están ocupados, leer un despacho espera un lugar y después tiene su tiempo entero, como validar. Antes, un despacho normal que conseguía lugar sobre el final vencía leyendo y la persona veía «tardó demasiado».
+
+## 2026-11-05 · fix: el texto de una factura se saca aparte (RENDIMIENTO-1d)
+
+- **fix(seguridad):** sacar el texto de la factura para adivinar el vendedor corre en el proceso aparte de la validación, con su tope de memoria, de CPU y por flujo. Un PDF que pasa la validación y se infla al leer sus fuentes ya no hace crecer la app más de 1 GB: la factura sigue, sin vendedor adivinado. Del texto vuelven a la app 64 K caracteres como mucho: un PDF de 1 KB que da 28 millones ya no la hace crecer 296 MB.
+
 ## 2026-11-05 · fix: con CSRF exigido, la landing y la pantalla vieja escriben y la recuperación de cuenta anda (CSRF-2)
 
 - **fix(seguridad):** el control CSRF exenta sólo rutas exactas (login, registro y las tres de recuperación de cuenta): ya no saltea rutas que empiezan parecido ni las que dicen «webhook». `static/csrf.js` agrega el token a las escrituras de la landing y de la pantalla vieja, incluido su «Salir».
+
+## 2026-11-05 · fix: ninguna falla al guardar deja un éxito a la vista (DESPACHO-1c, devolución)
+
+- Si asignar el cliente o guardar la operación falla (error del servidor, plan vencido, red caída o la memoria sin guardar), se cierra el «Cliente guardado» de antes y lo último que se ve es el error; el panel queda abierto para reintentar.
+- Confirmar una posición SIM o aprender los productos del proveedor avisa también cuando el servidor rechaza el pedido. Con proveedor, la operación se guarda después de aprender el catálogo, para que su error no quede tapado, y se guarda como se generó aunque mientras tanto se cambie de cliente o de operación.
+- Reintentar después de crear un cliente en el panel vuelve a guardar en ese cliente, sin crear otro.
+
+## 2026-11-05 · fix: lo que no quedó en la memoria de productos se avisa (DESPACHO-1c)
+
+- Guardar una operación o confirmar una posición SIM muestra un aviso si los productos no quedaron en la memoria para sugerirse la próxima vez; el «Cliente guardado» ya no lo tapa.
+- Una descripción sin letras ni números latinos (por ejemplo, en japonés) ya no se sugiere para cualquier producto ni recibe sugerencias de productos ajenos.
+
+## 2026-11-05 · fix: un PDF sano que esperó turno no se rechaza (RENDIMIENTO-1c, vuelta 2)
+
+- Al subir un PDF, la espera por un lugar ya no se descuenta del tiempo para validarlo: o se valida, o recibe 503 «Hay muchos PDFs en revisión». Validar también tiene tope de 10 s de CPU: uno que lo pasa da 400 «El PDF es demasiado pesado para abrirlo».
+
+## 2026-11-05 · fix: una descripción larga se guarda o da error (CATALOGO-LARGO-1)
+
+- La memoria del cliente y el catálogo del proveedor guardan descripciones de hasta 2000 caracteres; una más larga da 400 a la vista en vez de responder bien sin guardar. El arranque pasa las dos columnas del catálogo a texto sin tope; si no puede, no arranca.
+
+## 2026-11-05 · fix: un uso no se pierde si el producto cambia mientras se guarda (DESPACHO-1b)
+
+- Si otro pedido cambia o borra el producto mientras se guarda un uso, el uso queda en una fila nueva en lugar de perderse o dar 500. Confirmar un NCM dice si guardó el historial del cliente.
+
+## 2026-10-29 · fix: un producto es una sola fila en el catálogo del cliente (DESPACHO-1b, vuelta 4)
+
+- Aprender, cargar una operación, guardar un despacho, cambiar un producto y confirmar un NCM usan la misma regla: NCM de 8 dígitos y la descripción sin mirar mayúsculas, espacios ni forma Unicode. La base no deja dos filas iguales y el arranque une las que ya estaban repetidas.
+- Un NCM con dígitos arábigos o de ancho completo, un carácter que no se puede guardar o un ítem que no es un producto da 400; cambiar un producto para que quede igual a otro da 409; aprender acepta hasta 500 productos. Cambiar un producto y confirmar un NCM validan como guardar un despacho: el origen tiene que ser un país de dos letras y el NCM, de 8 dígitos; una operación con productos o resumen que no son objetos da 400 y no 500. Un peso o valor de 1e12 o más, o escrito como «1_000» o «٣», no entra en el promedio; al guardar un despacho, el renglón vuelve marcado con el motivo.
+- El tope de CPU del despacho cubre leer y entender el texto, y vuelve a cortar si el primer corte se pierde.
+
+## 2026-11-05 · fix: esperar lugar para revisar un PDF no culpa al archivo (RENDIMIENTO-1c)
+
+- Si un PDF no consigue lugar a tiempo para revisarse, porque hay muchos en revisión o el mismo usuario ya tiene uno, la respuesta es 503 «probá de nuevo» y no el 400 que manda a cambiar de archivo.
+- Un PDF que deja sin memoria a pypdf en una función en C da «demasiado pesado» y no un «Invalid PDF file» con texto interno.
+
+## 2026-10-28 · fix: un PDF armado no infla la app al subirlo (RENDIMIENTO-1c)
+
+- Validar un PDF al subir una factura o leer un despacho corre en un proceso aparte con tope de 256 MB y de tiempo: uno que se infla da 400 «El PDF es demasiado pesado para abrirlo» en vez de ocupar más de 1 GB de la app.
+- Las validaciones de un mismo usuario van de a una: diez PDFs pesados de uno no frenan la subida de otro. Si el proceso que valida se cae, la respuesta es 500 y no «Invalid PDF file».
+
+## 2026-10-28 · fix: el despacho no traba al lector ni mezcla productos (DESPACHO-1b, devolución 20:07)
+
+- Leer un despacho tiene tope de 10 s de CPU, aunque se pase en medio de una hoja (avisa hasta qué hoja leyó), y cada usuario lee uno a la vez (429 si ya está leyendo otro); el lector no carga el `.env`.
+- El catálogo une el mismo NCM con o sin puntos y no funde dos descripciones largas distintas; cada promedio cuenta sólo los usos con ese valor, también en el historial de operaciones.
+- Aprender o editar un peso infinito, enorme o negativo no se guarda (400 al editar), un infinito viejo no rompe el catálogo ni la búsqueda, y el valor unitario de un despacho que no está en dólares no se guarda (D47).
+
+## 2026-10-28 · fix: historial de NCM sin 500 y sin sugerencias perdidas (DISCO-1, devolución)
+
+- Si falla la memoria del cliente o el catálogo del proveedor, sugerir sigue con el historial (en Postgres se perdía todo).
+- Confirmar o importar una descripción de más de 2000 caracteres, una NCM de más de 20 o un carácter que la base no guarda da 400 claro; en la importación, el archivo entero y nombrando la fila. Los archivos viejos saltean esas entradas y un `.migrado` anterior ya no se pisa.
+- Importar respeta el orden del archivo para sugerir, y dos importaciones del mismo usuario a la vez ya no se traban en Postgres. Confirmar con un cliente ajeno o con un carácter inválido da error sin sumar la confirmación.
+
+## 2026-10-28 · fix: leer y guardar un despacho sin trabar ni romper el catálogo (DESPACHO-1b, D41)
+
+- El despacho se lee en un proceso aparte con la memoria y el tiempo topeados: un PDF que se infla avisa o da 504, y no traba a los demás. Hojas, texto, líneas y rótulos tienen tope; se leen hasta 500 renglones contando subítems, y de los errores del lector se guarda sólo el final. Un número del tope para arriba o un carácter que no es Unicode ya no dan 500: quedan con aviso.
+- Guardar es todo o nada; un número o un peso por unidad que pasa el tope no se guarda y avisa; no se suma a un producto de otro NCM porque la descripción se parezca.
+- Un valor nuevo sobre uno que estaba vacío ya no se promedia con ese vacío.
+
+## 2026-10-28 · fix: un email, una cuenta al invitar al estudio (ORG-1, D40)
+
+- Invitar un email que ya tiene cuenta en CDI (en este estudio, en otro o en ninguno) da error y no ocupa un lugar del plan.
+- Al registrarse con una invitación, las otras pendientes de ese email en el estudio quedan usadas: quien sale del estudio no puede volver a entrar con una de ellas.
+
+## 2026-10-28 · fix: sin respuesta de los avisos no se ofrece «Dejar el seguro» (SEGURO-1, revisión)
+
+- Si los avisos no contestan, la pantalla no ofrece dejar el seguro que calculó el sistema: con CIF, el 1 % habría salido en el TXT.
+
+## 2026-10-28 · fix: un número que cambiaría de valor en un sufijo no se genera (SUFIJOS-2, revisión)
+
+- Un sufijo con un número que el MARIA convertiría en otro (un signo como «-5», una fracción como «1/2», un punto de miles como «1.500») no genera el TXT y el aviso dice dónde. Los que piden número (Z) aceptan sólo enteros.
+- «0.750» sigue saliendo «0,750»; «1,500» sale igual.
+
+## 2026-10-28 · fix: invitar exige un email que el registro acepte (ORG-1)
+
+- Invitar a alguien al estudio rechaza el email con el mismo criterio que el registro (formato usuario@dominio.com, hasta 100 caracteres). Antes bastaba una «@», y esa invitación no la podía usar nadie y ocupaba un lugar 7 días.
+
+## 2026-10-28 · fix: el email de la cuenta se busca sin mirar mayúsculas (EMAIL-1)
+
+- Recuperar usuario, recuperar contraseña y entrar con el email encuentran la cuenta aunque el email venga con otras mayúsculas o espacios; el correo sale a la dirección guardada. La respuesta es la misma exista o no.
+- El perfil ya no deja cambiar el email a uno que otra cuenta tiene con otras mayúsculas, y no reescribe el email si sólo cambian las mayúsculas.
+- Si dos cuentas viejas comparten el email con distintas mayúsculas, no se tocan: gana la que coincide exacto; si ninguna coincide exacto no se elige ninguna (no sale correo y el login pide el email exacto o el usuario).
+
+## 2026-10-28 · fix: límites en registro, recuperar usuario y eventos (ABUSO-1, S6 y C9)
+
+- Registro: 5 por hora y 20 por día por IP. Recuperar usuario: 5 cada 15 minutos por IP y, por email, 3 por hora (el resto contesta lo mismo sin mandar el mail). Eventos de uso: 120 por minuto por ruta, y sin sesión se guardan sólo los de la landing y el registro.
+- Los intentos de login, recuperar contraseña, registro y recuperar usuario se cuentan en la base (tabla `limites_auth`) y no en la memoria de cada proceso: un reinicio ya no los borra. La cuenta de fallos se olvida a las 24 horas sin fallos.
+- Recuperar contraseña: los pedidos que llegan a la vez ya no pasan el tope de 5 (antes, 20 simultáneos desde una IP pasaban los 20).
+- Una IP de más de 120 caracteres en X-Forwarded-For ya no da error 500 en login, recuperar contraseña, recuperar usuario y registro (en Postgres), y sigue contando para el límite.
+
+## 2026-10-28 · fix: los límites contra abuso cuentan la IP real (ABUSO-1, S4)
+
+- Los límites de intentos (login, recuperar contraseña y los por minuto) toman la IP que agrega el proxy de Railway, la última de X-Forwarded-For, y no la primera, que la escribe quien manda el pedido: inventando una IP distinta en cada intento se esquivaba el bloqueo, y poniendo la de otro se lo bloqueaba. Cada 429 deja en el log la IP tomada.
+
+## 2026-10-28 · fix: los eventos de uso tienen un tope de tamaño (ABUSO-1, S5)
+
+- Un evento de uso de más de 16 KB se rechaza y no se guarda; antes cualquiera, sin sesión, podía mandar eventos de varios MB que se copiaban enteros a un archivo del servidor. Los eventos ya no se copian a un archivo de log que nadie leía: quedan sólo en la base.
+
+## 2026-10-28 · fix: cerrar sesión y cambiar la contraseña cierran de verdad las sesiones (SESION-1)
+
+- Cambiar la contraseña cierra las otras sesiones y deja abierta la tuya; resetearla las cierra todas; cerrar sesión invalida ese acceso aunque alguien se haya copiado la cookie. Antes, cambiar o resetear la contraseña volvía a habilitar las sesiones viejas.
+- Cambiar el email en el perfil pide la contraseña actual.
+
+## 2026-10-28 · fix: las métricas de uso se vuelven a grabar en bases viejas (OBSERVABILIDAD-1)
+
+- Al arrancar, si la tabla de métricas no tiene la columna del dueño, se agrega sola (vacía, sin tocar lo grabado) con su índice. Sin ella cada métrica se perdía y el panel de admin daba error. Si no se puede agregar, la app arranca igual y lo deja en el log.
+
+## 2026-10-28 · fix: el historial de NCM ya no se borra con cada deploy (DISCO-1)
+
+- Las NCM confirmadas e importadas se guardan en la base, por usuario, con el mismo comportamiento que antes. Al arrancar, los archivos de historial que hubiera en el disco se cargan una sola vez.
+
+## 2026-10-28 · fix: borrar un cliente con presupuesto compartido, `/health` y los errores 500 (DATOS-1)
+
+- Borrar un cliente que tenía un presupuesto compartido ya no da error: se borran también sus presupuestos compartidos, y esos links dejan de andar (dan «no encontrado»). La pantalla lo avisa antes de borrar.
+- `/health` responde 503 cuando la base no contesta, y los errores 500 ya no muestran el detalle técnico: va sólo al log del servidor.
+
+## 2026-10-28 · feat: el catálogo del cliente se carga desde un despacho, sin IA (DESPACHO-1b)
+
+- En Catálogo, «Cargar desde despacho» lee del PDF, por rótulo, un renglón por ítem o subítem: posición SIM, descripción, sufijos, origen, unidad, cantidad, valor unitario y kilo neto. Lo que falta queda marcado y vacío; un escaneado avisa.
+- Se revisa renglón por renglón y se guarda todo o nada en los productos del cliente. No arma operaciones ni TXT; el lector de facturas sigue rechazando despachos.
+
+## 2026-10-28 · feat: con CIF, CIP, DPU, DAP y DDP el sistema no sugiere el seguro (SEGURO-1)
+
+- Con esos incoterms el seguro ya está en el precio: no hay botón «Calcular seguro». El seguro de la factura se sigue cargando y sale en el TXT como siempre.
+- Si el seguro lo calculó el sistema y el incoterm pasa a uno de esos, se borra y queda para completar; el que cargó la persona no se toca.
+
+## 2026-10-28 · feat: los sufijos de valor aceptan la coma de un número y frenan los vacíos (SUFIJOS-2)
+
+- En un sufijo de código libre, un número con decimales sale con coma: «AF(2.5)» sale «AF(2,5)», no «AF(2 5)».
+- Un sufijo que pide número (los que empiezan con Z) con decimales, o uno vacío como «AA()», no genera el TXT: el aviso dice en qué producto y cuál es.
 
 ## 2026-11-05 · fix: cerrar sesión desde otro sitio ya no borra la sesión (CSRF-1, vuelta 2)
 
@@ -253,10 +529,6 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - En la pantalla de validación, «Destino de la mercadería» ofrece comercialización o reventa (por defecto), bien de uso de la empresa o bien de uso de una persona, por operación y con cambio por producto.
 - El TXT saca GANANCIASOP3 e IVAADICIONAL1 de a pares: COMERC + NO_VALIDA, BDEUSO + IVAAD2 o USOPAR + IVAAD1. Antes GANANCIASOP3 salía siempre COMERC. Un valor fuera de esos tres no genera el archivo.
 
-## 2026-10-28 · fix: la sugerencia de NCM no pierde la SIM completa del proveedor (GUARDAR-2, D32 b)
-
-- **fix(sugerencia):** si el historial del cliente tiene el NCM de 8 dígitos y el catálogo del proveedor tiene, para el mismo producto (la misma descripción, no una parecida), la SIM completa que empieza con esos 8, el autorrelleno (`/api/catalog/lookup`) y `/api/ncm/sugerir` traen la del proveedor. Desde GUARDAR-1 llegaba `84714900` y la pantalla marcaba incompleto lo que antes llegaba listo. Sin migración.
-
 ## 2026-10-28 · feat: el catálogo del cliente se baja en Excel (DESPACHO-1a)
 
 - En la pestaña Catálogo del cliente, «Descargar en Excel» baja los productos aprendidos de ese cliente, un renglón por producto y en el mismo orden que la pantalla: posición (como texto, con ceros y letra), descripción, origen, valor unitario, cantidad y peso promedio, veces usado y última vez.
@@ -270,6 +542,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - Validar o usar una invitación ya no da error 500 en Postgres. La invitación sólo sirve para registrarse con el email invitado, y el estudio no pasa de los usuarios de su plan (el dueño incluido; al invitar cuentan también las invitaciones pendientes sin vencer).
 - La invitación se gasta en la misma transacción que el alta y sólo si seguía pendiente: dos registros a la vez con el mismo enlace dejan un usuario y un 400, no dos altas ni un 500.
+
+## 2026-10-28 · fix: la sugerencia de NCM no pierde la SIM completa del proveedor (GUARDAR-2, D32 b)
+
+- **fix(sugerencia):** si el historial del cliente tiene el NCM de 8 dígitos y el catálogo del proveedor tiene, para el mismo producto (la misma descripción, no una parecida), la SIM completa que empieza con esos 8, el autorrelleno (`/api/catalog/lookup`) y `/api/ncm/sugerir` traen la del proveedor. Desde GUARDAR-1 llegaba `84714900` y la pantalla marcaba incompleto lo que antes llegaba listo. Sin migración.
 
 ## 2026-10-27 · fix: un cargo en plural, que no viene primero o en Item con otra descripción se avisa con su fila (EXCEL-3f)
 

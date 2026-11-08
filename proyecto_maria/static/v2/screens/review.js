@@ -271,6 +271,12 @@
         return String(val);
     }
 
+    // El seguro que la factura traía y no se leyó quedó en 0: se ve vacío, porque
+    // un 0 a la vista parece leído y escribir el mismo 0 no lo completaría.
+    function valorEnLaRevision(name, op) {
+        return name === 'seguro' && CDI.seguroSinLeer(op) ? '' : normalizeValueForField(name, op[name]);
+    }
+
     let fieldsFromUserDefaults = {};
     function applyUserDefaults(op) {
         // Si el despachante guardo en su perfil un puerto/aduana/tipo destinacion
@@ -302,7 +308,7 @@
         FIELDS.forEach(key => {
             const el = form.querySelector('[name="' + key + '"]');
             if (!el) return;
-            const normalized = normalizeValueForField(key, op[key]);
+            const normalized = valorEnLaRevision(key, op);
             el.value = normalized;
             // Si el valor viene del default del perfil (no del PDF), NO lo
             // marcamos como "Detectado del PDF" porque seria mentira.
@@ -662,8 +668,12 @@
             value = value.trim();
         }
         op[el.name] = value;
-        // VALOR-1: un seguro escrito a mano deja de ser el calculado.
-        if (el.name === 'seguro') delete op.seguro_calculado;
+        // Un seguro escrito a mano deja de ser el calculado o el dejado; el
+        // borrado, sólo si queda un valor: vaciado sigue siendo el borrado.
+        if (el.name === 'seguro') {
+            delete op.seguro_calculado; delete op.seguro_dejado;
+            if (String(el.value).trim() !== '') delete op.seguro_borrado;
+        }
         // MARIA-1c: un campo que la factura traía sin poder leerse deja de
         // avisarse cuando la persona escribe un valor (0 incluido) y vuelve a
         // avisarse si lo borra. La lista del lector no se toca.
@@ -997,7 +1007,7 @@
             });
             const out = await res.json().catch(() => ({}));
             if (!res.ok || !out.success || !out.cliente) {
-                const det = humanizeApiError(out.detail, 'No se pudo crear el cliente');
+                const det = textoDeError(out.detail, 'No se pudo crear el cliente');
                 CDI.toast && CDI.toast('No se pudo crear', det, 'error');
                 return;
             }
@@ -1062,7 +1072,7 @@
             });
             const out = await res.json().catch(() => ({}));
             if (!res.ok || !out.success || !out.cliente) {
-                const det = humanizeApiError(out.detail, 'No se pudo crear el cliente');
+                const det = textoDeError(out.detail, 'No se pudo crear el cliente');
                 CDI.toast && CDI.toast('No se pudo crear', det, 'error');
                 return;
             }
@@ -1145,16 +1155,15 @@
         });
     }
 
-    function humanizeApiError(detail, fallback) {
-        if (!detail) return fallback;
-        if (typeof detail === 'string') return detail;
-        if (Array.isArray(detail)) {
-            const msg = detail.map(d => (d && d.msg) || '').filter(Boolean).join('; ');
-            return msg || fallback;
-        }
-        if (detail.msg) return String(detail.msg);
-        try { return JSON.stringify(detail); } catch (_) { return fallback; }
+    // Un rechazo de generar que se corrige en un campo de acá, a la vista junto a él.
+    function marcarEnLaRevision(name, texto) {
+        const el = form && form.querySelector('[name="' + name + '"]');
+        const errEl = form && form.querySelector('[data-error-for="' + name + '"]');
+        if (el) el.classList.add('is-error');
+        if (errEl) { errEl.textContent = texto; errEl.hidden = false; }
+        if (el) { try { el.scrollIntoView({ block: 'center' }); } catch (_) {} }
     }
+    CDI.marcarEnLaRevision = marcarEnLaRevision;
 
     CDI.registerScreen('review', {
         onEnter() {

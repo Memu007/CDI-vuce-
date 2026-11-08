@@ -247,6 +247,14 @@ def auth_override():
         app.dependency_overrides.pop(get_current_user, None)
 
 @pytest.fixture(autouse=True)
+def _limitador_apagado(monkeypatch):
+    """Cada caso arranca con el limitador apagado, sin importar qué corrió antes;
+    los que miden un tope lo prenden ellos."""
+    from proyecto_maria.core.rate_limit import limiter
+    monkeypatch.setattr(limiter, "enabled", False)
+
+
+@pytest.fixture(autouse=True)
 def reset_environment():
     """Reset environment between tests"""
     yield

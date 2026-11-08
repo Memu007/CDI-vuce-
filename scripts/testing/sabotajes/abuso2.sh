@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# Negativos de ABUSO-2: cada sabotaje deshace una regla y la prueba de esa
+# regla tiene que fallar por ese motivo.
+# Login (tests/test_abuso2.py): un login correcto perdona sólo los fallos que
+# la IP hizo con su cuenta, una sola vez y sin lo vencido, y no cambia otras
+# claves; la cuenta se cuenta por la cuenta encontrada, también si se tipeó
+# el email, y la cuenta y la IP olvidan a las 24 h. Recuperar usuario: el tope de 3 por hora se
+# cuenta por la cuenta encontrada y no por el texto pedido; en SQLite lo ve
+# tests/test_abuso1.py con mayúsculas y, con PG_URL, la İ que sólo Postgres
+# junta lo ve scripts/testing/abuso2_postgres.py.
+#
+# uso: PY=/ruta/al/venv/bin/python [PG_URL=postgresql://cdi@127.0.0.1:55432/postgres] \
+#        scripts/testing/sabotajes/abuso2.sh [SHA]
+# Trabaja en un worktree descartable con su propia SQLite (y, con PG_URL, una
+# base de Postgres local que crea y borra): no toca tu copia ni datos
+# compartidos. Sale con error si un sabotaje no encuentra su patrón o no pone
+# rojo donde tiene que ponerlo.
+set -uo pipefail
+REPO="$(git rev-parse --show-toplevel)"
+SHA="$(git -C "$REPO" rev-parse "${1:-HEAD}")"
+PY="${PY:-python}"
+PG_URL="${PG_URL:-}"
+TMPD="$(mktemp -d)"; WT="$TMPD/wt"
+git -C "$REPO" worktree add --detach "$WT" "$SHA" >/dev/null || exit 2
+trap 'git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rmdir "$TMPD" 2>/dev/null' EXIT
+cd "$WT"
+FALLAS=0
+
+# sabotaje <archivo> <nombre> <lo que el rojo tiene que decir> <viejo> <nuevo> [<viejo> <nuevo> ...]
+# Cada <viejo> tiene que aparecer una sola vez en el archivo. Corre `correr`.
+sabotaje() {
+  local archivo="$1" nombre="$2" esperado="$3"; shift 3
+  git checkout -q -- proyecto_maria/
+  rm -f test.db
+  if ! "$PY" - "$archivo" "$@" <<'PYEOF'
+import sys
+p = sys.argv[1]; s = open(p, encoding="utf-8").read()
+pares = sys.argv[2:]
+for viejo, nuevo in zip(pares[::2], pares[1::2]):
+    if s.count(viejo) != 1:
+        sys.exit(f"patrón no encontrado una sola vez ({s.count(viejo)}): {viejo!r}")
+    s = s.replace(viejo, nuevo)
+open(p, "w", encoding="utf-8").write(s)
+PYEOF
+  then echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return; fi
+  local salida codigo
+  salida="$(correr)"; codigo=$?
+  if [ "$codigo" -eq 0 ]; then
+    echo "VERDE | $nombre: la prueba no lo vio"; FALLAS=$((FALLAS+1))
+  elif grep -qF -- "$esperado" <<<"$salida"; then
+    echo "ROJO  | $nombre: dice «$esperado»"
+  else
+    echo "ROJO? | $nombre: rojo (salida $codigo), pero sin «$esperado»"; grep -E "FAILED|FALLA|Error" <<<"$salida" | head -3; FALLAS=$((FALLAS+1))
+  fi
+}
+
+M=proyecto_maria/main.py
+L=proyecto_maria/core/limites_auth.py
+T=tests/test_abuso2.py
+P="FAILED $T::test_login_correcto_perdona_solo_los_fallos_de_su_cuenta"
+export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
+       VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
+correr() { "$PY" -m pytest -q --no-cov -p no:cacheprovider -W ignore -rf $T 2>&1; }
+
+T="tests/test_abuso2.py tests/test_abuso1.py"
+rm -f test.db
+if ! correr >/dev/null; then
+  echo "BASE  | la prueba ya está en rojo sin sabotaje: no se puede medir nada"; correr | grep FAILED; exit 1
+fi
+echo "BASE  | en verde"
+T=tests/test_abuso2.py
+
+# --- el login correcto perdona sólo lo propio
+sabotaje $M "el login correcto borra todos los fallos de la IP" "$P[otra_cuenta]" \
+  '    await limites_auth.descontar(db, clave_intentos, clave_cuenta)' \
+  '    await limites_auth.limpiar(db, clave_intentos)'
+sabotaje $M "los fallos de la cuenta no se cuentan aparte" "$P[solo_propios]" \
+  $'        if clave_cuenta:\n            await limites_auth.sumar_fallo' \
+  $'        if False:\n            await limites_auth.sumar_fallo'
+sabotaje $M "la cuenta se cuenta sin la IP" "$P[fallos_propios_desde_otra_ip]" \
+  'f"cuenta:{user.username}:{clave_intentos}"' 'f"cuenta:{user.username}"'
+sabotaje $M "la cuenta se cuenta por el texto tipeado" "$P[fallos_con_el_email]" \
+  'f"cuenta:{user.username}:{clave_intentos}"' 'f"cuenta:{username}:{clave_intentos}"'
+sabotaje $M "la cuenta se cuenta en una ventana fija" "$P[fallos_propios_de_mas_de_un_dia]" \
+  'sumar_fallo(db, clave_cuenta, exacta=True)' 'contar(db, clave_cuenta, 24 * 3600)'
+sabotaje $L "descontar borra lo propio pero no lo resta de la IP" "$P[mitad_y_mitad]" \
+  'case((_T.c.cuenta > n, _T.c.cuenta - n), else_=0)' '_T.c.cuenta'
+sabotaje $L "descontar deja la IP en negativo" "FAILED $T::test_descontar_no_deja_la_ip_en_negativo" \
+  'case((_T.c.cuenta > n, _T.c.cuenta - n), else_=0)' '_T.c.cuenta - n'
+sabotaje $M "el login cuenta los fallos de la IP con el tope de recuperar" "$P[ajeno_tras_el_bloqueo]" \
+  'sumar_fallo(db, clave_intentos, exacta=True)' 'sumar_fallo(db, clave_intentos)'
+sabotaje $L "descontar resta en todas las claves" "FAILED $T::test_un_login_correcto_no_cambia_otras_claves" \
+  'update(_T).where(_T.c.clave == clave).values(' 'update(_T).values('
+sabotaje $L "descontar resta también en reset" "FAILED $T::test_un_login_correcto_no_cambia_otras_claves" \
+  'update(_T).where(_T.c.clave == clave).values(' \
+  'update(_T).where((_T.c.clave == clave) | _T.c.clave.like("reset:%")).values('
+sabotaje $L "descontar resta también en el tope diario de registro" "FAILED $T::test_un_login_correcto_no_cambia_otras_claves" \
+  'update(_T).where(_T.c.clave == clave).values(' \
+  'update(_T).where((_T.c.clave == clave) | _T.c.clave.like("registro:d:%")).values('
+sabotaje $L "descontar alarga el olvido de la IP" "FAILED $T::test_un_login_correcto_no_cambia_otras_claves" \
+  'cuenta=case((_T.c.cuenta > n, _T.c.cuenta - n), else_=0)))' \
+  'cuenta=case((_T.c.cuenta > n, _T.c.cuenta - n), else_=0), vence=ahora + 24 * 3600))'
+sabotaje $L "descontar lee lo propio y no lo borra" "$P[dos_logins_seguidos]" \
+  'delete(_T).where(_T.c.clave == propia).returning(_T.c.cuenta)' \
+  'select(_T.c.cuenta).where(_T.c.clave == propia)'
+sabotaje $L "descontar resta lo propio vencido" "$P[propios_vencidos_con_la_ip_viva]" \
+  $'    await db.execute(delete(_T).where(_T.c.vence <= ahora))\n    n =' '    n ='
+sabotaje $M "la cuenta olvida a las 48 h" "$P[propios_vencidos_con_la_ip_viva]" \
+  'sumar_fallo(db, clave_cuenta, exacta=True)' 'sumar_fallo(db, clave_cuenta, exacta=True, olvido=48 * 3600)'
+sabotaje $M "la cuenta olvida a las 23,5 h" "$P[la_cuenta_recuerda_un_dia]" \
+  'sumar_fallo(db, clave_cuenta, exacta=True)' 'sumar_fallo(db, clave_cuenta, exacta=True, olvido=23.5 * 3600)'
+sabotaje $M "la IP olvida a las 48 h" "$P[los_dos_olvidan_al_dia]" \
+  'sumar_fallo(db, clave_intentos, exacta=True)' 'sumar_fallo(db, clave_intentos, exacta=True, olvido=48 * 3600)'
+sabotaje $M "la IP olvida a las 23,5 h" "$P[la_ip_recuerda_un_dia]" \
+  'sumar_fallo(db, clave_intentos, exacta=True)' 'sumar_fallo(db, clave_intentos, exacta=True, olvido=23.5 * 3600)'
+
+# --- recuperar usuario: el tope va por la cuenta, no por el texto
+T=tests/test_abuso1.py
+sabotaje $M "el tope de recuperar va por el texto pedido" \
+  "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email" \
+  'f"recuperar:cuenta:{user.username}"' 'f"recuperar:cuenta:{request.email}"'
+if [ -n "$PG_URL" ]; then
+  correr() { "$PY" scripts/testing/abuso2_postgres.py "$PG_URL" 2>&1; }
+  sabotaje $M "Postgres: el tope de recuperar va por el texto en minúsculas de Python" \
+    "FALLA | cinco variantes del mismo email mandan tres mails" \
+    'f"recuperar:cuenta:{user.username}"' 'f"recuperar:cuenta:{request.email.strip().lower()}"'
+else
+  echo "SIN PG| el sabotaje de la İ necesita PG_URL: no se corrió"
+fi
+
+git checkout -q -- proyecto_maria/
+echo "fallas: $FALLAS"
+exit $((FALLAS > 0))

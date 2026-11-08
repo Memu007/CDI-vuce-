@@ -368,8 +368,10 @@ def test_sin_token_fuera_de_desarrollo_no_hay_demo(client, monkeypatch, entorno)
         monkeypatch.delenv("ENVIRONMENT", raising=False)
     else:
         monkeypatch.setenv("ENVIRONMENT", entorno)
+    # Fuera de desarrollo el CSRF bloquea: el pedido lleva su token como el front.
+    csrf = {"X-CSRF-Token": client.cookies.get("csrf_token")}
     antes = dict(main_mod.pending_payments)
-    r = client.post("/api/billing/checkout", json={"plan": "premium"})
+    r = client.post("/api/billing/checkout", json={"plan": "premium"}, headers=csrf)
     assert r.status_code == 503, r.text
     assert "demo" not in r.text.lower()
     assert main_mod.pending_payments == antes
@@ -377,7 +379,7 @@ def test_sin_token_fuera_de_desarrollo_no_hay_demo(client, monkeypatch, entorno)
     main_mod.pending_payments["demo_prod0001"] = {"status": "pending", "username": usuario, "plan": "premium"}
     try:
         assert client.get("/api/payments/demo-checkout/demo_prod0001").status_code == 404
-        assert client.post("/api/payments/demo-confirm/demo_prod0001").status_code == 404
+        assert client.post("/api/payments/demo-confirm/demo_prod0001", headers=csrf).status_code == 404
         assert main_mod.pending_payments["demo_prod0001"]["status"] == "pending"
     finally:
         main_mod.pending_payments.pop("demo_prod0001", None)

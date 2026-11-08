@@ -127,6 +127,7 @@ if [ "$MODO" = "docker" ]; then
         -e ENVIRONMENT=production \
         -e JWT_SECRET_KEY="$CLAVE" \
         -e ALLOWED_ORIGINS="$ORIGEN_OK" \
+        -e FRONTEND_URL="$ORIGEN_OK" \
         -e DATABASE_URL="postgresql+asyncpg://cdi:cdi-prueba@${PG}:5432/cdi" \
         -e EMAIL_VERIFICATION_REQUIRED=false \
         "$IMG" >/dev/null || { echo -e "${RED}❌ No arrancó la app.${NC}"; exit 1; }
@@ -179,6 +180,7 @@ else
     ENVIRONMENT=production \
     JWT_SECRET_KEY="$CLAVE" \
     ALLOWED_ORIGINS="$ORIGEN_OK" \
+    FRONTEND_URL="$ORIGEN_OK" \
     DATABASE_URL="$DB_URL" \
     EMAIL_VERIFICATION_REQUIRED=false \
     CDI_DATA_DIR="$TMP/datos" \
@@ -332,7 +334,7 @@ if [ "$MODO" = "docker" ]; then
     docker restart "$APP" >/dev/null 2>&1
 else
     kill "$APP_PID" >/dev/null 2>&1; wait "$APP_PID" 2>/dev/null
-    ENVIRONMENT=production JWT_SECRET_KEY="$CLAVE" ALLOWED_ORIGINS="$ORIGEN_OK" \
+    ENVIRONMENT=production JWT_SECRET_KEY="$CLAVE" ALLOWED_ORIGINS="$ORIGEN_OK" FRONTEND_URL="$ORIGEN_OK" \
     DATABASE_URL="$DB_URL" \
     EMAIL_VERIFICATION_REQUIRED=false CDI_DATA_DIR="$TMP/datos" \
     PYTHONPATH=. nohup "$PY" -m uvicorn proyecto_maria.main:app \

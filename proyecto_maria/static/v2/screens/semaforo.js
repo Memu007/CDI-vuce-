@@ -57,6 +57,9 @@
         return campos.filter(function (c) {
             return completados.indexOf(c) === -1;
         }).map(function (c) {
+            if (c === 'seguro' && op.seguro_borrado) {
+                return 'El seguro que calculó el sistema se borró al cambiar el incoterm: cargá el de la factura; si no trae seguro, escribí 0.';
+            }
             return 'No pudimos leer ' + (NOMBRES_SIN_LEER[c] || c) + ' de la factura: completalo.';
         });
     }

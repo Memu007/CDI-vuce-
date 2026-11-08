@@ -22,6 +22,7 @@
     let tabOps, tabCatalogo, tabDatos, panelOps, panelCatalogo, panelDatos;
     let opsList, opsEmpty, opsExpand, opsExpandBtn, exportCsvBtn;
     let catalogoList, catalogoEmpty, catalogoActions, catalogoReset, catalogoSave, catalogoBadge, catalogoProductosList, catalogoProductosEmpty, catalogoExcelBtn;
+    let despachoBtn, despachoFile, despachoPanel, despachoEstado, despachoAvisos, despachoRenglones, despachoAcciones, despachoDescartar, despachoGuardar;
     let datosGrid;
     let filterChips = [], sortSelect;
 
@@ -103,6 +104,15 @@
         catalogoProductosList  = $('cxCatalogoProductosList');
         catalogoProductosEmpty = $('cxCatalogoProductosEmpty');
         catalogoExcelBtn       = $('cxCatalogoExcelBtn');
+        despachoBtn            = $('cxDespachoBtn');
+        despachoFile           = $('cxDespachoFile');
+        despachoPanel          = $('cxDespacho');
+        despachoEstado         = $('cxDespachoEstado');
+        despachoAvisos         = $('cxDespachoAvisos');
+        despachoRenglones      = $('cxDespachoRenglones');
+        despachoAcciones       = $('cxDespachoAcciones');
+        despachoDescartar      = $('cxDespachoDescartar');
+        despachoGuardar        = $('cxDespachoGuardar');
         datosGrid      = $('cxDatosGrid');
         filterChips    = Array.from(screenEl.querySelectorAll('.cx-chip[data-filter]'));
         sortSelect     = $('cxSort');
@@ -174,6 +184,10 @@
         if (catalogoReset) catalogoReset.addEventListener('click', resetCatalogo);
         if (catalogoSave)  catalogoSave.addEventListener('click', saveCatalogo);
         if (catalogoExcelBtn) catalogoExcelBtn.addEventListener('click', downloadCatalogoExcel);
+        if (despachoBtn) despachoBtn.addEventListener('click', onDespachoElegir);
+        if (despachoFile) despachoFile.addEventListener('change', onDespachoArchivo);
+        if (despachoDescartar) despachoDescartar.addEventListener('click', cerrarDespacho);
+        if (despachoGuardar) despachoGuardar.addEventListener('click', onDespachoGuardar);
 
         // Export CSV e expand de operaciones
         if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportClientCsv);
@@ -1035,6 +1049,8 @@
         renderOps(null);
         renderCatalogo(null);
         renderDatos(c);
+        // Lo leído de un despacho es de un cliente: con otro, se descarta.
+        if (despachoCliente !== c.id) cerrarDespacho();
         currentMapping = null;
         mappingDraft = null;
         switchTab('ops');
@@ -1542,6 +1558,217 @@
     }
 
     // DESPACHO-1a: el catálogo del cliente, tal como se ve, en Excel.
+    /* ==========================================================
+       Productos desde un despacho (DESPACHO-1b): se leen, se
+       revisan renglón por renglón y recién ahí se guardan en el
+       catálogo del cliente para el que se leyó el despacho.
+       ========================================================== */
+    let despachoCliente = null;
+    let despachoSeq = 0;
+    let despachoDivisa = null;
+
+    const DESPACHO_CAMPOS = [
+        ['posicion_sim', 'Posición SIM'],
+        ['descripcion', 'Descripción'],
+        ['origen', 'Origen (código de 2 letras)'],
+        ['cantidad', 'Cantidad'],
+        ['valor_unitario', 'Valor unitario'],
+        ['kilo_neto', 'Kilo neto'],
+    ];
+    const DESPACHO_NUMEROS = ['cantidad', 'valor_unitario', 'kilo_neto'];
+
+    function cerrarDespacho() {
+        despachoSeq++;
+        despachoCliente = null;
+        despachoDivisa = null;
+        if (!despachoPanel) return;
+        despachoPanel.hidden = true;
+        despachoEstado.textContent = '';
+        despachoAvisos.innerHTML = '';
+        despachoAvisos.hidden = true;
+        despachoRenglones.innerHTML = '';
+        despachoAcciones.hidden = true;
+    }
+
+    function onDespachoElegir() {
+        if (!despachoFile || !detailClienteId) return;
+        despachoFile.value = '';
+        despachoFile.click();
+    }
+
+    function mensajeDeRespuesta(data, status) {
+        if (data && typeof data.detail === 'string' && data.detail) return data.detail;
+        if (data && typeof data.message === 'string' && data.message) return data.message;
+        return 'No pude leer el despacho (error ' + status + ').';
+    }
+
+    async function onDespachoArchivo() {
+        const file = despachoFile.files && despachoFile.files[0];
+        if (!file || !detailClienteId) return;
+        cerrarDespacho();
+        const cid = detailClienteId;
+        const seq = despachoSeq;
+        despachoCliente = cid;
+        despachoPanel.hidden = false;
+        despachoEstado.textContent = 'Leyendo ' + file.name + '…';
+        despachoBtn.disabled = true;
+        const form = new FormData();
+        form.append('file', file);
+        try {
+            const res = await CDI.api('/api/clientes/' + encodeURIComponent(cid) + '/catalogo/despacho/leer', { method: 'POST', body: form });
+            const data = await res.json().catch(() => ({}));
+            if (seq !== despachoSeq) return;
+            if (!res.ok) throw new Error(mensajeDeRespuesta(data, res.status));
+            renderDespacho(data);
+            CDI.track && CDI.track('catalogo_despacho_leido', { id: cid, renglones: (data.renglones || []).length });
+        } catch (err) {
+            if (seq !== despachoSeq) return;
+            despachoEstado.textContent = String(err.message || err);
+        } finally {
+            despachoBtn.disabled = false;
+        }
+    }
+
+    // Los números se muestran y se escriben como en el despacho: 1.234,56.
+    function numeroComoDespacho(x) {
+        if (x == null || !Number.isFinite(x)) return '';
+        const [entero, decimales] = String(x).split('.');
+        const conMiles = entero.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        return decimales ? conMiles + ',' + decimales : conMiles;
+    }
+
+    // Lo que no tiene esa forma se manda como vino, para que el servidor lo
+    // rechace y se vea: nada se pierde en silencio.
+    function numeroDesdeTexto(texto) {
+        const t = texto.trim();
+        if (t === '') return null;
+        if (/^(\d{1,3}(\.\d{3})+|\d+)(,\d+)?$/.test(t)) return Number(t.replace(/\./g, '').replace(',', '.'));
+        return t;
+    }
+
+    function renderDespacho(data) {
+        const renglones = Array.isArray(data.renglones) ? data.renglones : [];
+        const avisos = Array.isArray(data.avisos) ? data.avisos : [];
+        despachoDivisa = data.divisa || null;
+        despachoAvisos.innerHTML = avisos.map(a => '<li>' + CDI.escapeHtml(a) + '</li>').join('');
+        despachoAvisos.hidden = !avisos.length;
+        if (!renglones.length) {
+            despachoEstado.textContent = data.sin_texto
+                ? 'El PDF no tiene texto (parece escaneado): no guardé nada.'
+                : 'No encontré productos en el despacho: no guardé nada.';
+            return;
+        }
+        const faltan = renglones.filter(r => (r.faltantes || []).length).length;
+        despachoEstado.textContent = 'Encontré ' + renglones.length + (renglones.length === 1 ? ' producto' : ' productos') +
+            (faltan ? '; a ' + faltan + ' les falta algo (marcado en naranja)' : '') +
+            '. Revisalos y corregí lo que haga falta: nada se guarda hasta que toques «Guardar en el catálogo».';
+        despachoRenglones.innerHTML = renglones.map(renderRenglonDespacho).join('');
+        despachoRenglones.querySelectorAll('[data-campo]').forEach(input => {
+            input.addEventListener('input', () => {
+                const campo = input.closest('.cx-despacho-campo');
+                if (campo && input.value.trim()) campo.classList.remove('is-faltante');
+            });
+        });
+        despachoAcciones.hidden = false;
+    }
+
+    function renderRenglonDespacho(r, i) {
+        const faltantes = r.faltantes || [];
+        const heredados = r.heredados || [];
+        const titulo = 'Ítem ' + (r.item || '?') + (r.subitem ? ' · subítem ' + r.subitem : '');
+        const campos = DESPACHO_CAMPOS.map(([campo, rotulo]) => {
+            const id = 'cxDesp' + i + '_' + campo;
+            const falta = faltantes.includes(campo);
+            const valor = DESPACHO_NUMEROS.includes(campo) ? numeroComoDespacho(r[campo]) : (r[campo] || '');
+            let etiqueta = rotulo;
+            if (campo === 'valor_unitario') etiqueta += ' (' + (despachoDivisa || 'divisa no encontrada') + ')';
+            const notas = [];
+            if (falta) notas.push('No estaba en el despacho' + (campo === 'origen' && r.origen_leido ? ': decía «' + r.origen_leido + '»' : ''));
+            if (heredados.includes(campo)) notas.push('Del ítem');
+            const control = campo === 'descripcion'
+                ? '<textarea id="' + id + '" data-campo="' + campo + '" rows="2" maxlength="2000">' + CDI.escapeHtml(valor) + '</textarea>'
+                : '<input id="' + id + '" type="text" data-campo="' + campo + '" value="' + CDI.escapeHtml(valor) + '"' +
+                  (DESPACHO_NUMEROS.includes(campo) ? ' inputmode="decimal" placeholder="1.234,56"' : '') +
+                  (campo === 'origen' ? ' maxlength="2" autocapitalize="characters"' : '') + '>';
+            return '<div class="cx-despacho-campo' + (falta ? ' is-faltante' : '') + (campo === 'descripcion' ? ' is-ancho' : '') + '">' +
+                '<label for="' + id + '">' + CDI.escapeHtml(etiqueta) + '</label>' + control +
+                (notas.length ? '<span class="cx-despacho-nota">' + CDI.escapeHtml(notas.join(' · ')) + '</span>' : '') +
+            '</div>';
+        }).join('');
+        const sufijos = (r.sufijos || []).map(s =>
+            '<li><code>' + CDI.escapeHtml(s.texto) + '</code>' + (s.significado ? ' ' + CDI.escapeHtml(s.significado) : '') + '</li>').join('');
+        const avisos = (r.avisos || []).map(a => '<li>' + CDI.escapeHtml(a) + '</li>').join('');
+        return '<li class="cx-despacho-renglon" data-indice="' + i + '">' +
+            '<div class="cx-despacho-renglon-titulo">' + CDI.escapeHtml(titulo) + '</div>' +
+            '<div class="cx-despacho-campos">' + campos + '</div>' +
+            '<div class="cx-despacho-dato">Unidad: ' + CDI.escapeHtml(r.unidad || '—') + ' <span class="cx-despacho-nota">(no se guarda)</span></div>' +
+            (sufijos ? '<div class="cx-despacho-dato">Sufijos de valor <span class="cx-despacho-nota">(no se guardan)</span><ul class="cx-despacho-sufijos">' + sufijos + '</ul></div>' : '') +
+            (avisos ? '<ul class="cx-despacho-renglon-avisos">' + avisos + '</ul>' : '') +
+            '<ul class="cx-despacho-errores" hidden></ul>' +
+        '</li>';
+    }
+
+    async function onDespachoGuardar() {
+        if (!despachoCliente) return;
+        const cid = despachoCliente;
+        const seq = despachoSeq;
+        const items = Array.from(despachoRenglones.querySelectorAll('.cx-despacho-renglon'));
+        const renglones = items.map(li => {
+            const valor = campo => {
+                const el = li.querySelector('[data-campo="' + campo + '"]');
+                return el ? el.value.trim() : '';
+            };
+            return {
+                posicion_sim: valor('posicion_sim'),
+                descripcion: valor('descripcion'),
+                origen: valor('origen').toUpperCase(),
+                cantidad: numeroDesdeTexto(valor('cantidad')),
+                valor_unitario: numeroDesdeTexto(valor('valor_unitario')),
+                kilo_neto: numeroDesdeTexto(valor('kilo_neto')),
+            };
+        });
+        items.forEach(li => {
+            const ul = li.querySelector('.cx-despacho-errores');
+            li.classList.remove('is-error');
+            ul.innerHTML = '';
+            ul.hidden = true;
+        });
+        despachoGuardar.disabled = true;
+        try {
+            const res = await CDI.api('/api/clientes/' + encodeURIComponent(cid) + '/catalogo/despacho/guardar', {
+                method: 'POST', body: JSON.stringify({ renglones, divisa: despachoDivisa }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (seq !== despachoSeq) return;
+            if (!res.ok) {
+                (Array.isArray(data.errores) ? data.errores : []).forEach(e => {
+                    const li = items[(e.renglon || 0) - 1];
+                    if (!li) return;
+                    const ul = li.querySelector('.cx-despacho-errores');
+                    li.classList.add('is-error');
+                    ul.innerHTML = (e.problemas || []).map(p => '<li>' + CDI.escapeHtml(p) + '</li>').join('');
+                    ul.hidden = false;
+                });
+                throw new Error(mensajeDeRespuesta(data, res.status));
+            }
+            cerrarDespacho();
+            CDI.toast && CDI.toast.success('Guardé ' + data.guardados + (data.guardados === 1 ? ' producto' : ' productos') + ' en el catálogo.');
+            // D47: el valor unitario sólo se guarda si el despacho está en dólares.
+            const sinValor = Array.isArray(data.avisos) ? data.avisos.length : 0;
+            if (sinValor && CDI.toast && CDI.toast.info) {
+                CDI.toast.info('Sin valor unitario', 'El despacho no está en dólares: no guardé el valor unitario de ' + sinValor + (sinValor === 1 ? ' producto.' : ' productos.'));
+            }
+            CDI.track && CDI.track('catalogo_despacho_guardado', { id: cid, renglones: data.guardados });
+            if (cid === detailClienteId) loadCatalogo(cid);
+        } catch (err) {
+            if (seq !== despachoSeq) return;
+            despachoEstado.textContent = String(err.message || err);
+            CDI.toast && CDI.toast.error(String(err.message || err));
+        } finally {
+            despachoGuardar.disabled = false;
+        }
+    }
+
     async function downloadCatalogoExcel() {
         if (!detailClienteId) return;
         try {
@@ -1591,7 +1818,7 @@
         const ok = await CDI.confirm({
             title: 'Eliminar cliente',
             lead: '¿Eliminar "' + (c.nombre || 'este cliente') + '"?',
-            text: 'Sus operaciones quedan en el historial como «Sin cliente», sin el detalle de sus ítems. Se borran sus productos aprendidos y notas NCM. Esta acción no se puede deshacer.',
+            text: 'Sus operaciones quedan en el historial como «Sin cliente», sin el detalle de sus ítems, y dejan de andar los links de presupuestos que compartiste. Se borran sus productos aprendidos y notas NCM. Esta acción no se puede deshacer.',
             acceptText: 'Eliminar cliente',
             kind: 'danger',
         });
