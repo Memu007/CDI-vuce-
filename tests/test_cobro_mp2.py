@@ -881,6 +881,28 @@ def test_el_reintento_que_falla_en_otra_deja_la_suya_para_volver_a_conciliar(cli
     assert _leer_org(org_id)["billing_status"] == "canceled" and _leer(nombres["abrio"])["cancelar_sin_confirmar"] is None
 
 
+def test_si_falla_la_suya_la_duena_no_concilia_ni_toca_la_que_paga(client):
+    from tests.test_cobro_mp1 import _leer_org
+    nombres, sid, org_id, _ = _org_con_suscripcion(client, "duena")
+    SUS["sus-d"] = "pending"
+    _set_user(nombres["duena"], mp_preapproval_id="sus-d")
+
+    def _falla_la_de_la_duena(request):
+        s = _RUTA_SUS.fullmatch(str(request.url)).group(1)
+        if s == "sus-d" and request.method == "PUT":
+            FALLA["GET"] = _falla_la_de_la_duena  # tras el PUT, tampoco confirma leyéndola
+        if s == "sus-d" and "GET" in FALLA:
+            return httpx.Response(500, json={})
+        if request.method == "PUT":
+            SUS[s] = "cancelled"
+        return httpx.Response(200, json={"id": s, "status": SUS[s]})
+    FALLA["PUT"] = _falla_la_de_la_duena
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == 503, r.text
+    assert SUS[sid] == "authorized" and _leer(nombres["abrio"])["mp_preapproval_id"] == sid
+    assert _leer_org(org_id)["billing_status"] == "active"
+
+
 class _NoContesta:
     soltar = threading.Event()
 

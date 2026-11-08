@@ -87,6 +87,9 @@ sabotaje $M "la marca de otra cuenta del estudio concilia" \
 sabotaje $M "cancelar empieza por la suscripción de quien pide" \
   "FAILED $T::test_el_reintento_que_falla_en_otra_deja_la_suya_para_volver_a_conciliar" \
   "key=lambda c: (paga[c], c is db_user)" "key=paga.get"
+sabotaje $M "el desempate pone primero a quien pide, antes que a la que paga" \
+  "FAILED $T::test_si_falla_la_suya_la_duena_no_concilia_ni_toca_la_que_paga" \
+  "key=lambda c: (paga[c], c is db_user)" "key=lambda c: (c is db_user, paga[c])"
 
 CORRER=correr_pg
 sabotaje $M "el arranque no agrega la columna a una base que ya existe" \
