@@ -2,7 +2,7 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## FRONT-422 (D100): **en curso**: falta el resultado de las dos suites sobre `4dbdb0b` (2026-11-08)
+## FRONT-422 (D100): **entregada** en `4dbdb0b` (2026-11-08)
 
 | Qué | SHAs |
 |---|---|
@@ -10,7 +10,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 | Producto y CHANGELOG | `37ceeed`, `9ee40b8`, `8decbfc` |
 | Pruebas y sabotajes | `ca54f74`, `1b93976`, `4dbdb0b` |
 | Merge de tu rama (sólo `docs/pm/`) | `038a42d` = `ff88333` traído con merge |
-| Informe | el commit `docs:` que sigue a `038a42d` |
+| Informe | `32ec8dd` (en curso) y el `docs:` que lo cierra |
 
 **Resultado.** Un 422 de pydantic (`detail` en lista) ya no muestra «[object Object]», el texto en inglés ni un genérico que tapa el motivo. Pasa en las cuatro entradas que leen `detail`:
 - `CDI.api` (`app_v2.js`), que usan todas las pantallas del panel, entre ellas revisión y finalizar;
@@ -101,8 +101,8 @@ Cada entrada verifica además:
 |---|---|
 | `tests/test_front422.py` | `33 passed` |
 | `front422.sh 4dbdb0b` | `BASE \| en verde`, 17 `ROJO`, `sabotajes con falla: 0` |
-| Suite completa, la mía (`ENVIRONMENT=test`, SQLite), worktree limpio | corriendo; no la doy por verde hasta copiar su salida |
-| Suite completa, la de CI (`env -u DATABASE_URL ENVIRONMENT=testing …`), worktree limpio | corriendo; no la doy por verde hasta copiar su salida |
+| Suite completa, la mía (`ENVIRONMENT=test`, SQLite), worktree limpio | `5157 passed, 335 skipped, 3 xfailed, 97 warnings in 851.77s (0:14:11)`, `SALIDA 0` |
+| Suite completa, la de CI (`env -u DATABASE_URL ENVIRONMENT=testing …`), worktree limpio | `5157 passed, 335 skipped, 3 xfailed, 94 warnings in 831.95s (0:13:51)`, `SALIDA 0` |
 | `chequeo-6.py 19b7764 4dbdb0b` | abajo, 1 aviso (las +42, explicado arriba) |
 | grep de historia de §6 sobre `proyecto_maria/` | vacío |
 | `/code-review high` y adversario Opus alto | abajo |
