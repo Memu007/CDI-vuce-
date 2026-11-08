@@ -668,8 +668,12 @@
             value = value.trim();
         }
         op[el.name] = value;
-        // Un seguro escrito a mano deja de ser el calculado, el borrado o el dejado.
-        if (el.name === 'seguro') { delete op.seguro_calculado; delete op.seguro_borrado; delete op.seguro_dejado; }
+        // Un seguro escrito a mano deja de ser el calculado o el dejado; el
+        // borrado, sólo si queda un valor: vaciado sigue siendo el borrado.
+        if (el.name === 'seguro') {
+            delete op.seguro_calculado; delete op.seguro_dejado;
+            if (String(el.value).trim() !== '') delete op.seguro_borrado;
+        }
         // MARIA-1c: un campo que la factura traía sin poder leerse deja de
         // avisarse cuando la persona escribe un valor (0 incluido) y vuelve a
         // avisarse si lo borra. La lista del lector no se toca.
@@ -1157,6 +1161,7 @@
         const errEl = form && form.querySelector('[data-error-for="' + name + '"]');
         if (el) el.classList.add('is-error');
         if (errEl) { errEl.textContent = texto; errEl.hidden = false; }
+        if (el) { try { el.scrollIntoView({ block: 'center' }); } catch (_) {} }
     }
     CDI.marcarEnLaRevision = marcarEnLaRevision;
 

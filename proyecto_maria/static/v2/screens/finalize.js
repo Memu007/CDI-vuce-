@@ -407,9 +407,9 @@
     }
 
     // Con un incoterm que ya lleva el seguro en el precio, el 1 % que puso el
-    // sistema no va: se borra y queda para completar, como un campo que no se
-    // leyó (SEGURO-1). Sólo con las cuentas del pedido de ahora; el seguro
-    // leído o escrito por la persona no se toca.
+    // sistema no va: se borra, queda para completar y marcado como borrado para
+    // que los avisos no digan que no se leyó. Sólo con las cuentas del pedido de
+    // ahora; el seguro leído o escrito por la persona no se toca.
     function borrarSeguroCalculado(valor, firma) {
         const op = CDI.state && CDI.state.operacion;
         if (!op || !valor || !valor.seguro_en_el_precio || !(op.seguro_calculado || op.seguro_dejado)) return false;
@@ -516,14 +516,16 @@
         if (nota) {
             nota.textContent = !ok ? '' :
                 enElPrecio ? 'Con ' + incoterm + ' el seguro ya está en el precio: el sistema no lo calcula.' +
-                    (seguroSinLeer(op) && op.seguro_borrado ? ' El que calculó el sistema se borró: cargá el de la factura en la revisión; si la factura no trae seguro, escribí 0.' :
-                        seguroSinLeer(op) ? ' No pudimos leerlo de la factura: completalo en la revisión; si no trae seguro, escribí 0.' :
+                    (seguroSinLeer(op) ? (op.seguro_borrado ?
+                        ' El que calculó el sistema se borró: cargá el de la factura en la revisión; si la factura no trae seguro, escribí 0.' :
+                        ' No pudimos leerlo de la factura: completalo en la revisión; si no trae seguro, escribí 0.') :
                         valor.seguro > 0 ? '' : ' Si la factura lo trae, cargalo en la revisión.') :
                 (calculado && valor.seguro !== valor.seguro_sugerido) ? 'El seguro se calculó con otros importes.' :
                 calculado ? 'Seguro calculado: 1 % de (' + base + ' + flete).' :
                 valor.seguro > 0 ? 'La operación ya trae seguro.' :
-                mostrar && seguroSinLeer(op) ? 'La factura puede traer un seguro que no pudimos leer: ' +
-                    'revisala antes de calcularlo.' : '';
+                mostrar && seguroSinLeer(op) ? (op.seguro_borrado ?
+                    'El seguro que calculó el sistema se borró al cambiar el incoterm: calculalo de nuevo o cargá el de la factura.' :
+                    'La factura puede traer un seguro que no pudimos leer: revisala antes de calcularlo.') : '';
         }
     }
 

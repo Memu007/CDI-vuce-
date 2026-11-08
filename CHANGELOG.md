@@ -8,8 +8,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-08 · fix: el seguro que se borró al pasar a CIF dice eso, y el motivo se ve junto al campo (AVISOS-1)
 
-- Pasar de FOB a un incoterm con el seguro en el precio borra el 1 % calculado; generar, los avisos y la nota ahora dicen que se borró, en vez de «no pudimos leerlo de la factura».
-- Cuando generar frena por el seguro y vuelve a la revisión, el motivo queda escrito debajo del campo, y la pista pide el 0 sólo si la factura no trae seguro.
+- Pasar de FOB a un incoterm con el seguro en el precio borra el 1 % calculado; generar, los avisos, el semáforo y la nota (también de vuelta a FOB) ahora dicen que se borró, en vez de «no pudimos leerlo de la factura»; vaciar el campo no quita esa marca.
+- Cuando generar frena por el seguro y vuelve a la revisión, el motivo queda escrito debajo del campo, que se lleva a la vista, y la pista pide el 0 sólo si la factura no trae seguro.
 
 ## 2026-11-08 · fix: lo que va delante de EC no deja pasar una exportación como importación (AVISOS-1)
 
