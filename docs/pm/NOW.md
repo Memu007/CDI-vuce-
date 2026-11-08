@@ -213,6 +213,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-08 13:58 UTC: vuelta. Contexto OK (técnica 134k, MARIA 138k, PM 143k, todas 200k; límite `allowed_warning`). Sin entregas nuevas: técnica en PERMISOS-2 (suite corriendo, `a1db966`), MARIA en AVISOS-1. Corte 15:50 UTC.
 2026-11-08 13:40 UTC: **SEGURO-2 aceptada** (`d160738`, MARIA, sin integrar): 242 passed, 19+12 sabotajes en rojo, Sonnet en pantalla real sin TXT malo. D125 a, D126 a; dos textos a AVISOS-1. MARIA sigue AVISOS-1.
 2026-11-08 13:30 UTC: **COBRO-MP-4 aceptada** (`0fb991c`, técnica, sin integrar): PG fallas 0, 1492 passed, 8 sabotajes en rojo; Sonnet halló un hueco de prueba del orden (mutación verde) → primer paso de PERMISOS-2. SEGURO-2 en reproducción.
 2026-11-08 12:30 UTC: **COBRO-MP-2+3, PERMISOS-1 y BACKUP-1a aceptadas** (`ca84c5f`, técnica, sin integrar): 4 guiones de sabotaje con falla 0, adversarios sin nada grave nuevo. Riesgo: el backup no compara índices ni secuencias.
