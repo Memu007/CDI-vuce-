@@ -3674,13 +3674,6 @@ def _xlsx_solo_primera_hoja(ruta, max_filas=None) -> tuple:
 _COMBINADAS_SE_COPIAN = {"descripcion", "origen", "pieza"}
 
 
-class _Compartido(dict):
-    """iterrows copia entero df.attrs en cada fila: con miles de filas
-    rellenadas eso era cuadrático. Ya lleno, sólo se lee."""
-    def __deepcopy__(self, memo):
-        return self
-
-
 def _rellenar_combinadas(df, combinadas, mapeo=None):
     """El texto de una celda combinada vale para todas sus filas, sólo en su
     propia columna: «China» combinada en C4:C5 es el origen de las dos filas;
@@ -3716,6 +3709,9 @@ def _rellenar_combinadas(df, combinadas, mapeo=None):
     # propios de la fila (un origen combinado hasta el flete no lo vuelve
     # producto; EXCEL-3b).
     rellenadas = df.attrs.setdefault("celdas_rellenadas", {})
+    # Una asignación de pandas por combinada costaba medio milisegundo: cada
+    # columna se arma aparte y se asigna una vez.
+    nuevas = {}
     for f1, c1, f2, _c2 in sorted(set(combinadas)):
         if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:
             continue
@@ -3731,9 +3727,13 @@ def _rellenar_combinadas(df, combinadas, mapeo=None):
             continue
         desde, hasta = max(f1 + 1, primera) - 2, min(f2, ultima) - 2
         if desde <= hasta:
-            filas = df.index[(df.index >= desde) & (df.index <= hasta)]
-            df.loc[filas, col] = valor
-            rellenadas.setdefault(col, set()).update(filas)
+            i, j = df.index.searchsorted([desde, hasta + 1])
+            if col not in nuevas:
+                nuevas[col] = df[col].to_numpy(copy=True)
+            nuevas[col][i:j] = valor
+            rellenadas.setdefault(col, set()).update(df.index[i:j])
+    for col, valores in nuevas.items():
+        df[col] = valores
     return df
 
 
@@ -5221,8 +5221,11 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
     # descripción combinada sin otro rótulo es la misma cosa (EXCEL-3c), y un
     # renglón del grupo, lo mismo que su cabecera (EXCEL-3d).
     no_es_mercaderia_en = {}
-    rellenadas = df.attrs["celdas_rellenadas"] = _Compartido(df.attrs.get("celdas_rellenadas", {}))
-    for _, row in df.iterrows():
+    rellenadas = df.attrs.get("celdas_rellenadas", {})
+    # iterrows copia df.attrs en cada fila, y las filas no lo usan.
+    filas = df.copy(deep=False)
+    filas.attrs = {}
+    for _, row in filas.iterrows():
         try:
             if all((not pd.notna(v)) or str(v).strip() == "" for v in row.values):
                 continue  # fila vacía

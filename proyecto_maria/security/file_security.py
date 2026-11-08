@@ -11,6 +11,7 @@ import math
 import os
 import re
 import io
+import struct
 from pathlib import Path
 from typing import Optional
 from fastapi import HTTPException, UploadFile
@@ -261,14 +262,19 @@ def _mas_elementos_que(z, parte: str, tope: int) -> bool:
 _FORMATO_MAX_LARGO, _FORMATO_MAX_CORCHETES, _MAX_FORMATOS_DE_CELDA = 255, 32, 65_490
 
 
+_FORMATOS_QUE_EXCEL_NO_GUARDA = (
+    "El Excel tiene formatos de celda que Excel no guarda (demasiados o demasiado "
+    "largos). Guardalo de nuevo desde Excel o cargá los productos a mano.")
+
+
 def _formatos_que_excel_no_guarda(z, parte: str) -> bool:
     from xml.etree import ElementTree as ET
-    en_celdas, celdas = False, 0
+    en_celdas, celdas = 0, 0
     with z.open(parte) as f:
         for evento, e in ET.iterparse(f, events=("start", "end")):
             nombre = e.tag.rpartition("}")[2]
             if evento == "start":
-                en_celdas = en_celdas or nombre == "cellXfs"
+                en_celdas += nombre == "cellXfs"
                 continue
             if nombre == "numFmt":
                 codigo = e.get("formatCode", "")
@@ -279,7 +285,7 @@ def _formatos_que_excel_no_guarda(z, parte: str) -> bool:
                 if celdas > _MAX_FORMATOS_DE_CELDA:
                     return True
             elif nombre == "cellXfs":
-                en_celdas = False
+                en_celdas -= 1
             e.clear()
     return False
 
@@ -319,9 +325,7 @@ def _contar_hojas_xlsx(contents: bytes) -> tuple[int, bool]:
                     "Una parte del Excel es demasiado grande. Guardalo de nuevo desde Excel o "
                     "cargá los productos a mano.")
         if ARC_STYLE in nombres and _formatos_que_excel_no_guarda(z, ARC_STYLE):
-            raise ExcelDemasiadoGrande(
-                "El Excel tiene formatos de celda que Excel no guarda (demasiados o demasiado "
-                "largos). Guardalo de nuevo desde Excel o cargá los productos a mano.")
+            raise ExcelDemasiadoGrande(_FORMATOS_QUE_EXCEL_NO_GUARDA)
         if hojas and hojas[0][1] not in nombres:
             raise ValueError("falta la primera hoja dentro del archivo")
         # 10 MB son unas 9.400 filas de 20 columnas con texto, o 3.100 de 60
@@ -375,7 +379,7 @@ def _medida_hoja(xml: bytes) -> tuple[int, float, int]:
             etiqueta = elemento.tag.rsplit("}", 1)[-1]
             # openpyxl arma un objeto por rango de cada sqref (formato condicional,
             # validación, selección): 640 000 rangos en 1.4 MB tardan 4 s al leer.
-            rangos += len(elemento.get("sqref", "").split())
+            rangos += len(elemento.get("sqref", "").split(None, _EXCEL_MAX_RANGOS))
             if rangos > _EXCEL_MAX_RANGOS:
                 raise ExcelDemasiadoGrande(
                     "La primera hoja del Excel tiene demasiados rangos con formato condicional o "
@@ -404,12 +408,32 @@ def _medida_hoja(xml: bytes) -> tuple[int, float, int]:
     return columna, fila, max(ancho, columna)
 
 
+def _formatos_xls_que_excel_no_guarda(contents: bytes) -> bool:
+    """xlrd mira cada registro FORMAT (BIFF 0x041E y 0x001E) con la misma
+    expresión cuadrática en los «[»: se cuentan antes, sin leer el libro."""
+    from xlrd import compdoc
+    datos = contents
+    if contents[:8] == compdoc.SIGNATURE:
+        doc = compdoc.CompDoc(contents, logfile=io.StringIO())
+        datos = doc.get_named_stream("Workbook") or doc.get_named_stream("Book") or b""
+    pos = 0
+    while pos + 4 <= len(datos):
+        tipo, largo = struct.unpack_from("<HH", datos, pos)
+        pos += 4
+        if tipo in (0x041E, 0x001E) and datos.count(b"[", pos, pos + largo) > _FORMATO_MAX_CORCHETES:
+            return True
+        pos += largo
+    return False
+
+
 def _contar_hojas_excel(contents: bytes, file_ext: str) -> tuple[int, bool]:
     if file_ext == '.xlsx':
         return _contar_hojas_xlsx(contents)
     # El formato binario .xls no puede abrirse con openpyxl.
     # Pandas usa xlrd y alcanza con validar que exista alguna hoja.
     import pandas as pd
+    if _formatos_xls_que_excel_no_guarda(contents):
+        raise ExcelDemasiadoGrande(_FORMATOS_QUE_EXCEL_NO_GUARDA)
     return len(pd.ExcelFile(io.BytesIO(contents), engine='xlrd').sheet_names), False
 
 
