@@ -69,26 +69,27 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## SEGURO-2: aceptada sobre `d160738`, sin integrar (2026-11-08 PM)
+## AVISOS-1: aceptada sobre `0aed334`, sin integrar (2026-11-08 PM)
 
-Evidencia: `docs/pm/REPRODUCCION-SEGURO-2-2026-11-08.md`. Igual al informe:
-242 passed en las suites de la entrega; `seguro2.sh` 19 ROJO, `seguro1.sh`
-12 ROJO, `valor1c.sh` en curso (lo completo en el acta). Un adversario Sonnet alto manejó la
-pantalla real y no logró un TXT con seguro sin leer ni con el 1 % bajo CIF.
+Evidencia: `docs/pm/REPRODUCCION-AVISOS-1-2026-11-08.md`. Igual al informe:
+chequeo-6 con los tres avisos explicados; `avisos1.sh` 22 ROJO y `seguro2.sh`
+en curso (lo completo en el acta). Las seis suites dan `256 passed`, no 199: el número del
+informe quedó de una corrida anterior. Sonnet alto: ninguna importación
+frenada por error y ninguna exportación que genere; sin 500.
 
-- **D125 → (a)**, **D126 → (a)**, decididas por la PM.
-- **AVISOS-1 suma dos cosas** (mismo tema: lo que la persona lee):
-  1. calcular con FOB y pasar a CIF dice «no pudimos leerlo de la factura»,
-     que es falso; el freno queda, el texto tiene que decir lo que pasó;
-  2. tras el 400 «no pudimos leerlo», la revisión no muestra el motivo (queda
-     en la pantalla de generar, oculta) y la pista del campo dice «Dejar en 0
-     si no aplica» con el campo vacío. El motivo tiene que verse donde la
-     persona cae. Caso de la familia: cada 400 que cambia de pantalla.
-- El arnés roto de `separadores1b.sh` (de antes) va a la cola de limpieza.
+- **D129 → (a)**, decidida por la PM: el predicado único antes de limpiar.
+- **D130 → (a)**, decidida por la PM: pieza **AVISOS-2**, después de EMAIL-1.
+  Suma tres bajas del adversario:
+  1. `es_exportacion` normaliza el texto entero (2 millones de caracteres,
+     unos 5 s con el proceso trabado): que un texto enorme no cueste;
+  2. con el seguro borrado y de vuelta a FOB, el 400 dice «al pasar a un
+     incoterm que ya lo lleva en el precio»: tiene que decir lo que pasó,
+     como la nota;
+  3. `/generate_maria_export` acepta `IC04` o `TRAN` en un TXT de exportación.
+- Al dar números, el del SHA que entregás.
 
-Seguí con **AVISOS-1** (D123 a + lo de arriba). Corte hoy 15:50 UTC: si no
-llegás, commit y push de lo que tengas y anotá en `PARA-PM-2.md` dónde
-quedaste. Próxima D libre: D127.
+Corte: hoy 15:50 UTC. No arranques nada nuevo: anotá en `PARA-PM-2.md` dónde
+quedó EMAIL-1, commit y push, y frená. Próxima D libre: D131.
 
 ## SUFIJOS-2+SEGURO-1: aceptada sobre `ad2d0f8`, sin integrar (2026-11-08 PM)
 

@@ -15,15 +15,14 @@ Tus supuestos quedan como están.
   las cuentas es una pieza aparte, y antes hay que mirar producción: se la
   propongo a Emi. Sin su sí no entra.
 
-## Seguí con SEPARADORES-1b-ARNÉS (2026-11-08 PM, de la cola de limpieza)
+## SEPARADORES-1b-ARNÉS: aceptada sobre `1063b32`, sin integrar (2026-11-08 PM)
 
-`scripts/testing/sabotajes/separadores1b.sh`: el patrón 3 no encuentra su
-ancla desde `4f2045f` y el guion da salida 1 también en la base
-(`COLA-LIMPIEZA.md`). Pedido: que el guion vuelva a dar base en verde y todos
-sus sabotajes en rojo sobre tu cabeza, sin tocar producto. El ancla es código.
+Evidencia: `docs/pm/REPRODUCCION-SEPARADORES-1b-ARNES-2026-11-08.md`. Igual
+al informe: base `265 passed`, 12 ROJO, salida 0. Tu hallazgo del caso que ya
+no distingue `sin_grupo` va a la cola de limpieza.
 
-Corte: hoy 15:50 UTC se apagan las rutinas. Si no llegás, commit y push de lo
-que tengas y anotá en `PARA-PM.md` dónde quedaste. Próxima D libre: D128.
+Corte: hoy 15:50 UTC. No arranques nada nuevo: commit y push si te queda algo,
+anotá en `PARA-PM.md` dónde quedaste y frená. Próxima D libre: D128.
 
 ## AISLAMIENTO-2 y LIMPIEZA-1: aceptadas sobre `c86f3ff`, sin integrar (2026-11-08 PM)
 
