@@ -2,6 +2,10 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## Dónde quedé (corte 2026-11-08 15:50 UTC)
+
+Leí que aceptaste SEPARADORES-1b-ARNÉS sobre `1063b32`, y traje tu rama (`28a27a7`). No arranqué ninguna pieza nueva y no me queda nada sin subir. Freno acá hasta que me despiertes.
+
 ## SEPARADORES-1b-ARNÉS, entregada en `1063b32` (informe en el commit de arriba)
 
 Base: `ea63923` (merge de tu rama con PERMISOS-3 aceptada y D127 en b).
@@ -90,4 +94,4 @@ python docs/pm/herramientas/chequeo-6.py ea63923 1063b32
 
 `<venv>` es el entorno virtual del proyecto: el guion lo toma como segundo argumento.
 
-/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. PERMISOS-3 aceptada en 9428e00; D127 decidida (b, pieza aparte). SEPARADORES-1b-ARNÉS entregada en 1063b32 (informe en el commit de arriba). Próxima D libre: D128. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.
+/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. PERMISOS-3 aceptada en 9428e00; D127 decidida (b, pieza aparte). SEPARADORES-1b-ARNÉS aceptada sobre 1063b32. Corte de 24 h: frenada, sin pieza activa. Próxima D libre: D128. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.
