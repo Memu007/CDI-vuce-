@@ -102,9 +102,12 @@ sabotaje "un --deselect en otro paso" "ci.yml saca pruebas con --deselect o --ig
 
       - name: Otra corrida
         run: python -m pytest --no-cov --deselect tests/test_csrf.py::test_enforce_no_afecta_bearer_sin_cookie"
-sabotaje "un -k por PYTEST_ADDOPTS" "ci.yml le pasa opciones a pytest por PYTEST_ADDOPTS" \
+sabotaje "un -k por PYTEST_ADDOPTS" "ci.yml le cambia la configuración a pytest con una variable PYTEST_" \
   reemplazar $CI '          EMAIL_VERIFICATION_REQUIRED: "false"' '          EMAIL_VERIFICATION_REQUIRED: "false"
           PYTEST_ADDOPTS: "-k not quote"'
+sabotaje "los plugins apagados por PYTEST_DISABLE_PLUGIN_AUTOLOAD" "ci.yml le cambia la configuración a pytest con una variable PYTEST_" \
+  reemplazar $CI '          EMAIL_VERIFICATION_REQUIRED: "false"' '          EMAIL_VERIFICATION_REQUIRED: "false"
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"'
 
 sabotaje "un -k dentro de un grupo de cortas" "la suite corre con algo fuera de lo permitido: ['-vknot quotes']" \
   reemplazar $CI "$RUN" "$RUN -vk\"not quotes\""
@@ -132,6 +135,20 @@ sabotaje "el paso con continue-on-error" "la CI puede esconder el resultado de l
 sabotaje "el job con continue-on-error" "la CI puede esconder el resultado de la suite: ['continue-on-error: true']" \
   reemplazar $CI "    timeout-minutes: 20" "    timeout-minutes: 20
     continue-on-error: true"
+sabotaje "un # que tapa la línea que sigue" "la suite corre con algo fuera de lo permitido: ['#', 'nota', 'exit', '0']" \
+  reemplazar $CI "$RUN" "        shell: bash {0}
+        run: |
+          python -m pytest --no-cov # nota
+          exit 0"
+sabotaje "continue-on-error entre comillas" "la CI puede esconder el resultado de la suite: ['\"continue-on-error\": true']" \
+  reemplazar $CI "      - name: Suite completa" "      - name: Suite completa
+        \"continue-on-error\": true"
+sabotaje "if con un espacio antes de los dos puntos" "la CI puede esconder el resultado de la suite: ['if : false']" \
+  reemplazar $CI "      - name: Suite completa" "      - name: Suite completa
+        if : false"
+sabotaje "working-directory entre comillas" "la CI puede esconder el resultado de la suite: [\"'working-directory': proyecto_maria\"]" \
+  reemplazar $CI "      - name: Suite completa" "      - name: Suite completa
+        'working-directory': proyecto_maria"
 sabotaje "el paso con if: false" "la CI puede esconder el resultado de la suite: ['if: false']" \
   reemplazar $CI "      - name: Suite completa" "      - name: Suite completa
         if: false"

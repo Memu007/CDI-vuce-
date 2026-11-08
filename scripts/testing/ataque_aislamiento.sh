@@ -24,7 +24,9 @@
 # tampoco pasa. No toca ninguna base real ni usa internet.
 # ========================================================================
 
-set -uo pipefail
+# Sin pipefail: en «cuerpo | grep -q» grep corta temprano y el SIGPIPE de la
+# izquierda haría pasar una fuga en una respuesta larga por un bloqueo.
+set -u
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
@@ -62,18 +64,23 @@ codigo()  { curl -s -o /dev/null -w '%{http_code}' -m 10 "$@"; }
 csrf() { grep -i "csrf_token" "$1" 2>/dev/null | awk '{print $NF}' | tail -1; }
 esperar_health() { for _ in $(seq 1 45); do [ "$(codigo "${BASE}/health")" = "200" ] && return 0; sleep 2; done; return 1; }
 
-# Un ataque = Beto pide algo de Ana. Tiene que dar 401/403/404, nunca 200.
+# Un 2xx es fuga y 401/403/404 es bloqueo; otro código (500, sin respuesta) no prueba nada.
+juzgar() {
+    case "$2" in
+        2??) pierde "$1" "devolvió $2 · $3" ;;
+        401|403|404) gana "$1 ($2)" ;;
+        *) duda "$1" "devolvió $2 y se esperaba 401, 403 o 404 · $3" ;;
+    esac
+}
+
+# Un ataque = Beto pide algo de Ana.
 atacar() {
     local NOMBRE="$1"; shift
     local C BODY
     BODY=$(curl -s -m 10 -w $'\n%{http_code}' -b "$COOKIE_B" -c "$COOKIE_B" \
         -H "X-CSRF-Token: $(csrf "$COOKIE_B")" "$@")
     C=$(echo "$BODY" | tail -1)
-    if [ "$C" = "200" ]; then
-        pierde "$NOMBRE" "devolvió 200 · $(echo "$BODY" | head -n -1 | tr -d '\n' | head -c 160)"
-    else
-        gana "$NOMBRE (${C})"
-    fi
+    juzgar "$NOMBRE" "$C" "$(echo "$BODY" | head -n -1 | tr -d '\n' | head -c 160)"
 }
 
 echo -e "${BLUE}========================================${NC}"
@@ -204,11 +211,7 @@ paso "4· Descargar el MARIA.TXT de Ana (adivinando el nro de factura)"
 if [ -n "$ARCHIVO" ]; then
     RESP=$(curl -s -m 10 -w $'\n%{http_code}' -b "$COOKIE_B" "${BASE}/download/${ARCHIVO}")
     C=$(echo "$RESP" | tail -1)
-    if [ "$C" = "200" ]; then
-        pierde "Descargar el MARIA.TXT de Ana" "bajó la declaración completa; contiene: $(echo "$RESP" | grep -o 'MERCADERIA CONFIDENCIAL DE ANA' | head -1)$(echo "$RESP" | grep -o "$CUIT_ANA" | head -1)"
-    else
-        gana "Descargar el MARIA.TXT de Ana (${C})"
-    fi
+    juzgar "Descargar el MARIA.TXT de Ana" "$C" "contiene: $(echo "$RESP" | grep -o 'MERCADERIA CONFIDENCIAL DE ANA' | head -1)$(echo "$RESP" | grep -o "$CUIT_ANA" | head -1)"
 else
     echo -e "${YELLOW}  (salteado: Ana no llegó a generar el TXT)${NC}"
 fi

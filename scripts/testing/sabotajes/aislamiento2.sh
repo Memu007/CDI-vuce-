@@ -274,6 +274,27 @@ ataques() {
     '    return user["username"] in _admin_usernames() or "admin" in roles_de(user)' \
     '    return True' \
     "Beto en GET /api/admin/stats/summary" "Beto en GET /api/dev/stats" "Beto en GET /dev/dashboard"
+  # Un 201 también es fuga en los ataques directos, no sólo el 200.
+  ataque $M "clientes: el mapeo de columnas no mira el dueño y contesta 201" \
+    '    client = await _get_owned_client(db, client_id, user["username"])
+    mapping = client.column_mapping if isinstance(client.column_mapping, dict) else {}
+    return {
+        "success": True,
+        "cliente_id": client_id,
+        "mapping": mapping or {},
+        "canonicos": _CANON_COLUMNS,
+    }' \
+    '    client = (await db.execute(sa_select(ClientModel).where(ClientModel.id == client_id))).scalars().first()
+    return JSONResponse(status_code=201, content={"success": True, "cliente_id": client_id, "nombre": client.name})' \
+    "Ver mapeo de columnas"
+  # Una respuesta larga con lo de Ana arriba: grep corta antes de leerla entera.
+  ataque $M "notas: ver no filtra por dueño y la respuesta es larga" \
+    '    notas = await _fetch_notas_ordered(db, user["username"], ncm_key)
+    return {"notas": [n.note for n in notas]}' \
+    "    notas = $TODAS
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(\"\\n\".join([n.note for n in notas] + [\"x\" * 40] * 20000))" \
+    "Beto no ve la nota de Ana"
 }
 
 [ "$QUE" != ataque ] && prueba

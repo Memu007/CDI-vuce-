@@ -33,6 +33,8 @@ def _no_permitidas(tokens):
 def _tokens(texto):
     lex = shlex.shlex(texto, posix=True, punctuation_chars=True)
     lex.whitespace_split = True
+    # Un «#» no corta: en un run de varias líneas taparía lo que viene después.
+    lex.commenters = ""
     return list(lex)
 
 
@@ -60,9 +62,10 @@ def test_la_ci_corre_la_suite_sin_sacar_pruebas():
 
 def test_nada_esconde_el_resultado_de_la_suite():
     """Un paso que no corre, que falla sin poner roja la CI o que corre en otra carpeta."""
-    malos = re.findall(r"^\s*-?\s*((?:if|continue-on-error):.*)", _job_tests(), re.M)
+    # YAML acepta la clave entre comillas y con espacios antes de los dos puntos.
+    malos = re.findall(r"^\s*-?\s*([\"']?(?:if|continue-on-error)[\"']?\s*:.*)", _job_tests(), re.M)
     # En todo el archivo: «defaults» también cambia la carpeta de cada run.
-    malos += re.findall(r"working-directory:.*", CI.read_text(encoding="utf-8"))
+    malos += re.findall(r"[\"']?working-directory[\"']?\s*:.*", CI.read_text(encoding="utf-8"))
     assert not malos, f"la CI puede esconder el resultado de la suite: {malos}"
 
 
@@ -86,8 +89,8 @@ def test_ci_yml_no_deselecciona_en_ningun_paso():
     assert "--deselect" not in texto and "--ignore" not in texto, (
         "ci.yml saca pruebas con --deselect o --ignore"
     )
-    # PYTEST_ADDOPTS suma opciones al comando sin que se vean en el run.
-    assert "PYTEST_ADDOPTS" not in texto, "ci.yml le pasa opciones a pytest por PYTEST_ADDOPTS"
+    # PYTEST_ADDOPTS, PYTEST_PLUGINS y las demás cambian la corrida sin que se vea en el run.
+    assert "PYTEST_" not in texto, "ci.yml le cambia la configuración a pytest con una variable PYTEST_"
 
 
 def test_no_queda_un_camino_de_publicacion_a_google_cloud():
