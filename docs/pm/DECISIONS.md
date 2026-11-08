@@ -471,3 +471,7 @@ FRONT-422 aceptada sobre `4dbdb0b`, sin integrar. D108 decidida por la PM: (a), 
 ### 2026-11-08 03:55 UTC (PM principal)
 
 ENTRADAS-2 aceptada sobre `b8aa9bd`, sin integrar. D109 (a) y D110 (a), decididas por la PM: pieza ENTRADAS-3 de MARIA después de ENTORNO-3 (lo que quedó afuera de ENTRADAS-2 más el `1e308` que se guarda y rompe la suma de clientes y métricas), dentro de «arreglos chicos de seguridad a cero» (Emi). Acta: `REPRODUCCION-ENTRADAS-2-2026-11-08.md`.
+
+### 2026-11-08 05:00 UTC (PM principal)
+
+ENTORNO-3 aceptada sobre `fd545c1`, sin integrar. Decididas por la PM: D111 (a), el limitador por ruta sin montar va a la cola de limpieza; D112 (c) y D113 (b), pieza ENTORNO-4 de MARIA tras ENTRADAS-3 (sin `FRONTEND_URL` no arranca fuera de desarrollo; `billing_service.py` usa la misma URL). La D112 de la Dev técnica (COBRO-MP-2+3) se registra como D114. Riesgo para publicar: mirar en Railway `ENVIRONMENT`, `ALLOWED_ORIGINS` y `FRONTEND_URL` (D99).
