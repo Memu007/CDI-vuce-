@@ -2,184 +2,170 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CSRF-2, entregada en `fcd1072` (informe en el commit de arriba)
+## NOMBRES-1 vuelta 2, entregada en `1960a9a` (informe en el commit de arriba)
 
-**Resultado.**
-- **Rutas exentas.** El control CSRF exenta sólo un conjunto exacto de rutas:
-  `/auth/login`, `/auth/register`, `/auth/request-password-reset`,
-  `/auth/recover-username` y `/auth/reset-password`.
-  - Ya no saltea rutas que empiezan parecido (`/auth/loginx`, `/healthx`,
-    `/staticx`) ni las que dicen «webhook» en cualquier parte. Ejemplo:
-    `DELETE /api/catalog/x/productos/abc-webhook`.
-  - Las tres rutas de recuperación de cuenta andan con una cookie de sesión
-    vieja.
-- **`static/csrf.js` (nuevo).** Envuelve `fetch` en la landing y en la pantalla
-  vieja: toda escritura al mismo origen lleva `X-CSRF-Token`.
-  - Con `CSRF_ENFORCE=true`, la telemetría de la landing con sesión abierta y
-    las escrituras de `app.js` dan 200.
-  - El «Salir» de `app.js` cierra la sesión: después, `/auth/current_user` da
-    401.
-- **Alias `/logout`.** Hay una prueba que exige que cierre de verdad: con
-  cookie y token, 200 y las dos cookies borradas.
-- Producto `+37/−11`.
+Base: `ccded98`, que ya entregué. Tu devolución está en `180fde1` y la traje con el merge `0a0ab41`.
 
-### Decisiones
-
-- **D58. Duplicación con `app_v2.js`.** La v2 pone el token con su propio
-  wrapper.
-  - Opciones:
-    - (a) a la cola de limpieza: cargar `csrf.js` también en `dashboard_v2` y
-      sacar el header a mano de `app_v2.js`;
-    - (b) dejarlo así.
-  - Recomiendo (a). Es una sola regla en un solo lugar, y la v2 ya está
-    cubierta por `csrf1.sh`. No lo hice acá porque la tarea no lo pide y
-    tocaría la v2.
-- **D59. Sesión con `access_token` pero sin `csrf_token`.** Una cookie de
-  sesión emitida antes de CSRF da 403 en toda escritura, «Salir» incluido,
-  hasta volver a entrar.
-  - Ningún GET vuelve a emitir `csrf_token`: sólo lo hacen login y registro.
-  - Es previo a esta pieza. Lo marcaron el `/code-review` y el adversario.
-  - Opciones:
-    - (a) pieza chica antes de activar el enforce en producción: emitir
-      `csrf_token` si falta, por ejemplo en `/auth/current_user`;
-    - (b) aceptar que esas cuentas vuelvan a entrar. Login y registro están
-      exentos, así que pueden.
-  - Recomiendo (a), si el enforce se va a prender con sesiones vivas. Si no,
-    (b).
-- **D60. El guard de la pantalla vieja depende de `localStorage`.**
-  `dashboard.html` (la v1) manda a `/` si `localStorage.access_token` está
-  vacío, y sólo `landing_legacy.html` lo llena.
-  - Con la landing nueva, `/dashboard?v=1` no abre. Es previo a esta pieza.
-  - La prueba lo esquiva poniendo el token antes de abrir.
-  - Opciones:
-    - (a) confirmar si la v1 todavía se usa y, si se usa, abrir una pieza;
-    - (b) nada, si la v1 ya no tiene usuarios.
-  - Recomiendo (a), nada más que confirmar.
-
-Supuesto reversible: la familia de rutas de la prueba suma `/auth/register`,
-que la tarea no nombraba. Lo pidió el adversario: sin esa fila, sacar
-`/auth/register` de las exentas dejaba la prueba en verde.
-
-### SHAs (desde `6e71766`, tu merge)
-
-| SHA | Qué |
+| Commit | Qué |
 |---|---|
-| `8abfed3` | fix: conjunto exacto de rutas exentas; `csrf.js` cargado en `landing.html` y `dashboard.html`; `CHANGELOG.md` |
-| `965a415` | test: alias `/logout` con token; familia de rutas sin token (`RUTAS_SIN_TOKEN`); `pantalla_csrf2.js`; `csrf2.sh`; el arnés común `_csrf_comun.sh`, que ahora usa también `csrf1.sh` |
-| `aa4eced` | fix: `csrf.js` mira el método primero, y un `fetch` mal armado falla en la promesa, como el nativo (hallazgos 2 y 8 del code-review) |
-| `a6af49f` | test: la pantalla vieja entra con su token en `localStorage` (hallazgo 1); caso y sabotaje de la URL inválida |
-| `fcd1072` | test: el chequeo de otro origen mira lo que `csrf.js` le pasa a `fetch` nativo, porque la CSP `connect-src 'self'` corta el pedido antes de la red y la prueba no lo veía nunca (adversario 1B); `/auth/register` entra a la familia, con su sabotaje (adversario 2) |
-| (este) | docs: informe |
+| `5cda09d` | test: el caso de las cuentas viejas corre una vez con cada cuenta en `ADMIN_USERNAMES`. El sabotaje del arranque queda sin `order_by` |
+| `a150d5e` | test: arreglos de `/code-review`. La cuenta de la lista sale de las sembradas, la comparación de roles es por cantidad, y el sabotaje exige que el rojo venga de la línea de la promoción |
+| `1960a9a` | test: fila con una sola cuenta sembrada y la lista en otras mayúsculas, más dos sabotajes de búsqueda de respaldo (arranque y login) |
 
-### Rojos antes
+**producto +0/−0** contra `ccded98`; arnés +44/−14. Contra `4087b46`, la pieza entera sigue en producto +4/−2. Producto sin cambio, como pediste.
 
-La `tests/test_csrf.py` final, copiada sobre `6e71766`:
+### Resultado
 
-```
-FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[DELETE /api/catalog/x/productos/abc-webhook]
-FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[POST /api/payments/webhook/x]
-FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[POST /healthx]
-FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[POST /staticx]
-FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[POST /auth/loginx]
-FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[POST /auth/request-password-reset]
-FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[POST /auth/recover-username]
-FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[POST /auth/reset-password]
-=================== 8 failed, 18 passed, 5 warnings in 8.52s ===================
-```
+1. **El caso da rojo con `lower()` + `.first()` sin `order_by`, encuentre la base la fila que encuentre.**
+   - Cada una de las dos cuentas es, en una fila distinta, la de `ADMIN_USERNAMES`. Están cargadas como datos del caso.
+   - La fila que la base devuelva primero sale sin admin en alguna de las dos corridas.
+   - Lo probé en SQLite (`nombres1.sh`) y en **Postgres 16 real**. En PG falló en `[mayusculas]` y en `[sola_y_la_lista_en_mayusculas]`, con `assert 1 == 0`.
+2. **Fila nueva, `sola_y_la_lista_en_mayusculas`.** La encontró el adversario: con las dos cuentas siempre sembradas, un arranque o un login que prueban primero exacto y, si no hay resultado, buscan con `lower()` quedaban verdes. La fila siembra sólo la cuenta en minúsculas y pone la lista en mayúsculas. Nadie tiene que quedar admin, y el nombre en mayúsculas no entra. Los sabotajes 6 y 7 la rompen.
+3. **La carrera se reproduce.** Tu corrida lo mostró: con uvicorn sobre PG 16 y 4 altas a la vez, alternando las dos rutas, entraron las 4 (`rc69a854`, `RC69A854`, `Rc69a854`, `rc69A854`).
+   - Hace falta que las altas lleguen al mismo tiempo. Contra una cuenta que ya existe, el chequeo frena siempre.
+   - Las cuentas duplicadas son de quien las pidió.
+   - La reserva de `ADMIN_USERNAMES` se chequea en memoria y no tiene esta carrera.
+   - Ya pasaba antes: dos altas con el mismo nombre exacto dan 500.
+   - Queda como límite conocido, sin índice. No la cierro: la decidís vos.
+4. **Corrijo mi informe anterior: el «Postgres 16» de pytest era SQLite.** `tests/conftest.py:19` pisa `DATABASE_URL` con un SQLite temporal antes de importar la app. Por eso, las filas «Postgres 16 descartable» de `ccded98` («8 failed, 30 passed» y «38 passed») corrieron en SQLite.
+   - Tu fila «las mismas dos suites en PG 16 (`con_pg16.sh`): 38 passed», de `REPRODUCCION-NOMBRES-1`, también corrió en SQLite, si fue con el comando de pytest de mi informe.
+   - Esta vuelta probé en PG real con `--noconftest` y un plugin que imprime `dialecto: postgresql`. El comando está abajo.
+   - Lo que no pasa por conftest no está afectado: tu carrera con uvicorn, y `test_backup1a.py`, que lee `BACKUP1A_PG_URL` por su cuenta.
+   - No revisé si hay otras puertas en PG que pasen por conftest.
 
-- **Alias `/logout`.** En la base ya delega (desde CSRF-1 vuelta 2), así que
-  su prueba pasa. Lo que la mide es el sabotaje «el alias responde sin cerrar
-  la sesión».
-- **Pantalla sobre la base.** `FALLA: la telemetría de la landing dio 403 en
-  /api/ui/event…`
+Nada para decidir. No abro ninguna D. La carrera es tuya y la dejo como la escribiste.
 
-### Puertas, sobre `fcd1072`
+### Riesgos (quedan, sin arreglo)
 
-| Puerta | Resultado |
+| Riesgo | Severidad | Por qué queda |
+|---|---|---|
+| Dos altas simultáneas que difieren en mayúsculas entran las dos | media-baja (tuya) | Se reproduce (punto 3). Sin índice, por decisión tuya; el índice sobre `lower(username)` es para después, con Emi |
+| Un pytest con `DATABASE_URL` de Postgres que carga `tests/conftest.py` corre en SQLite sin avisar | arnés | `conftest.py` queda fuera de alcance. Para PG real hace falta `--noconftest` y el plugin de abajo |
+| `test_permisos2.py` no lo corrí en PG real | arnés | Puede depender de fixtures de conftest. En PG real corrí sólo `test_nombres1.py` |
+| Los sabotajes 6 y 7 no los corrí en PG | arnés | Rompen la fila de una sola cuenta, donde hay una sola fila que encontrar: no depende del orden de la base |
+| El caso repite el login por cada fila | arnés | Menos de 1 s por fila |
+| `include_router` se suma de nuevo en cada `lifespan` de los `TestClient` | arnés | Ya pasaba; no cambia resultados |
+| La búsqueda con `lower()` recorre toda la tabla `users` en cada alta | baja | Sigue igual que en `ccded98`. Va con el mismo índice |
+| Postgres con una colación rara podría bajar las mayúsculas distinto que Python | especulativa | Sigue igual que en `ccded98`. En el peor caso bloquea un nombre de más; nunca deja pasar uno igual |
+| Las demos del arranque no pasan por el chequeo | baja | Existen sólo fuera de producción, y ya era así |
+
+Sale el riesgo del informe anterior «el sabotaje del arranque depende de que SQLite ordene la mayúscula primero»: ya no hay `order_by`, y el rojo sale también en PG.
+
+### Hallazgos de la autorrevisión
+
+| Revisor (modelo, esfuerzo) | Hallazgo | Qué hice |
+|---|---|---|
+| `/code-review high` sobre `5cda09d` | La cuenta de la lista se armaba aparte de las sembradas, y podía no coincidir con ninguna | Arreglado en `a150d5e`: sale de `str.lower` y `str.upper` sobre el mismo nombre |
+| `/code-review high` | `"admin" in roles` no distinguía un admin de dos | Arreglado en `a150d5e`: `roles.count("admin") == …` |
+| `/code-review high` | El sabotaje del arranque aceptaba cualquier rojo del caso | Arreglado en `a150d5e`: exige la línea de la promoción |
+| adversario-sonnet-alto (Sonnet, alto) | Medio: un arranque que prueba exacto y, si no hay, busca con `lower()` quedaba verde | Lo reproduje. Arreglado en `1960a9a`: fila `sola_y_la_lista_en_mayusculas` y sabotaje 6 |
+| adversario-sonnet-alto | Medio: lo mismo en el login | Lo reproduje. Arreglado en `1960a9a`: la misma fila y sabotaje 7 |
+| adversario-sonnet-alto | Observación: la carrera sigue | Es tuya (punto 3) |
+
+### Pruebas
+
+| Puerta | Sobre | Resultado |
+|---|---|---|
+| `nombres1.sh` (SQLite) | `1960a9a` | «BASE … en verde» con «40 passed, 5 warnings in 12.99s», 7 `ROJO`, «sabotajes con falla: 0», salida 0 |
+| `test_nombres1.py`, SQLite | `1960a9a` | «15 passed in 10.08s» |
+| `test_nombres1.py`, Postgres 16 real (`--noconftest`) | `1960a9a` | «dialecto: postgresql», «15 passed in 16.68s» |
+| lo mismo, con el arranque en `func.lower(...)` + `.first()` y sin `order_by` | `1960a9a` | `FAILED …siguen_entrando[mayusculas]` y `FAILED …siguen_entrando[sola_y_la_lista_en_mayusculas]`, «2 failed, 13 passed, 3 warnings in 15.93s»; sin el filtro, el error es «assert 1 == 0» |
+| suite completa, worktree limpio | `1960a9a` | «4733 passed, 110 skipped, 3 xfailed in 742.41s (0:12:22)», salida 0 |
+| `compileall -q proyecto_maria` | `1960a9a` | salida 0 |
+
+En PG, las líneas «Exception closing connection» que salen al cerrar son ruido del `NullPool` del plugin: el resultado no cambia.
+
+No volví a correr `smoke_friccion.sh`, `ataque_aislamiento.sh` ni `permisos2.sh`. Esta vuelta no toca producto ni `test_permisos2.py`. Sus salidas sobre `ccded98` y `fa722eb` están en el informe anterior (`bcdaa68`).
+
+Sabotajes de `nombres1.sh`, tal como los dio la corrida:
+
+| Sabotaje | El rojo dice |
 |---|---|
-| suite completa (`pytest -q --no-cov --timeout=120`, base limpia) | `4438 passed, 121 skipped, 3 xfailed, 101 warnings in 639.62s`, salida 0. Al cerrar, asyncio imprime «Task was destroyed but it is pending!»: es ruido del cierre, no un fallo |
-| `tests/test_csrf.py` | `26 passed` |
-| `csrf2.sh fcd1072` | 10 ROJO, `sabotajes con falla: 0`, salida 0 |
-| `csrf1.sh fcd1072` | 8 ROJO, `sabotajes con falla: 0`, salida 0 (el arnés común no rompió CSRF-1) |
-| grep de historia de §6 | vacío (salida 1) |
-| `/code-review high` (yo, sobre `965a415`) | 8 hallazgos: se arreglaron 1, 2 y 8; los demás, abajo |
-| `/security-review` (subagente Sonnet, sobre `6e71766..a6af49f`) | sin hallazgos de confianza ≥7. `fcd1072` sólo toca pruebas |
-| adversario Sonnet alto (sobre `965a415`) | 4 hallazgos, abajo |
+| el chequeo vuelve a comparar exacto | `FAILED …test_un_nombre_que_existe_con_otras_mayusculas_no_se_registra[mayusculas-/auth/register]` |
+| el chequeo no baja la cuenta guardada | `FAILED …[existe_en_mayusculas-/api/organizations/create]` |
+| el chequeo no baja el pedido | `FAILED …[capitalizada-/auth/register]` |
+| el login busca sin distinguir mayúsculas | `FAILED tests/test_nombres1.py::test_dos_cuentas_viejas_que_difieren_en_mayusculas_siguen_entrando` |
+| el arranque promueve sin distinguir mayúsculas | `assert roles.count("admin") == (1 if fila and username == admin else 0)` |
+| el arranque prueba exacto y si no hay, sin distinguir mayúsculas | `FAILED …siguen_entrando[sola_y_la_lista_en_mayusculas]` |
+| el login prueba exacto y si no hay, sin distinguir mayúsculas | `FAILED …siguen_entrando[sola_y_la_lista_en_mayusculas]` |
 
-No corrí `smoke_friccion.sh` ni `ataque_aislamiento.sh`. Esta pieza toca el
-middleware CSRF y dos `<script>`, no datos ni aislamiento. Lo que cambia en el
-backend lo miden `test_csrf.py` y la suite.
+El sabotaje del arranque es `func.lower(User.username) == identifier.lower()` con `.first()`, sin `order_by`. En los sabotajes 6 y 7, el guion exige además que el rojo **no** venga de `[minusculas]`: así queda claro que lo rompe la fila nueva.
 
-### Hallazgos
-
-| De | Modelo y esfuerzo | Hallazgo | Qué pasó |
-|---|---|---|---|
-| code-review 1 | yo, alto | la v1 redirige a `/` sin token en localStorage: la prueba pasaba sin abrir la pantalla vieja | arreglado en `a6af49f` |
-| code-review 2 y 8 | yo, alto | `csrf.js` podía tirar antes de devolver la promesa (URL inválida, `init` nulo) | arreglado en `aa4eced`, con caso y sabotaje |
-| code-review 3 / adversario «opinión» | yo, alto; Sonnet alto | sesión sin `csrf_token` trabada | previo: **D59** |
-| code-review 4 | yo, alto | `csrf.js` duplica lo que hace `app_v2.js` | **D58** |
-| code-review 5 / adversario 3 | yo, alto; Sonnet alto | exentas a mano; `POST /auth/login/` (con barra) con cookie da 403 | riesgo menor: ningún cliente usa la barra |
-| code-review 6 | yo, alto | un detalle menor de la prueba | no lo reproduje; no queda |
-| code-review 7 | yo, alto | la landing carga `csrf.js` sin `?v=` (es `FileResponse`, sin plantilla) | riesgo menor: después de un cambio de `csrf.js`, un navegador con caché puede seguir con el viejo |
-| adversario 1A | Sonnet alto | la v1 redirige y la prueba no abre la pantalla vieja | ya estaba arreglado en `a6af49f` (el adversario miró `965a415`) |
-| adversario 1B | Sonnet alto | la CSP bloquea el pedido a otro origen antes de `p.route`, así que el chequeo nunca puede ver el token | arreglado en `fcd1072`; el sabotaje del origen da ROJO con su texto |
-| adversario 2 | Sonnet alto | sacar `/auth/register` de las exentas no pone rojo | arreglado en `fcd1072`, con su sabotaje |
-| adversario 4 | Sonnet alto | `fetch(url, null)` tiraba `TypeError` | arreglado en `aa4eced` (`init \|\| {}`) |
-
-### Riesgos
-
-- **XHR y `sendBeacon` salen sin token.** La landing y `app.js` no los usan
-  hoy (adversario y `grep`). Uno nuevo daría 403 con el enforce prendido.
-- **Las exentas son una lista a mano, comparada exacta.** Una ruta pública
-  nueva que no use la sesión va a pedir el token hasta que se sume. Falla
-  cerrada, no abierta.
-- **Otro origen.** Lo cubren dos defensas: la comparación de origen en
-  `csrf.js` y la CSP `connect-src 'self'`. La prueba mide la primera.
-- **`POST /api/payments/webhook` dejó de estar exento.** Mercado Pago no manda
-  la cookie de sesión, y sin ella el middleware no valida. Un webhook con
-  cookie da 403 (adversario).
-
-### chequeo-6, salida entera
+### chequeo-6
 
 ```
-chequeo-6 6e71766..fcd1072: avisos para mirar, no un veredicto
-producto +37/−11
-  AVISO producto suma 26 líneas netas: el informe dice por qué (§6: más de 20)
-arnés +218/−74
+chequeo-6 4087b46..1960a9a: avisos para mirar, no un veredicto
+producto +4/−2
+arnés +220/−0
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/main.py: 11307 → 11304
-  proyecto_maria/static/csrf.js: nuevo, 27
-avisos: 1
+  proyecto_maria/main.py: 11373 → 11375
+avisos: 0
 ```
 
-El AVISO: `main.py` resta 3 líneas. Las 29 netas de más son `csrf.js` (27,
-nuevo) y sus dos `<script>`. La landing y la v1 no tienen un wrapper de `fetch`
-propio donde poner el token. Ponerlo a mano en cada llamada eran más líneas y
-un lugar más para olvidárselo.
+```
+chequeo-6 ccded98..1960a9a: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +44/−14
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+avisos: 0
+```
+
+### Lo que no se corrió
+
+- **La CI de GitHub**: esta rama no tiene PR.
+- **Los sabotajes 6 y 7 en PG**, y **`test_permisos2.py` en PG real** (riesgos arriba).
 
 ### Para reproducir
 
 ```bash
-git checkout fcd1072
-# 1. 26 passed
-DATABASE_URL=sqlite+aiosqlite:///./t.db GEMINI_API_KEY=test-key ENVIRONMENT=test python -m pytest -q --no-cov tests/test_csrf.py
-# 2. 10 ROJO, «sabotajes con falla: 0»
-PY=$(which python) PUERTO=8879 scripts/testing/sabotajes/csrf2.sh fcd1072
-# 3. 8 ROJO, «sabotajes con falla: 0» (el arnés común no rompió CSRF-1)
-PY=$(which python) PUERTO=8880 scripts/testing/sabotajes/csrf1.sh fcd1072
-# 4. 1 AVISO, explicado arriba
-python docs/pm/herramientas/chequeo-6.py 6e71766 fcd1072
+git fetch origin claude/dev-tecnica && git checkout --detach 1960a9a
+PY=<venv>/bin/python
+export GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake \
+       AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
+
+# «BASE  | en verde» con 40 passed, 7 ROJO, «sabotajes con falla: 0», salida 0
+PY="$PY" bash scripts/testing/sabotajes/nombres1.sh 1960a9a; echo salida=$?
+
+# Postgres 16 real: el plugin hace lo mismo que conftest, pero sin pisar DATABASE_URL.
+# Tiene que mostrar «dialecto: postgresql» y «15 passed»
+mkdir -p /tmp/pgplug && cat > /tmp/pgplug/pg_nullpool.py <<'EOF'
+import asyncio, os
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.pool import NullPool
+import proyecto_maria.database.connection as _conn
+assert os.environ["DATABASE_URL"].startswith("postgresql+asyncpg"), "no es Postgres"
+_e = create_async_engine(os.environ["DATABASE_URL"], future=True, poolclass=NullPool)
+_conn.engine = _e
+_conn.AsyncSessionLocal = async_sessionmaker(_e, class_=AsyncSession, expire_on_commit=False)
+print("dialecto:", _conn.engine.dialect.name)
+def pytest_sessionstart(session):
+    asyncio.run(_conn.init_db())
+EOF
+PY="$PY" bash scripts/testing/con_pg16.sh bash -c \
+  'DATABASE_URL="${BACKUP1A_PG_URL/postgresql:/postgresql+asyncpg:}" PYTHONPATH=/tmp/pgplug \
+   "$PY" -m pytest --noconftest -p pg_nullpool -s -q --no-cov tests/test_nombres1.py 2>&1 | grep -E "dialecto|passed|failed|^FAILED"'
+
+# El mismo comando, con el sabotaje del arranque sin order_by: FAILED en [mayusculas]
+# y en [sola_y_la_lista_en_mayusculas], «2 failed, 13 passed»
+"$PY" - <<'EOF'
+p = "proyecto_maria/main.py"; s = open(p).read()
+v = 'select(User).where(User.username == identifier))'
+assert s.count(v) == 1
+open(p, "w").write(s.replace(v, 'select(User).where(func.lower(User.username) == identifier.lower()))'))
+EOF
+#   (repetir el comando de PG de arriba)
+git checkout -- proyecto_maria/main.py
+
+# Que conftest pisa DATABASE_URL: muestra la línea 19
+sed -n 19p tests/conftest.py
+
+# Los números de §6: la salida de arriba
+"$PY" docs/pm/herramientas/chequeo-6.py 4087b46 1960a9a
+"$PY" docs/pm/herramientas/chequeo-6.py ccded98 1960a9a
 ```
 
-### Archivos de producto tocados
+`<venv>` es el entorno virtual del proyecto.
 
-`proyecto_maria/main.py`, `proyecto_maria/static/csrf.js` (nuevo),
-`proyecto_maria/templates/dashboard.html` y
-`proyecto_maria/templates/landing.html` (y `CHANGELOG.md`).
-
----
-
-/compact conservar: Dev 1, rama claude/dev-tecnica. CSRF-2 entregada en
-fcd1072 (informe en el commit de arriba), con D58-D60. Sigue COBRO-CORTE-1, en
-tu orden. Nada se publica sin el «dale» de Emi; nunca main.
+/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. NOMBRES-1 vuelta 2 entregada en 1960a9a, esperando veredicto; corte 2026-11-09 05:00 UTC. Sin pieza «apenas entregues». No abrí ninguna D; la carrera queda como límite conocido por decisión de la PM. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.

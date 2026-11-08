@@ -7,9 +7,11 @@ Prevents:
 - Malicious File Upload (CWE-434)
 """
 
+import math
 import os
 import re
 import io
+import struct
 from pathlib import Path
 from typing import Optional
 from fastapi import HTTPException, UploadFile
@@ -211,7 +213,6 @@ def tope_de_entorno(nombre: str, defecto: float, escala: int = 1) -> int:
     devuelve el entero. Usa el de defecto si no se lee, si no es finito o si
     el entero da 0 o menos: con tope 0 no entra ningún archivo (devolución de
     EXCEL-2b). 1e308 MB es finito, pero en bytes no."""
-    import math
     try:
         valor = float(os.getenv(nombre, "") or defecto) * escala
     except (TypeError, ValueError):
@@ -256,8 +257,45 @@ def _mas_elementos_que(z, parte: str, tope: int) -> bool:
             cola = trozo[-1:] if trozo.endswith(b"<") else b""
 
 
-def _contar_hojas_xlsx(contents: bytes) -> int:
-    """Cuenta las hojas desde xl/workbook.xml y mira, antes de abrir el libro,
+# Los topes de Excel. openpyxl mira al abrir si el formato de cada formato de
+# celda es de fecha, con una expresión cuadrática en los «[» que retiene el GIL.
+_FORMATO_MAX_LARGO, _FORMATO_MAX_CORCHETES, _MAX_FORMATOS_DE_CELDA = 255, 32, 65_490
+
+
+_FORMATOS_QUE_EXCEL_NO_GUARDA = (
+    "El Excel tiene formatos de celda que Excel no guarda (demasiados o demasiado "
+    "largos). Guardalo de nuevo desde Excel o cargá los productos a mano.")
+
+
+def _formato_caro(codigo: str) -> bool:
+    return len(codigo) > _FORMATO_MAX_LARGO or codigo.count("[") > _FORMATO_MAX_CORCHETES
+
+
+def _formatos_que_excel_no_guarda(z, parte: str) -> bool:
+    from xml.etree import ElementTree as ET
+    en_celdas, celdas = 0, 0
+    with z.open(parte) as f:
+        for evento, e in ET.iterparse(f, events=("start", "end")):
+            nombre = e.tag.rpartition("}")[2]
+            if evento == "start":
+                en_celdas += nombre == "cellXfs"
+                continue
+            if nombre == "numFmt":
+                if _formato_caro(e.get("formatCode", "")):
+                    return True
+            elif nombre == "xf" and en_celdas:
+                celdas += 1
+                if celdas > _MAX_FORMATOS_DE_CELDA:
+                    return True
+            elif nombre == "cellXfs":
+                en_celdas -= 1
+            e.clear()
+    return False
+
+
+def _contar_hojas_xlsx(contents: bytes) -> tuple[int, bool]:
+    """Devuelve (hojas, caro): caro si la forma del libro pide el carril pesado.
+    Cuenta las hojas desde xl/workbook.xml y mira, antes de abrir el libro,
     cuánto pesan los textos compartidos y la primera hoja: openpyxl los lee
     enteros al abrir, y un libro armado (millones de textos vacíos, una hoja
     enorme) tardaba minutos y usaba gigas de memoria (D26 a, EXCEL-2)."""
@@ -289,6 +327,8 @@ def _contar_hojas_xlsx(contents: bytes) -> int:
                 raise ExcelDemasiadoGrande(
                     "Una parte del Excel es demasiado grande. Guardalo de nuevo desde Excel o "
                     "cargá los productos a mano.")
+        if ARC_STYLE in nombres and _formatos_que_excel_no_guarda(z, ARC_STYLE):
+            raise ExcelDemasiadoGrande(_FORMATOS_QUE_EXCEL_NO_GUARDA)
         if hojas and hojas[0][1] not in nombres:
             raise ValueError("falta la primera hoja dentro del archivo")
         # 10 MB son unas 9.400 filas de 20 columnas con texto, o 3.100 de 60
@@ -304,21 +344,35 @@ def _contar_hojas_xlsx(contents: bytes) -> int:
         # Una celda en la última columna (XFD) hace que pandas rellene cada
         # fila hasta 16.384 columnas: 2.000 filas así (15 KB comprimido)
         # llegaban a 943 MB (revisión de la devolución de EXCEL-2).
-        if hojas and _ultima_columna(z.read(hojas[0][1])) > _EXCEL_MAX_COLUMNAS:
+        columna, fila, ancho = _medida_hoja(z.read(hojas[0][1])) if hojas else (0, 0, 0)
+        if columna > _EXCEL_MAX_COLUMNAS:
             raise ExcelDemasiadoGrande(
                 f"La primera hoja del Excel usa una columna más allá de la {_EXCEL_MAX_COLUMNAS}. "
                 "Dejá sólo las columnas de los productos de la factura.")
-        return len(hojas)
+        # Con pocos KB, una fila lejana o miles de estilos o textos ya cuestan
+        # segundos al leer: eso no va a los hilos livianos.
+        caro = (fila > tope_de_entorno("EXCEL_LIVIANO_FILAS", 20_000)
+                or ancho > tope_de_entorno("EXCEL_LIVIANO_COLUMNAS", 64)
+                or (ARC_STYLE in nombres
+                    and _mas_elementos_que(z, ARC_STYLE, tope_de_entorno("EXCEL_LIVIANO_ESTILOS", 5_000)))
+                or (bool(textos) and textos in nombres
+                    and _mas_elementos_que(z, textos, tope_de_entorno("EXCEL_LIVIANO_TEXTOS", 40_000))))
+        return len(hojas), caro
 
 
 # Las columnas que puede usar la primera hoja (IV, el límite del Excel viejo).
 _EXCEL_MAX_COLUMNAS = 256
+_EXCEL_MAX_RANGOS = 64_000
 
 
-def _ultima_columna(xml: bytes) -> int:
-    """Máxima columna de la hoja; termina apenas supera el tope permitido."""
+def _medida_hoja(xml: bytes) -> tuple[int, float, int]:
+    """(columna, fila, ancho) máximos; sin «r», la fila o celda es la siguiente, como en
+    openpyxl. «ancho» suma la <dimension>, que Excel guarda a veces como A1:XFD1048576.
+    Rechaza la hoja con más de _EXCEL_MAX_RANGOS rangos entre sus sqref, celdas
+    combinadas y vínculos."""
     from xml.etree import ElementTree as ET
-    ultima = 0
+    from openpyxl.utils.cell import coordinate_to_tuple, range_boundaries
+    columna = fila = ancho = fila_actual = columna_actual = rangos = 0
     # XML normaliza comillas, espacios y entidades en los atributos. No se
     # conserva el árbol de la hoja ni se expanden filas hasta esa columna.
     with io.BytesIO(xml) as fuente:
@@ -326,26 +380,77 @@ def _ultima_columna(xml: bytes) -> int:
             if evento == "end":
                 elemento.clear()
                 continue
-            if elemento.tag.rsplit("}", 1)[-1] != "c":
-                continue
-            referencia = re.fullmatch(r"([A-Za-z]{1,3})[0-9]+", elemento.get("r", ""))
-            if referencia:
-                n = 0
-                for letra in referencia[1].upper():
-                    n = n * 26 + ord(letra) - 64
-                ultima = max(ultima, n)
-                if ultima > _EXCEL_MAX_COLUMNAS:
-                    return ultima
-    return ultima
+            etiqueta = elemento.tag.rsplit("}", 1)[-1]
+            # openpyxl arma un objeto por rango de cada sqref (formato condicional, validación,
+            # selección), combinada o vínculo: 300 000 en 1.4 MB tardan segundos al abrir.
+            rangos += len(elemento.get("sqref", "").split(None, _EXCEL_MAX_RANGOS))
+            rangos += etiqueta in ("mergeCell", "hyperlink")
+            if rangos > _EXCEL_MAX_RANGOS:
+                raise ExcelDemasiadoGrande(
+                    "La primera hoja del Excel tiene demasiados rangos con formato condicional, "
+                    "validación, celdas combinadas o vínculos. Sacáselos o cargá los productos a mano.")
+            try:
+                if etiqueta == "row":
+                    columna_actual = 0
+                    r = elemento.get("r")
+                    fila_actual = fila_actual + 1 if r is None else int(float(r))
+                    fila = max(fila, fila_actual)
+                elif etiqueta == "c":
+                    if elemento.get("r"):
+                        f, columna_actual = coordinate_to_tuple(elemento.get("r"))
+                        fila = max(fila, f)
+                    else:
+                        columna_actual += 1
+                    columna = max(columna, columna_actual)
+                    if columna > _EXCEL_MAX_COLUMNAS:
+                        break
+                elif etiqueta == "dimension":
+                    _, _, ultima_columna, ultima_fila = range_boundaries(elemento.get("ref", ""))
+                    ancho = max(ancho, ultima_columna or 0)
+                    fila = max(fila, ultima_fila or 0)
+            except (TypeError, ValueError, OverflowError):
+                fila = math.inf
+    return columna, fila, max(ancho, columna)
 
 
-def _contar_hojas_excel(contents: bytes, file_ext: str) -> int:
+def _formatos_xls_que_excel_no_guarda(contents: bytes) -> bool:
+    """xlrd mira cada registro FORMAT (BIFF 0x041E y 0x001E) con la misma
+    expresión cuadrática en los «[»: se cuentan antes, sin leer el libro."""
+    from xlrd import compdoc
+    datos = contents
+    if contents[:8] == compdoc.SIGNATURE:
+        doc = compdoc.CompDoc(contents, logfile=io.StringIO())
+        datos = doc.get_named_stream("Workbook") or doc.get_named_stream("Book") or b""
+    pos = 0
+    while pos + 4 <= len(datos):
+        tipo, largo = struct.unpack_from("<HH", datos, pos)
+        pos += 4
+        if tipo in (0x041E, 0x001E) and _formato_xls_caro(tipo, datos[pos:pos + largo]):
+            return True
+        pos += largo
+    return False
+
+
+def _formato_xls_caro(tipo: int, registro: bytes) -> bool:
+    """En BIFF8 el FORMAT trae cuenta, bandera y texto, en UTF-16 si la bandera lo dice;
+    de otra versión o si no cuadra, se cuentan los «[» de todos sus bytes."""
+    if tipo == 0x041E and len(registro) >= 5:
+        cuenta, bandera = struct.unpack_from("<HB", registro, 2)
+        ancho = 2 if bandera & 1 else 1
+        if len(registro) == 5 + ancho * cuenta:
+            return _formato_caro(registro[5:].decode("utf-16-le" if ancho == 2 else "latin-1"))
+    return registro.count(b"[") > _FORMATO_MAX_CORCHETES
+
+
+def _contar_hojas_excel(contents: bytes, file_ext: str) -> tuple[int, bool]:
     if file_ext == '.xlsx':
         return _contar_hojas_xlsx(contents)
     # El formato binario .xls no puede abrirse con openpyxl.
     # Pandas usa xlrd y alcanza con validar que exista alguna hoja.
     import pandas as pd
-    return len(pd.ExcelFile(io.BytesIO(contents), engine='xlrd').sheet_names)
+    if _formatos_xls_que_excel_no_guarda(contents):
+        raise ExcelDemasiadoGrande(_FORMATOS_QUE_EXCEL_NO_GUARDA)
+    return len(pd.ExcelFile(io.BytesIO(contents), engine='xlrd').sheet_names), False
 
 
 def _excel_max_descomprimido_bytes() -> int:
@@ -440,7 +545,7 @@ def _cabeza_de(contents: bytes, info) -> bytes:
 
 
 def _excel_liviano(contents: bytes, file_ext: str) -> bool:
-    """¿Va al carril liviano? Se mide una sola vez, desde los bytes subidos:
+    """¿Va al carril liviano por su tamaño? Se mide desde los bytes subidos:
     un .xls, por su tamaño; un .xlsx, por lo que declara descomprimido su
     índice, sin las imágenes reconocidas por su firma. El libro no puede
     declarar menos de lo que entrega: zipfile no lee más bytes que los del
@@ -490,7 +595,7 @@ def _excel_liviano(contents: bytes, file_ext: str) -> bool:
         return False
 
 
-def _abrir_excel(contents: bytes, file_ext: str) -> int:
+def _abrir_excel(contents: bytes, file_ext: str) -> tuple[int, bool]:
     """Mira cuánto ocupa descomprimido y recién entonces cuenta las hojas.
     Corre en otro hilo: un zip con miles de entradas también tarda (EXCEL-1)."""
     if file_ext == '.xlsx' and _excel_descomprimido_bytes(contents) > _excel_max_descomprimido_bytes():
@@ -500,7 +605,6 @@ def _abrir_excel(contents: bytes, file_ext: str) -> int:
 
 def _pdf_validate_timeout_s() -> float:
     """Mal escrito, en 0 o negativo, vale 30 s (RENDIMIENTO-1b)."""
-    import math
     try:
         valor = float(os.getenv("PDF_VALIDATE_TIMEOUT_S", "") or 30)
     except (TypeError, ValueError):
@@ -538,8 +642,8 @@ async def validar_con_carril(
 
     Returns:
         (contents, liviano): los bytes, y si un Excel va al carril liviano
-        (_excel_liviano); para otros tipos, False. Quien lee el Excel después
-        usa ese mismo valor: no se vuelve a medir (EXCEL-2b).
+        (_excel_liviano y la forma del libro); para otros tipos, False. Quien
+        lee el Excel después usa ese mismo valor: no se vuelve a medir.
 
     Raises:
         HTTPException: If file is invalid
@@ -632,7 +736,7 @@ async def validar_con_carril(
             # para que un archivo pesado no frene al resto (EXCEL-1).
             import asyncio
             try:
-                hojas = await asyncio.wait_for(
+                hojas, caro = await asyncio.wait_for(
                     asyncio.get_running_loop().run_in_executor(
                         _pool_validar_excel_carril(liviano), _abrir_excel, contents, file_ext
                     ),
@@ -651,6 +755,7 @@ async def validar_con_carril(
                 )
             if hojas == 0:
                 raise HTTPException(400, "Excel file has no sheets")
+            liviano = liviano and not caro
 
         except HTTPException:
             raise

@@ -51,7 +51,7 @@ def test_etapas():
             reloj = _cronometro(); fs._sin_dtd(z); t["sin_dtd"] = reloj()
             reloj = _cronometro(); hojas = fs.hojas_del_xlsx(z); fs.partes_del_xlsx(z); t["partes"] = reloj()
             reloj = _cronometro(); xml = z.read(hojas[0][1]); t["leer_hoja"] = reloj()
-            reloj = _cronometro(); fs._ultima_columna(xml); t["ultima_columna"] = reloj()
+            reloj = _cronometro(); fs._medida_hoja(xml); t["medida_hoja"] = reloj()
         reloj = _cronometro(); fs._abrir_excel(libro, ".xlsx"); t["TOTAL_validar"] = reloj()
         print(nombre, t)
     fd, ruta = tempfile.mkstemp(suffix=".xlsx")
@@ -138,17 +138,17 @@ def test_linea_de_tiempo(monkeypatch):
 
 
 def test_hilos_contra_procesos():
-    """El costo dominante (_ultima_columna) cuatro veces a la vez: en hilos
+    """El costo dominante (_medida_hoja) cuatro veces a la vez: en hilos
     comparten el GIL; en procesos usan un núcleo cada uno."""
     from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
     armado, _ = _libros()
     with zipfile.ZipFile(io.BytesIO(armado)) as z:
         xml = z.read(fs.hojas_del_xlsx(z)[0][1])
-    reloj = _cronometro(); fs._ultima_columna(xml); uno = reloj()
+    reloj = _cronometro(); fs._medida_hoja(xml); uno = reloj()
     with ThreadPoolExecutor(4) as p:
-        reloj = _cronometro(); list(p.map(fs._ultima_columna, [xml] * 4)); hilos = reloj()
+        reloj = _cronometro(); list(p.map(fs._medida_hoja, [xml] * 4)); hilos = reloj()
     with ProcessPoolExecutor(4) as p:
         list(p.map(len, [b""] * 4))  # que los procesos ya estén levantados
-        reloj = _cronometro(); list(p.map(fs._ultima_columna, [xml] * 4)); procesos = reloj()
+        reloj = _cronometro(); list(p.map(fs._medida_hoja, [xml] * 4)); procesos = reloj()
     print(f"núcleos: {os.cpu_count()}; una: {uno} s; cuatro en hilos: {hilos} s; cuatro en procesos: {procesos} s")

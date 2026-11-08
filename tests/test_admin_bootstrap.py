@@ -1,7 +1,7 @@
 """Tests para el bootstrap de admin via ADMIN_USERNAMES en startup.
 
 Verifica que cuando la app arranca, los usuarios definidos en ADMIN_USERNAMES
-reciben el rol de admin, ya sea buscándolos por username o por email.
+reciben el rol de admin por su username; un email no lo da.
 """
 import pytest
 import os
@@ -77,17 +77,41 @@ def test_bootstrap_admin_promotes_by_username(monkeypatch):
     assert "admin" in roles
 
 
-def test_bootstrap_admin_promotes_by_email(monkeypatch):
-    """Setear ADMIN_USERNAMES=email@test.com → startup → user.roles incluye 'admin'."""
-    monkeypatch.setenv("ADMIN_USERNAMES", "email@test.com")
-    monkeypatch.setenv("ENVIRONMENT", "testing")
+ADMIN_EMAIL = "jefe@estudio.test"
+
+
+@pytest.mark.parametrize("en_admin_usernames, cuenta_previa", [
+    (ADMIN_EMAIL, False),
+    ("Jefe@Estudio.TEST", False),
+    (f"  {ADMIN_EMAIL}  ", False),
+    (ADMIN_EMAIL, True),
+], ids=["tal_cual", "mayusculas", "espacios", "de_una_cuenta_borrada"])
+def test_lo_que_puso_el_usuario_en_su_perfil_no_da_admin(monkeypatch, en_admin_usernames, cuenta_previa):
+    """Quien pone en su perfil, como email o como nombre, algo de ADMIN_USERNAMES sigue sin admin al reiniciar."""
+    from proyecto_maria.main import get_current_user
+
+    async def _cuenta_borrada():
+        async with AsyncSessionLocal() as session:
+            session.add(User(username="se_fue_boot", password="x", email=ADMIN_EMAIL, roles=[]))
+            await session.commit()
+            await session.execute(delete(User).where(User.username == "se_fue_boot"))
+            await session.commit()
+
+    if cuenta_previa:
+        _run_async(_cuenta_borrada())
+    monkeypatch.setenv("ADMIN_USERNAMES", en_admin_usernames)
     monkeypatch.setenv("DISABLE_DB_INIT", "true")
-    
+    app.dependency_overrides[get_current_user] = lambda: {"username": "admin_by_email", "roles": []}
+    try:
+        r = TestClient(app).put("/api/user/profile", json={"email": ADMIN_EMAIL, "name": ADMIN_EMAIL})
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+    assert r.status_code == 200, r.text[:200]
+
     with TestClient(app):
         pass
-        
-    roles = _run_async(_get_user_roles("admin_by_email"))
-    assert "admin" in roles
+
+    assert "admin" not in _run_async(_get_user_roles("admin_by_email"))
 
 
 def test_bootstrap_admin_idempotent(monkeypatch):

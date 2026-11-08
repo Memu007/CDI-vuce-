@@ -150,6 +150,9 @@ class _FakeSDK:
 # Helper webhook con firma HMAC válida
 # ──────────────────────────────────────────────────────────────────────
 
+WH_SECRET = "test-secret-b2"
+
+
 def _signed_webhook_headers(body: dict, secret: str) -> dict:
     """Genera headers x-signature y x-request-id válidos para el webhook."""
     ts = str(int(datetime.now(timezone.utc).timestamp()))
@@ -226,7 +229,7 @@ class TestCheckout:
         assert resp.status_code == 200
         pref = _FakeSDK.captured.get("data", {})
         assert pref.get("auto_return") == "approved"
-        assert pref.get("notification_url") == "https://cdi.example.com/api/payments/webhook"
+        assert pref.get("notification_url") == "https://cdi.example.com/api/payments/webhook?source_news=webhooks"
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -235,8 +238,9 @@ class TestCheckout:
 
 class TestWebhook:
 
-    def _wh_post(self, client, body, monkeypatch, secret="", is_prod=False, mp_token="TEST-fake", sdk_cls=None):
-        """Helper: setea las constantes del módulo y postea al webhook."""
+    def _wh_post(self, client, body, monkeypatch, secret=WH_SECRET, is_prod=False, mp_token="TEST-fake", sdk_cls=None,
+                 firmar=True):
+        """Helper: setea las constantes del módulo y postea al webhook, firmado salvo `firmar=False`."""
         import proyecto_maria.main as main_mod
         monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", secret)
         monkeypatch.setattr(main_mod, "IS_PRODUCTION", is_prod)
@@ -246,27 +250,26 @@ class TestWebhook:
         return client.post(
             "/api/payments/webhook",
             content=json.dumps(body),
-            headers={"content-type": "application/json"},
+            headers=_signed_webhook_headers(body, secret) if firmar else {"content-type": "application/json"},
         )
 
     def test_firma_invalida_401(self, client, monkeypatch):
         """Webhook con MP_WEBHOOK_SECRET seteado y firma incorrecta → 401."""
         body = {"type": "payment", "data": {"id": "pay-bad"}}
         # Con secret seteado y sin headers de firma → debe rechazar
-        resp = self._wh_post(client, body, monkeypatch, secret="supersecret", is_prod=False)
+        resp = self._wh_post(client, body, monkeypatch, is_prod=False, firmar=False)
         assert resp.status_code == 401
 
-    def test_firma_valida_en_dev_sin_secret(self, client, monkeypatch):
-        """En dev sin MP_WEBHOOK_SECRET → firma omitida (pasa), pero sin token → 400."""
+    def test_firma_valida_sin_token_400(self, client, monkeypatch):
+        """Firma válida pero sin MP_ACCESS_TOKEN → 400."""
         body = {"type": "payment", "data": {"id": "pay-dev-1"}}
-        resp = self._wh_post(client, body, monkeypatch, secret="", is_prod=False, mp_token="")
-        # Firma pasa, pero MP_ACCESS_TOKEN vacío → 400
+        resp = self._wh_post(client, body, monkeypatch, is_prod=False, mp_token="")
         assert resp.status_code == 400
 
     def test_evento_no_payment_skipped(self, client, monkeypatch):
         """Evento que no es 'payment' → 200 skipped."""
         body = {"type": "plan", "data": {"id": "plan-1"}}
-        resp = self._wh_post(client, body, monkeypatch, secret="", is_prod=False)
+        resp = self._wh_post(client, body, monkeypatch, is_prod=False)
         assert resp.status_code == 200
         assert resp.json().get("skipped") is not None
 
@@ -303,7 +306,7 @@ class TestWebhook:
             def payment(self): return FakePayment()
 
         body = {"type": "payment", "data": {"id": payment_id}}
-        resp = self._wh_post(client, body, monkeypatch, secret="", is_prod=False,
+        resp = self._wh_post(client, body, monkeypatch, is_prod=False,
                              mp_token="TEST-fake", sdk_cls=FakeSDKOk)
         assert resp.status_code == 200, resp.text
 
@@ -340,7 +343,7 @@ class TestWebhook:
             def payment(self): return FakePaymentReset()
 
         body = {"type": "payment", "data": {"id": payment_id}}
-        self._wh_post(client, body, monkeypatch, secret="", is_prod=False,
+        self._wh_post(client, body, monkeypatch, is_prod=False,
                       mp_token="TEST-fake", sdk_cls=FakeSDKReset)
 
         after = _get_user(uname)
@@ -371,13 +374,13 @@ class TestWebhook:
             def payment(self): return FakePayDup()
 
         import proyecto_maria.main as main_mod
-        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "")
+        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", WH_SECRET)
         monkeypatch.setattr(main_mod, "IS_PRODUCTION", False)
         monkeypatch.setattr(main_mod, "MP_ACCESS_TOKEN", "TEST-fake")
         monkeypatch.setattr(main_mod.mercadopago, "SDK", FakeSDKDup)
 
         body = {"type": "payment", "data": {"id": payment_id}}
-        headers = {"content-type": "application/json"}
+        headers = _signed_webhook_headers(body, WH_SECRET)
         r1 = client.post("/api/payments/webhook", content=json.dumps(body), headers=headers)
         assert r1.status_code == 200
 
@@ -406,7 +409,7 @@ class TestWebhook:
             def payment(self): return FakePayRej()
 
         body = {"type": "payment", "data": {"id": f"pay-{uuid.uuid4().hex[:8]}"}}
-        resp = self._wh_post(client, body, monkeypatch, secret="", is_prod=False,
+        resp = self._wh_post(client, body, monkeypatch, is_prod=False,
                              mp_token="TEST-fake", sdk_cls=FakeSDKRej)
         assert resp.status_code == 200
         assert "skipped" in resp.json()
@@ -436,7 +439,7 @@ class TestWebhook:
             def payment(self): return FakePayNoUser()
 
         body = {"type": "payment", "data": {"id": f"pay-{uuid.uuid4().hex[:8]}"}}
-        resp = self._wh_post(client, body, monkeypatch, secret="", is_prod=False,
+        resp = self._wh_post(client, body, monkeypatch, is_prod=False,
                              mp_token="TEST-fake", sdk_cls=FakeSDKNoUser)
         assert resp.status_code == 200, resp.text
         assert "rechazado" in resp.json().get("skipped", ""), resp.json()
@@ -586,14 +589,14 @@ class TestTopup:
             def payment(self): return FakePayTopup()
 
         import proyecto_maria.main as main_mod
-        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "")
+        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", WH_SECRET)
         monkeypatch.setattr(main_mod, "IS_PRODUCTION", False)
         monkeypatch.setattr(main_mod, "MP_ACCESS_TOKEN", "TEST-fake")
         monkeypatch.setattr(main_mod.mercadopago, "SDK", FakeSDKTopup)
 
         body = {"type": "payment", "data": {"id": payment_id}}
         resp = client.post("/api/payments/webhook", content=json.dumps(body),
-                           headers={"content-type": "application/json"})
+                           headers=_signed_webhook_headers(body, WH_SECRET))
         assert resp.status_code == 200, resp.text
 
         after = _get_user(uname)
@@ -631,14 +634,14 @@ class TestTopup:
             def payment(self): return FakePayCap()
 
         import proyecto_maria.main as main_mod
-        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "")
+        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", WH_SECRET)
         monkeypatch.setattr(main_mod, "IS_PRODUCTION", False)
         monkeypatch.setattr(main_mod, "MP_ACCESS_TOKEN", "TEST-fake")
         monkeypatch.setattr(main_mod.mercadopago, "SDK", FakeSDKCap)
 
         body = {"type": "payment", "data": {"id": payment_id}}
         r = client.post("/api/payments/webhook", content=json.dumps(body),
-                        headers={"content-type": "application/json"})
+                        headers=_signed_webhook_headers(body, WH_SECRET))
         assert r.status_code == 200 and "rechazado" in r.json().get("skipped", ""), r.text
 
         after = _get_user(uname)

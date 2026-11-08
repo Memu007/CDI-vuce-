@@ -244,7 +244,7 @@
         CDI.state = Object.assign({}, CDI.state, {
             filename: null, operacion: {}, items: [], sourceFormat: null, documento: null,
             uploadedAt: null, simulated: false, catalogAutofillBanner: null,
-            operationSavedFor: null, orphanDismissedFor: null,
+            operacionId: null, operationSavedFor: null, orphanDismissedFor: null,
         });
         try { sessionStorage.removeItem('cdi.pending_create_client'); } catch (_) {}
         // El borrador de esta pestaña, no el de otras (ORDEN-1).
@@ -434,8 +434,8 @@
                 showError(msg + ' Elegí otra factura comercial para empezar de nuevo.');
                 return;
             }
-            // Si el error es payment_required, el modal ya se mostró via app_v2.js.
-            if (msg === 'payment_required') return;
+            // Un 402: el modal ya se mostró via app_v2.js.
+            if (err && err.code === 'payment_required') return;
             // Sin lector automático (MARIA-2): ningún producto, se ofrece
             // seguir con la carga manual.
             if (err && (err.code === 'lectura_automatica_no_disponible'

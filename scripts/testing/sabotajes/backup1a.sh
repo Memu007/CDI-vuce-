@@ -6,7 +6,7 @@
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/backup1a.sh [SHA]
 # Trabaja en un worktree descartable: no toca tu copia. Cada corrida levanta su
 # propio Postgres 16 con scripts/testing/con_pg16.sh (un sabotaje que deja bases
-# colgadas no ensucia al siguiente). Unos cinco minutos.
+# colgadas no ensucia al siguiente). Unos ocho minutos.
 # Sale con error si un sabotaje no encuentra su patrón, no pone rojo, el rojo
 # no dice lo esperado o alguna prueba se saltea.
 set -uo pipefail
@@ -106,8 +106,50 @@ sabotaje "verificar no borra la marca vieja" "fila_cambiada" "quedó marcada com
   reemplazar $C '    if os.path.lexists(_de_marca(archivo)):
         os.unlink(_de_marca(archivo))
 ' ''
+sabotaje "una copia vacía queda verificada" "copia_vacia" "copia verificada: 0 tablas, 0 filas|copia verificada: 2 tablas, 0 filas" \
+  reemplazar $C 'if not filas:' 'if False:'
+sabotaje "copiar fija una copia vacía" "copia_vacia" "vuelta 1: quedó algo" \
+  reemplazar $C '            _filas(tablas)
+' ''
+sabotaje "verificar acepta una huella sin filas" "sin_filas" "falta la variable COPIA_PRUEBA_URL" \
+  reemplazar $C 'filas = _filas(datos["tablas"])' 'filas = sum(t["filas"] for t in datos["tablas"].values())'
+sabotaje "copiar sale bien aunque la verificación falle" "sale_con_error" "LA COPIA NO SIRVE|pg_restore falló (salida 1)" \
+  reemplazar $C 'return await verificar(archivo)' 'await verificar(archivo); return 0'
+sabotaje "la huella sólo mira public" "otro_esquema" "copia verificada" \
+  reemplazar $C "WHERE c.relkind = 'r'" "WHERE c.relkind = 'r' AND n.nspname = 'public'"
 sabotaje "una huella que no se entiende llega a la base" "huella_que_no_se_entiende" "falta la variable COPIA_PRUEBA_URL" \
   reemplazar $C 'if not re.fullmatch(r"[A-Z0-9_]+", str(datos.get("codificacion", ""))):' 'if False:'
+
+echo "== un corte"
+sabotaje "sin plazo" "un_corte" "LA COPIA NO SIRVE|falta en la restauración" \
+  reemplazar $C 'loop.call_later(int(plazo), cortar, f"no terminó en {plazo} s")' 'pass'
+sabotaje "un plazo que no se entiende corre igual" "plazo_que_no_se_entiende" "no terminó en 0 s|no terminó en -5 s" \
+  reemplazar $C 'if not re.fullmatch(r"[0-9]+", plazo) or int(plazo) == 0:' 'if not plazo.lstrip("-").isdigit():'
+sabotaje "un plazo con «²» rompe" "plazo_que_no_se_entiende" "ValueError: invalid literal for int()" \
+  reemplazar $C 'if not re.fullmatch(r"[0-9]+", plazo) or int(plazo) == 0:' 'if not plazo.isdigit() or int(plazo) == 0:'
+sabotaje "la señal mata sin limpiar" "un_corte" "(-15 == 1" \
+  reemplazar $C 'loop.add_signal_handler(senal, cortar, f"se cortó por {senal.name} antes de terminar")' 'pass'
+sabotaje "una señal ignorada corta igual" "un_corte" "se cortó por SIGHUP" \
+  reemplazar $C 'if signal.getsignal(senal) is not signal.SIG_IGN:' 'if True:'
+sabotaje "cortar no mata al hijo" "un_corte" "pg_restore quedó corriendo" \
+  reemplazar $C '        if proc.returncode is None:
+            proc.kill()
+            await proc.wait()
+' ''
+
+sabotaje "la limpieza no está protegida del corte" "durante_el_borrado" "close']" \
+  reemplazar $C 'await asyncio.shield(tarea)' 'await tarea'
+sabotaje "el borrado no tiene tope" "colgado" "Timeout" \
+  reemplazar $C 'asyncio.wait_for(borrar(), TOPE_BORRADO_S)' 'borrar()'
+sabotaje "al cortar, la base que quedó no se avisa" "colgado" "hay que borrarla a mano' in ''" \
+  reemplazar $C '        await asyncio.wait([tarea])
+        _quedo(tarea, base)
+' '        await asyncio.wait([tarea])
+'
+sabotaje "la base que quedó no da error" "quedo_no_marca" "assert 0 == 1" \
+  reemplazar $C '    if not borrada:
+        return 1
+' ''
 
 echo "== no pisar"
 # Sin este control, _fijar igual no pisa: el rojo es que falta el aviso de antes de copiar.
@@ -132,6 +174,11 @@ sabotaje "tapar no mira ?password=" "tapar_no_deja" "en_la_consulta|queda la cla
   reemplazar $C 'secretos |= {v, quote(v, safe="")}' 'pass'
 
 echo "== enviar"
+sabotaje "los archivos los lee cualquiera" "lleva_la_copia_verificada" "copia.dump: 0o100644" \
+  reemplazar $C 'os.umask(0o077)' 'pass'
+sabotaje "enviar sin huella" "sin_su_huella" "copia.dump.huella.json" \
+  reemplazar $C '    leer_huella(archivo)
+    # La marca va última' '    # La marca va última'
 sabotaje "enviar sin marca la da por verificada" "cortada" "destino/copia.dump" \
   reemplazar $C 'raise Falla(f"la copia {archivo} no está verificada: correr verificar") from None' 'verificada = sha256_de(archivo)'
 sabotaje "enviar no mira si cambió" "copia_que_cambio" "la copia llegó distinta" \

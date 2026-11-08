@@ -362,7 +362,7 @@
             billingNextWrap.hidden = false;
             billingNextEl.textContent = formatDateAr(trialEnd);
             if (nextLabel) {
-                // «Próximo cobro» sólo si hay una suscripción que se renueva (COBRO-MP-2).
+                // «Próximo cobro» sólo si hay una suscripción que se renueva.
                 const vencida = new Date(trialEnd) <= new Date();
                 if (status === 'trial') nextLabel.textContent = 'Trial vence';
                 else if (status === 'active') nextLabel.textContent = (b && b.renueva) ? 'Próximo cobro' : 'Activo hasta';
@@ -454,7 +454,7 @@
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) throw new Error((data && data.detail) || 'No se pudo reactivar');
             if (data.needs_checkout) {
-                // Antes de pagar, se dice cuándo cobra y qué suma (COBRO-MP-2, D7.3).
+                // Antes de pagar, se dice cuándo cobra y qué suma.
                 const seguir = await CDI.confirm({
                     title: 'Reactivar plan',
                     lead: 'Se crea una suscripción nueva en Mercado Pago.',

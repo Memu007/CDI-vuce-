@@ -54,8 +54,9 @@
                 SUBSCRIPTION_PAST_DUE: 'Tenés un pago pendiente',
                 SUBSCRIPTION_INACTIVE: 'No tenés una suscripción activa',
             };
-            const titulo = motivo.billing_status === 'canceled' ? 'Cancelaste tu suscripción'
-                : (titulos[motivo.code] || 'Tu plan venció');
+            // Cancelada con el período vigente, lo que la frena es el tope.
+            const cancelo = motivo.billing_status === 'canceled' && motivo.code !== 'PLAN_LIMIT_EXCEEDED';
+            const titulo = cancelo ? 'Cancelaste tu suscripción' : (titulos[motivo.code] || 'Tu plan venció');
             const lead = motivo.message || (typeof detail === 'string' && detail) ||
                 'Necesitás renovar tu suscripción para seguir usando CDI.';
             if (CDI.confirm) {
@@ -76,8 +77,9 @@
                     }
                 });
             }
-            const err = new Error('payment_required');
-            err.motivo = lead;
+            // La razón como mensaje: quien muestra err.message dice por qué, no un código.
+            const err = new Error(lead);
+            err.code = 'payment_required';
             throw err;
         }
         return res;

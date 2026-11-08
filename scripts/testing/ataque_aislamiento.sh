@@ -24,7 +24,9 @@
 # tampoco pasa. No toca ninguna base real ni usa internet.
 # ========================================================================
 
-set -uo pipefail
+# Sin pipefail: en «cuerpo | grep -q» grep corta temprano y el SIGPIPE de la
+# izquierda haría pasar una fuga en una respuesta larga por un bloqueo.
+set -u
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
@@ -62,18 +64,23 @@ codigo()  { curl -s -o /dev/null -w '%{http_code}' -m 10 "$@"; }
 csrf() { grep -i "csrf_token" "$1" 2>/dev/null | awk '{print $NF}' | tail -1; }
 esperar_health() { for _ in $(seq 1 45); do [ "$(codigo "${BASE}/health")" = "200" ] && return 0; sleep 2; done; return 1; }
 
-# Un ataque = Beto pide algo de Ana. Tiene que dar 401/403/404, nunca 200.
+# Un 2xx es fuga y 401/403/404 es bloqueo; otro código (500, sin respuesta) no prueba nada.
+juzgar() {
+    case "$2" in
+        2??) pierde "$1" "devolvió $2 · $3" ;;
+        401|403|404) gana "$1 ($2)" ;;
+        *) duda "$1" "devolvió $2 y se esperaba 401, 403 o 404 · $3" ;;
+    esac
+}
+
+# Un ataque = Beto pide algo de Ana.
 atacar() {
     local NOMBRE="$1"; shift
     local C BODY
     BODY=$(curl -s -m 10 -w $'\n%{http_code}' -b "$COOKIE_B" -c "$COOKIE_B" \
         -H "X-CSRF-Token: $(csrf "$COOKIE_B")" "$@")
     C=$(echo "$BODY" | tail -1)
-    if [ "$C" = "200" ]; then
-        pierde "$NOMBRE" "devolvió 200 · $(echo "$BODY" | head -n -1 | tr -d '\n' | head -c 160)"
-    else
-        gana "$NOMBRE (${C})"
-    fi
+    juzgar "$NOMBRE" "$C" "$(echo "$BODY" | head -n -1 | tr -d '\n' | head -c 160)"
 }
 
 echo -e "${BLUE}========================================${NC}"
@@ -107,20 +114,21 @@ PY="./venv/bin/python"; [ -x "$PY" ] || PY="python3"
 
 paso "Levantando la app con configuración de producción"
 mkdir -p "$TMP/datos"
-# Un tercer usuario es administrador, para comprobar que las rutas de admin
-# existen y que el 403 de Beto es por no serlo. El dólar apunta a un puerto
-# cerrado: el presupuesto usa su valor de reserva sin salir a internet.
-# FRONTEND_URL: en producción el link de invitación la exige.
+# El dólar apunta a un puerto cerrado: el presupuesto usa su valor de reserva
+# sin salir a internet. FRONTEND_URL: en producción el link de invitación la exige.
 JEFE="jefe$RANDOM"
+levantar() {
 ENVIRONMENT=production JWT_SECRET_KEY="$CLAVE" ALLOWED_ORIGINS="https://cdi-prueba.example.com" \
 FRONTEND_URL="https://cdi-prueba.example.com" \
 DATABASE_URL="$DB_URL" EMAIL_VERIFICATION_REQUIRED=false CDI_DATA_DIR="$TMP/datos" \
-API_RATE_LIMIT="100000/minute" RATE_LIMIT_PREMIUM="100000/minute" ADMIN_USERNAMES="$JEFE" \
+API_RATE_LIMIT="100000/minute" RATE_LIMIT_PREMIUM="100000/minute" ADMIN_USERNAMES="$1" \
 DOLARAPI_BASE="http://127.0.0.1:9/v1/dolares" \
 PYTHONPATH=. nohup "$PY" -m uvicorn proyecto_maria.main:app \
     --host 127.0.0.1 --port "$PUERTO" > "$TMP/app.log" 2>&1 &
 APP_PID=$!
 esperar_health || { echo -e "${RED}❌ La app no arrancó:${NC}"; tail -30 "$TMP/app.log"; exit 1; }
+}
+levantar ""
 echo -e "${GREEN}✅ App viva${NC}"
 
 # ------------------------------------------------------- los dos usuarios
@@ -133,6 +141,17 @@ registrar() {
     curl -s -m 20 -c "$2" -X POST "${BASE}/auth/register" -H 'Content-Type: application/json' \
         -d "{\"username\":\"$1\",\"password\":\"Clave-Larga-Prueba-1\",\"email\":\"$1@ejemplo.com\"${INV}}"
 }
+
+# Un tercer usuario es administrador, para comprobar que las rutas de admin
+# existen y que el 403 de Beto es por no serlo. Como la cuenta de Emi: existe
+# antes de estar en ADMIN_USERNAMES y el arranque le pone el rol.
+paso "Registrando a ${JEFE} y reiniciando la app con él en ADMIN_USERNAMES"
+CK_J="$TMP/jefe.txt"
+registrar "$JEFE" "$CK_J" >/dev/null
+grep -q access_token "$CK_J" || { echo -e "${RED}❌ No se pudo crear a ${JEFE}.${NC}"; tail -20 "$TMP/app.log"; exit 1; }
+kill "$APP_PID"; wait "$APP_PID" 2>/dev/null
+levantar "$JEFE"
+echo -e "${GREEN}✅ App reiniciada${NC}"
 
 paso "Creando dos despachantes distintos: ${ANA} y ${BETO}"
 registrar "$ANA"  "$COOKIE_A" >/dev/null
@@ -204,11 +223,7 @@ paso "4· Descargar el MARIA.TXT de Ana (adivinando el nro de factura)"
 if [ -n "$ARCHIVO" ]; then
     RESP=$(curl -s -m 10 -w $'\n%{http_code}' -b "$COOKIE_B" "${BASE}/download/${ARCHIVO}")
     C=$(echo "$RESP" | tail -1)
-    if [ "$C" = "200" ]; then
-        pierde "Descargar el MARIA.TXT de Ana" "bajó la declaración completa; contiene: $(echo "$RESP" | grep -o 'MERCADERIA CONFIDENCIAL DE ANA' | head -1)$(echo "$RESP" | grep -o "$CUIT_ANA" | head -1)"
-    else
-        gana "Descargar el MARIA.TXT de Ana (${C})"
-    fi
+    juzgar "Descargar el MARIA.TXT de Ana" "$C" "contiene: $(echo "$RESP" | grep -o 'MERCADERIA CONFIDENCIAL DE ANA' | head -1)$(echo "$RESP" | grep -o "$CUIT_ANA" | head -1)"
 else
     echo -e "${YELLOW}  (salteado: Ana no llegó a generar el TXT)${NC}"
 fi
@@ -281,12 +296,12 @@ cuerpo() { echo "$1" | head -n -1; }
 cod()    { echo "$1" | tail -1; }
 resumir() { cuerpo "$1" | tr -d '\n' | head -c 160; }
 
-# atacar_como COOKIE NOMBRE CÓDIGO args...: 200 es fuga; el código esperado
+# atacar_como COOKIE NOMBRE CÓDIGO args...: un 2xx es fuga; el código esperado
 # es bloqueo; cualquier otro, sin probar.
 atacar_como() {
     local CK="$1" NOMBRE="$2" ESPERA="$3"; shift 3
     local R C; R=$(pedir "$CK" "$@"); C=$(cod "$R")
-    if [ "$C" = "200" ]; then pierde "$NOMBRE" "devolvió 200 · $(resumir "$R")"
+    if [[ "$C" == 2?? ]]; then pierde "$NOMBRE" "devolvió $C · $(resumir "$R")"
     elif [ "$C" = "$ESPERA" ]; then gana "$NOMBRE ($C)"
     else duda "$NOMBRE" "devolvió $C y se esperaba $ESPERA · $(resumir "$R")"; fi
 }
@@ -314,8 +329,10 @@ sql() {
         psql -h 127.0.0.1 -p 5434 -U cdi -d cdi -tAc "$1"
     else
         "$PY" -c 'import sqlite3, sys
-for r in sqlite3.connect(sys.argv[1]).execute(sys.argv[2]):
-    print("|".join("" if v is None else str(v) for v in r))' "$TMP/aisl.db" "$1"
+con = sqlite3.connect(sys.argv[1])
+for r in con.execute(sys.argv[2]).fetchall():
+    print("|".join("" if v is None else str(v) for v in r))
+con.commit()' "$TMP/aisl.db" "$1"
     fi
 }
 
@@ -368,10 +385,8 @@ operaciones() {
 presupuestos() {
     paso "10· Compartir el presupuesto de una operación de Ana"
     [ -n "${OP_ANA:-}" ] || { duda "Presupuestos" "Ana no tiene operación (falló el paso 9)"; return; }
-    # Con configuración de producción el cálculo de aranceles no tiene fuente
-    # sin internet (el modo simulado está prohibido ahí) y da 503. Alcanza:
-    # quien pasa el control de dueño llega al cálculo, con 200 o con ese 503;
-    # quien no, recibe 404 antes. Ana tiene que llegar; Beto, no.
+    # Sin internet el cálculo de aranceles da 503 en producción: pasar el control
+    # de dueño es llegar al cálculo (200 o 503); no pasarlo, un 404 antes.
     local R CA CB
     R=$(pedir "$COOKIE_A" -X POST "${BASE}/api/quotes/share" -H 'Content-Type: application/json' -d "{\"operation_id\":\"${OP_ANA}\"}")
     CA=$(cod "$R")
@@ -414,8 +429,8 @@ estudios() {
     # Generar con el estudio de Ana: el TXT de Beto saldría con el CUIT de Ana.
     R=$(pedir "$COOKIE_B" -X POST "${BASE}/generate_maria" -H 'Content-Type: application/json' \
         -d "{\"operation_id\":\"FAC_0001-00099999\",\"estudio_id\":\"${EST}\",\"comprador_nombre\":\"Importadora de Beto SA\",\"comprador_cuit\":\"${CUIT_ANA}\",\"moneda\":\"DOL\",\"incoterm\":\"FOB\",\"fecha_emision\":\"18/07/2025\",\"sbt_sufijo_valor\":\"AA(DEMO)-AB(DEMO)-CA00-\",\"items\":[{\"pieza\":\"1\",\"descripcion\":\"MERCADERIA DE BETO\",\"ncm\":\"84713000900R\",\"cantidad\":1,\"valor_unitario\":100,\"peso_kg\":1,\"origen\":\"310\",\"unidad\":\"01\"}]}")
-    if [ "$(cod "$R")" = "200" ]; then
-        pierde "Generar un TXT con el estudio de Ana" "devolvió 200 · $(resumir "$R")"
+    if [[ "$(cod "$R")" == 2?? ]]; then
+        pierde "Generar un TXT con el estudio de Ana" "devolvió $(cod "$R") · $(resumir "$R")"
     elif [ "$(cod "$R")" = "400" ] && cuerpo "$R" | grep -qF "no está en tu cuenta"; then
         gana "Generar un TXT con el estudio de Ana (400, no está en su cuenta)"
     else
@@ -468,9 +483,8 @@ organizaciones() {
 
 administrador() {
     paso "14· Un despachante común no entra a lo de administrador"
-    local CK_J="$TMP/jefe.txt" RUTA METODO
-    registrar "$JEFE" "$CK_J" >/dev/null
-    for RUTA in "GET /api/admin/stats/summary" "GET /api/admin/logs/recent/5" "POST /api/admin/errors/clear-old" \
+    local RUTA METODO
+    for RUTA in "GET /api/admin/stats/summary" "GET /api/admin/logs/recent/5" "GET /api/admin/errors/insights" \
                 "GET /api/dev/stats" "GET /dev/dashboard"; do
         METODO="${RUTA%% *}"; RUTA="${RUTA#* }"
         # El administrador entra: la ruta existe y el 403 de Beto es por no serlo.

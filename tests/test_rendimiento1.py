@@ -14,6 +14,7 @@ import httpx
 import pytest
 
 from proyecto_maria import main
+from tests.conftest import cuenta_de_prueba
 
 PDF = (Path(__file__).parent / "test_factura.pdf").read_bytes()
 LENTO_S = 1.5
@@ -29,7 +30,8 @@ def _entorno(monkeypatch):
     monkeypatch.setattr(main, "lectura_automatica_disponible", lambda: True)
     monkeypatch.setattr(ai_quota, "enforce_pdf_quota", lambda *a, **k: None)
     main.app.dependency_overrides[main.get_current_user] = lambda: dict(USUARIO)
-    yield
+    with cuenta_de_prueba(USUARIO["username"]):
+        yield
     main.app.dependency_overrides.pop(main.get_current_user, None)
 
 

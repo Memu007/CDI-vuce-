@@ -32,6 +32,7 @@ from proyecto_maria.core.rate_limit import limiter  # noqa: E402
 from proyecto_maria.database.connection import get_async_session, AsyncSessionLocal  # noqa: E402
 from proyecto_maria.database.models import User  # noqa: E402
 from sqlalchemy.future import select  # noqa: E402
+from tests.mp_firma import aviso_firmado  # noqa: E402
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -284,16 +285,11 @@ class TestWebhookSeguridad:
         assert resp.status_code == 401
 
     def test_firma_valida_pero_token_ausente_400(self, client, monkeypatch):
-        """Con secret vacío (dev) y sin MP_ACCESS_TOKEN → pasa firma, 400 por falta de token."""
-        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "")
+        """Con firma válida y sin MP_ACCESS_TOKEN → pasa firma, 400 por falta de token."""
+        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "TESTSECRET")
         monkeypatch.setattr(main_mod, "IS_PRODUCTION", False)
         monkeypatch.setattr(main_mod, "MP_ACCESS_TOKEN", "")
-        body = {"type": "payment", "data": {"id": "pay-3"}}
-        resp = client.post(
-            "/api/payments/webhook",
-            content=json.dumps(body),
-            headers={"content-type": "application/json"},
-        )
+        resp = client.post("/api/payments/webhook", **aviso_firmado("payment", "pay-3", "TESTSECRET"))
         assert resp.status_code == 400
 
     def test_secret_configurado_rechaza_evento_sin_firma(self, client, monkeypatch):
@@ -303,17 +299,12 @@ class TestWebhookSeguridad:
         # La firma se valida ANTES de mirar el type → 401
         assert resp.status_code == 401
 
-    def test_sin_secret_dev_acepta_evento_no_payment(self, client, monkeypatch):
-        """Sin secret en dev, evento no-payment pasa la firma y es skipped (200)."""
-        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "")
+    def test_firma_valida_acepta_evento_no_payment(self, client, monkeypatch):
+        """Un evento no-payment firmado pasa la firma y es skipped (200)."""
+        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "TESTSECRET")
         monkeypatch.setattr(main_mod, "IS_PRODUCTION", False)
         monkeypatch.setattr(main_mod, "MP_ACCESS_TOKEN", "TEST-token")
-        body = {"type": "subscription_updated", "data": {"id": "sub-2"}}
-        resp = client.post(
-            "/api/payments/webhook",
-            content=json.dumps(body),
-            headers={"content-type": "application/json"},
-        )
+        resp = client.post("/api/payments/webhook", **aviso_firmado("subscription_updated", "sub-2", "TESTSECRET"))
         assert resp.status_code == 200
         assert resp.json().get("skipped") is not None
 
@@ -466,18 +457,14 @@ class TestLoggingSeguro:
             def __init__(self, token): pass
             def payment(self): return FakePayCard()
 
-        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "")
+        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "TESTSECRET")
         monkeypatch.setattr(main_mod, "IS_PRODUCTION", False)
         monkeypatch.setattr(main_mod, "MP_ACCESS_TOKEN", "TEST-fake")
         monkeypatch.setattr(main_mod.mercadopago, "SDK", FakeSDKLog)
 
         with caplog.at_level(logging.DEBUG, logger="mp_webhook"):
-            body = {"type": "payment", "data": {"id": payment_id}}
-            client.post(
-                "/api/payments/webhook",
-                content=json.dumps(body),
-                headers={"content-type": "application/json"},
-            )
+            r = client.post("/api/payments/webhook", **aviso_firmado("payment", payment_id, "TESTSECRET"))
+        assert r.status_code == 200, r.text
 
         # El número de tarjeta completo NO debe aparecer en los logs
         all_logs = " ".join(caplog.messages)
@@ -514,18 +501,14 @@ class TestLoggingSeguro:
             def __init__(self, token): pass
             def payment(self): return FakePayTok()
 
-        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "")
+        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "TESTSECRET")
         monkeypatch.setattr(main_mod, "IS_PRODUCTION", False)
         monkeypatch.setattr(main_mod, "MP_ACCESS_TOKEN", "TEST-fake")
         monkeypatch.setattr(main_mod.mercadopago, "SDK", FakeSDKTok)
 
         with caplog.at_level(logging.DEBUG, logger="mp_webhook"):
-            body = {"type": "payment", "data": {"id": payment_id}}
-            client.post(
-                "/api/payments/webhook",
-                content=json.dumps(body),
-                headers={"content-type": "application/json"},
-            )
+            r = client.post("/api/payments/webhook", **aviso_firmado("payment", payment_id, "TESTSECRET"))
+        assert r.status_code == 200, r.text
 
         if access_token:
             all_logs = " ".join(caplog.messages)
@@ -556,18 +539,14 @@ class TestLoggingSeguro:
             def __init__(self, token): pass
             def payment(self): return FakePayOk()
 
-        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "")
+        monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "TESTSECRET")
         monkeypatch.setattr(main_mod, "IS_PRODUCTION", False)
         monkeypatch.setattr(main_mod, "MP_ACCESS_TOKEN", "TEST-fake")
         monkeypatch.setattr(main_mod.mercadopago, "SDK", FakeSDKOk)
 
         with caplog.at_level(logging.INFO, logger="mp_webhook"):
-            body = {"type": "payment", "data": {"id": payment_id}}
-            client.post(
-                "/api/payments/webhook",
-                content=json.dumps(body),
-                headers={"content-type": "application/json"},
-            )
+            r = client.post("/api/payments/webhook", **aviso_firmado("payment", payment_id, "TESTSECRET"))
+        assert r.status_code == 200, r.text
 
         all_logs = " ".join(caplog.messages)
         assert payment_id in all_logs, "payment_id debería estar en logs para trazabilidad"
