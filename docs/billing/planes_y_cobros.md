@@ -31,7 +31,7 @@ No hay plan Básico activo. El sistema rechaza `"basic"` con error claro.
 |----------|-----------|-------------|
 | `MP_ACCESS_TOKEN` | Sí | Access Token de MercadoPago (empieza con `TEST-` en sandbox, `APP_USR-` en producción). |
 | `MP_WEBHOOK_SECRET` | Prod sí, Dev no | Secret HMAC para validar firmas del webhook. En dev puede omitirse. |
-| `FRONTEND_URL` | No | URL pública de CDI (ej: `https://cdi-app.up.railway.app`). Si no está, usa `http://127.0.0.1:8000`. |
+| `FRONTEND_URL` | Sí, fuera de desarrollo | URL pública de CDI (ej: `https://cdi-app.up.railway.app`). Sin ella la app no arranca; en `development`, `test` o `testing` usa `http://127.0.0.1:8010`. |
 | `MP_SANDBOX` | No | `true`/`1` para modo sandbox (default en dev). `false` para cobrar de verdad. |
 | `MP_TOPUP_PRICE_ARS` | No | Precio del top-up (default: 10000). |
 | `MP_TOPUP_OPS` | No | Cantidad de ops por top-up (default: 10). |

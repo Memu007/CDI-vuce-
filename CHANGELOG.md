@@ -8,7 +8,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-08 · fix: fuera de desarrollo, sin FRONTEND_URL la app no arranca (ENTORNO-4)
 
-- Como con `ALLOWED_ORIGINS`: sin `FRONTEND_URL`, y con `ENVIRONMENT` distinto de `development`, `test` o `testing`, la app no arranca. La vuelta del cobro de Mercado Pago usa la misma URL que los emails y ya no cae a localhost.
+- Como con `ALLOWED_ORIGINS`: sin `FRONTEND_URL`, y con `ENVIRONMENT` distinto de `development`, `test` o `testing`, la app no arranca; una `FRONTEND_URL` con sólo espacios cuenta como vacía. La vuelta del cobro de Mercado Pago usa la misma URL que los emails y ya no cae a localhost.
+- `docker-compose.yml` trae `FRONTEND_URL` y `preflight_env.sh` avisa si falta.
 
 ## 2026-11-08 · fix: un cuerpo muy hondo, un NUL en la consulta, un campo del cliente que no es texto o un número enorme no dan 500 (ENTRADAS-3)
 

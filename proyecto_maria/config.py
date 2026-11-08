@@ -17,7 +17,7 @@ def es_desarrollo() -> bool:
 
 def get_frontend_url() -> str:
     """Base pública de la UI para los links de los emails y la vuelta del cobro."""
-    url = (os.getenv("FRONTEND_URL") or "").rstrip("/")
+    url = (os.getenv("FRONTEND_URL") or "").strip().rstrip("/")
     if url:
         return url
     if not es_desarrollo():
