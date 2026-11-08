@@ -547,3 +547,7 @@ Emi: «Trabaja 12 horas mas». Vuelven las tres rutinas; corte el 2026-11-09 a l
 ### 2026-11-08 17:40 UTC (PM principal)
 
 EMAIL-1 (D45) aceptada sin producto. D132 (a), decidida por la PM bajo «arreglos chicos de seguridad»: RESET-3, tope por cuenta al pedir el reset, después de AVISOS-2. D131 (a) va a Emi: mirar la collation de la base de producción, una consulta de sólo lectura.
+
+### 2026-11-08 18:40 UTC (PM principal)
+
+NOMBRES-1 aceptada sobre `1960a9a` (producto `ccded98`, +4/−2). Escape de la PM en la vuelta 1: el acta decía «PG 16» y corrió en SQLite porque `tests/conftest.py` pisa `DATABASE_URL`; corregido, y el riesgo va a la cola de limpieza. La carrera de altas simultáneas queda como límite conocido; el índice sobre `lower(username)` va con Emi. CONEXIONES-1 pasa de MARIA a la técnica, decidido por la PM (pieza de base y servidor; MARIA tiene cuatro por delante).

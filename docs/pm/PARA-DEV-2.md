@@ -3,6 +3,11 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
+## CONEXIONES-1 pasa a la técnica (2026-11-08 PM)
+
+Decidido por la PM. Tu cola queda AVISOS-2 → RESET-3 → OBSERVABILIDAD-1 →
+ORG-1+D40 → D102. No la empieces.
+
 ## Ritmo y calidad (Emi, 2026-10-28)
 
 Vamos tranquilas: no hay fecha de entrega y, si el plan se estira, no pasa

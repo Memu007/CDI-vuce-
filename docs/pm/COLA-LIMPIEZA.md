@@ -120,3 +120,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - Arnés de sabotajes y helpers de `scripts/testing/*_postgres.py` (crear y borrar base, registrar usuario, `chequear`) copiados entre piezas: unificar.
 - `tests/test_separadores1b.py`: `test_en_la_factura_con_la_pista_en_contra_queda_sin_leer` ya no distingue la regla `sin_grupo` (`_numero_factura` ya devuelve None): darle una entrada que sólo la regla rechace, o sacarlo.
 - `proyecto_maria/main.py` 1754, 1771, 2373 y 3406: comentarios con historia («EMAIL-1»), sacarlos.
+- `tests/conftest.py:19`: pisa `DATABASE_URL` con SQLite sin avisar, así que
+  un `pytest` con la URL de Postgres corre en SQLite. Hoy se esquiva con
+  `--noconftest -p pg_nullpool`; que avise o que respete una URL de PG pedida.

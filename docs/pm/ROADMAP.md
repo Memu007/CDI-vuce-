@@ -165,14 +165,14 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | ✅ PYPDF-1 | Dev MARIA | Sumada por la PM el 06/11 (D73 de MARIA): ver qué cambió en pypdf 6.21.4, que rompe 5 pruebas, y fijar la versión o adaptar las pruebas según eso |
 | ✅ ABUSO-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ EMAIL-1 | Dev MARIA | Sumada por Emi el 28/10 (D36 de MARIA): recuperar usuario y contraseña encuentran el email con otras mayúsculas; ningún alta ni cambio crea un email repetido con otras mayúsculas; los pares que ya existan no se tocan hasta que Emi los cuente |
-| 🔵 CONEXIONES-1 | Dev MARIA | Sumada por Emi el 28/10 (D37 de MARIA): medir si el cierre de la sesión de base cancelado deja conexiones tomadas, con Postgres 16; arreglar sólo si las deja |
+| 🔵 CONEXIONES-1 | Dev técnica (desde el 08/11; antes MARIA) | Sumada por Emi el 28/10 (D37 de MARIA): medir si el cierre de la sesión de base cancelado deja conexiones tomadas, con Postgres 16; arreglar sólo si las deja |
 | ✅ AISLAMIENTO-2 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ LIMPIEZA-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ PERMISOS-1 | Dev técnica | Sumada por la PM el 08/11 («arreglos chicos de seguridad», Emi; D116): ningún usuario llega a admin por un email que él puso |
 | ✅ COBRO-MP-4 | Dev técnica | Sumada por la PM el 08/11 (D119 b, seguridad de MP, Emi): sólo quien recibió el 503 de cancelar, o la dueña, concilia el reintento |
 | ✅ PERMISOS-2 | Dev técnica | Sumada por la PM el 08/11 (D120 b, «arreglos chicos de seguridad», Emi): sólo los roles guardados dan admin; el registro rechaza un nombre de `ADMIN_USERNAMES` |
 | ✅ PERMISOS-3 | Dev técnica | Sumada por la PM el 08/11 («arreglos chicos de seguridad», Emi): un nombre de usuario con `\n` final o con otras mayúsculas que uno de `ADMIN_USERNAMES` no se registra |
-| 🔵 NOMBRES-1 | Dev técnica | Sí de Emi el 08/11 (D127 b): un nombre de usuario que ya existe con otras mayúsculas no se registra, para todas las cuentas; las cuentas que ya existen quedan como están |
+| ✅ NOMBRES-1 | Dev técnica | Sí de Emi el 08/11 (D127 b): un nombre de usuario que ya existe con otras mayúsculas no se registra, para todas las cuentas; las cuentas que ya existen quedan como están |
 | 🔵 OBSERVABILIDAD-1 | Dev MARIA | La columna `api_logs.owner_username` que falta en producción, con migración probada en Postgres descartable |
 | ✅ CATALOGO-LARGO-1 | Dev MARIA | Sumada por Emi el 04/11: una descripción larga (301 a 2000 caracteres) no se pierde en silencio en la memoria del cliente ni en el catálogo (`product_key` de 300); con migración probada en Postgres descartable si hace falta |
 | ✅ CATALOGO-LARGO-2 | Dev MARIA | Sí de Emi el 05/11 21:41: un origen de más de 5 caracteres o un proveedor de más de 200 no se pierden en silencio (hoy dan 200 sin guardar o 500), y una descripción que normaliza a vacío no contesta «guardado» |

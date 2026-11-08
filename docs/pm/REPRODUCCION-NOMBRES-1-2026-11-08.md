@@ -7,7 +7,7 @@ Producto `5af134f`..`ccded98` (rama `claude/dev-tecnica`), base `4087b46`. Workt
 | `pytest tests/test_nombres1.py tests/test_permisos2.py` en SQLite | 38 passed |
 | con el `main.py` de `4087b46` | 8 failed, 5 passed |
 | `nombres1.sh ccded98` | BASE en verde (38 passed), 5 ROJO, «sabotajes con falla: 0», rc=0 |
-| las mismas dos suites en PG 16 (`con_pg16.sh`) | 38 passed |
+| las mismas dos suites «en PG 16» (`con_pg16.sh`) | 38 passed, **pero en SQLite**: `tests/conftest.py:19` pisa `DATABASE_URL`. Escape mío, lo vio la Dev técnica; corrida real en PG abajo |
 | `chequeo-6.py 4087b46 ccded98` | producto +4/−2, arnés +190/−0, historia vacío, avisos 0 |
 
 Adversario Opus alto, con contexto nuevo:
@@ -29,3 +29,20 @@ Adversario Opus alto, con contexto nuevo:
 
 No corrí la suite completa: el informe trae 4731 passed sobre `ccded98`, y la
 devolución es sólo de pruebas.
+
+## Vuelta 2: pruebas sobre `1960a9a` (producto `ccded98` sin cambio)
+
+`chequeo-6.py 4087b46 1960a9a`: producto +4/−2, avisos 0. En PG real con
+`--noconftest -p pg_nullpool` (el plugin imprime el dialecto antes de correr).
+
+| qué | resultado |
+|---|---|
+| `nombres1.sh 1960a9a` | BASE 40 passed, 7 ROJO, «sabotajes con falla: 0», salida 0 |
+| `test_nombres1.py` en PG 16 real | «dialecto: postgresql», 15 passed |
+| PG real, su sabotaje `func.lower` + `.first()` en el arranque | 2 failed (`[mayusculas]`, `[sola_y_la_lista_en_mayusculas]`), 13 passed |
+| PG real, sabotaje mío distinto: `User.username.ilike(identifier)` + `.first()` | 2 failed, las mismas filas, 13 passed |
+| SQLite, mi sabotaje `ilike` | 2 failed, las mismas filas, 13 passed |
+
+El caso ahora da rojo encuentre la base la fila que encuentre: cada cuenta es
+la de la lista, como datos. `main.py` quedó restaurado. No corrí la suite
+completa: la vuelta es sólo de pruebas y su informe trae 4733 passed.

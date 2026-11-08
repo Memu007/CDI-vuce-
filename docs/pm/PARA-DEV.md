@@ -3,47 +3,40 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## NOMBRES-1: devolución chica de pruebas, sobre `ccded98` (2026-11-08 PM)
+## NOMBRES-1: aceptada sobre `1960a9a` (2026-11-08 PM)
 
-El producto queda como está (+4/−2): no lo toques. Corte, como antes: el
-**2026-11-09 a las 05:00 UTC**.
+Evidencia: `docs/pm/REPRODUCCION-NOMBRES-1-2026-11-08.md`, vuelta 2. Igual a
+tu informe: `nombres1.sh` 40 passed y 7 ROJO, falla 0; en PG 16 real 15
+passed. Mi sabotaje con `ilike` + `.first()` también da rojo, en PG y en
+SQLite. Tenías razón con lo de SQLite: corregí el acta y el riesgo va a la
+cola de limpieza. No hay D nuevas. La carrera queda como límite conocido; el
+índice sobre `lower(username)` lo veo con Emi.
 
-Evidencia en `docs/pm/REPRODUCCION-NOMBRES-1-2026-11-08.md`. Mis corridas dan
-igual que tu informe:
+## Tarea activa: CONEXIONES-1 (2026-11-08 PM)
 
-- verde: 38 passed, en SQLite y en PG 16;
-- rojo: 8 failed, 5 passed;
-- `nombres1.sh`: 5 ROJO, con falla 0;
-- chequeo-6: 0 avisos.
+Pasa de la cola de MARIA a la tuya, decidido por la PM: es de base y de
+servidor, y MARIA tiene cuatro piezas por delante. Está en el roadmap (sí de
+Emi del 28/10). El origen es la D37 de MARIA:
+`git show 1f648c3:docs/pm/PARA-DEV-2.md`, y la D46 en `PARA-DEV-2.md`.
 
-El adversario (Opus alto) no encontró otro camino que cree o renombre
-cuentas, ni confusión de identidad.
-
-**Devolución.** Causa: el caso de las cuentas viejas pone en
-`ADMIN_USERNAMES` la cuenta que se sembró primero. Si el arranque pasa a
-buscar con `func.lower(...)` y `.first()`, encuentra justo esa y el caso sigue
-verde: en una copia dio `13 passed`. Tu sabotaje da rojo sólo porque agrega
-`.order_by(User.username)`.
-
-Lo que pido: que el caso dé rojo con un `lower()` + `.first()`, encuentre la
-base la fila que encuentre. Por ejemplo, que cada una de las dos cuentas sea
-la de la lista, como datos. El sabotaje queda sin `order_by`. Producto sin
-cambio.
-
-**Riesgo que tu informe tiene que corregir.** La carrera sí se reproduce: con
-uvicorn sobre PG 16 y 4 altas a la vez, que alternan las dos rutas, entraron
-las 4 (`rc69a854`, `RC69A854`, `Rc69a854`, `rc69A854`). Dejá en el informe que
-se reproduce. Que quede así, sin índice, lo decido yo (abajo): no lo cierres.
-
-- Hace falta que las altas lleguen al mismo tiempo. Contra una cuenta que ya
-  existe, el chequeo frena siempre.
-- Las cuentas duplicadas son del mismo que las pidió.
-- La reserva de `ADMIN_USERNAMES` se chequea en memoria y no tiene esta
-  carrera.
-- Ya pasaba antes: dos altas con el mismo nombre exacto dan 500, no 400.
-
-Queda como límite conocido. Un índice sobre `lower(username)` exige mirar
-antes si producción ya tiene nombres repetidos: es para después, con Emi.
+- Medí si un `await session.close()` cancelado (el `finally` de
+  `get_async_session`, `database/connection.py`) deja conexiones tomadas:
+  gunicorn con la misma configuración del `Dockerfile` y Postgres 16
+  descartable, muchas respuestas 401 y algunas normales, mirando
+  `pg_stat_activity` y el pool.
+- Condiciones de la D46: esperás a que `api_logs` tenga todos los pedidos
+  (no tiempos fijos); un control que cancele el `close` a propósito y tenga
+  que dar rojo; cortes en vuelo de verdad (cliente que corta a mitad).
+- También entran la conexión tomada durante bcrypt, Gemini en
+  `/api/ncm/sugerir` (con la clave vacía y sin red) y la subida pública de
+  PDF (D74 de MARIA).
+- Si quedan conexiones tomadas: arreglo con una prueba roja antes y verde
+  después. Si no quedan: producto sin cambio, el informe trae los números y
+  el aviso de las pruebas sigue en riesgos.
+- Toca todas las rutas: revisión fuerte, adversario y `/security-review` si
+  hay producto.
+- Corte, como antes: el **2026-11-09 a las 05:00 UTC**. Si no llegás,
+  commit, push y anotá dónde quedaste.
 
 ## PERMISOS-3: aceptada sobre `9428e00`, sin integrar (2026-11-08 PM)
 
