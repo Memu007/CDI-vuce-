@@ -80,10 +80,9 @@ try:
     from tests.test_entradas4 import campos_form_de_texto  # noqa: E402
     limiter.enabled = False
 
-    encontrados = {(ruta, campo) for ruta, campo, _ in campos_form_de_texto(main_mod.app.routes)}
-    chequear(encontrados == set(CAMPOS), f"campos Form de texto: {sorted(encontrados)}")
-
     with TestClient(main_mod.app, raise_server_exceptions=False) as c:
+        encontrados = {(ruta, campo) for ruta, campo, _ in campos_form_de_texto(main_mod.app.routes)}
+        chequear(encontrados == set(CAMPOS), f"campos Form de texto: {sorted(encontrados)}")
         u = "e4_" + uuid.uuid4().hex[:10]
         r = c.post("/auth/register", json={"username": u, "password": CLAVE,
                                            "email": f"{u}@example.com", "name": "E"})

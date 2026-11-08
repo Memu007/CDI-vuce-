@@ -6,6 +6,7 @@ import enum
 import typing
 
 from fastapi.params import Form
+from fastapi.testclient import TestClient
 from fastapi.routing import APIRoute, iter_route_contexts
 from pydantic import BaseModel
 
@@ -51,7 +52,9 @@ def campos_form_de_texto(rutas):
 
 
 def test_form_de_texto_pasa_por_guardable_en_pg():
-    campos = list(campos_form_de_texto(m.app.routes))
+    # Con la app arrancada: hay routers que se montan en el lifespan.
+    with TestClient(m.app):
+        campos = list(campos_form_de_texto(m.app.routes))
     assert campos, "no encontró ningún campo Form de texto: la búsqueda está rota"
     sin_guarda = [(ruta, campo) for ruta, campo, guardado in campos if not guardado]
     assert not sin_guarda, f"campos Form de texto sin _guardable_en_pg: {sin_guarda}"
