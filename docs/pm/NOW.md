@@ -213,6 +213,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-08 19:58 UTC: sin entregas. Técnica en INTEGRAR-1 (suite corrida, mirando sabotajes; `org1` lo rompe el merge). MARIA cerrando RESET-3 (`4458020`); le dije que la entregue y después AVISOS-2b. Contexto 138k y 141k, ventana 200k.
 2026-11-08 19:35 UTC: **AVISOS-2 aceptada** (`4db641b`, sin integrar): falla 0, Sonnet sin camino. MARIA → AVISOS-2b (D133 a, D135 a). Las ramas chocan en 5 archivos: técnica → INTEGRAR-1 antes de CONEXIONES-1 (D136).
 2026-11-08 18:40 UTC: **NOMBRES-1 aceptada** (`1960a9a`, producto `ccded98`, técnica): PG real 15 passed, sabotaje `ilike` mío en rojo; acta corregida (vuelta 1 corrió en SQLite). Técnica → CONEXIONES-1 (pasa de MARIA, decidido por la PM). MARIA sigue AVISOS-2.
 2026-11-08 17:56 UTC: vuelta sin entregas nuevas. MARIA subió AVISOS-2 (`217c7cd7` fix, `e51d54ff` test) y corre sus sabotajes; técnica espera adversario y suite sobre `5cda09d`. Ninguna frenada.
@@ -225,7 +226,6 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 2026-11-08 13:58 UTC: vuelta. Contexto OK (técnica 134k, MARIA 138k, PM 143k, todas 200k; límite `allowed_warning`). Sin entregas nuevas: técnica en PERMISOS-2 (suite corriendo, `a1db966`), MARIA en AVISOS-1. Corte 15:50 UTC.
 2026-11-08 13:40 UTC: **SEGURO-2 aceptada** (`d160738`, MARIA, sin integrar): 242 passed, 19+12 sabotajes en rojo, Sonnet en pantalla real sin TXT malo. D125 a, D126 a; dos textos a AVISOS-1. MARIA sigue AVISOS-1.
 2026-11-08 13:30 UTC: **COBRO-MP-4 aceptada** (`0fb991c`, técnica, sin integrar): PG fallas 0, 1492 passed, 8 sabotajes en rojo; Sonnet halló un hueco de prueba del orden (mutación verde) → primer paso de PERMISOS-2. SEGURO-2 en reproducción.
-2026-11-08 12:30 UTC: **COBRO-MP-2+3, PERMISOS-1 y BACKUP-1a aceptadas** (`ca84c5f`, técnica, sin integrar): 4 guiones de sabotaje con falla 0, adversarios sin nada grave nuevo. Riesgo: el backup no compara índices ni secuencias.
 
 2026-11-06 11:20 UTC: **COBRO-CORTE-1 aceptada** (`ca50916`, técnica, sin integrar por `e0b8626`): 98 passed, 88 sabotajes en rojo sin falla, suite `4284 passed` rc=0, chequeo-6 con sus 3 avisos explicados; Opus y Sonnet alto sin doble cobro. Cuatro bajas a la cola. Para Emi: la validación de 60 s cruza cargas (de antes), pieza nueva. Técnica entregó COBRO-MP-2 (`4f1822f`, D62): reviso con Opus y Sonnet alto.
 
