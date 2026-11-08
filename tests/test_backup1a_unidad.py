@@ -3,6 +3,7 @@ errores no muestran la clave de ninguna de las dos direcciones, una copia no
 pisa un archivo, el envío no deja una copia distinta y una huella que no se
 entiende no llega a la base de prueba."""
 import asyncio
+import contextlib
 import hashlib
 import json
 import secrets
@@ -123,6 +124,7 @@ def test_una_huella_sin_filas_no_llega_a_la_base(monkeypatch, tmp_path, tablas):
         monkeypatch.delenv(v, raising=False)
     with pytest.raises(copia_base.Falla, match=f"la copia está vacía: {len(tablas)} tablas, 0 filas"):
         asyncio.run(copia_base.verificar(str(archivo)))
+    assert not (tmp_path / "copia.dump.sha256").exists()
 
 
 class _Admin:
@@ -159,9 +161,58 @@ def test_un_corte_durante_el_borrado_no_lo_deja_a_medias():
     assert asyncio.run(principal()) == ['DROP DATABASE IF EXISTS "cdi_restauracion_x" WITH (FORCE)', "close"]
 
 
-def test_un_borrado_colgado_tiene_tope(monkeypatch):
+@pytest.mark.parametrize("cortar", [False, True])
+def test_un_borrado_colgado_tiene_tope_y_avisa(monkeypatch, capsys, cortar):
+    """Con o sin corte, la base que quedó se avisa: si no, nadie la borra."""
     monkeypatch.setattr(copia_base, "TOPE_BORRADO_S", 0.2)
-    admin = _Admin()
-    with pytest.raises(copia_base.Falla, match="no se pudo borrar cdi_restauracion_x en 0.2 s"):
-        asyncio.run(copia_base._borrar_restauracion(admin, "cdi_restauracion_x"))
-    assert admin.hecho == ["terminate"]
+
+    async def principal():
+        admin = _Admin()
+        tarea = asyncio.ensure_future(copia_base._borrar_restauracion(admin, "cdi_restauracion_x"))
+        if cortar:
+            await admin.empezo.wait()
+            tarea.cancel()
+        # Sin tope, el DROP colgado no termina nunca: el rojo es este plazo, no el global.
+        return admin, await asyncio.wait_for(tarea, 5)
+
+    if cortar:
+        with pytest.raises(asyncio.CancelledError):
+            asyncio.run(principal())
+    else:
+        admin, borrada = asyncio.run(principal())
+        assert borrada is False and admin.hecho == ["terminate"]
+    assert "no se pudo borrar cdi_restauracion_x en 0.2 s: hay que borrarla a mano" in capsys.readouterr().err
+
+
+def test_una_restauracion_que_quedo_no_marca_la_copia(monkeypatch, tmp_path):
+    """La comparación da igual pero la base de prueba quedó: sale con error para que se vea."""
+    archivo = _copia_verificada(tmp_path)
+    tablas = json.loads((tmp_path / "copia.dump.huella.json").read_text())["tablas"]
+
+    class Conexion:
+        async def execute(self, sql):
+            pass
+
+        async def close(self):
+            pass
+
+    async def conectar(self, base=None):
+        return Conexion()
+
+    async def huella(conn):
+        return tablas
+
+    async def correr(*args, env):
+        return 0, ""
+
+    async def borrar(admin, base):
+        return False
+
+    monkeypatch.setenv("COPIA_PRUEBA_URL", f"postgresql://u:c@{HOST}/x")
+    monkeypatch.setattr(copia_base.Direccion, "conectar", conectar)
+    monkeypatch.setattr(copia_base, "_correr", correr)
+    monkeypatch.setattr(copia_base, "huella", huella)
+    monkeypatch.setattr(copia_base, "_instante", lambda conn: contextlib.nullcontext())
+    monkeypatch.setattr(copia_base, "_borrar_restauracion", borrar)
+    assert asyncio.run(copia_base.verificar(str(archivo))) == 1
+    assert not (tmp_path / "copia.dump.sha256").exists()
