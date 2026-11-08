@@ -50,7 +50,7 @@ NUM="FAILED $T::test_manual_con_numero_no_valido_da_400_y_no_guarda"
 OBJ="FAILED $T::test_manual_con_algo_que_no_es_objeto_da_400"
 GUA="FAILED $T::test_manual_guarda_lo_de_afuera_en_la_forma_que_entra_en_su_columna"
 CLI="FAILED $T::test_texto_del_cliente_que_no_se_puede_guardar_queda_con_reemplazo"
-SAV="FAILED $T::test_guardar_al_cliente_con_numero_no_valido_da_400_y_no_guarda"
+SAV="FAILED $T::test_guardar_al_cliente_con_cuerpo_no_valido_da_400_y_no_guarda"
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
 correr() { "$PY" -m pytest -q --no-cov -p no:cacheprovider -W ignore -rf "$T" 2>&1; }
@@ -84,27 +84,58 @@ sabotaje $M "el grupo fuera de rango se guarda" "$GUA[grupo_id_fuera_de_rango]" 
 
 # --- Clientes
 sabotaje $M "el alta no limpia los textos" "$CLI[alta-nul]" \
-  "    client = _guardable_en_pg(client)" "    pass"
+  "    client = _textos_de_arriba_guardables(client)" "    pass"
 sabotaje $M "la edición no limpia los textos" "$CLI[edicion-nul]" \
-  "    client_data = _guardable_en_pg(client_data)" "    pass"
+  "    client_data = _textos_de_arriba_guardables(client_data)" "    pass"
+sabotaje $M "el cliente se limpia entero y no campo por campo" \
+  "FAILED $T::test_cliente_con_un_campo_muy_anidado_se_guarda[alta" \
+  "    return {clave: _guardable_en_pg(v) if isinstance(v, str) else v for clave, v in cuerpo.items()}" \
+  "    return _guardable_en_pg(cuerpo)"
 sabotaje $M "el email repetido en la edición no da 409" \
   "FAILED $T::test_editar_cliente_con_el_email_de_otro_da_409_y_no_cambia_nada" \
   'raise HTTPException(status_code=409, detail=f"Ya tenés un cliente con el email {email}") from e' 'raise'
 
 # --- Guardar al cliente
-sabotaje $M "un no finito fuera de los números leídos pasa" "$SAV[nan_en_resumen_que_va_crudo_al_json]" \
-  "    if _tiene_no_finito(data):" "    if False:"
+sabotaje $M "un NaN fuera de los números leídos pasa" "$SAV[nan_anidado_en_una_lista]" \
+  "parse_constant=_no_finito, " ""
+sabotaje $M "un infinito fuera de los números leídos pasa" "$SAV[infinito_en_resumen]" \
+  "    return numero if math.isfinite(numero) else _no_finito(texto)" "    return numero"
+sabotaje $M "un JSON roto da 500" "$SAV[json_cortado]" \
+  "    except (ValueError, RecursionError):
+        raise HTTPException(status_code=400, detail=\"Body JSON inválido\")" \
+  "    except RecursionError:
+        raise HTTPException(status_code=400, detail=\"Body JSON inválido\")"
+sabotaje $M "lo muy hondo se revisa fuera del try" "$SAV[lista_mas_honda_que_la_pila]" \
+  "        if tiene_medio_par(data):
+            raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
+        return data
+    except (ValueError, RecursionError):
+        raise HTTPException(status_code=400, detail=\"Body JSON inválido\")" \
+  "        pass
+    except (ValueError, RecursionError):
+        raise HTTPException(status_code=400, detail=\"Body JSON inválido\")
+    if tiene_medio_par(data):
+        raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
+    return data"
 sabotaje $M "un entero de más pasa" "$SAV[resumen_items_enorme]" \
   "    if not -2**31 <= numero < 2**31:" "    if False:"
 sabotaje $M "resumen.items de texto no se revisa" "$SAV[resumen_items_de_texto]" \
-  'total_items=_entero_de_afuera(resumen.get("items", len(items)), "La cantidad de ítems"),' \
-  'total_items=int(resumen.get("items", len(items))),'
+  '_entero_de_afuera(
+                len(items) if resumen.get("items") is None else resumen["items"], "La cantidad de ítems"),' \
+  'int(
+                len(items) if resumen.get("items") is None else resumen["items"]),'
+sabotaje $M "resumen.items en null no cuenta los ítems" \
+  "FAILED $T::test_guardar_al_cliente_con_resumen_items_null_cuenta_los_items" \
+  'len(items) if resumen.get("items") is None else resumen["items"]' 'resumen.get("items", len(items)) or 0'
 sabotaje $M "la cantidad de un ítem no se revisa" "$SAV[cantidad_de_texto_en_items]" \
   'cantidad=_numero_de_afuera(item.get("cantidad"), "La cantidad"),' 'cantidad=float(item.get("cantidad") or 0),'
 
 # --- Ruta, agrupar y clave
 sabotaje $M "el NUL en la ruta llega a la ruta" "FAILED $T::test_nul_en_la_ruta_da_404_antes_de_llegar_a_la_ruta[GET-" \
   "app.add_middleware(_RutaSinNul)" ""
+sabotaje $M "agrupar pasa el último número de grupo" \
+  "FAILED $T::test_agrupar_sin_numeros_de_grupo_libres_da_409_y_no_cambia_nada" \
+  "    if nuevo_grupo_id >= 2**31:" "    if False:"
 sabotaje $M "agrupar no tiene tope" "FAILED $T::test_agrupar_con_mas_ids_de_los_que_acepta_da_422" \
   "Field(default=[], max_length=10000)" "Field(default=[])"
 sabotaje $M "el alta de estudio no pide número o símbolo" \

@@ -120,6 +120,21 @@ def test_texto_del_cliente_que_no_se_puede_guardar_queda_con_reemplazo(via, text
     assert (guardado.name, guardado.notes) == ("x�y", "x�y")
 
 
+@pytest.mark.parametrize("via", ["alta", "edicion"])
+def test_cliente_con_un_campo_muy_anidado_se_guarda(via):
+    _, sesion = _sesion()
+    anidado = "{}"
+    for _ in range(1000):
+        anidado = '{"a": %s}' % anidado
+    cuerpo = ('{"nombre": "N", "notas": %s}' % anidado).encode()
+    if via == "alta":
+        r = _post("/api/clientes", cuerpo, sesion)
+    else:
+        r = _post(f"/api/clientes/{_cliente(sesion)}", cuerpo, sesion, metodo="PUT")
+    assert r.status_code == 200, r.text
+    assert _cliente_guardado(r.json()["cliente"]["id"]).notes.startswith("{'a': {'a':")
+
+
 def test_editar_cliente_con_el_email_de_otro_da_409_y_no_cambia_nada():
     _, sesion = _sesion()
     _cliente(sesion, email="otro@example.com")
@@ -137,15 +152,33 @@ GUARDAR_MALOS = {
     "cantidad_de_texto_en_items": b'{"items": [{"descripcion": "D", "cantidad": "abc"}]}',
     "resumen_items_de_texto": b'{"items": [], "resumen": {"items": "abc"}}',
     "resumen_items_enorme": b'{"items": [], "resumen": {"items": 99999999999}}',
+    "nan_anidado_en_una_lista": b'{"items": [], "resumen": {"a": [[1, NaN]]}}',
+    "entero_de_5000_cifras": b'{"items": [], "resumen": {"a": 1%s}}' % (b"0" * 5000),
+    "infinito_en_resumen": b'{"items": [], "resumen": {"a": 1e999}}',
+    "json_cortado": b'{"items": [',
+    "vacio": b"",
+    "bytes_que_no_son_utf8": b'\xff\xfe',
+    "lista_mas_honda_que_la_pila": b'{"items": [], "resumen": {"a": %s%s}}' % (b"[" * 700, b"]" * 700),
 }
 
 
 @pytest.mark.parametrize("cuerpo", GUARDAR_MALOS.values(), ids=list(GUARDAR_MALOS))
-def test_guardar_al_cliente_con_numero_no_valido_da_400_y_no_guarda(cuerpo):
+def test_guardar_al_cliente_con_cuerpo_no_valido_da_400_y_no_guarda(cuerpo):
     u, sesion = _sesion()
     r = _post(f"/api/clientes/{_cliente(sesion)}/operaciones", cuerpo, sesion)
     assert r.status_code == 400, r.text
     assert _operaciones(u) == 0
+
+
+def test_guardar_al_cliente_con_resumen_items_null_cuenta_los_items():
+    u, sesion = _sesion()
+    cuerpo = b'{"items": [{"descripcion": "A"}, {"descripcion": "B"}], "resumen": {"items": null}}'
+    r = _post(f"/api/clientes/{_cliente(sesion)}/operaciones", cuerpo, sesion)
+    assert r.status_code == 200, r.text
+
+    async def _f(s):
+        return (await s.execute(select(Operation.total_items).where(Operation.owner_username == u))).scalar()
+    assert _consulta(_f) == 2
 
 
 @pytest.mark.parametrize("metodo,ruta", [
@@ -162,6 +195,19 @@ def test_agrupar_con_mas_ids_de_los_que_acepta_da_422():
     _, sesion = _sesion()
     r = _post("/api/operacion/no-existe/agrupar", {"item_ids": [str(i) for i in range(10001)]}, sesion)
     assert r.status_code == 422, r.text
+
+
+def test_agrupar_sin_numeros_de_grupo_libres_da_409_y_no_cambia_nada():
+    _, sesion = _sesion()
+    r = _manual(sesion, _cliente(sesion), ", ".join([
+        '{"descripcion": "Tope", "cantidad": 1, "grupo_id": 2147483647}',
+        '{"descripcion": "A", "cantidad": 1}', '{"descripcion": "B", "cantidad": 1}']))
+    assert r.status_code == 200, r.text
+    op_id = r.json()["operation_id"]
+    ids = [it.id for it in _items(op_id) if it.grupo_id is None]
+    r = _post(f"/api/operacion/{op_id}/agrupar", {"item_ids": ids}, sesion)
+    assert (r.status_code, r.json()["detail"]) == (409, "No quedan números de grupo libres.")
+    assert sorted(str(it.grupo_id) for it in _items(op_id)) == ["2147483647", "None", "None"]
 
 
 def test_alta_de_estudio_pide_la_misma_clave_que_el_registro():
