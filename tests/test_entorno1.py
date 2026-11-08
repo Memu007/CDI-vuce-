@@ -59,6 +59,12 @@ def _sondear(valor, carpeta: Path) -> dict:
                           cwd=str(carpeta), env=env, timeout=120)
     datos["arranca_sin_base"] = base.returncode == 0
     datos["rechaza_sin_base"] = "ENVIRONMENT no es de desarrollo" in base.stderr
+    env["DATABASE_URL"] = f"sqlite+aiosqlite:///{carpeta}/sonda.db"
+    del env["ALLOWED_ORIGINS"]
+    origenes = subprocess.run([sys.executable, "-c", IMPORTAR_SIN_ENV], capture_output=True, text=True,
+                              cwd=str(carpeta), env=env, timeout=120)
+    datos["arranca_sin_origenes"] = origenes.returncode == 0
+    datos["rechaza_sin_origenes"] = "CORS config error" in origenes.stderr
     return datos
 
 
@@ -93,6 +99,10 @@ PUERTAS = {
     "docs_y_openapi": lambda d: _estado(d["docs"] == [200, 200, 200], d["docs"] == [404, 404, 404]),
     "sqlite_sin_database_url": lambda d: _estado(d["arranca_sin_base"], d["rechaza_sin_base"]),
     "vuce_simulado": lambda d: _estado(d["vuce"] == "responde", d["vuce"] == "SourceUnavailableError"),
+    "frontend_en_localhost": lambda d: _estado(d["frontend"] == "http://127.0.0.1:8010", d["frontend"] == "rechaza"),
+    "origenes_de_localhost": lambda d: _estado(d["arranca_sin_origenes"], d["rechaza_sin_origenes"]),
+    "sin_hsts": lambda d: _estado(not d["hsts"], d["hsts"]),
+    "sin_limite_desde_127": lambda d: _estado(d["limite_127"] == 200, d["limite_127"] == 429),
 }
 
 

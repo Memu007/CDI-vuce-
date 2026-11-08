@@ -3,6 +3,7 @@ y escribe en la última línea, como JSON, qué puertas de desarrollo abre."""
 
 import asyncio
 import json
+import os
 import sys
 
 import dotenv
@@ -13,6 +14,7 @@ dotenv.load_dotenv = lambda *a, **k: False
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from starlette.requests import Request
+from starlette.responses import Response
 
 import proyecto_maria.main as m
 from proyecto_maria.database.connection import get_async_session
@@ -43,12 +45,35 @@ def _vuce_simulado():
         return type(e).__name__
 
 
+def _frontend_por_defecto():
+    guardada = os.environ.pop("FRONTEND_URL")
+    try:
+        return m.get_frontend_url()
+    except RuntimeError:
+        return "rechaza"
+    finally:
+        os.environ["FRONTEND_URL"] = guardada
+
+
+async def _limite_desde_127():
+    from proyecto_maria.security.security_middleware import RateLimitByEndpointMiddleware
+    async def siguiente(_):
+        return Response("ok")
+    limite = RateLimitByEndpointMiddleware(app=None)
+    pedido = lambda: Request({"type": "http", "method": "POST", "path": "/upload_pdf", "headers": [],
+                              "query_string": b"", "client": ("127.0.0.1", 1)})
+    # El tope de las rutas pesadas es 10 por minuto: el pedido 11 pasa sólo con el pase.
+    codigos = [(await limite.dispatch(pedido(), siguiente)).status_code for _ in range(11)]
+    return codigos[-1]
+
+
 def main():
     with TestClient(m.app) as c:
         demo = asyncio.run(_consultar(lambda s: _escalar(s, select(User.username).where(
             User.username.in_(["demo", "premium", "basico"])))))
         guardada = asyncio.run(_crear_usuario())
         entrada = c.post("/auth/login", json={"username": "sonda", "password": "Clave-sonda-1"})
+        hsts = "strict-transport-security" in entrada.headers
         sesion = entrada.json()
         cookies = {h.split("=", 1)[0]: "; secure" in h.lower() for h in entrada.headers.get_list("set-cookie")}
         bearer = {"Authorization": f"Bearer {sesion['access_token']}"}
@@ -68,7 +93,9 @@ def main():
                                    "token": token[0] if token else None, "firma": firma,
                                    "cobro": cobro,
                                    "cookies": cookies, "csrf": csrf, "docs": docs,
-                                   "vuce": _vuce_simulado()}))
+                                   "vuce": _vuce_simulado(), "hsts": hsts,
+                                   "frontend": _frontend_por_defecto(),
+                                   "limite_127": asyncio.run(_limite_desde_127())}))
 
 
 async def _escalar(s, q):
