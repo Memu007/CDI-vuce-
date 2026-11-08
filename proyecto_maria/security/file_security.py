@@ -313,10 +313,10 @@ def _contar_hojas_xlsx(contents: bytes) -> tuple[int, bool]:
         # segundos al leer: eso no va a los hilos livianos.
         caro = (fila > tope_de_entorno("EXCEL_LIVIANO_FILAS", 20_000)
                 or ancho > tope_de_entorno("EXCEL_LIVIANO_COLUMNAS", 64)
-                or ARC_STYLE in nombres
-                and _mas_elementos_que(z, ARC_STYLE, tope_de_entorno("EXCEL_LIVIANO_ESTILOS", 5_000))
-                or bool(textos) and textos in nombres
-                and _mas_elementos_que(z, textos, tope_de_entorno("EXCEL_LIVIANO_TEXTOS", 40_000)))
+                or (ARC_STYLE in nombres
+                    and _mas_elementos_que(z, ARC_STYLE, tope_de_entorno("EXCEL_LIVIANO_ESTILOS", 5_000)))
+                or (bool(textos) and textos in nombres
+                    and _mas_elementos_que(z, textos, tope_de_entorno("EXCEL_LIVIANO_TEXTOS", 40_000))))
         return len(hojas), caro
 
 
@@ -340,9 +340,9 @@ def _medida_hoja(xml: bytes) -> tuple[int, float, int]:
             etiqueta = elemento.tag.rsplit("}", 1)[-1]
             try:
                 if etiqueta == "row":
+                    columna_actual = 0
                     r = elemento.get("r")
                     fila_actual = fila_actual + 1 if r is None else int(float(r))
-                    columna_actual = 0
                     fila = max(fila, fila_actual)
                 elif etiqueta == "c":
                     if elemento.get("r"):
@@ -463,7 +463,7 @@ def _cabeza_de(contents: bytes, info) -> bytes:
 
 
 def _excel_liviano(contents: bytes, file_ext: str) -> bool:
-    """¿Va al carril liviano? Se mide una sola vez, desde los bytes subidos:
+    """¿Va al carril liviano por su tamaño? Se mide desde los bytes subidos:
     un .xls, por su tamaño; un .xlsx, por lo que declara descomprimido su
     índice, sin las imágenes reconocidas por su firma. El libro no puede
     declarar menos de lo que entrega: zipfile no lee más bytes que los del
@@ -523,7 +523,6 @@ def _abrir_excel(contents: bytes, file_ext: str) -> tuple[int, bool]:
 
 def _pdf_validate_timeout_s() -> float:
     """Mal escrito, en 0 o negativo, vale 30 s (RENDIMIENTO-1b)."""
-    import math
     try:
         valor = float(os.getenv("PDF_VALIDATE_TIMEOUT_S", "") or 30)
     except (TypeError, ValueError):
@@ -561,8 +560,8 @@ async def validar_con_carril(
 
     Returns:
         (contents, liviano): los bytes, y si un Excel va al carril liviano
-        (_excel_liviano); para otros tipos, False. Quien lee el Excel después
-        usa ese mismo valor: no se vuelve a medir (EXCEL-2b).
+        (_excel_liviano y la forma del libro); para otros tipos, False. Quien
+        lee el Excel después usa ese mismo valor: no se vuelve a medir.
 
     Raises:
         HTTPException: If file is invalid
