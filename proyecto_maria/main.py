@@ -76,7 +76,7 @@ from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
 from proyecto_maria.services.fecha_inic_activ import fecha_del_alta
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, seguro_en_el_precio, importe_escrito, usa_el_sufijo_de_la_operacion, fecha_inicio_actividad, es_exportacion, EXPORTACION_EN_IMPORTACION
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, seguro_en_el_precio, importe_escrito, usa_el_sufijo_de_la_operacion, fecha_inicio_actividad, destinacion_del_txt
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     DocumentoNoAdmitido,
@@ -4837,7 +4837,7 @@ SIN_PRODUCTOS = "No hay productos para generar: volvé a cargar la factura."
 
 SEGURO_PARA_COMPLETAR = ("Seguro: no pudimos leerlo de la factura. Completalo en la revisión; "
                          "si la factura no trae seguro, escribí 0.")
-SEGURO_BORRADO = ("Seguro: el que calculó el sistema se borró al pasar a un incoterm que ya lo lleva en el precio. "
+SEGURO_BORRADO = ("Seguro: el que calculó el sistema se borró al cambiar el incoterm. "
                   "Cargá el de la factura en la revisión; si la factura no trae seguro, escribí 0.")
 
 
@@ -4874,9 +4874,11 @@ def _importes_como_numeros(request: MariaRequest) -> None:
     request.gastos_anteriores_fob = importe_valido(request.gastos_anteriores_fob, "Gastos (gastos anteriores a FOB)")
 
 
-def _rechazar_exportacion_en_importacion(request: MariaRequest) -> None:
-    if es_exportacion(request.tipo_destinacion):
-        raise HTTPException(status_code=400, detail=EXPORTACION_EN_IMPORTACION)
+def _destinacion_o_400(tipo_destinacion, exportacion: bool = False) -> str:
+    try:
+        return destinacion_del_txt(tipo_destinacion, exportacion)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 def _textos_como_van_al_txt(request: MariaRequest) -> None:
@@ -4903,7 +4905,7 @@ async def avisos_maria_endpoint(
 ):
     """Los avisos de `/generate_maria`, antes de generar (MARIA-3): la
     pantalla los muestra junto al botón. No genera ni guarda nada."""
-    _rechazar_exportacion_en_importacion(request)
+    _destinacion_o_400(request.tipo_destinacion)
     estudio = await _estudio_elegido(db, request.estudio_id, user["username"])
     _textos_como_van_al_txt(request)
     items = _items_con_procedencia(request)
@@ -4990,7 +4992,7 @@ async def generate_maria_endpoint(
     Recibe los items con: ncm/pieza, cantidad, valor_unitario, peso_kg, origen
     Devuelve: archivo TXT descargable
     """
-    _rechazar_exportacion_en_importacion(request)
+    _destinacion_o_400(request.tipo_destinacion)
     estudio = await _estudio_elegido(db, request.estudio_id, user["username"])
     if not request.items:
         raise HTTPException(status_code=400, detail=SIN_PRODUCTOS)
@@ -5260,6 +5262,7 @@ async def generate_maria_export_endpoint(
     
     Similar a /generate_maria pero para destinaciones de exportación.
     """
+    request.tipo_destinacion = _destinacion_o_400(request.tipo_destinacion, exportacion=True)
     try:
         from proyecto_maria.core.maria_generator_export import (
             generate_maria_export_txt,

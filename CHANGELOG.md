@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: la destinación que llega al TXT es un código de 4 letras o números, y la exportación sólo genera con una EC (AVISOS-2)
+
+- Generar, los avisos y la exportación dan 400 con una destinación que no es de 4 letras o números ASCII (de más o de menos, con un invisible, de ancho completo, de otro alfabeto), en vez de cortarla o escribirla así en el ISTA; la exportación también da 400 con una de importación o vacía.
+- Con el seguro borrado y de vuelta a FOB, el motivo dice que se borró al cambiar el incoterm, sin decir que va en el precio. El lector de facturas rechaza la exportación con un invisible adelante en cualquiera de los tres lugares.
+
 ## 2026-11-08 · fix: el seguro que se borró al pasar a CIF dice eso, y el motivo se ve junto al campo (AVISOS-1)
 
 - Pasar de FOB a un incoterm con el seguro en el precio borra el 1 % calculado; generar, los avisos, el semáforo y la nota (también de vuelta a FOB) ahora dicen que se borró, en vez de «no pudimos leerlo de la factura»; vaciar el campo no quita esa marca.

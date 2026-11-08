@@ -1070,13 +1070,26 @@ def _item_de_los_renglones(renglones: list, renglones_de: dict, lugar: dict) -> 
 
 
 EXPORTACION_EN_IMPORTACION = "Una destinación de exportación (EC*) no puede generar un TXT de importación."
+IMPORTACION_EN_EXPORTACION = "Un TXT de exportación lleva una destinación EC*, como EC01."
 
 
 def es_exportacion(tipo_destinacion) -> bool:
     # Lo que no es letra o número ASCII adelante (un espacio, un control, un
-    # invisible, un relleno) no la vuelve de importación.
-    texto = unicodedata.normalize("NFKC", str(tipo_destinacion or "")).upper()
+    # invisible, un relleno) no la vuelve de importación. Un código tiene 4
+    # caracteres: normalizar un texto enorme entero traba el proceso.
+    texto = unicodedata.normalize("NFKC", str(tipo_destinacion or "")[:64]).upper()
     return re.match(r"[^A-Z0-9]*EC", texto) is not None
+
+
+def destinacion_del_txt(tipo_destinacion, exportacion: bool = False) -> str:
+    """La destinación como va al ISTA: cuatro letras o números ASCII, o ValueError."""
+    if es_exportacion(tipo_destinacion) != exportacion:
+        raise ValueError(IMPORTACION_EN_EXPORTACION if exportacion else EXPORTACION_EN_IMPORTACION)
+    codigo = str(tipo_destinacion or "").strip() or ("" if exportacion else "IC04")
+    if not re.fullmatch(r"[A-Za-z0-9]{4}", codigo):
+        ejemplo = "EC01" if exportacion else "IC04"
+        raise ValueError(f"Destinación: va un código de 4 letras o números, como {ejemplo}.")
+    return codigo.upper()
 
 
 def generate_maria_txt(operation_id: str, items: list, 
@@ -1166,9 +1179,7 @@ def generate_maria_txt(operation_id: str, items: list,
     # === [DDT] Cabecera ===
     # Normalizamos config de aduana/destinacion con defaults seguros (Ezeiza IC04)
     aduana_codigo = (str(aduana_codigo or "").strip() or "001")[:3]
-    if es_exportacion(tipo_destinacion):
-        raise ValueError(EXPORTACION_EN_IMPORTACION)
-    tipo_destinacion = (str(tipo_destinacion or "").strip().upper() or "IC04")[:4]
+    tipo_destinacion = destinacion_del_txt(tipo_destinacion)
 
     lines.append("[DDT]")
     lines.append(f"ISTA={tipo_destinacion}")

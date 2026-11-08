@@ -2024,6 +2024,7 @@ sin completar una operación de importación. Las secciones siguientes aplican
 
 def validar_documento_importacion(result: dict) -> dict:
     """Sólo una clasificación positiva admite productos de una nueva lectura."""
+    from proyecto_maria.core.maria_generator import es_exportacion
     documento = result.get("documento") if isinstance(result, dict) else None
     if not isinstance(documento, dict):
         raise DocumentoNoAdmitido(MENSAJE_DOCUMENTO_NO_ADMITIDO)
@@ -2031,9 +2032,8 @@ def validar_documento_importacion(result: dict) -> dict:
              for campo in ("tipo", "operacion", "destinacion")}
     operacion = result.get("operacion") if isinstance(result.get("operacion"), dict) else {}
     if (clase["tipo"] != "factura_comercial" or clase["operacion"] != "importacion"
-            or clase["destinacion"].startswith("ec")
-            or any(str(datos.get("tipo_destinacion") or "").strip().upper().startswith("EC")
-                   for datos in (result, operacion))
+            or any(es_exportacion(destinacion) for destinacion in (
+                documento.get("destinacion"), result.get("tipo_destinacion"), operacion.get("tipo_destinacion")))
             or any(datos.get("tipo_documento") is not None
                    and str(datos["tipo_documento"]).strip().lower() != "factura_comercial"
                    for datos in (result, operacion))):
