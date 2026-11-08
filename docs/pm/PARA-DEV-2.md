@@ -69,6 +69,24 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## SUFIJOS-2+SEGURO-1: aceptada sobre `ad2d0f8`, sin integrar (2026-11-08 PM)
+
+Evidencia: `docs/pm/REPRODUCCION-SUFIJOS-2-SEGURO-1-2026-11-08.md`. Igual al
+informe: chequeo-6 (`+86/−62`, el AVISO de 24 netas explicado), 224 passed,
+`sufijos2.sh` y `seguro1.sh` con «sabotajes sin rojo: 0». Mío: el grupo
+MARIA da 1549 passed, y mis negativos (`−5`, `１０`, `1⁄2`, `1.500,50`, `1·5`,
+`1٫5`, `X1.500`) frenan.
+
+- **D123 → (a)**, decidido por la PM, como pieza chica **AVISOS-1** después
+  de SEGURO-2: el rechazo de exportación va después de limpiar los textos,
+  en los dos endpoints, con su caso de la familia (cualquier invisible o
+  espacio adelante del código).
+- Supuesto (los avisos miran los textos limpios): de acuerdo, queda.
+- Riesgos anotados, no se tocan: `31/02/2026` pasa como fecha; `٥` frena con
+  el mensaje de «vacío».
+
+Seguí con **SEGURO-2**. Próxima D libre: D124.
+
 ## ENTRADAS-4: aceptada sobre `6baddb5`, sin integrar (2026-11-08 PM)
 
 Evidencia: `docs/pm/REPRODUCCION-ENTRADAS-4-2026-11-08.md`. Igual al
@@ -474,43 +492,6 @@ métrica sin mirar qué graba, y eso no se puede publicar así.
 
 Postgres 16 y SQLite. Línea en `CHANGELOG.md`. Commits aparte y su propio
 `/entregar`.
-
-## SUFIJOS-2: devolución, sobre `bd76f9f` (2026-10-28 18:05 UTC)
-
-Evidencia en `REPRODUCCION-SUFIJOS-2-2026-10-28.md`. Va en la cola después
-de ABUSO-1 y antes de EMAIL-1.
-
-**Causa.** La detección de «cambiaría de valor» mira el texto crudo con una
-lista de signos ASCII; la limpieza que va al TXT (`caracteres_del_maria`)
-hace NFKD y pasa a espacio todo lo que no es letra ni número. Lo que la
-limpieza cambia y la lista no nombra sale cambiado sin frenar: `ZA(−5)` →
-`ZA( 5)`, `AJ(½)` → `AJ(1 2)`, `AJ(1E-3)` y `AJ(1E+3)` → `AJ(1E 3)` los
-dos, `AJ(１.５００)` → `AJ(1 500)`, `ZA(10%)` → `ZA(10 )`.
-
-Se pide:
-
-1. **Un solo criterio, sobre lo que sale.** Que la decisión compare el
-   valor que escribió el usuario con el que va al TXT (después de NFKD y de
-   la limpieza), no una lista de signos sobre el texto crudo. Lo que cambia
-   un número, frena con el aviso de hoy.
-2. **Fechas, decidido por la PM:** la pieza no pidió frenar fechas y antes
-   pasaban. Una fecha `dd/mm/aaaa`, `dd.mm.aaaa` o `dd-mm-aaaa` sale
-   `dd mm aaaa` sin frenar, igual con los tres separadores. Hoy
-   `AR(31/12/2026)` y `AR(31.12.2026)` dan error y `AR(31-12-2026)` pasa.
-   Sumá la pregunta a `PREGUNTAS-DESPACHANTE.md` (cómo se escribe una fecha
-   en un sufijo); no se espera la respuesta.
-3. **Z, sólo dígitos:** en un sufijo que pide número, cualquier carácter
-   que no sea un dígito ASCII (incluidos `%`, espacio entre dígitos, letras
-   de ancho completo) frena. Hoy `ZA(10%)` y `ZA(1 500)` pasan.
-4. **Caso de la familia, en rojo antes del arreglo:** menos Unicode, raya,
-   `- 5`, ancho completo, `½`, `1⁄2`, `1 / 2`, `1E-3` contra `1E+3`, `10⁻³`,
-   `1'500`, `%`, y uno que no esté en esta lista.
-5. **Los siete mutantes que sobreviven** (en la reproducción), cada uno con
-   la prueba que lo mata.
-6. A riesgos, sin cambiar: `AJ(1,500)` pasa sin aviso (el sistema no lo
-   cambia); `AK`, `AI` y `AW` pasan `15.3` a `15,3`.
-
-Toca el TXT: el golden no se toca.
 
 ## D41 y el orden de lo que queda (2026-10-28 17:20 UTC)
 
