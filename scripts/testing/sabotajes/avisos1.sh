@@ -69,18 +69,18 @@ P='re.match(r"[\W_]*EC", request.tipo_destinacion or "", re.IGNORECASE)'
 
 sabotaje $M "sólo se saca lo que saca strip" \
   "$P" '(request.tipo_destinacion or "").strip().upper().startswith("EC")' \
-  "FAILED $T[​EC01-True-/generate_maria]" \
-  "FAILED $T[\x00EC01-True-/generate_maria/avisos]"
+  "FAILED $T"'[\u200bEC01-True-/generate_maria]' \
+  "FAILED $T"'[\x00EC01-True-/generate_maria/avisos]'
 sabotaje $M "distingue mayúsculas" \
   "$P" 're.match(r"[\W_]*EC", request.tipo_destinacion or "")' \
-  "FAILED $T[ ec01 -True-/generate_maria]"
+  "FAILED $T"'[ ec01 -True-/generate_maria]'
 sabotaje $M "exige algo delante" \
   "$P" 're.match(r"[\W_]+EC", request.tipo_destinacion or "", re.IGNORECASE)' \
-  "FAILED $T[EC02-True-/generate_maria]"
+  "FAILED $T"'[EC02-True-/generate_maria]'
 sabotaje $M "rechaza cualquier destinación" \
   "$P" 're.match(r"[\W_]*[A-Z]", request.tipo_destinacion or "", re.IGNORECASE)' \
-  "FAILED $T[IC04-False-/generate_maria]" \
-  "FAILED $T[​IC04-False-/generate_maria/avisos]"
+  "FAILED $T"'[IC04-False-/generate_maria]' \
+  "FAILED $T"'[\u200bIC04-False-/generate_maria/avisos]'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
