@@ -4724,6 +4724,7 @@ class MariaRequest(BaseModel):
     seguro_calculado: bool = False
     seguro_dejado: bool = False
     seguro_para_completar: bool = False
+    seguro_borrado: bool = False
     # Transport data
     bl_numero: str = ""
     puerto_origen: str = ""
@@ -4836,13 +4837,15 @@ SIN_PRODUCTOS = "No hay productos para generar: volvé a cargar la factura."
 
 SEGURO_PARA_COMPLETAR = ("Seguro: no pudimos leerlo de la factura. Completalo en la revisión; "
                          "si la factura no trae seguro, escribí 0.")
+SEGURO_BORRADO = ("Seguro: el que calculó el sistema se borró al pasar a un incoterm que ya lo lleva en el precio. "
+                  "Cargá el de la factura en la revisión; si la factura no trae seguro, escribí 0.")
 
 
 def _seguro_por_corregir(request: MariaRequest, valor: dict) -> str | None:
     """Lo que frena la generación por el seguro. El 1 % no entra sin que la persona
     lo elija, y con el seguro en el precio no hay 1 % que elegir: va el de la factura."""
     if request.seguro_para_completar:
-        return SEGURO_PARA_COMPLETAR
+        return SEGURO_BORRADO if request.seguro_borrado else SEGURO_PARA_COMPLETAR
     if not (request.seguro_calculado or request.seguro_dejado):
         return None
     if seguro_en_el_precio(request.incoterm):

@@ -389,6 +389,7 @@
         op.seguro = ultimoValor.seguro_sugerido;
         op.seguro_calculado = true;
         delete op.seguro_dejado;
+        delete op.seguro_borrado;
         // Ya está completo: deja de avisarse que no se leyó (MARIA-1c).
         if (Array.isArray(op.campos_sin_leer) && op.campos_sin_leer.includes('seguro')) {
             const completados = new Set(op.campos_completados || []);
@@ -415,6 +416,7 @@
         let ahora = null;
         try { ahora = firmaDelPedido(buildMariaRequest()); } catch (err) { ahora = null; }
         if (!firma || firma !== ahora) return false;
+        op.seguro_borrado = true;
         op.seguro = '';
         delete op.seguro_calculado;
         delete op.seguro_dejado;
@@ -514,7 +516,8 @@
         if (nota) {
             nota.textContent = !ok ? '' :
                 enElPrecio ? 'Con ' + incoterm + ' el seguro ya está en el precio: el sistema no lo calcula.' +
-                    (seguroSinLeer(op) ? ' No pudimos leerlo de la factura: completalo en la revisión; si no trae seguro, escribí 0.' :
+                    (seguroSinLeer(op) && op.seguro_borrado ? ' El que calculó el sistema se borró: cargá el de la factura en la revisión; si la factura no trae seguro, escribí 0.' :
+                        seguroSinLeer(op) ? ' No pudimos leerlo de la factura: completalo en la revisión; si no trae seguro, escribí 0.' :
                         valor.seguro > 0 ? '' : ' Si la factura lo trae, cargalo en la revisión.') :
                 (calculado && valor.seguro !== valor.seguro_sugerido) ? 'El seguro se calculó con otros importes.' :
                 calculado ? 'Seguro calculado: 1 % de (' + base + ' + flete).' :
@@ -736,8 +739,10 @@
                     CDI.goTo('validating');
                     throw new Error(detail);
                 }
-                if (typeof detail === 'string' && detail.startsWith('Seguro: no pudimos leerlo')) {
+                // Lo que falta del seguro se completa en la revisión, junto al campo.
+                if (typeof detail === 'string' && /^Seguro: (no pudimos leerlo|el que calculó el sistema se borró)/.test(detail)) {
                     CDI.goTo('review');
+                    if (CDI.marcarEnLaRevision) CDI.marcarEnLaRevision('seguro', detail);
                     throw new Error(detail);
                 }
                 // Los controles de antes de generar llegan como {errors: [...]};
@@ -869,6 +874,7 @@
             seguro: montoDelPedido(op.seguro),
             seguro_calculado: !!op.seguro_calculado,
             seguro_dejado: !!op.seguro_dejado,
+            seguro_borrado: !!op.seguro_borrado,
             seguro_para_completar: seguroSinLeer(op),
             // MARIA-3: el servidor decide si van al TXT (sólo EXW, FCA o FAS).
             gastos_anteriores_fob: montoDelPedido(op.gastos_anteriores_fob),
