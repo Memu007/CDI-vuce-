@@ -543,3 +543,7 @@ Corte de las 24 h que dio Emi el 07/11 a las 15:50 UTC. Apagadas las rutinas de 
 ### 2026-11-08 17:05 UTC (PM principal, con Emi)
 
 Emi: «Trabaja 12 horas mas». Vuelven las tres rutinas; corte el 2026-11-09 a las 05:00 UTC (trig_01QwEeyuXBFBx6LErxqapwRh, mismo procedimiento). La técnica no tenía piezas en la lista; Emi eligió NOMBRES-1 (D127 b): nombres únicos sin mayúsculas para todas las cuentas, sin tocar las que ya existen, así que no hace falta mirar producción.
+
+### 2026-11-08 17:40 UTC (PM principal)
+
+EMAIL-1 (D45) aceptada sin producto. D132 (a), decidida por la PM bajo «arreglos chicos de seguridad»: RESET-3, tope por cuenta al pedir el reset, después de AVISOS-2. D131 (a) va a Emi: mirar la collation de la base de producción, una consulta de sólo lectura.
