@@ -2,133 +2,168 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ENTORNO-3 (D107 a): **entregada** en `fd545c1` (2026-11-08)
+## ENTRADAS-3 (D109 a, D110 a): **entregada** en `cf5309a` (2026-11-08)
 
-Base `a9c4f06`. Sin ENVIRONMENT o con un valor que no es `development`, `test` ni
-`testing`, las cuatro puertas que faltaban van como en producción: sin
-`FRONTEND_URL` el link de los emails no cae a localhost (la llamada falla), sin
-`ALLOWED_ORIGINS` la app no arranca, toda respuesta lleva HSTS y el limitador por
-ruta no deja pasar a 127.0.0.1. Las cuatro usan `es_desarrollo()` / `_es_desarrollo()`
-de ENTORNO-1, sin regla nueva.
+Base `0f09bd8` (producto igual a `fd545c1`). Ninguno de estos da 500 ni se guarda:
+
+- un cuerpo más hondo que la pila en aprender productos, guardar despacho y
+  editar producto (400 «Body JSON inválido»);
+- un NUL en la consulta (400 «La consulta tiene un carácter nulo.»);
+- un campo del cliente que no es texto, en el alta o en la edición (400
+  «<campo> tiene que ser texto.»).
+
+Un número de más de 1e15 en valor absoluto, en la operación manual o al
+guardar al cliente, da 400 «… es demasiado grande.». Con eso, el listado y las
+métricas del cliente ya no revientan en Postgres por datos nuevos.
+
+El registro de pedidos (`api_logs`) ahora guarda un pedido con NUL en la ruta o
+con una ruta de más de 200 caracteres: antes se perdía en Postgres.
+
+`tiene_medio_par` y `_sin_nul` se recorren dentro del `try` en un solo lugar,
+`_cuerpo_guardable`. El aviso de medio par se levanta afuera del `try`.
 
 | SHA | qué |
 |---|---|
-| `c7ec382` | fix: las cuatro puertas + CHANGELOG |
-| `63c072d` | fix: los avisos dicen la regla que aplican, no «en produccion» |
-| `8c35989` | test: cuatro puertas más en la sonda de entorno |
-| `6ddd38a` | test: sabotajes de las cuatro puertas (`entorno3.sh`) |
-| `2b7f09a` | test: la sonda del límite con reloj quieto; FRONTEND_URL opcional en la sonda |
-| `47e8ca7` | merge de tu `ba3289f` |
-| `dbdad51` | test: el sabotaje de FRONTEND_URL anclado en código, no en un comentario |
-| `fd545c1` | test: `_entorno_comun.sh` define ALLOWED_ORIGINS (arreglo de una regresión mía, abajo) |
+| `02ad156` | fix: cuerpo hondo, NUL en la consulta, campo no texto, número enorme, `api_logs` + CHANGELOG |
+| `c7fa1f8` | test: casos, sabotajes (`entradas3.sh`, ajuste de `entradas2.sh`) y chequeo en Postgres |
+| `0fc85a0` | fix: un nombre null en el cliente da 400 (hallazgo del adversario, abajo) |
+| `cf5309a` | test: nombre null, campo desconocido muy anidado, sabotaje del «None» reescrito |
 
-`producto +11/−10`.
+`producto +48/−21`. Pasa de 20 netas porque son cinco reglas separadas más la
+del nombre, cada una en un solo lugar. Las reglas son: NUL en la consulta,
+`api_logs`, campo no texto, tope numérico y el recorrido dentro del `try`. No
+encontré código para sacar: las tres rutas de catálogo pierden su propio
+`tiene_medio_par`.
 
 ## Decisiones
 
-- **D111 — `RateLimitByEndpointMiddleware` no está montado en la app.**
-  (`security_middleware.py:165`; `main.py` no lo agrega.) El cambio de ENTORNO-3
-  en ese limitador es correcto pero hoy no protege nada.
-  (a) dejarlo así y anotarlo en la cola de limpieza; (b) montarlo, pieza aparte
-  con sus pruebas (cambia respuestas 429 en rutas de clientes y cálculo);
-  (c) borrarlo. **Recomiendo (a)**: montarlo cambia comportamiento visible y el
-  login ya tiene sus límites propios (ABUSO-1/2); que la PM decida si vale (b).
-- **D112 — sin FRONTEND_URL fuera de desarrollo, tres rutas guardan el token antes de fallar.**
-  `request-password-reset` (`main.py` ~1828/1832), la invitación (~10814/10816)
-  y verify-email (296, en tarea de fondo) hacen commit del token y después
-  llaman a `get_frontend_url()`, que ahora levanta. Queda un token sin email y
-  un 500 (o un error en la tarea). No abre nada: es una mala configuración que
-  ya daba un link a localhost.
-  (a) dejarlo: es una variable obligatoria de despliegue; (b) pieza chica: pedir la URL antes del commit en las tres rutas;
-  (c) que la app no arranque sin FRONTEND_URL fuera de desarrollo, como
-  ALLOWED_ORIGINS. **Recomiendo (c)**: un solo chequeo, en el arranque, y no hay
-  que tocar las tres rutas; pero cambia el arranque, así que es tuya.
-- **D113 — `billing_service.py:32-36` tiene su propio `get_frontend_url`.**
-  Cae a `http://127.0.0.1:8000` sin mirar el entorno. No lo toqué: no está en
-  D107. (a) cola de limpieza; (b) pieza chica: que use el de `main.py` (o uno
-  común en `config.py`). **Recomiendo (b)** dentro de la pieza de D112 si sale
-  (c), porque es el mismo chequeo.
+- **D115: filas ya guardadas con un número enorme.** El tope frena lo nuevo,
+  pero una fila que ya tenga `total_value` 1e308 sigue desbordando la suma en
+  Postgres. El listado y las métricas de ese cliente dan 500. No sé si hay
+  alguna en producción: no la miro.
+  - (a) Dejarlo. Si aparece un 500 de ese cliente, se limpia esa fila a mano.
+  - (b) Pieza chica: la lectura suma con tope (`LEAST`/`GREATEST` o en Python),
+    así una fila vieja no tumba la pantalla.
+  - (c) Migración que corrija las filas fuera de rango.
+
+  **Recomiendo (a).** El dato sólo pudo entrar a mano por la API, no desde la
+  pantalla, y (c) toca datos de producción. Si querés red de seguridad, (b),
+  que no toca datos.
+- **D117: un NUL en un campo de formulario multipart da 500 en Postgres.**
+  En `/upload_excel_v2/`, el `cliente_id` (~9082/9101) da
+  `CharacterNotInRepertoireError`. Lo encontró el adversario y lo reproduje.
+  La sonda está en mi scratchpad. Es otra vía de entrada, fuera de D109/D110.
+  - (a) Pieza chica: el mismo `_guardable_en_pg` en los campos `Form` que van a la base.
+  - (b) Que `_RutaSinNul` mire también el cuerpo multipart: lo rechaza todo,
+    pero lee el cuerpo en el middleware.
+  - (c) Cola de limpieza.
+
+  **Recomiendo (a)**: es el patrón que ya usamos y no lee cuerpos en un middleware.
 
 ## Lo que hay que saber
 
-- **Rompí el arnés de ENTORNO-1 y lo arreglé en `fd545c1`.** En `2b7f09a`,
-  `entorno1.sh` dio `ROJO?` en «ninguna puerta abre ni en desarrollo»: con
-  ENVIRONMENT ausente la app ahora exige ALLOWED_ORIGINS y el arnés no la
-  definía (`ValueError: CORS config error: ALLOWED_ORIGINS no puede ser vacio
-  ni '*' si ENVIRONMENT no es development, test ni testing...`). `fd545c1` la
-  define en `_entorno_comun.sh`; en `fd545c1` los tres arneses dan salida 0.
-- **Orden de commits:** el rojo de las cuatro puertas lo corrí sobre la base
-  antes de tocar el producto, pero el commit de producto (`c7ec382`) quedó antes
-  que el de las pruebas (`8c35989`). La evidencia del rojo es el sabotaje:
-  cada uno vuelve a la regla vieja y la prueba falla por esa puerta.
-- Quedan monkeypatch de `IS_PRODUCTION` en pruebas viejas (`test_cobro_mp1:38`,
-  `test_cobro_mp2:106`, `test_email1:158,216`, `test_prelaunch_block2:242,375,590,635`,
-  `test_prelaunch_block3:200–260`) y `main.py:105` sigue definiendo
-  `IS_PRODUCTION`. No los toqué: van a la cola de limpieza (lo dice D107).
+- El tope es **1e15**, el mismo de `validate_numeric`
+  (`security/input_validation.py:206`). Es distinto de `_MAX_VALOR = 1e12`
+  (`client_memory.py:39`), que es el tope del promedio del historial. No los
+  unifiqué: son reglas distintas y unificar no está en la pieza.
+- El tope va sobre cada número. En la operación manual también va sobre el
+  total, que se calcula. Al guardar al cliente, el total es el
+  `resumen.valor_total` que manda el cliente. Así, ítems de valor 1e15 por
+  cantidad 1e15 se guardan con total 0. Eso no desborda nada: la suma que
+  revienta es la de `total_value`. Lo dejo como estaba; lo encontró el
+  adversario.
+- Cambios visibles fuera de lo pedido, todos consecuencia de las reglas:
+  - un `cuit` numérico (sin comillas) ahora da 400;
+  - `/health?x=%00` da 400;
+  - en aprender productos, si un cuerpo trae a la vez un medio par y un NUL,
+    el mensaje puede cambiar de orden;
+  - `divisa` ahora pasa por la limpieza de NUL.
+- Un null en un texto del cliente (salvo el nombre) queda vacío, no «None».
+  Un nombre null da 400. Un nombre `""` en la edición se acepta, igual que
+  antes: no lo cambié.
 
 ## Riesgos
 
-- `ALLOWED_ORIGINS='*'` y valores con sólo espacios fuera de desarrollo: el
-  código los rechaza, pero no hay caso nuevo para esos dos (la prueba cubre
-  vacío).
-- HSTS va en toda respuesta fuera de desarrollo, también en un staging por
-  HTTP: el navegador lo ignora sin TLS, no rompe.
-- D112: con FRONTEND_URL faltante, reset e invitación dan 500 después de
-  guardar el token.
+- `client_ip` es `String(45)`. Detrás de un proxy, si llega una lista de IPs,
+  el registro de ese pedido puede perderse, como antes con la ruta. No lo vi
+  pasar y no lo toqué.
+- La guarda es por ruta, no en el parseo general: una ruta nueva que lea JSON
+  a mano tiene que pasar por `_cuerpo_guardable` o `_json_guardable`.
+- `_TEXTOS_DEL_CLIENTE` repite los nombres que el alta y la edición leen más
+  abajo. Va a la cola de limpieza si querés.
+- `DataStore.add_operation` (`core/datastore.py`) parece código muerto. No lo toqué.
 
 ## Hallazgos de la autorrevisión
 
 | quién | modelo y esfuerzo | hallazgo | qué hice |
 |---|---|---|---|
-| adversario | Sonnet alto | sin hallazgos dentro de la pieza | — |
-| `/code-review` | high | sin hallazgos confirmados dentro de la pieza | — |
-| yo, relectura contra §6 | — | el sabotaje de FRONTEND_URL se anclaba en un comentario | `dbdad51` |
-| `/security-review` | — | sin hallazgos | — |
-| yo | — | sonda del límite podía partir los 11 pedidos en dos minutos | `2b7f09a` (reloj quieto) |
-| yo | — | `entorno1.sh` en `ROJO?` por ALLOWED_ORIGINS | `fd545c1` |
-| yo | — | D111, D112, D113 | arriba |
+| adversario | Sonnet alto | NUL en un campo multipart da 500 en Postgres | D117 |
+| adversario | Sonnet alto | nombre null en la edición dejaba al cliente sin nombre | `0fc85a0` + caso en `cf5309a` |
+| adversario | Sonnet alto | al guardar al cliente, ítems enormes con `resumen.valor_total` 0 se guardan (sin desborde) | informativo, arriba |
+| `/code-review` | high | sin hallazgos confirmados dentro de la pieza; riesgos ya listados | — |
+| `/security-review` | — | sin hallazgos ≥8 | — |
+| yo | — | el sabotaje del «None» no producía el defecto | reescrito en `cf5309a` |
+| yo | — | se había perdido el caso del campo desconocido muy anidado | vuelto en `cf5309a` |
 
 ## Puertas
 
-| puerta | SHA | salida |
-|---|---|---|
-| suite (`pytest -q --no-cov --timeout=300`, entorno del proyecto) | `2b7f09a` | `5201 passed, 335 skipped, 3 xfailed, 97 warnings in 976.75s (0:16:16)`, salida 0 |
-| suite como la CI (`env -u DATABASE_URL ENVIRONMENT=testing ...`) | `2b7f09a` | `5201 passed, 335 skipped, 3 xfailed, 97 warnings in 983.93s (0:16:23)`, salida 0 |
-| `compileall -q proyecto_maria` | `2b7f09a` | 0 |
-| `entorno1.sh` | `fd545c1` | 10 ROJO, salida 0 |
-| `entorno2.sh` | `fd545c1` | 8 ROJO, salida 0 |
-| `entorno3.sh` | `fd545c1` | 4 ROJO, «sabotajes sin rojo: 0», salida 0 |
+Todas sobre `cf5309a`, desde worktree limpio, una a la vez; logs en el scratchpad.
 
-`dbdad51` y `fd545c1` sólo cambian scripts de sabotaje: el producto y las
-pruebas de pytest son los de `2b7f09a`, así que las suites valen para `fd545c1`.
-No corrí smoke ni ataque de aislamiento: no hay cambio de datos ni de rutas.
+| puerta | salida exacta |
+|---|---|
+| suite (env de `/entregar`, SQLite) | `5212 passed, 335 skipped, 3 xfailed, 97 warnings in 1038.00s`; salida 0 |
+| suite como la CI (`env -u DATABASE_URL ENVIRONMENT=testing …`) | `5212 passed, 335 skipped, 3 xfailed, 96 warnings in 1005.40s`; salida 0 |
+| `compileall -q proyecto_maria` | salida 0 |
+| `entradas3_postgres.py` en `cf5309a` | 16 `OK`, `fallas: 0`, salida 0; última: `OK | NUL en la consulta: 400 {"detail":"La consulta tiene un carácter nulo."}` |
+| `entradas3_postgres.py` en `fd545c1` (producto de antes, arnés nuevo) | `fallas: 11`, salida 1 (abajo) |
+| `entradas3.sh cf5309a` | BASE en verde, 11 `ROJO`, `sabotajes con falla: 0` |
+| `entradas2.sh cf5309a` | BASE en verde, 24 `ROJO`, `sabotajes con falla: 0` |
+
+Rojos de Postgres sin el arreglo, copiados del log:
+
+```
+FALLA | NUL en la ruta: 404; en api_logs: 0
+FALLA | ruta de 300 caracteres: 404; en api_logs: 0
+FALLA | 1e308: manual 200, guardar al cliente 200
+FALLA | 1e308: manual 200, guardar al cliente 200
+FALLA | después de 1e308: listado 500, métricas 500
+FALLA | -1e308: manual 200, guardar al cliente 200
+FALLA | -1e308: manual 200, guardar al cliente 200
+FALLA | después de -1e308: listado 500, métricas 500
+FALLA | 1e16: manual 200, guardar al cliente 200
+FALLA | 1e16: manual 200, guardar al cliente 200
+FALLA | NUL en la consulta: 500 {"detail":"No pudimos procesar tu solicitud. Probá de nuevo en unos segundos. Si
+```
+
+No corrí `smoke_friccion.sh` ni `ataque_aislamiento.sh`: la pieza no toca sesión ni permisos, y lo que cambia (400 en entradas) lo cubren la suite, el arnés de Postgres y los sabotajes. Queda para la PM si lo quiere antes de publicar.
 
 chequeo-6, entero:
 
 ```
-chequeo-6 a9c4f06..fd545c1: avisos para mirar, no un veredicto
-producto +11/−10
-arnés +72/−3
+chequeo-6 0f09bd8..cf5309a: avisos para mirar, no un veredicto
+producto +48/−21
+  AVISO producto suma 27 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +389/−25
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/main.py: 12047 → 12048
-  proyecto_maria/security/security_middleware.py: 238 → 238
-avisos: 0
+  proyecto_maria/main.py: 12048 → 12075
+avisos: 1
 ```
 
 ## Comandos
 
 ```bash
-git fetch origin claude/dev-maria && git checkout fd545c1
-PY=<venv>/bin/python scripts/testing/sabotajes/entorno3.sh fd545c1   # 4 ROJO, «sabotajes sin rojo: 0»
-PY=<venv>/bin/python scripts/testing/sabotajes/entorno1.sh fd545c1   # 10 ROJO, ningún ROJO?, salida 0
-PY=<venv>/bin/python -m pytest -q --no-cov tests/test_entorno1.py   # verde
+git fetch origin claude/dev-maria && git checkout cf5309a
+PY=<venv>/bin/python scripts/testing/sabotajes/entradas3.sh cf5309a   # BASE en verde, 11 ROJO, «sabotajes con falla: 0»
+PY=<venv>/bin/python scripts/testing/sabotajes/entradas2.sh cf5309a   # BASE en verde, 24 ROJO, «sabotajes con falla: 0»
+<venv>/bin/python scripts/testing/entradas3_postgres.py postgresql://cdi@127.0.0.1:55432/postgres   # «fallas: 0»
+PY=<venv>/bin/python -m pytest -q --no-cov tests/test_entradas3.py tests/test_entradas2.py   # verde
 ```
 
 ## Archivos de producto tocados
 
-`proyecto_maria/main.py`, `proyecto_maria/security/security_middleware.py`.
+`proyecto_maria/main.py`, `CHANGELOG.md`.
 
-Sigo con ENTRADAS-3 (D109 a, D110 a).
+Sigo con ENTORNO-4 (D112 c + D113 b).
 
-/compact conservar: Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi), rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM session_01B7FVQspcEHF7PqNv797wNM con send_message next. ENTORNO-3 (D107 a) entregada en fd545c1 (base a9c4f06), D111–D113 abiertas, próxima D libre D114. Sigue ENTRADAS-3 (D109 a, D110 a; trabajo sin commitear en el worktree wt_ent3 del scratchpad), después SUFIJOS-2+SEGURO-1 y D102 (fijar bcrypt). Corte de rutinas 2026-11-08 15:50 UTC. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; TXT y proforma reales nunca en el repo.
+/compact conservar: Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi), rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM session_01B7FVQspcEHF7PqNv797wNM con send_message next. ENTRADAS-3 (D109 a, D110 a) entregada en cf5309a (base 0f09bd8); D115 y D117 abiertas (mías; D116 es de la técnica: PERMISOS-1), D114 también de la técnica, próxima D libre D118. ENTORNO-3 aceptada; D111 a, D112 c + D113 b decididas. Sigue ENTORNO-4, después SUFIJOS-2+SEGURO-1, el resto y D102 (fijar bcrypt). Corte de rutinas 2026-11-08 15:50 UTC. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; TXT y proforma reales nunca en el repo.
