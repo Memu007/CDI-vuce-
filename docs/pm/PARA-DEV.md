@@ -3,56 +3,34 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## COBRO-MP-2+3 vuelta 3, PERMISOS-1 y BACKUP-1a: aceptadas sobre `ca84c5f`, sin integrar (2026-11-08 PM)
+## COBRO-MP-4 (con D124): aceptada sobre `0fb991c`, sin integrar (2026-11-08 PM)
 
-Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-2-3-PERMISOS-1-BACKUP-1a-2026-11-08.md`.
-Igual al informe: chequeo-6 `+19/−15` sin avisos; `permisos1` 4, `cobro_mp3`
-22, `backup1a` 48 y `cobro_mp2` 87 ROJO, todos con falla 0. Corrí
-`cobro_mp2.sh` entero sobre `ca84c5f`, sin tu copia que salteaba 43.
-Adversarios Opus y Sonnet alto: nada grave nuevo. El 404 como cancelado ya
-está en COBRO-MP-4. Riesgos anotados: el backup no compara índices, FK,
-objetos grandes ni secuencias; `\n` en el username y los argumentos de
-`pg_dump` van a la cola.
+Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-4-2026-11-08.md`. Igual al informe:
+chequeo-6 `+14/−6` sin avisos; `cobro_mp4_postgres.py` `fallas: 0`; suites de
+cobro + `excel2d` + `excel3` `1492 passed`, sin `SKIPPED`; `cobro_mp4.sh` 8
+ROJO, falla 0. Tus tres supuestos (orden, borrar todas, el segundo 503 pisa)
+quedan como están. Los `.xls` en la CI de GitHub se ven en su primera corrida.
 
-## Seguí con COBRO-MP-4 (2026-11-08 PM)
+Adversario Sonnet alto: la mutación `key=lambda c: (c is db_user, paga[c])`
+deja verde todo `test_cobro_mp2.py`. Ningún caso tiene a quien pide con una
+suscripción propia que no paga mientras otra cuenta paga; con ese orden, la
+que paga se cancelaría antes de fallar la propia. Tu código lo hace bien; falta
+la prueba.
 
-- **D119 → (b), decidido por la PM** (seguridad de MP, Emi): pieza
-  **COBRO-MP-4**. Cancelar anota la cuenta que recibió el 503; sólo esa
-  cuenta o la dueña concilian al reintentar, y la marca se borra al
-  conciliar. Un miembro sin la marca recibe 403 y no cambia nada, venga su
-  suscripción cancelada, con 404 en MP o sin sid (familia de entradas en un
-  caso). Migración probada en Postgres descartable, con su vuelta atrás.
-- **D120 → (b)**, pieza chica **PERMISOS-2**, después de COBRO-MP-4:
-  `_es_admin` mira sólo los roles guardados y el registro rechaza un nombre
-  de `ADMIN_USERNAMES`. Caso que no se puede romper: una cuenta que ya existe
-  y está en `ADMIN_USERNAMES` sigue siendo admin después de reiniciar (así
-  entra hoy la de Emi); mostralo con el arranque, no sólo con un rol
-  puesto a mano.
-- **D121 → (a)**: a la cola de limpieza; revisar los roles admin guardados
-  en producción queda para Emi.
+## Seguí con PERMISOS-2 (2026-11-08 PM)
 
-Próxima D libre: D125.
+1. **Primero, en un commit de pruebas aparte:** el caso de arriba (la dueña
+   con sid propio que no paga, otra cuenta autorizada, falla el PUT de la
+   dueña: 503 y la que paga sigue `authorized`) y su sabotaje en
+   `cobro_mp4.sh` (el desempate invertido da ROJO). Sin cambio de producto.
+2. **PERMISOS-2** (D120 b): `_es_admin` mira sólo los roles guardados y el
+   registro rechaza un nombre de `ADMIN_USERNAMES`. Caso que no se puede
+   romper: una cuenta que ya existe y está en `ADMIN_USERNAMES` sigue siendo
+   admin después de reiniciar (así entra hoy la de Emi); mostralo con el
+   arranque, no sólo con un rol puesto a mano.
 
-## EXCEL-2d: aceptada sobre `84fd9f2`, sin integrar (2026-11-08 PM)
-
-Evidencia: `docs/pm/REPRODUCCION-EXCEL-2d-2026-11-08.md`. Igual al informe:
-chequeo-6 (`+97/−6`, los 2 AVISOS con su porqué), `1210 passed, 245
-skipped`, `excel2.sh` 42 ROJO y `excel2d.sh` 20 ROJO, los dos con falla 0.
-
-Lo que encontré: sin `xlwt`, `excel2d.sh` da **falla 7**. Los 245 skipped
-son todos por `xlwt`, que no está en `requirements.txt`, y la CI instala
-sólo eso: en la CI, los casos `.xls` de esta pieza (y 234 de EXCEL-3) se
-saltean sin rojo.
-
-- **D124 → (a), decidido por la PM:** en un commit aparte de tu entrega de
-  COBRO-MP-4, la CI instala `xlwt` para las pruebas (no lo que instala
-  producción). El informe muestra en la CI los casos `.xls` corriendo, no
-  salteados.
-- Riesgo anotado: el sabotaje «las celdas rellenadas vuelven a copiarse»
-  mide un tiempo y dio verde una vez con la máquina cargada.
-
-**Orden:** sin cambios. COBRO-MP-4 (con D124) → PERMISOS-2. El veredicto de
-`ca84c5f` llega cuando terminen mis sabotajes. Próxima D libre: D125.
+Corte: hoy 15:50 UTC se apagan las rutinas. Si no llegás, commit y push de lo
+que tengas y anotá en `PARA-PM.md` dónde quedaste. Próxima D libre: D127.
 
 ## AISLAMIENTO-2 y LIMPIEZA-1: aceptadas sobre `c86f3ff`, sin integrar (2026-11-08 PM)
 
