@@ -213,13 +213,13 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-08 23:35 UTC: **Emi: uso al 87 %, se puede llegar al 95 % y frenar.** La PM no ve el medidor: frena cuando Emi avise 95 % o a las 05:00, lo que llegue primero, con el procedimiento de corte. Mientras, sin adversarios Opus nuevos. OBSERVABILIDAD-1 con devolución (`3d7f296`); D142 a Emi.
 2026-11-08 21:58 UTC: sin entregas nuevas. Técnica: suite del merge 5906 passed y 1 rojo (el de D140, webhook sin secreto en desarrollo), sabotajes 23/96. MARIA en OBSERVABILIDAD-1 (`7fe33c5`). Contexto 120k y 140k de 200k.
 2026-11-08 21:55 UTC: **SMOKE-1 aceptada** (`00df4de`, sin integrar), sabotajes rojos. MARIA → OBSERVABILIDAD-1 (D139); técnica en INTEGRAR-1 (D140).
 2026-11-08 21:40 UTC: **RESET-3 aceptada** (`8fda3d2`, sin integrar): 8 ROJO falla 0 con PG, Opus sin camino. D138 (a). MARIA entregó SMOKE-1 (`00df4de`), reviso. Técnica en INTEGRAR-1.
 2026-11-08 20:58 UTC: **AVISOS-2b aceptada** (`aa115f4`, sin integrar): 16 ROJO falla 0, mi negativo rojo. D137 (a) → SMOKE-1 tras RESET-3. MARIA en RESET-3; técnica en INTEGRAR-1.
 2026-11-08 19:58 UTC: sin entregas. Técnica en INTEGRAR-1 (suite corrida, mirando sabotajes; `org1` lo rompe el merge). MARIA cerrando RESET-3 (`4458020`); le dije que la entregue y después AVISOS-2b. Contexto 138k y 141k, ventana 200k.
 2026-11-08 19:35 UTC: **AVISOS-2 aceptada** (`4db641b`, sin integrar): falla 0, Sonnet sin camino. MARIA → AVISOS-2b (D133 a, D135 a). Las ramas chocan en 5 archivos: técnica → INTEGRAR-1 antes de CONEXIONES-1 (D136).
-2026-11-08 18:40 UTC: **NOMBRES-1 aceptada** (`1960a9a`, producto `ccded98`, técnica): PG real 15 passed, sabotaje `ilike` mío en rojo; acta corregida (vuelta 1 corrió en SQLite). Técnica → CONEXIONES-1 (pasa de MARIA, decidido por la PM). MARIA sigue AVISOS-2.
 2026-11-08 17:56 UTC: vuelta sin entregas nuevas. MARIA subió AVISOS-2 (`217c7cd7` fix, `e51d54ff` test) y corre sus sabotajes; técnica espera adversario y suite sobre `5cda09d`. Ninguna frenada.
 2026-11-08 18:00 UTC: NOMBRES-1: producto bien, devolución chica de prueba (el caso de la promoción no distingue `lower()`+`.first()`); carrera de altas simultáneas, límite conocido.
 2026-11-08 17:40 UTC: EMAIL-1 (D45) de MARIA aceptada sobre `40423be`; D131 a Emi, D132 → RESET-3. MARIA → AVISOS-2.
