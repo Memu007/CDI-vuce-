@@ -1076,8 +1076,9 @@ IMPORTACION_EN_EXPORTACION = "Un TXT de exportación lleva una destinación EC*,
 def es_exportacion(tipo_destinacion) -> bool:
     # Lo que no es letra o número ASCII adelante (un espacio, un control, un
     # invisible, un relleno) no la vuelve de importación. Un código tiene 4
-    # caracteres: normalizar un texto enorme entero traba el proceso.
-    texto = unicodedata.normalize("NFKC", str(tipo_destinacion or "")[:64]).upper()
+    # caracteres: normalizar un texto enorme entero traba el proceso, y los
+    # blancos se sacan antes de cortar porque el código se lee sin ellos.
+    texto = unicodedata.normalize("NFKC", str(tipo_destinacion or "").strip()[:64]).upper()
     return re.match(r"[^A-Z0-9]*EC", texto) is not None
 
 
