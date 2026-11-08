@@ -14,6 +14,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - Se compara lo escrito con lo que sale al TXT: un menos o una raya, una fracción, un exponente, dígitos de ancho completo o de otra escritura, un `%` o un apóstrofo de miles que el MARIA cambiaría frenan con el aviso de siempre. Las fechas `31/12/2026`, `31.12.2026` y `31-12-2026` salen `31 12 2026` sin frenar.
 - Un sufijo que pide número (Z) acepta sólo dígitos: `ZA(10%)`, `ZA(1 500)` o dígitos de ancho completo frenan.
+- Un punto de miles pegado a letras (`2.500KG`, `AB-1.500`) y una fecha con el día o el mes fuera de rango (`12.50.2026`) también frenan.
 
 ## 2026-11-08 · fix: un NUL en el cliente elegido al subir un Excel no da 500 (ENTRADAS-4)
 

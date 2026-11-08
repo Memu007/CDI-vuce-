@@ -341,12 +341,14 @@ SUFIJO_MAXIMO = 120  # el mismo tope que valida /generate_maria
 PIDE_NUMERO = ("Z",)
 # Una palabra con números cuyo separador el MARIA no acepta (sale espacio) se
 # lee igual sólo si es una fecha, números con guion o un código con letras
-# en el que, después de un dígito, sólo hay guion, punto o «°».
+# en el que, después de un dígito, sólo hay guion, punto o «°», y ningún
+# punto parece de miles.
 _PALABRA = re.compile(r"[A-Za-z0-9]+(?:[^A-Za-z0-9\s][A-Za-z0-9]+)*")
 _SE_LEE_IGUAL = re.compile(
-    r"[0-9]{1,2}([./-])[0-9]{1,2}\1[0-9]{2,4}"
+    r"(?:0?[1-9]|[12][0-9]|3[01])([./-])(?:0?[1-9]|1[0-2])\1(?:[0-9]{2}|[0-9]{4})"
     r"|[0-9]+(?:-[0-9]+)+"
-    r"|(?=.*[A-Za-z])(?!.*[0-9][Ee][^A-Za-z0-9][0-9])(?!.*[0-9][^A-Za-z0-9.°-]).+")
+    r"|(?=.*[A-Za-z])(?!.*[0-9][Ee][^A-Za-z0-9][0-9])(?!.*[0-9]\.[0-9]{3})"
+    r"(?!.*[0-9][^A-Za-z0-9.°-]).+")
 
 
 def _alrededor(texto: str, i: int) -> str:
@@ -394,9 +396,9 @@ def limpiar_sufijo(sufijo: str, donde: str = "") -> tuple[str, bool]:
     demás, espacio; una letra con tilde, sin tilde) y separados con «-»; el
     «-» final, si vino. Devuelve también si cambió algo, para avisarlo. Lo
     que no se puede partir en códigos (un paréntesis sin cerrar, un «(»
-    dentro del valor), un valor vacío o un número con decimales en un código
-    que pide número no se adivinan: error con `donde` (qué producto y qué
-    sufijo)."""
+    dentro del valor), un valor vacío, un código que pide número sin un
+    número entero o un número que en el TXT cambiaría de valor no se
+    adivinan: error con `donde` (qué producto y qué sufijo)."""
     sufijo = str(sufijo or "")
     partes, pos = [], _ENTRE_SUFIJOS.match(sufijo).end()
     while pos < len(sufijo):
