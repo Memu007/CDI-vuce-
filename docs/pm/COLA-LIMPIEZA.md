@@ -129,3 +129,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   vez, en los dos generadores.
 - `tests/test_abuso1.py`: el caso del tope de reset casi copia el de
   recuperar; un caso con las dos rutas como datos.
+- `tests/test_excel2d.py:199`: el tope de 0,5 s entre pasos del hilo testigo
+  falló en la CI de `d9a6962` (sólo docs) con 0,506 s, y pasó en `2d08e94`
+  con el mismo producto. Medir el freno sin depender de la carga del runner.
