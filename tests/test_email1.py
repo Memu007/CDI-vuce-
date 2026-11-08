@@ -330,3 +330,16 @@ def test_registro_con_invitacion_acepta_otras_mayusculas():
                    json={"username": _nombre(), "password": CLAVE, "email": f"Mili@{d.upper()}", "name": "M",
                          "invite_token": token})
     assert r.status_code == 200, r.text
+
+
+@pytest.mark.parametrize("ruta, pista", ((RECUPERAR, "dev_username_hint"), (RESET, "dev_token_hint")))
+def test_un_email_vacio_no_encuentra_la_cuenta_sin_email(ruta, pista, _limpio):
+    """Una cuenta con el email en blanco no es de quien manda un email vacío."""
+    u = _cuenta("")
+    try:
+        with TestClient(app) as c:
+            respuestas = [c.post(ruta, headers=_ip(), json={"email": e}) for e in ("", "   ")]
+        assert all(r.status_code == 200 and pista not in r.json() for r in respuestas), [r.text for r in respuestas]
+        assert _limpio == [] and _tokens_de(u) == set()
+    finally:
+        asyncio.run(_sql("delete from users where username = :u", u=u))

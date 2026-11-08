@@ -157,5 +157,13 @@ sabotaje $M "la pista de dev vuelve con ENVIRONMENT que falta (RESET-2)" \
   'return not email_sent and not IS_PRODUCTION' \
   "FAILED tests/test_email1.py::test_la_pista_de_dev_solo_en_el_entorno_de_prueba"
 
+sabotaje $M "un email vacío encuentra la cuenta sin email" \
+  '    email = (email or "").strip()
+    if not email:' \
+  '    email = (email or "").strip()
+    if False:' \
+  "FAILED tests/test_email1.py::test_un_email_vacio_no_encuentra_la_cuenta_sin_email[/auth/recover-username-dev_username_hint]" \
+  "FAILED tests/test_email1.py::test_un_email_vacio_no_encuentra_la_cuenta_sin_email[/auth/request-password-reset-dev_token_hint]"
+
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
