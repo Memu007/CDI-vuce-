@@ -17,10 +17,10 @@ ARNES = pathlib.Path(__file__).with_name("front422_pantalla.js")
 PANTALLAS = ("api", "reset", "landing")
 EN_INGLES = ("Field required", "should", "Value error", "Input", "JSON decode", "object Object", "Expecting")
 
-# entrada → (ruta, cuerpo, lo que la persona tiene que leer); las del panel van con sesión
+# entrada → (ruta, cuerpo, lo que la persona tiene que leer); las de /api/ van con sesión
 GRUPO = "/api/operacion/no-existe/"
 ENTRADAS = {
-    "falta_campo": ("/auth/login", b"{}", "Falta"),
+    "falta_campo": ("/auth/login", b"{}", "Falta el usuario. Falta la contraseña."),
     "no_es_json": ("/auth/login", b"nope", "JSON"),
     "tipo_equivocado": ("/auth/login", b'{"username": 1, "password": "x"}', "texto"),
     "no_es_objeto": ("/auth/login", b"[1]", "objeto"),
@@ -31,6 +31,8 @@ ENTRADAS = {
     "no_es_numero": (GRUPO + "desagrupar", {"grupo_id": "x"}, "número"),
     "sin_texto_propio": (GRUPO + "desagrupar", {"grupo_id": 2**40}, "Revisá el campo «grupo_id»."),
     "item_de_lista": (GRUPO + "agrupar", {"item_ids": ["a", 2, 3]}, "ítem 3"),
+    "cambio_de_clave": ("/api/user/change-password", b"{}",
+                        "Falta la contraseña actual. Falta la contraseña nueva."),
 }
 
 
@@ -45,9 +47,12 @@ def _pantalla(modo, status, cuerpo):
 @pytest.mark.parametrize("modo", PANTALLAS)
 def test_el_422_de_pydantic_se_lee_en_castellano(modo, entrada):
     ruta, cuerpo, esperado = ENTRADAS[entrada]
-    r = _post(ruta, cuerpo, _bearer(_login(_usuario()[0])) if ruta.startswith(GRUPO) else None)
+    r = _post(ruta, cuerpo, _bearer(_login(_usuario()[0])) if ruta.startswith("/api/") else None)
     assert r.status_code == 422 and isinstance(r.json()["detail"], list), r.text
-    texto = _pantalla(modo, 422, r.text)["texto"]
+    pantalla = _pantalla(modo, 422, r.text)
+    texto = pantalla["texto"]
+    # CDI.api devuelve la respuesta con el texto cambiado: sigue siendo un error.
+    assert pantalla.get("status", 422) == 422, pantalla
     assert isinstance(texto, str), texto
     assert esperado in texto, texto
     assert not [p for p in EN_INGLES if p in texto], texto

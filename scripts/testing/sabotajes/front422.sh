@@ -60,12 +60,20 @@ echo "BASE  | en verde"
 # --- Cada pantalla pasa el detail por el traductor
 sabotaje proyecto_maria/static/v2/app_v2.js "CDI.api deja la lista como llegó" "$L[api-falta_campo]" \
   "cuerpo.detail = textoDeError(cuerpo.detail, 'Revisá los datos ingresados.');" ""
+sabotaje proyecto_maria/static/v2/app_v2.js "CDI.api devuelve el 422 como un 200" "$L[api-falta_campo]" \
+  "{ status: res.status, statusText: res.statusText," "{"
 sabotaje proyecto_maria/templates/landing.html "el login tapa el motivo con el texto genérico" "$L[landing-falta_campo]" \
   "textoDeError(detail, (data" "(typeof detail === 'string' ? detail : null) || ((data"
 sabotaje proyecto_maria/templates/reset_password.html "el reset muestra la lista cruda" "$L[reset-clave_73_bytes]" \
   "showError(textoDeError(data.detail, " "showError(String(data.detail) || ("
 
 # --- Cada tipo de error de pydantic tiene su texto
+sabotaje $E "sólo se muestra el primer error" "$L[api-falta_campo]" \
+  "textos.join(' ')" "textos[0]"
+sabotaje $E "el campo se dice con su nombre técnico" "$L[landing-falta_campo]" \
+  "(CAMPOS[nombre] ||" "(undefined ||"
+sabotaje $E "las dos claves del cambio de clave se leen como una" "$L[reset-cambio_de_clave]" \
+  "current_password: 'la contraseña actual'" "current_password: 'la contraseña'"
 sabotaje $E "falta un campo se dice con el msg de pydantic" "$L[reset-falta_campo]" \
   "case 'missing': return 'Falta ' + c + '.';" ""
 sabotaje $E "un tipo equivocado se dice en genérico" "$L[api-tipo_equivocado]" \
