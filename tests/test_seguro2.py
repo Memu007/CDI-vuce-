@@ -8,6 +8,9 @@ se corrige.
 
 Datos inventados, con la forma de la factura del 24/10.
 """
+import json
+import subprocess
+
 import pytest
 
 from tests.test_maria7_rechazos_24_10 import LONA, _registrar_con_cuit, _valor
@@ -55,6 +58,17 @@ def test_el_pedido_dice_si_el_seguro_sigue_para_completar(op, manda):
 
 def test_si_el_servidor_pide_completarlo_se_vuelve_a_la_revision():
     assert _generar_en_pantalla(COMPLETAR)["fueA"] == "review"
+
+
+def test_la_revision_tiene_el_predicado_de_finalize():
+    # La revisión lo llama desde CDI: sin la exportación, abrirla tira un error.
+    codigo = ("globalThis.window = globalThis; window.CDI = {registerScreen() {}};\n"
+              "globalThis.document = {addEventListener() {}};\n"
+              "require('./proyecto_maria/static/v2/screens/finalize.js');\n"
+              "console.log(JSON.stringify([{campos_sin_leer: ['seguro']}, {}].map(window.CDI.seguroSinLeer)));")
+    salida = subprocess.run(["node", "-e", codigo], capture_output=True, text=True)
+    assert salida.returncode == 0, salida.stderr[-800:]
+    assert json.loads(salida.stdout) == [True, False]
 
 
 def _seguro_sin_leer():

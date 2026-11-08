@@ -98,6 +98,10 @@ sabotaje $R "escribirlo no lo completa" \
 sabotaje $R "el seguro sin leer se ve en 0" \
   "return name === 'seguro' && CDI.seguroSinLeer(op) ? '' : " 'return ' \
   "FAILED $T::test_un_campo_sin_leer_se_ve_vacio_en_la_revision[sin_leer]"
+sabotaje $F "finalize no exporta el predicado" \
+  '    CDI.seguroSinLeer = seguroSinLeer;
+' '' \
+  "FAILED $T::test_la_revision_tiene_el_predicado_de_finalize"
 sabotaje $R "la revisión no lo usa" \
   'const normalized = valorEnLaRevision(key, op);' 'const normalized = normalizeValueForField(key, op[key]);' \
   "FAILED $T::test_la_revision_muestra_vacio_el_seguro_sin_leer_y_lo_deja_en_0"
