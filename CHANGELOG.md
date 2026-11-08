@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: una cuenta recibe hasta 3 links de cambio de clave por hora, aunque los pedidos lleguen de IPs distintas (RESET-3)
+
+- Desde el cuarto pedido de la hora la respuesta es la misma, pero no se manda el mail ni se crea un link: uno nuevo anularía el que la persona sí pidió.
+
 ## 2026-11-08 · fix: la destinación que llega al TXT es un código de 4 letras o números, y la exportación sólo genera con una EC (AVISOS-2)
 
 - Generar, los avisos y la exportación dan 400 con una destinación que no es de 4 letras o números ASCII (de más o de menos, con un invisible, de ancho completo, de otro alfabeto), en vez de cortarla o escribirla así en el ISTA; la exportación también da 400 con una de importación o vacía.

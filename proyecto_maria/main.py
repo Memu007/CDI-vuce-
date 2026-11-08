@@ -1792,8 +1792,12 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
         log_429(req, "reset bloqueado")
         raise HTTPException(status_code=429, detail=f"Demasiados intentos. Intente en {espera // 60 + 1} minutos.")
     
+    mensaje = {"message": "Si el email existe, se envió un link."}
     # 1. Buscar usuario
     user = await _cuenta_por_email(db, request.email)
+    # Antes de trabar la cuenta: contar hace commit y soltaría la traba.
+    if user and limiter.enabled and await limites_auth.contar(db, f"reset:cuenta:{user.username}", 3600) > 3:
+        return mensaje
     if user:
         # Trabar la cuenta con el email leído: un cambio de clave o email a la vez barre este link o lo impide.
         user = (await db.execute(select(User).where(
@@ -1802,7 +1806,7 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
     if not user:
         # Por seguridad, no decimos si el email existe o no, pero simulamos éxito
         # Opcional: sleep aleatorio para evitar timing attacks
-        return {"message": "Si el email existe, se envió un link."}
+        return mensaje
 
     # 2. Generar token
     token = str(uuid.uuid4())
@@ -1831,8 +1835,7 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
     
     email_sent = send_email(user.email, "Recuperar Contraseña - CDI", email_body)
     
-    response = {"message": "Si el email existe, se envió un link."}
-    
+    response = mensaje
     if _pista_dev_habilitada(email_sent):
         # MODO DEV: Devolver token para facilitar pruebas si no hay SMTP
         print(f"🔑 [DEV] Reset Token para {user.username}: {token}")
