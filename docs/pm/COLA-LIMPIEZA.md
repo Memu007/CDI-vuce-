@@ -100,3 +100,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   comentario con historia (D103).
 - `register` y `create_organization`: `re.match(r'^[a-zA-Z0-9_-]{3,30}$')`
   acepta un `\n` final en el usuario; `fullmatch` lo cierra.
+- Tests viejos (email1, prelaunch_block2/3, cobro_mp1/2 y los scripts
+  `cobro_mp1*_postgres.py`) parchean `main_mod.IS_PRODUCTION`, que ya no
+  controla lo que dicen probar: parchear `ENVIRONMENT` (ENTORNO-2).
