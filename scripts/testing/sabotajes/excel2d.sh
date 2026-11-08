@@ -91,12 +91,8 @@ sabotaje $F "los sqref vuelven a contarse por elemento y no por rango" \
 
 # celdas combinadas
 sabotaje $M "las celdas rellenadas vuelven a copiarse en cada fila" \
-  '    rellenadas = df.attrs.setdefault("celdas_rellenadas", _Compartido())' \
-  '    rellenadas = df.attrs.setdefault("celdas_rellenadas", {})' \
-  "FAILED $T::test_la_subida_cara_no_frena_a_nadie[2499 combinadas en 4998 filas]"
-sabotaje $M "las celdas rellenadas vuelven a copiarse después de renombrar las columnas" \
-  '                df.attrs["celdas_rellenadas"] = _Compartido({' \
-  '                df.attrs["celdas_rellenadas"] = dict({' \
+  'df.attrs["celdas_rellenadas"] = _Compartido(' \
+  'df.attrs["celdas_rellenadas"] = dict(' \
   "FAILED $T::test_la_subida_cara_no_frena_a_nadie[2499 combinadas en 4998 filas]"
 
 echo "sabotajes con falla: $FALLAS"
