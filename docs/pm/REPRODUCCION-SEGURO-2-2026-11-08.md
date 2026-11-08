@@ -14,7 +14,7 @@ venv Python 3.12, sin red y con `GEMINI_API_KEY` vacía.
 | suites de seguro, valor y MARIA de la entrega | `242 passed, 4 warnings in 46.30s`, salida 0 |
 | `sabotajes/seguro2.sh d160738` | 19 `ROJO`, `sabotajes sin rojo: 0`, salida 0 |
 | `sabotajes/seguro1.sh d160738` | 12 `ROJO`, `sabotajes sin rojo: 0`, salida 0 |
-| `sabotajes/valor1c.sh d160738` | en curso al subir este commit (4 ROJO de 25 hasta ahí); se completa en el siguiente |
+| `sabotajes/valor1c.sh d160738` | 25 `ROJO`, «OK: los 25 sabotajes dan rojo por la razón esperada», salida 0 |
 
 La suite completa no la repetí: la Dev la corrió dos veces (5294 passed) y
 el diff no toca el servidor fuera de `_seguro_por_corregir` y el pedido.
