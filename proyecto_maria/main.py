@@ -4719,9 +4719,11 @@ class MariaRequest(BaseModel):
     # (SEPARADORES-1b, D19). Ver `importe_valido`.
     flete: float | str = 0
     seguro: float | str = 0
-    # El seguro lo puso el botón «Calcular seguro» (VALOR-1c): si las cuentas
-    # de ahora dan otro, no se genera hasta recalcularlo o dejarlo.
+    # Cómo llegó el seguro a la pantalla: lo calculó el botón, se dejó el
+    # calculado, o la factura lo traía y no se pudo leer. Ver `_seguro_por_corregir`.
     seguro_calculado: bool = False
+    seguro_dejado: bool = False
+    seguro_para_completar: bool = False
     # Transport data
     bl_numero: str = ""
     puerto_origen: str = ""
@@ -4832,16 +4834,24 @@ def _supuestos_maria(request: MariaRequest, items: list, gastos_fob) -> list:
 SIN_PRODUCTOS = "No hay productos para generar: volvé a cargar la factura."
 
 
-def _seguro_calculado_viejo(request: MariaRequest, valor: dict) -> str | None:
-    """Un seguro que calculó el sistema con otros importes (VALOR-1c): la
-    persona elige recalcularlo o dejarlo; el TXT no lo lleva sin que elija.
-    Con un incoterm que ya lleva el seguro en el precio no hay 1 % que
-    comprobar ni que dejar (SEGURO-1): se carga el de la factura."""
-    if not request.seguro_calculado:
+SEGURO_PARA_COMPLETAR = ("Seguro: no pudimos leerlo de la factura. Completalo en la revisión; "
+                         "si la factura no trae seguro, escribí 0.")
+
+
+def _seguro_por_corregir(request: MariaRequest, valor: dict) -> str | None:
+    """Lo que frena la generación hasta que se corrija el seguro. El 1 % no
+    entra al TXT sin que la persona lo elija, y con un incoterm que ya lleva
+    el seguro en el precio no hay 1 % que elegir: va el de la factura."""
+    if request.seguro_para_completar:
+        return SEGURO_PARA_COMPLETAR
+    if not (request.seguro_calculado or request.seguro_dejado):
         return None
     if seguro_en_el_precio(request.incoterm):
         return (f"Seguro: lo calculó el sistema, pero con {str(request.incoterm).strip().upper()} el seguro "
                 "ya está en el precio y no se calcula. Cargá el de la factura en la revisión.")
+    # Dejarlo es elegirlo: no se compara con las cuentas de ahora.
+    if not request.seguro_calculado:
+        return None
     if valor.get("error"):
         return (f"Seguro: lo calculó el sistema y ahora no se puede comprobar: {valor['error']} "
                 "Corregí las cuentas o dejá el seguro como está en «Ajustes y seguro».")
@@ -4915,9 +4925,9 @@ async def avisos_maria_endpoint(
     from proyecto_maria.core.controles_maria import avisos_de_ncm
     avisos_ncm = avisos_de_ncm(items)
     valor, avisos_valor = _cuentas_del_valor(request, items)
-    viejo = _seguro_calculado_viejo(request, valor)
-    if viejo:
-        avisos_valor = [viejo, *avisos_valor]
+    por_corregir = _seguro_por_corregir(request, valor)
+    if por_corregir:
+        avisos_valor = [por_corregir, *avisos_valor]
     if not items:
         avisos_valor = [SIN_PRODUCTOS, *avisos_valor]
     return {
@@ -5081,9 +5091,9 @@ async def generate_maria_endpoint(
         if kit_errors or errores_1b:
             raise HTTPException(status_code=400, detail={"errors": list(dict.fromkeys([*errors, *kit_errors, *errores_1b]))})
         _importes_como_numeros(request)
-        _viejo = _seguro_calculado_viejo(request, _cuentas_del_valor(request, items)[0])
-        if _viejo:
-            raise HTTPException(status_code=400, detail=_viejo)
+        _por_corregir = _seguro_por_corregir(request, _cuentas_del_valor(request, items)[0])
+        if _por_corregir:
+            raise HTTPException(status_code=400, detail=_por_corregir)
 
         # Si el user tiene CUIT en su perfil y la request no manda cuit_agr,
         # usamos el del perfil (para que el despachante no tenga que re-escribir

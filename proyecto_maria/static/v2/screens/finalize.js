@@ -346,9 +346,11 @@
     }
 
     // El seguro que calculó el sistema con otros importes queda como está:
-    // pasa a ser de la persona y el servidor deja de frenarlo (VALOR-1c).
+    // pasa a ser de la persona. El servidor lo frena sólo si el incoterm ya
+    // lleva el seguro en el precio.
     function dejarSeguro() {
         const op = CDI.state.operacion = CDI.state.operacion || {};
+        op.seguro_dejado = true;
         delete op.seguro_calculado;
         cuentasViejas();
         refrescarAvisos();
@@ -386,6 +388,7 @@
         const op = CDI.state.operacion = CDI.state.operacion || {};
         op.seguro = ultimoValor.seguro_sugerido;
         op.seguro_calculado = true;
+        delete op.seguro_dejado;
         // Ya está completo: deja de avisarse que no se leyó (MARIA-1c).
         if (Array.isArray(op.campos_sin_leer) && op.campos_sin_leer.includes('seguro')) {
             const completados = new Set(op.campos_completados || []);
@@ -408,12 +411,13 @@
     // leído o escrito por la persona no se toca.
     function borrarSeguroCalculado(valor, firma) {
         const op = CDI.state && CDI.state.operacion;
-        if (!op || !valor || !valor.seguro_en_el_precio || !op.seguro_calculado) return false;
+        if (!op || !valor || !valor.seguro_en_el_precio || !(op.seguro_calculado || op.seguro_dejado)) return false;
         let ahora = null;
         try { ahora = firmaDelPedido(buildMariaRequest()); } catch (err) { ahora = null; }
         if (!firma || firma !== ahora) return false;
         op.seguro = '';
         delete op.seguro_calculado;
+        delete op.seguro_dejado;
         const sinLeer = Array.isArray(op.campos_sin_leer) ? op.campos_sin_leer : [];
         if (!sinLeer.includes('seguro')) op.campos_sin_leer = sinLeer.concat(['seguro']);
         if (Array.isArray(op.campos_completados)) {
@@ -510,7 +514,7 @@
         if (nota) {
             nota.textContent = !ok ? '' :
                 enElPrecio ? 'Con ' + incoterm + ' el seguro ya está en el precio: el sistema no lo calcula.' +
-                    (seguroSinLeer(op) ? ' No pudimos leerlo de la factura: completalo en la revisión.' :
+                    (seguroSinLeer(op) ? ' No pudimos leerlo de la factura: completalo en la revisión; si no trae seguro, escribí 0.' :
                         valor.seguro > 0 ? '' : ' Si la factura lo trae, cargalo en la revisión.') :
                 (calculado && valor.seguro !== valor.seguro_sugerido) ? 'El seguro se calculó con otros importes.' :
                 calculado ? 'Seguro calculado: 1 % de (' + base + ' + flete).' :
@@ -860,6 +864,8 @@
             flete: montoDelPedido(op.flete),
             seguro: montoDelPedido(op.seguro),
             seguro_calculado: !!op.seguro_calculado,
+            seguro_dejado: !!op.seguro_dejado,
+            seguro_para_completar: seguroSinLeer(op),
             // MARIA-3: el servidor decide si van al TXT (sólo EXW, FCA o FAS).
             gastos_anteriores_fob: montoDelPedido(op.gastos_anteriores_fob),
             // VALOR-1: sólo para las cuentas; no van al TXT (D12).
