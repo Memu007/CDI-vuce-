@@ -23,7 +23,7 @@ sino en PGPASSWORD, y ningún error la muestra.
     COPIA_DESTINO=/mnt/copias python scripts/datos/copia_base.py enviar /copias/cdi.dump
 
 COPIA_PG_BIN es la carpeta de pg_dump y pg_restore (por defecto, los del PATH).
-COPIA_PLAZO_S es cuántos segundos puede durar una orden (por defecto, 3600).
+COPIA_PLAZO_S es cuántos segundos pueden durar copiar o verificar (por defecto, 3600).
 Correrlo contra producción lo decide Emi.
 """
 import argparse
@@ -309,7 +309,9 @@ async def copiar(archivo: str) -> int:
             try:
                 tablas = await huella(conn)
             except BaseException:
-                volcado.cancel()
+                # Cancelar la espera no alcanza: si todavía no arrancó, no mata a pg_dump.
+                if proc.returncode is None:
+                    proc.kill()
                 await asyncio.gather(volcado, return_exceptions=True)
                 raise
             err = await volcado
@@ -354,24 +356,24 @@ async def verificar(archivo: str) -> int:
     try:
         await admin.execute(f'CREATE DATABASE "{base}" TEMPLATE template0 '
                             f"ENCODING '{datos['codificacion']}' LOCALE 'C'")
-        try:
-            codigo, err = await _correr(
-                _bin("pg_restore"), "--exit-on-error", "--single-transaction", "--no-owner",
-                "--no-acl", "--no-password", f"--dbname={prueba.url(base)}", archivo,
-                env=prueba.entorno())
-            if codigo != 0:
-                problemas = [f"pg_restore falló (salida {codigo}):\n    {_resumen(err)}"]
-            else:
-                restaurada = await prueba.conectar(base)
-                try:
-                    async with _instante(restaurada):
-                        problemas = diferencias(datos["tablas"], await huella(restaurada))
-                finally:
-                    await restaurada.close()
-        finally:
-            await admin.execute(f'DROP DATABASE IF EXISTS "{base}" WITH (FORCE)')
+        codigo, err = await _correr(
+            _bin("pg_restore"), "--exit-on-error", "--single-transaction", "--no-owner",
+            "--no-acl", "--no-password", f"--dbname={prueba.url(base)}", archivo,
+            env=prueba.entorno())
+        if codigo != 0:
+            problemas = [f"pg_restore falló (salida {codigo}):\n    {_resumen(err)}"]
+        else:
+            restaurada = await prueba.conectar(base)
+            try:
+                async with _instante(restaurada):
+                    problemas = diferencias(datos["tablas"], await huella(restaurada))
+            finally:
+                await restaurada.close()
     finally:
-        await admin.close()
+        try:
+            await admin.execute(f'DROP DATABASE IF EXISTS "{base}" WITH (FORCE)')
+        finally:
+            await admin.close()
     if problemas:
         print("LA COPIA NO SIRVE:\n  " + "\n  ".join(problemas), file=sys.stderr)
         return 1
@@ -417,11 +419,10 @@ ORDENES = {"copiar": copiar, "verificar": verificar, "enviar": enviar}
 
 
 async def _cortable(orden, archivo: str) -> int:
-    """La orden, cortada por el plazo o por una señal como si fallara: los
-    `finally` borran la base descartable y matan al hijo. Sólo cuenta el primer
-    corte, para que otro no interrumpa esa limpieza."""
+    """La orden, cortada por el plazo o una señal como si fallara, así sus `finally`
+    limpian; sólo cuenta el primer corte, para que otro no interrumpa la limpieza."""
     plazo = os.environ.get("COPIA_PLAZO_S", "3600")
-    if not plazo.isdigit() or int(plazo) == 0:
+    if not re.fullmatch(r"[0-9]+", plazo) or int(plazo) == 0:
         raise Falla("COPIA_PLAZO_S tiene que ser una cantidad entera de segundos mayor que 0")
     tarea, loop, motivo = asyncio.current_task(), asyncio.get_running_loop(), []
 
@@ -431,7 +432,9 @@ async def _cortable(orden, archivo: str) -> int:
             tarea.cancel()
 
     for senal in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
-        loop.add_signal_handler(senal, cortar, "se cortó por una señal antes de terminar")
+        # Quien la ignoró a propósito (nohup) no quiere que corte.
+        if signal.getsignal(senal) is not signal.SIG_IGN:
+            loop.add_signal_handler(senal, cortar, f"se cortó por {senal.name} antes de terminar")
     loop.call_later(int(plazo), cortar, f"no terminó en {plazo} s")
     try:
         return await orden(archivo)
@@ -465,7 +468,9 @@ def main(argv=None) -> int:
     # sólo quien lo corre.
     os.umask(0o077)
     try:
-        return asyncio.run(_cortable(ORDENES[args.orden], os.path.abspath(args.archivo)))
+        orden, archivo = ORDENES[args.orden], os.path.abspath(args.archivo)
+        # enviar sólo copia archivos: no tiene hijos ni bases que limpiar al cortarse.
+        return asyncio.run(orden(archivo) if orden is enviar else _cortable(orden, archivo))
     except Falla as e:
         print(f"error: {tapar(str(e))}", file=sys.stderr)
     except Exception as e:  # noqa: BLE001 - se informa sin traceback: puede tener la dirección

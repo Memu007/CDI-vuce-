@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-08 · fix: la copia de la base no da por buena una base vacía ni deja restos al cortarse (BACKUP-1a)
 
-- **fix(datos):** una copia sin filas sale con error y no queda verificada. Una orden que pasa `COPIA_PLAZO_S` (por defecto, una hora) o recibe una señal borra la base descartable, corta pg_dump o pg_restore y sale con error. La copia, su huella y su marca sólo las lee quien corre el script.
+- **fix(datos):** una copia sin filas sale con error y no queda verificada. Copiar o verificar, si pasan `COPIA_PLAZO_S` (por defecto, una hora) o reciben una señal que no se ignoró a propósito (como con nohup), borran la base descartable, cortan pg_dump o pg_restore y salen con error. La copia, su huella y su marca sólo las lee quien corre el script.
 
 ## 2026-11-07 · fix: cancelar sin respuesta de Mercado Pago no afirma que el plan sigue igual (COBRO-MP-2)
 
