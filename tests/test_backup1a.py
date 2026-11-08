@@ -282,11 +282,11 @@ def test_una_copia_vacia_da_error(tmp_path, tablas, dice):
         if tablas:
             sql(_url_de(nombre), *tablas)
         archivo = tmp_path / "copia.dump"
-        for orden in ("copiar", "verificar"):
-            r = correr(orden, str(archivo), origen=nombre)
-            assert r.returncode == 1 and dice in r.stderr, f"{orden}: {r.stdout + r.stderr}"
-            assert "copia verificada" not in r.stdout
-            assert not marca(archivo).exists()
+        # La segunda corrida, con el mismo nombre, no choca con restos de la primera.
+        for vuelta in (1, 2):
+            r = correr("copiar", str(archivo), origen=nombre)
+            assert r.returncode == 1 and dice in r.stderr, f"vuelta {vuelta}: {r.stdout + r.stderr}"
+            assert list(tmp_path.iterdir()) == [], f"vuelta {vuelta}: quedó algo"
     finally:
         sql(PG_URL, f'DROP DATABASE IF EXISTS "{nombre}" WITH (FORCE)')
 
@@ -357,6 +357,11 @@ def _vivo(pid: int) -> bool:
         return False
 
 
+def _pendiente(pid: int, senal: int) -> bool:
+    campos = dict(linea.split(":\t", 1) for linea in Path(f"/proc/{pid}/status").read_text().splitlines())
+    return any(int(campos[c], 16) >> (senal - 1) & 1 for c in ("SigPnd", "ShdPnd"))
+
+
 def _sin_restos(pid_restore: Path) -> None:
     assert not _vivo(int(pid_restore.read_text())), "pg_restore quedó corriendo"
     assert descartables() == []
@@ -385,6 +390,9 @@ def test_un_corte_no_deja_la_base_ni_el_pg_restore(origen, tmp_path):
             time.sleep(0.1)
         assert pid_restore.exists(), "no llegó a pg_restore"
         proc.send_signal(signal.SIGHUP)
+        # Dos señales juntas se atienden en cualquier orden: SIGTERM va cuando SIGHUP ya se entregó.
+        while _pendiente(proc.pid, signal.SIGHUP) and time.monotonic() < limite:
+            time.sleep(0.01)
         proc.send_signal(signal.SIGTERM)
         _, err = proc.communicate(timeout=30)
     finally:

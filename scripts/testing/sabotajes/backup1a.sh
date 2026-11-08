@@ -22,7 +22,7 @@ C=scripts/datos/copia_base.py
 
 # correr <-k>: las pruebas elegidas, con su Postgres.
 correr() {
-  PY="$PY" scripts/testing/con_pg16.sh "$PY" -m pytest -q --no-cov -p no:cacheprovider \
+  PY="$PY" scripts/testing/con_pg16.sh "$PY" -m pytest -q --no-cov --timeout=120 -p no:cacheprovider \
     tests/test_backup1a.py tests/test_backup1a_unidad.py -k "$1" 2>&1 | tr -d '\0'
 }
 
@@ -108,6 +108,9 @@ sabotaje "verificar no borra la marca vieja" "fila_cambiada" "quedó marcada com
 ' ''
 sabotaje "una copia vacía queda verificada" "copia_vacia" "copia verificada: 0 tablas, 0 filas|copia verificada: 2 tablas, 0 filas" \
   reemplazar $C 'if not filas:' 'if False:'
+sabotaje "copiar fija una copia vacía" "copia_vacia" "vuelta 1: quedó algo" \
+  reemplazar $C '            _filas(tablas)
+' ''
 sabotaje "copiar sale bien aunque la verificación falle" "sale_con_error" "LA COPIA NO SIRVE|pg_restore falló (salida 1)" \
   reemplazar $C 'return await verificar(archivo)' 'await verificar(archivo); return 0'
 sabotaje "la huella sólo mira public" "otro_esquema" "copia verificada" \
@@ -131,6 +134,11 @@ sabotaje "cortar no mata al hijo" "un_corte" "pg_restore quedó corriendo" \
             proc.kill()
             await proc.wait()
 ' ''
+
+sabotaje "la limpieza no está protegida del corte" "durante_el_borrado" "close']" \
+  reemplazar $C 'await asyncio.shield(tarea)' 'await tarea'
+sabotaje "el borrado no tiene tope" "colgado" "Timeout" \
+  reemplazar $C 'asyncio.wait_for(borrar(), TOPE_BORRADO_S)' 'borrar()'
 
 echo "== no pisar"
 # Sin este control, _fijar igual no pisa: el rojo es que falta el aviso de antes de copiar.

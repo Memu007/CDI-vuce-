@@ -112,3 +112,56 @@ def test_una_huella_que_no_se_entiende_no_llega_a_la_base(monkeypatch, tmp_path,
     with pytest.raises(copia_base.Falla, match="no se entiende"):
         asyncio.run(copia_base.verificar(str(archivo)))
     assert not (tmp_path / "copia.dump.sha256").exists()
+
+
+@pytest.mark.parametrize("tablas", [{}, {"public.x": {"filas": 0, "sha256": "0"}}])
+def test_una_huella_sin_filas_no_llega_a_la_base(monkeypatch, tmp_path, tablas):
+    archivo = _copia_verificada(tmp_path)
+    ruta = tmp_path / "copia.dump.huella.json"
+    ruta.write_text(json.dumps({**json.loads(ruta.read_text()), "tablas": tablas}))
+    for v in copia_base.VARIABLES:
+        monkeypatch.delenv(v, raising=False)
+    with pytest.raises(copia_base.Falla, match=f"la copia está vacía: {len(tablas)} tablas, 0 filas"):
+        asyncio.run(copia_base.verificar(str(archivo)))
+
+
+class _Admin:
+    """Una conexión cuyo DROP termina cuando la prueba lo suelta."""
+    def __init__(self):
+        self.empezo, self.soltar, self.hecho = asyncio.Event(), asyncio.Event(), []
+
+    async def execute(self, sql):
+        self.empezo.set()
+        await self.soltar.wait()
+        self.hecho.append(sql)
+
+    async def close(self):
+        self.hecho.append("close")
+
+    def is_closed(self):
+        return "close" in self.hecho or "terminate" in self.hecho
+
+    def terminate(self):
+        self.hecho.append("terminate")
+
+
+def test_un_corte_durante_el_borrado_no_lo_deja_a_medias():
+    async def principal():
+        admin = _Admin()
+        tarea = asyncio.ensure_future(copia_base._borrar_restauracion(admin, "cdi_restauracion_x"))
+        await admin.empezo.wait()
+        tarea.cancel()
+        await asyncio.sleep(0)  # el corte le llega mientras borra
+        admin.soltar.set()
+        with pytest.raises(asyncio.CancelledError):
+            await tarea
+        return admin.hecho
+    assert asyncio.run(principal()) == ['DROP DATABASE IF EXISTS "cdi_restauracion_x" WITH (FORCE)', "close"]
+
+
+def test_un_borrado_colgado_tiene_tope(monkeypatch):
+    monkeypatch.setattr(copia_base, "TOPE_BORRADO_S", 0.2)
+    admin = _Admin()
+    with pytest.raises(copia_base.Falla, match="no se pudo borrar cdi_restauracion_x en 0.2 s"):
+        asyncio.run(copia_base._borrar_restauracion(admin, "cdi_restauracion_x"))
+    assert admin.hecho == ["terminate"]
