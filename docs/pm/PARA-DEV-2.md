@@ -7,7 +7,7 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Evidencia: `docs/pm/REPRODUCCION-OBSERVABILIDAD-1-2026-11-08.md`. Igual al
 informe: chequeo-6 +35/−15 sin avisos, casos 10 passed, arranque SQLite y PG
-`fallas 0`, sabotajes todavía corriendo (15 ROJO, ninguno sin rojo hasta acá). Mi negativo (volver al camino
+`fallas 0`, sabotajes 24 ROJO, sin rojo 0. Mi negativo (volver al camino
 crudo sólo cuando no hay ruta) da rojo. Las cuatro cosas de la devolución
 anterior están bien.
 

@@ -9,7 +9,7 @@ Veredicto: **devolución** (el arnés de ENTRADAS-3 queda en rojo).
 | `pytest tests/test_observabilidad1.py` | 10 passed | `10 passed, 5 warnings in 1.47s` |
 | arranque SQLite | `fallas 0` | `fallas 0` |
 | arranque Postgres 16 | 60 OK, `fallas 0` | 60 OK, `fallas 0` (puerto 55462) |
-| sabotajes con PG | 24 ROJO, sin rojo 0 | en curso al escribir esto (15 ROJO hasta acá, ninguno sin rojo); el resultado va en la próxima vuelta |
+| sabotajes con PG | 24 ROJO, sin rojo 0 | 24 ROJO, `sabotajes sin rojo: 0; no corridos: 0`, salida 0 |
 | negativo PM: `or str(request.url.path)` en vez de `or "<sin ruta>"` | — | `AssertionError: la métrica guardó otra cosa que el molde: ['/no-existe-zq9']`, `1 failed` |
 | negativo PM: `/static/20123456786-secreto.js`, `/api/quotes/public/abc123hash?token=zzz`, `/api/invitations/TOKENSECRETO999` | — | grabado `['/api/quotes/public/{hash}', '/api/invitations/{token}']` (static no se registra); nada crudo |
 | `entradas3_postgres.py` con PG (ENTRADAS-3 aceptada) | no corrido | **`FALLA \| NUL en la ruta: 404; en api_logs: 0`, `FALLA \| ruta de 300 caracteres: 404; en api_logs: 0`, `fallas: 2`** |
