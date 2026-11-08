@@ -118,3 +118,4 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   código muerto.
 - `docker-compose.yml:61`: el mensaje `:?` de `JWT_SECRET_KEY` lleva «:» y compose lo corta.
 - Arnés de sabotajes y helpers de `scripts/testing/*_postgres.py` (crear y borrar base, registrar usuario, `chequear`) copiados entre piezas: unificar.
+- `scripts/testing/sabotajes/separadores1b.sh`: el patrón 3 no encuentra su ancla desde `4f2045f` y el guion da salida 1 también en la base.

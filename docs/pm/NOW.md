@@ -213,9 +213,10 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-08 13:40 UTC: **SEGURO-2 aceptada** (`d160738`, MARIA, sin integrar): 242 passed, 19+12 sabotajes en rojo, Sonnet en pantalla real sin TXT malo. D125 a, D126 a; dos textos a AVISOS-1. MARIA sigue AVISOS-1.
 2026-11-08 13:30 UTC: **COBRO-MP-4 aceptada** (`0fb991c`, técnica, sin integrar): PG fallas 0, 1492 passed, 8 sabotajes en rojo; Sonnet halló un hueco de prueba del orden (mutación verde) → primer paso de PERMISOS-2. SEGURO-2 en reproducción.
 2026-11-08 12:30 UTC: **COBRO-MP-2+3, PERMISOS-1 y BACKUP-1a aceptadas** (`ca84c5f`, técnica, sin integrar): 4 guiones de sabotaje con falla 0, adversarios sin nada grave nuevo. Riesgo: el backup no compara índices ni secuencias.
-2026-11-08 12:05 UTC: vuelta. Contexto OK (técnica 140k, MARIA 123k, PM 111k, todas 200k). **EXCEL-2d aceptada** (`84fd9f2`, técnica, sin integrar): igual al informe con `xlwt`; sin él, 7 sabotajes verdes y la CI saltea los casos `.xls` → D124 a. Técnica en COBRO-MP-4, MARIA en SEGURO-2; `ca84c5f` espera `cobro_mp2.sh`.
+2026-11-08 12:05 UTC: vuelta. Contexto OK (técnica 140k, MARIA 123k, PM 111k, todas 200k). **EXCEL-2d aceptada** (`84fd9f2`, técnica, sin integrar): igual al informe con `xlwt`; sin él, 7 sabotajes verdes y la CI saltea los casos `.xls` → D124 a. Técnica en COBRO-MP-4, SEGURO-2 ACEPTADA 08/11 sobre d160738 SIN INTEGRAR (D125 a, D126 a) → AVISOS-1; `ca84c5f` espera `cobro_mp2.sh`.
 2026-11-08 10:10 UTC: **SUFIJOS-2+SEGURO-1 aceptada** (`ad2d0f8`, MARIA, sin integrar): 224 + 1549 passed, sabotajes en rojo, mis negativos frenan. D123 a → AVISOS-1 tras SEGURO-2. Técnica: chequeo-6 de `ca84c5f` igual al informe; sabotajes y adversarios en curso.
 2026-11-08 08:59 UTC: vuelta. Contexto OK (MARIA 124k, técnica 116k, PM 124k, todas 200k). **EXCEL-2c aceptada** (`c2b84f1`, técnica, sin integrar); D122 a → EXCEL-2d. La técnica tiene COBRO vuelta 3 + PERMISOS-1 + BACKUP-1a en `ca84c5f`, informe cuando terminen sus sabotajes. MARIA en SUFIJOS-2+SEGURO-1.
 2026-11-08 07:52 UTC: **ENTRADAS-4 aceptada** (`6baddb5`, MARIA, sin integrar): sonda PG fallas 0, 5 sabotajes en rojo, 55 passed de subida con cliente real. MARIA sigue con SUFIJOS-2+SEGURO-1.

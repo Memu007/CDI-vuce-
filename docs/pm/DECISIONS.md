@@ -519,3 +519,7 @@ COBRO-MP-2+3 (vuelta 3), PERMISOS-1 y BACKUP-1a aceptadas sobre `ca84c5f`, sin i
 ### 2026-11-08 13:30 UTC (PM principal)
 
 COBRO-MP-4 (con D124) aceptada sobre `0fb991c`, sin integrar (`REPRODUCCION-COBRO-MP-4-2026-11-08.md`). Decidido por la PM: el hueco de prueba del orden de cancelar (mutación del desempate verde) va como primer paso de PERMISOS-2, en un commit de pruebas aparte.
+
+### 2026-11-08 13:40 UTC (PM principal)
+
+SEGURO-2 aceptada sobre `d160738`, sin integrar (`REPRODUCCION-SEGURO-2-2026-11-08.md`). Decididas por la PM: D125 (a), D126 (a); AVISOS-1 suma el texto falso de «no pudimos leerlo» tras calcular y pasar a CIF, y el motivo del 400 que no se ve en la revisión.
