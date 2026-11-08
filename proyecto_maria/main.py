@@ -224,7 +224,7 @@ def get_frontend_url() -> str:
         # Fail fast: mandar un email con link a localhost es un bug silencioso
         # que vuelve el reset de password inutil.
         raise RuntimeError(
-            "FRONTEND_URL no esta seteada en .env y estamos en produccion. "
+            "FRONTEND_URL no esta seteada y ENVIRONMENT no es development, test ni testing. "
             "Definir p.ej. FRONTEND_URL=https://cdi.tu-dominio.com"
         )
     return "http://127.0.0.1:8010"
@@ -414,8 +414,9 @@ elif not _es_desarrollo():
     # En prod sin ALLOWED_ORIGINS explicito, fallamos fuerte: es una mala
     # config que dejaria el sistema inaccesible o inseguro.
     raise ValueError(
-        "CORS config error: ALLOWED_ORIGINS no puede ser vacio ni '*' en "
-        "produccion porque la app usa cookies. Definir p.ej.: "
+        "CORS config error: ALLOWED_ORIGINS no puede ser vacio ni '*' si "
+        "ENVIRONMENT no es development, test ni testing, porque la app usa "
+        "cookies. Definir p.ej.: "
         "ALLOWED_ORIGINS=https://cdi.tu-dominio.com"
     )
 else:
