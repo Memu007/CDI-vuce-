@@ -116,3 +116,4 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `main.py`: `_TEXTOS_DEL_CLIENTE` repite los campos que leen el alta y la
   edición del cliente; `DataStore.add_operation` (`core/datastore.py`) parece
   código muerto.
+- `docker-compose.yml:61`: el mensaje `:?` de `JWT_SECRET_KEY` lleva «:» y compose lo corta.

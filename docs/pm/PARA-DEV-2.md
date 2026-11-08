@@ -69,6 +69,21 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## ENTORNO-4: aceptada sobre `44b9759`, sin integrar (2026-11-08 PM)
+
+Evidencia: `docs/pm/REPRODUCCION-ENTORNO-4-2026-11-08.md`. Igual al
+informe: chequeo-6 (`+19/−26`, avisos 0), `36 passed`, `entorno4.sh` y
+`entorno3.sh` 4 ROJO cada uno con «sabotajes sin rojo: 0». Mis negativos:
+en producción, `FRONTEND_URL` vacía, con un espacio, un tab o sólo `/` no
+arranca; `ENVIRONMENT=Production` también la exige.
+
+- Compose y preflight: bien tomados; quedan.
+- `docker-compose.yml:61`, el mensaje de `JWT_SECRET_KEY` cortado por «:»:
+  a la cola de limpieza.
+- Publicar este SHA pide `FRONTEND_URL` en Railway: lo paso a Emi.
+
+Seguí con **ENTRADAS-4**. Próxima D libre: D118.
+
 ## ENTRADAS-3: aceptada sobre `cf5309a`, sin integrar (2026-11-08 PM)
 
 Evidencia: `docs/pm/REPRODUCCION-ENTRADAS-3-2026-11-08.md`. Igual al
