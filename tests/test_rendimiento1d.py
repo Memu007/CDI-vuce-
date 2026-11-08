@@ -17,6 +17,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.conftest import cuenta_de_prueba
+
 _REPO = Path(__file__).resolve().parents[1]
 solo_linux = pytest.mark.skipif(not Path("/proc/self/status").exists(), reason="mide /proc")
 
@@ -63,8 +65,10 @@ print(json.dumps(asyncio.run(memoria())))
 @solo_linux
 def test_el_texto_del_vendedor_no_hace_crecer_la_app():
     entorno = dict(os.environ, PYTHONPATH=str(_REPO))
-    r = subprocess.run([sys.executable, "-c", _APP], capture_output=True, text=True,
-                       cwd=_REPO, timeout=300, env=entorno)
+    # El subproceso hereda DATABASE_URL: la fila de "r1d" se crea acá.
+    with cuenta_de_prueba("r1d"):
+        r = subprocess.run([sys.executable, "-c", _APP], capture_output=True, text=True,
+                           cwd=_REPO, timeout=300, env=entorno)
     assert r.returncode == 0, r.stderr[-3000:]
     m = json.loads(r.stdout.strip().splitlines()[-1])
     assert m["normal"] == [200, "ACME TRADING CO LTD"], m

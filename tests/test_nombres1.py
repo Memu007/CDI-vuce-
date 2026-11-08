@@ -104,7 +104,6 @@ def test_dos_cuentas_viejas_que_difieren_en_mayusculas_siguen_entrando(monkeypat
     existen = {f(nombre): claves[f(nombre)] for f in sembradas}
     for username, clave in existen.items():
         _run(_sembrar(username, clave))
-    monkeypatch.setattr(main, "login_attempts", {})
     c = TestClient(main.app)
     for username in claves:
         for clave in existen.values():

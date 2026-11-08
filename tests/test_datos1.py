@@ -17,6 +17,7 @@ from sqlalchemy import select
 from proyecto_maria.database.connection import AsyncSessionLocal
 from proyecto_maria.database.models import PublicQuote
 from proyecto_maria.main import app, get_current_user, get_db
+from tests.conftest import cuenta_de_prueba
 
 # El router de presupuestos se monta en el arranque (lifespan), que el
 # TestClient sin `with` no corre: igual que en test_pilar_b_quotes.py.
@@ -174,12 +175,16 @@ def _usuario_nuevo(base, prefijo):
 # hace fallar con 402 a pruebas de otros archivos.
 @pytest.fixture()
 def dueno(auth_override):
-    return _usuario_nuevo(auth_override, "d1")
+    u = _usuario_nuevo(auth_override, "d1")
+    with cuenta_de_prueba(u["username"]):
+        yield u
 
 
 @pytest.fixture()
 def otro_usuario(auth_override):
-    return _usuario_nuevo(auth_override, "otro")
+    u = _usuario_nuevo(auth_override, "otro")
+    with cuenta_de_prueba(u["username"]):
+        yield u
 
 
 @pytest.fixture()

@@ -84,7 +84,7 @@ reemplazar $M "    if clean_email not in emails_pendientes and len(emails_miembr
 caso "invitar_sin_tope" "FAILED $T::test_invitar_hasta_el_tope_del_plan[sqlite_sin_zona-2]"
 
 # 4. el tope fijo en 3 en vez del plan
-reemplazar $M '    tope = billing_service.get_plan(org.plan or "premium")["users"]
+reemplazar $M '    tope = billing_service.plan_de_la_cuenta(org)["users"]
     emails_miembros' '    tope = 3
     emails_miembros'
 caso "tope_fijo" "FAILED $T::test_invitar_hasta_el_tope_del_plan[sqlite_sin_zona-4]"
@@ -112,12 +112,12 @@ caso "gasto_sin_condicion" "FAILED $T::test_invitacion_gastada_entre_la_lectura_
 
 # 9. contar los miembros antes de gastar la invitación: en SQLite nada hace
 #    esperar al otro registro y los dos entran por el último lugar
-reemplazar $M '        tope = billing_service.get_plan(invite_org.plan or "premium")["users"]
+reemplazar $M '        tope = billing_service.plan_de_la_cuenta(invite_org)["users"]
         if len(await _emails_de_miembros(db, invite_org.id)) >= tope:
             await db.rollback()  # la invitación queda pendiente
             raise HTTPException(status_code=400, detail=f"El estudio ya tiene los {tope} usuarios de su plan.")
 ' ''
-reemplazar $M '        # La invitación se gasta en la misma transacción que el alta' '        tope = billing_service.get_plan(invite_org.plan or "premium")["users"]
+reemplazar $M '        # La invitación se gasta en la misma transacción que el alta' '        tope = billing_service.plan_de_la_cuenta(invite_org)["users"]
         if len(await _emails_de_miembros(db, invite_org.id)) >= tope:
             raise HTTPException(status_code=400, detail=f"El estudio ya tiene los {tope} usuarios de su plan.")
         # La invitación se gasta en la misma transacción que el alta'

@@ -118,13 +118,14 @@ def _generar(detalle):
     stubs = (_form_de_la_revision() + _funciones("review.js", ["marcarEnLaRevision"]) +
              "\nCDI.marcarEnLaRevision = marcarEnLaRevision;\n"
              "let generateInFlight = false; let lastMaria = null; let fueA = null; let enNcm = null;\n"
+             "let pedidaMientrasOtra = false; let lastValidation = null; function onEnterReady() {}\n"
              "const sbtError = {textContent: '', hidden: true};\n"
              "CDI.goTo = p => { fueA = p; if (p === 'review') { errSeguro.hidden = true; errSeguro.textContent = ''; } };\n"
              "CDI.track = () => {}; function showReadyError() {} function buildMariaRequest() { return {}; }\n"
              "CDI.ncmBatch = {marcarErrorDeSubitem(i, s, d) { enNcm = d; return true; }};\n"
              "CDI.state.items = [{}]; console.error = () => {};\n"
              f"CDI.api = async () => ({{ok: false, statusText: 'x', json: async () => ({{detail: {json.dumps(detalle)}}})}});\n")
-    codigo = stubs + _funciones("finalize.js", ["generateMaria"]) + (
+    codigo = stubs + _funciones("finalize.js", ["fotoDeLaPantalla", "generateMaria"]) + (
         "\ngenerateMaria().then(() => console.log(JSON.stringify({fueA, enNcm,"
         " sbt: sbtError.hidden ? null : sbtError.textContent,"
         " revision: errSeguro.hidden ? null : errSeguro.textContent})));")

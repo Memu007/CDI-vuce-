@@ -112,8 +112,12 @@ def _correr(escenario, *args, **extra):
     entorno = {k: v for k, v in os.environ.items()}
     entorno["PYTHONPATH"] = str(_REPO)
     entorno.update(extra)
-    r = subprocess.run([sys.executable, "-c", _APP, escenario, *args], capture_output=True, text=True,
-                       cwd=_REPO, timeout=300, env=entorno)
+    # El subproceso hereda DATABASE_URL: las filas de "a" y "b" se crean acá. Import
+    # local: _APP importa este módulo, y conftest le cambiaría la base.
+    from tests.conftest import cuenta_de_prueba
+    with cuenta_de_prueba("a"), cuenta_de_prueba("b"):
+        r = subprocess.run([sys.executable, "-c", _APP, escenario, *args], capture_output=True, text=True,
+                           cwd=_REPO, timeout=300, env=entorno)
     assert r.returncode == 0, r.stderr[-3000:]
     return json.loads(r.stdout.strip().splitlines()[-1])
 
