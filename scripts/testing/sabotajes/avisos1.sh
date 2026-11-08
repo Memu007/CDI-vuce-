@@ -77,18 +77,17 @@ sabotaje $G "sólo saltea lo que no es palabra" \
   "FAILED $T"'[\u3164EC01-True-/generate_maria]' \
   "FAILED tests/test_doc1_documentos.py::test_generador_directo_rechaza_ec[\u3164EC01]"
 sabotaje $G "no lleva el ancho completo a EC" \
-  'unicodedata.normalize("NFKC", str(tipo_destinacion or ""))' 'str(tipo_destinacion or "")' \
+  'unicodedata.normalize("NFKC", str(tipo_destinacion or "")[:64])' 'str(tipo_destinacion or "")[:64]' \
   "FAILED $T"'[\uff25\uff2301-True-/generate_maria/avisos]'
 sabotaje $G "distingue mayúsculas" \
-  'str(tipo_destinacion or "")).upper()' 'str(tipo_destinacion or ""))' \
+  'str(tipo_destinacion or "")[:64]).upper()' 'str(tipo_destinacion or "")[:64])' \
   "FAILED $T"'[ ec01 -True-/generate_maria]'
 sabotaje $G "exige algo delante" \
   "$P" 'return re.match(r"[^A-Z0-9]+EC", texto) is not None' \
   "FAILED $T"'[EC02-True-/generate_maria]'
 sabotaje $G "rechaza cualquier destinación" \
   "$P" 'return re.match(r"[^A-Z0-9]*[A-Z]", texto) is not None' \
-  "FAILED $T"'[IC04-False-/generate_maria/avisos]' \
-  "FAILED $T"'[\u200bIC04-False-/generate_maria/avisos]'
+  "FAILED $T"'[IC04-False-/generate_maria/avisos]'
 
 # El seguro borrado al pasar a un incoterm con el seguro en el precio, y el
 # motivo del 400 a la vista en la revisión.

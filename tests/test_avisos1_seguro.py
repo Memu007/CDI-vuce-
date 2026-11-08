@@ -17,7 +17,7 @@ from tests.test_seguro1 import EN_EL_PRECIO, VALOR_CIF
 from tests.test_seguro2 import COMPLETAR, _stubs_de_la_revision
 from tests.test_valor1 import VALOR, _correr, _funciones, _pantalla, _pedido_con
 
-BORRADO = ("Seguro: el que calculó el sistema se borró al pasar a un incoterm que ya lo lleva en el precio. "
+BORRADO = ("Seguro: el que calculó el sistema se borró al cambiar el incoterm. "
            "Cargá el de la factura en la revisión; si la factura no trae seguro, escribí 0.")
 NO_SE_LEYO = "no pudimos leerlo"
 

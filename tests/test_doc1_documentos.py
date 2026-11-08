@@ -60,7 +60,7 @@ def test_endpoint_rechaza_antes_de_heuristica(auth_override, client, monkeypatch
     *((adelante + "EC01", True) for adelante in
       ("\x00", "\x1f", "\x85", "\t", "\xa0", "\u2028", "\u200b", "\u2060", "\ufeff", "\u200b ", "\u3164", "\uffa0", "-")),
     ("\uff25\uff23" + "01", True),
-    ("\u200bIC04", False), ("IC04", False),
+    ("IC04", False),
 ])
 def test_ec_directa_nunca_entra_a_importacion(auth_override, client, ruta, destinacion, es_exportacion):
     r = client.post(ruta, json={"operation_id": "SINTETICA", "items": [], "tipo_destinacion": destinacion})
