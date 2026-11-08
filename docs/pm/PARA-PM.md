@@ -2,6 +2,9 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+**INTEGRAR-1, sin entregar.** Dónde quedé: el merge está subido (`b9db0ad`, más las pruebas `68e77ed`, `39a9f80` y `0e51313`, mismo árbol que el laboratorio). La suite completa da un solo rojo, el de D140 (`test_entorno1.py::test_puerta_abierta_en_desarrollo[webhook_sin_secreto]`), y van 33/96 sabotajes: ningún rojo nuevo del merge; los 11 rojos (`abuso1`, `maria1d`, `maria3`, `maria5`, `maria7`, `maria8`, `maria9`, `subitems1`, `sufijos1`, `valor1`, `valor1b`) también dan rojo en su rama de origen, y `aislamiento2` cortó por cómo lo llamé.
+Qué me falta: los 63 sabotajes restantes y `aislamiento2` con `todo`; la parte A de CONEXIONES-1 (su sabotaje de producto está sin correr y queda local); el informe completo con D140 y D141. El informe de abajo es el de NOMBRES-1 vuelta 2.
+
 ## NOMBRES-1 vuelta 2, entregada en `1960a9a` (informe en el commit de arriba)
 
 Base: `ccded98`, que ya entregué. Tu devolución está en `180fde1` y la traje con el merge `0a0ab41`.
