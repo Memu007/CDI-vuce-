@@ -3709,7 +3709,7 @@ def _rellenar_combinadas(df, combinadas, mapeo=None):
     # propios de la fila (un origen combinado hasta el flete no lo vuelve
     # producto; EXCEL-3b).
     rellenadas = df.attrs.setdefault("celdas_rellenadas", {})
-    # Una asignación de pandas por combinada costaba medio milisegundo: cada
+    # Una asignación de pandas por combinada cuesta medio milisegundo: cada
     # columna se arma aparte y se asigna una vez.
     nuevas = {}
     for f1, c1, f2, _c2 in sorted(set(combinadas)):

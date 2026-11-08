@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-08 · fix: un Excel chico armado para costar segundos ya no traba el servidor (EXCEL-2d)
 
-- **fix(excel):** antes de abrir, se rechaza un libro con un formato de número de más de 255 caracteres o 32 «[» (en un `.xls`, de más de 32 «[»), más de 65 490 formatos de celda (aunque haya un `cellXfs` vacío adentro), o más de 64 000 rangos en los `sqref` de la primera hoja (formato condicional, validación).
+- **fix(excel):** antes de abrir, se rechaza un libro con un formato de número de más de 255 caracteres o 32 «[» (en un `.xls` se lee el texto del formato, así un formato en chino no cuenta como «[»), más de 65 490 formatos de celda (aunque haya un `cellXfs` vacío adentro), o más de 64 000 rangos en los `sqref` de la primera hoja (formato condicional, validación).
 - **fix(excel):** miles de filas rellenadas desde celdas combinadas se leen en ~1 s: cada columna se rellena una sola vez; 9995 combinadas en 19 990 filas dan el rechazo de filas en ~1.2 s, sin frenar a otro pedido.
 
 ## 2026-11-08 · fix: un Excel chico con forma cara se lee en el carril pesado (EXCEL-2c)

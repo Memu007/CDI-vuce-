@@ -267,6 +267,10 @@ _FORMATOS_QUE_EXCEL_NO_GUARDA = (
     "largos). Guardalo de nuevo desde Excel o cargá los productos a mano.")
 
 
+def _formato_caro(codigo: str) -> bool:
+    return len(codigo) > _FORMATO_MAX_LARGO or codigo.count("[") > _FORMATO_MAX_CORCHETES
+
+
 def _formatos_que_excel_no_guarda(z, parte: str) -> bool:
     from xml.etree import ElementTree as ET
     en_celdas, celdas = 0, 0
@@ -277,8 +281,7 @@ def _formatos_que_excel_no_guarda(z, parte: str) -> bool:
                 en_celdas += nombre == "cellXfs"
                 continue
             if nombre == "numFmt":
-                codigo = e.get("formatCode", "")
-                if len(codigo) > _FORMATO_MAX_LARGO or codigo.count("[") > _FORMATO_MAX_CORCHETES:
+                if _formato_caro(e.get("formatCode", "")):
                     return True
             elif nombre == "xf" and en_celdas:
                 celdas += 1
@@ -420,10 +423,21 @@ def _formatos_xls_que_excel_no_guarda(contents: bytes) -> bool:
     while pos + 4 <= len(datos):
         tipo, largo = struct.unpack_from("<HH", datos, pos)
         pos += 4
-        if tipo in (0x041E, 0x001E) and datos.count(b"[", pos, pos + largo) > _FORMATO_MAX_CORCHETES:
+        if tipo in (0x041E, 0x001E) and _formato_xls_caro(tipo, datos[pos:pos + largo]):
             return True
         pos += largo
     return False
+
+
+def _formato_xls_caro(tipo: int, registro: bytes) -> bool:
+    """En BIFF8 el FORMAT trae cuenta, bandera y texto, en UTF-16 si la bandera lo dice;
+    de otra versión o si no cuadra, se cuentan los «[» de todos sus bytes."""
+    if tipo == 0x041E and len(registro) >= 5:
+        cuenta, bandera = struct.unpack_from("<HB", registro, 2)
+        ancho = 2 if bandera & 1 else 1
+        if len(registro) == 5 + ancho * cuenta:
+            return _formato_caro(registro[5:].decode("utf-16-le" if ancho == 2 else "latin-1"))
+    return registro.count(b"[") > _FORMATO_MAX_CORCHETES
 
 
 def _contar_hojas_excel(contents: bytes, file_ext: str) -> tuple[int, bool]:
