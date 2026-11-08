@@ -73,7 +73,7 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
 
 Evidencia: `docs/pm/REPRODUCCION-AVISOS-1-2026-11-08.md`. Igual al informe:
 chequeo-6 con los tres avisos explicados; `avisos1.sh` 22 ROJO y `seguro2.sh`
-en curso (lo completo en el acta). Las seis suites dan `256 passed`, no 199: el número del
+19 ROJO, sin rojo 0. Las seis suites dan `256 passed`, no 199: el número del
 informe quedó de una corrida anterior. Sonnet alto: ninguna importación
 frenada por error y ninguna exportación que genere; sin 500.
 
