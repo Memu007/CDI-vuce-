@@ -213,11 +213,11 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-08 17:56 UTC: vuelta sin entregas nuevas. MARIA subió AVISOS-2 (`217c7cd7` fix, `e51d54ff` test) y corre sus sabotajes; técnica espera adversario y suite sobre `5cda09d`. Ninguna frenada.
 2026-11-08 18:00 UTC: NOMBRES-1: producto bien, devolución chica de prueba (el caso de la promoción no distingue `lower()`+`.first()`); carrera de altas simultáneas, límite conocido.
 2026-11-08 17:40 UTC: EMAIL-1 (D45) de MARIA aceptada sobre `40423be`; D131 a Emi, D132 → RESET-3. MARIA → AVISOS-2.
 2026-11-08 17:05 UTC: **Emi da 12 h más**, corte 09/11 05:00 UTC. Rutinas prendidas. Técnica → NOMBRES-1 (sí de Emi, D127 b). MARIA: reviso EMAIL-1 (`cf68314`), después AVISOS-2.
 2026-11-08 15:50 UTC: **CORTE de las 24 h.** Las tres rutinas, apagadas. Técnica frenada en `65af1d3` (SEPARADORES-1b-ARNÉS aceptada, sin pieza nueva). MARIA frenada en `cf68314`: entregó EMAIL-1 sin cambio de producto, **sin revisar**; abiertas D131 y D132. Para retomar: revisar EMAIL-1 y prender las rutinas.
-2026-11-08 15:12 UTC: **AVISOS-1 aceptada** (`0aed334`, MARIA) y **SEPARADORES-1b-ARNÉS** (`1063b32`, técnica), sin integrar: 22+19 y 12 sabotajes en rojo, 256 passed; Sonnet alto sin altos. D129 a, D130 a = AVISOS-2 tras EMAIL-1. Corte 15:50.
 2026-11-08 14:45 UTC: **PERMISOS-3 aceptada** (`9428e00`, técnica, sin integrar): 10 sabotajes en rojo, 60 passed, ataque 47/0/0; Sonnet alto sin variante que entre. D127 b → propuesta a Emi. Técnica sigue con el arnés `separadores1b.sh` hasta el corte.
 2026-11-08 14:10 UTC: **PERMISOS-2 aceptada** (`a1db966`, técnica, sin integrar): 7+9 sabotajes en rojo, 35 passed, ataque 47/0/0; Opus alto sin camino a admin. Técnica sigue PERMISOS-3 (`\n` final y mayúsculas en la reserva). Demo admin fuera de producción → D99 a Emi.
 2026-11-08 13:58 UTC: vuelta. Contexto OK (técnica 134k, MARIA 138k, PM 143k, todas 200k; límite `allowed_warning`). Sin entregas nuevas: técnica en PERMISOS-2 (suite corriendo, `a1db966`), MARIA en AVISOS-1. Corte 15:50 UTC.
