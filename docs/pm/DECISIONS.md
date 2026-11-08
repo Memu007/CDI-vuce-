@@ -467,3 +467,7 @@ ENTORNO-2 aceptada sobre `bf92bf9`, sin integrar. D107 decidida por la PM: (a), 
 ### 2026-11-08 01:54 UTC (PM principal)
 
 FRONT-422 aceptada sobre `4dbdb0b`, sin integrar. D108 decidida por la PM: (a), el 422 se traduce en el front (`static/errores.js`); el contrato de la API no cambia.
+
+### 2026-11-08 03:55 UTC (PM principal)
+
+ENTRADAS-2 aceptada sobre `b8aa9bd`, sin integrar. D109 (a) y D110 (a), decididas por la PM: pieza ENTRADAS-3 de MARIA después de ENTORNO-3 (lo que quedó afuera de ENTRADAS-2 más el `1e308` que se guarda y rompe la suma de clientes y métricas), dentro de «arreglos chicos de seguridad a cero» (Emi). Acta: `REPRODUCCION-ENTRADAS-2-2026-11-08.md`.
