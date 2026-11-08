@@ -74,7 +74,7 @@ salida="$(casos_sqlite)" || { echo "BASE  | los casos no pasan sin sabotaje"; ta
 echo "BASE  | $(tail -1 <<<"$salida")"
 
 M=proyecto_maria/main.py
-TOPE='    if user and limiter.enabled and await limites_auth.contar(db, f"reset:cuenta:{user.username}", 3600) > 3:
+TOPE='    if user and await _tope_por_cuenta(db, f"reset:cuenta:{user.username}"):
         return mensaje
 '
 TOKEN='    db.add(reset_token)
@@ -88,16 +88,16 @@ sabotaje $M "sin el tope por cuenta" "$TOPE" '' "${MAIL[@]}"
 sabotaje $M "el tope por cuenta cuenta la IP" \
   'f"reset:cuenta:{user.username}"' 'f"reset:cuenta:{get_client_ip(req)}"' "${MAIL[@]}"
 sabotaje $M "el tope deja pasar cuatro" \
-  'f"reset:cuenta:{user.username}", 3600) > 3' 'f"reset:cuenta:{user.username}", 3600) > 4' "${MAIL[@]}"
+  'contar(db, clave, 3600) > 3' 'contar(db, clave, 3600) > 4' "${MAIL[@]}"
 MOVER=("$TOKEN" "$TOKEN$TOPE")
 sabotaje $M "el tope corta después de crear el link" "$TOPE" '' \
   "FAILED $T" "AssertionError: el cuarto pedido de la hora creó un link"
 MOVER=()
 sabotaje $M "la ventana dura menos de una hora" \
-  'f"reset:cuenta:{user.username}", 3600)' 'f"reset:cuenta:{user.username}", 3000)' \
+  'contar(db, clave, 3600)' 'contar(db, clave, 3000)' \
   "FAILED $T" "AssertionError: a los 59 minutos ya mandó otro"
 sabotaje $M "la ventana dura dos horas" \
-  'f"reset:cuenta:{user.username}", 3600)' 'f"reset:cuenta:{user.username}", 7200)' \
+  'contar(db, clave, 3600)' 'contar(db, clave, 7200)' \
   "FAILED $T" "AssertionError: pasada la hora no volvió a mandar"
 
 if [ -n "$PG_URL" ]; then
@@ -106,7 +106,7 @@ if [ -n "$PG_URL" ]; then
     echo "BASE  | la prueba en Postgres ya está en rojo sin sabotaje"; grep -E "^FALLA" <<<"$salida"; FALLAS=$((FALLAS+1))
   else
     echo "BASE  | Postgres: $(tail -1 <<<"$salida")"
-    TOPE_TRABADO='        if user and limiter.enabled and await limites_auth.contar(db, f"reset:cuenta:{user.username}", 3600) > 3:
+    TOPE_TRABADO='        if user and await _tope_por_cuenta(db, f"reset:cuenta:{user.username}"):
             return mensaje
 '
     MOVER=("$TRABA" "$TRABA$TOPE_TRABADO")

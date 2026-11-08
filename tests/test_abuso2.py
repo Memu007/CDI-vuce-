@@ -111,8 +111,8 @@ def test_un_login_correcto_no_cambia_otras_claves(cuentas):
     propia, otra = cuentas["propia"], cuentas["otra"]
     for cuenta, ip in [(propia, lejos), (otra, real), (propia, real), (propia, real)]:
         assert _login(c, cuenta, "mal", ip).status_code == 401
-    ajenas = [f"recuperar:cuenta:{propia}", f"recuperar:ip:{real}", f"registro:h:{real}",
-              f"registro:d:{real}", f"reset:{real}", f"pwd:{propia}"]
+    ajenas = [f"recuperar:cuenta:{propia}", f"reset:cuenta:{propia}", f"recuperar:ip:{real}",
+              f"registro:h:{real}", f"registro:d:{real}", f"reset:{real}", f"pwd:{propia}"]
 
     async def _sumar():
         async with conn.AsyncSessionLocal() as s:
