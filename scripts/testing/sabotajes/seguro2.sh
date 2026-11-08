@@ -95,16 +95,15 @@ sabotaje $R "escribirlo no lo completa" \
   "if (String(el.value).trim() !== '') completados.add(el.name);" 'if (false) completados.add(el.name);' \
   "FAILED $T::test_escribir_el_seguro_sin_leer_lo_completa[0-True]" \
   "FAILED $T::test_escribir_el_seguro_sin_leer_lo_completa[15-True]"
-sabotaje $R "el campo sin leer se ve en 0" \
-  "return sinLeer ? '' : normalizeValueForField(name, op[name]);" 'return normalizeValueForField(name, op[name]);' \
-  "FAILED $T::test_un_campo_sin_leer_se_ve_vacio_en_la_revision[sin_leer]" \
-  "FAILED $T::test_un_campo_sin_leer_se_ve_vacio_en_la_revision[flete_sin_leer]"
+sabotaje $R "el seguro sin leer se ve en 0" \
+  "return name === 'seguro' && CDI.seguroSinLeer(op) ? '' : " 'return ' \
+  "FAILED $T::test_un_campo_sin_leer_se_ve_vacio_en_la_revision[sin_leer]"
 sabotaje $R "la revisión no lo usa" \
   'const normalized = valorEnLaRevision(key, op);' 'const normalized = normalizeValueForField(key, op[key]);' \
   "FAILED $T::test_la_revision_muestra_vacio_el_seguro_sin_leer_y_lo_deja_en_0"
-sabotaje $R "un texto sin leer también se vacía" \
-  'const sinLeer = MONTOS.includes(name) && ' 'const sinLeer = ' \
-  "FAILED $T::test_un_campo_sin_leer_se_ve_vacio_en_la_revision[texto]"
+sabotaje $R "otro monto sin leer también se vacía" \
+  "return name === 'seguro' && CDI.seguroSinLeer(op)" "return CDI.seguroSinLeer(op)" \
+  "FAILED $T::test_un_campo_sin_leer_se_ve_vacio_en_la_revision[flete_sin_leer]"
 sabotaje $F "el 400 se queda en la pantalla de generar" \
   "                    CDI.goTo('review');
                     throw new Error(detail);" '                    throw new Error(detail);' \
@@ -143,8 +142,7 @@ sabotaje $F "recalcularlo deja la marca" \
 ' \
   "FAILED $T::test_recalcularlo_ya_no_es_el_dejado"
 sabotaje $R "escribirlo a mano deja la marca" \
-  "        if (el.name === 'seguro') delete op.seguro_dejado;
-" '' \
+  ' delete op.seguro_dejado; }' ' }' \
   "FAILED $T::test_escribirlo_a_mano_ya_no_es_el_dejado"
 
 # 4. Con CIF, la nota dice que una factura sin seguro necesita un 0.

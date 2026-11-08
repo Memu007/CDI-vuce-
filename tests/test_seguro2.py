@@ -57,17 +57,20 @@ def test_si_el_servidor_pide_completarlo_se_vuelve_a_la_revision():
     assert _generar_en_pantalla(COMPLETAR)["fueA"] == "review"
 
 
+def _seguro_sin_leer():
+    return _funciones("finalize.js", ["seguroSinLeer"]) + "\nCDI.seguroSinLeer = seguroSinLeer;\n"
+
+
 @pytest.mark.parametrize("op,campo,se_ve", [
     pytest.param({"seguro": 0, "campos_sin_leer": ["seguro"]}, "seguro", "", id="sin_leer"),
-    pytest.param({"flete": 0, "campos_sin_leer": ["flete"]}, "flete", "", id="flete_sin_leer"),
+    pytest.param({"flete": 30, "campos_sin_leer": ["seguro", "flete"]}, "flete", "30", id="flete_sin_leer"),
     pytest.param({"seguro": 0, "campos_sin_leer": ["seguro"], "campos_completados": ["seguro"]}, "seguro", "0",
                  id="cero_escrito"),
     pytest.param({"seguro": 0, "campos_sin_leer": ["flete"]}, "seguro", "0", id="leido"),
-    pytest.param({"vendedor_pais": "CN", "campos_sin_leer": ["vendedor_pais"]}, "vendedor_pais", "CN", id="texto"),
 ])
 def test_un_campo_sin_leer_se_ve_vacio_en_la_revision(op, campo, se_ve):
     # Un 0 a la vista parece leído, y escribir el mismo 0 no lo completaría.
-    codigo = "const MONTOS = ['flete', 'seguro', 'gastos_anteriores_fob'];\n" + _funciones(
+    codigo = "const MONTOS = ['flete', 'seguro', 'gastos_anteriores_fob'];\n" + _seguro_sin_leer() + _funciones(
         "review.js", ["normalizeValueForField", "valorEnLaRevision"]) + (
         f"\nconsole.log(JSON.stringify(valorEnLaRevision({campo!r}, CDI.state.operacion)));")
     assert _correr(codigo, op) == se_ve
@@ -82,7 +85,7 @@ def test_la_revision_muestra_vacio_el_seguro_sin_leer_y_lo_deja_en_0():
         "function $() { return null; } function hasTransportData() { return false; }\n"
         "function hasAduanaCustom() { return false; } function renderMetaPill() {} function recomputeHints() {}\n"
         "function validateAll() {} function renderIncotermWarning() {} function renderProrrateoPanel() {}\n"
-        "const MONTOS = ['flete', 'seguro', 'gastos_anteriores_fob'];\n"
+        "const MONTOS = ['flete', 'seguro', 'gastos_anteriores_fob'];\n" + _seguro_sin_leer()
         + _funciones("review.js", ["montoDelCampo", "normalizeValueForField", "valorEnLaRevision",
                                    "applyUserDefaults", "populate"])
         + "\npopulate();\nconsole.log(JSON.stringify([campos.seguro.value, campos.flete.value, "
