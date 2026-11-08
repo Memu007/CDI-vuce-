@@ -2,8 +2,9 @@
 # Negativos de AVISOS-2: cada sabotaje deja pasar al TXT una destinación que no
 # es un código de 4 letras o números ASCII, una de importación en una
 # exportación, normaliza un texto enorme entero, vuelve al texto viejo del
-# seguro borrado o deja al lector ver sólo lo que saca strip, y el caso tiene
-# que fallar por ese motivo.
+# seguro borrado, deja al lector ver sólo lo que saca strip o pasar una
+# destinación que no es un código, o deja al perfil guardar una que no es un
+# código de importación, y el caso tiene que fallar por ese motivo.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/avisos2.sh [SHA]
 # Trabaja en un worktree descartable con su propia SQLite y sin terceros: no
@@ -70,16 +71,19 @@ M=proyecto_maria/main.py
 A=tests/test_avisos2.py
 FORMA="$A::test_lo_que_no_es_un_codigo_da_400_y_no_genera"
 EXP="$A::test_la_exportacion_sólo_genera_con_una_ec"
-FORMA_RE='if not re.fullmatch(r"[A-Za-z0-9]{4}", codigo):'
+LECTOR="$A::test_el_lector_deja_vacio_lo_que_no_es_un_codigo"
+PERFIL="$A::test_el_perfil_solo_guarda_un_codigo_de_importacion"
+FORMA_RE='re.fullmatch(r"[A-Za-z0-9]{4}", codigo) else ""'
+X=proyecto_maria/pdf_extractor.py
 
 sabotaje $G "no mira la forma" \
-  "$FORMA_RE" 'if False:' \
-  "FAILED $FORMA[IC041-/generate_maria]" "FAILED $EXP[EC011-400]"
+  "$FORMA_RE" 'codigo else ""' \
+  "FAILED $FORMA[IC041-/generate_maria]" "FAILED $EXP[EC011-400]" "FAILED $LECTOR[IC-04--pymupdf]"
 sabotaje $G "acepta de 3 a 5" \
-  "$FORMA_RE" 'if not re.fullmatch(r"[A-Za-z0-9]{3,5}", codigo):' \
+  "$FORMA_RE" 're.fullmatch(r"[A-Za-z0-9]{3,5}", codigo) else ""' \
   "FAILED $FORMA[IC041-/generate_maria/avisos]" "FAILED $FORMA[IC0-/generate_maria]"
 sabotaje $G "acepta letras y números de cualquier alfabeto" \
-  "$FORMA_RE" 'if not re.fullmatch(r"\w{4}", codigo):' \
+  "$FORMA_RE" 're.fullmatch(r"\w{4}", codigo) else ""' \
   "FAILED $FORMA"'[\uff29\uff23\uff10\uff14-/generate_maria]' "FAILED $FORMA"'[\u0131c04-/generate_maria/avisos]'
 sabotaje $G "la exportación acepta una de importación" \
   'if es_exportacion(tipo_destinacion) != exportacion:' 'if es_exportacion(tipo_destinacion) and not exportacion:' \
@@ -117,10 +121,24 @@ sabotaje $M "los avisos no miran la forma" \
 sabotaje $M "el seguro borrado vuelve a decir que está en el precio" \
   'se borró al cambiar el incoterm. ' 'se borró al pasar a un incoterm que ya lo lleva en el precio. ' \
   "FAILED $A::test_el_seguro_borrado_de_vuelta_a_fob_dice_lo_que_paso"
-sabotaje proyecto_maria/pdf_extractor.py "el lector sólo saca lo que saca strip" \
+sabotaje $X "el lector sólo saca lo que saca strip" \
   'or any(es_exportacion(destinacion) for destinacion in (' \
   'or any(str(destinacion or "").strip().upper().startswith("EC") for destinacion in (' \
   "FAILED $A::test_el_lector_rechaza_la_exportacion_con_lo_invisible_adelante"'[documento-\u200bEC01-'
+LEE='clase["destinacion"] = codigo_de_destinacion(documento.get("destinacion"))'
+sabotaje $X "el lector pasa la destinación sin mirar la forma" \
+  "$LEE" 'clase["destinacion"] = clase["destinacion"].upper()' \
+  "FAILED $LECTOR[IC_4--pymupdf]" "FAILED $LECTOR[IC-04--pdf_directo]"
+sabotaje $X "el lector mira la forma del texto ya en minúsculas" \
+  "$LEE" 'clase["destinacion"] = codigo_de_destinacion(clase["destinacion"])' \
+  "FAILED $LECTOR"'[\u212aC04--pymupdf]'
+PERFIL_RE='_destinacion_o_400(destinacion) if destinacion else None'
+sabotaje $M "el perfil guarda el default sin mirar la forma" \
+  "$PERFIL_RE" '_sanitize_op_default(destinacion)' \
+  "FAILED $PERFIL[IC041-400-IC05]" "FAILED $PERFIL[IC_4-400-IC05]"
+sabotaje $M "el perfil guarda una exportación" \
+  "$PERFIL_RE" '_destinacion_o_400(destinacion, destinacion.upper().startswith("EC")) if destinacion else None' \
+  "FAILED $PERFIL[EC01-400-IC05]"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
