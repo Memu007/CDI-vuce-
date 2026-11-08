@@ -8,12 +8,15 @@ se sueltan juntos. Comprueba que:
    el perfil da 200, el reset 400 y la clave no cambia;
 3. un link pedido a la vez que un cambio de email que llega primero no sale,
    o no sirve: sin trabar la cuenta, el pedido lee el email viejo y guarda el
-   link después del cambio.
+   link después del cambio;
+4. el tope por cuenta del pedido se cuenta antes de trabar la cuenta: un
+   cambio de email que entra justo después de contar no deja salir el link.
 
 uso (con un Postgres local y descartable, nunca el de producción; el usuario
 tiene que poder crear bases):
   python scripts/testing/reset1_postgres.py postgresql://cdi@127.0.0.1:55432/postgres
 """
+import asyncio
 import concurrent.futures
 import os
 import sys
@@ -152,6 +155,32 @@ try:
                  f"el link pedido a la vez que el cambio de email no sirve: en cola {en_cola}, perfil "
                  f"{r_perfil.status_code}, pedido {r_link.status_code}, reset "
                  f"{r_reset.status_code if r_reset else 'sin link'}, clave sin cambiar {clave_es(u, CLAVE)}")
+
+        # 4. el tope por cuenta se cuenta antes de trabar: contar hace commit y,
+        # con la cuenta ya trabada, soltaría la traba. El cambio de email corre
+        # justo después de contar; si la traba se soltó, el link sale igual.
+        u, mail = usuario()
+        sesion = c.post("/auth/login", json={"username": u, "password": CLAVE}).json()["access_token"]
+        contar = main_mod.limites_auth.contar
+        perfil = []
+
+        async def contar_y_cambiar_email(db, clave, ventana):
+            n = await contar(db, clave, ventana)
+            if clave.startswith("reset:cuenta:") and not perfil:
+                perfil.append(await asyncio.wait_for(asyncio.to_thread(cambiar_email), 30))
+            return n
+        main_mod.limites_auth.contar, limiter.enabled = contar_y_cambiar_email, True
+        try:
+            r_link = c.post("/auth/request-password-reset", json={"email": mail})
+        finally:
+            main_mod.limites_auth.contar, limiter.enabled = contar, False
+        token = r_link.json().get("dev_token_hint")
+        r_reset = resetear(token, CLAVE3)() if token else None
+        chequear(perfil and perfil[0].status_code == 200 and r_link.status_code == 200
+                 and (r_reset is None or r_reset.status_code == 400) and clave_es(u, CLAVE),
+                 f"el tope por cuenta no suelta la traba: perfil {perfil[0].status_code if perfil else 'no corrió'}, "
+                 f"pedido {r_link.status_code}, reset {r_reset.status_code if r_reset else 'sin link'}, "
+                 f"clave sin cambiar {clave_es(u, CLAVE)}")
 finally:
     try:
         admin(f'drop database if exists "{BASE}" with (force)')
