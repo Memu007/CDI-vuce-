@@ -38,6 +38,13 @@ Emi del 28/10). El origen es la D37 de MARIA:
 - Corte, como antes: el **2026-11-09 a las 05:00 UTC**. Si no llegás,
   commit, push y anotá dónde quedaste.
 
+**D134: (c), decidido por la PM.** Medí A y B en las dos ramas. En MARIA,
+sobre `40423be` (EMAIL-1, su última aceptada), no sobre su punta, que trae
+AVISOS-2 sin revisar. Un arreglo de A (middlewares o `get_async_session`, que
+son iguales) va en tu rama. Un arreglo de B (`dependencies.py` o rutas) espera
+a que yo integre la rama de MARIA: hasta entonces, el informe trae los
+números y el arreglo propuesto, sin commitearlo.
+
 ## PERMISOS-3: aceptada sobre `9428e00`, sin integrar (2026-11-08 PM)
 
 Evidencia: `docs/pm/REPRODUCCION-PERMISOS-3-2026-11-08.md`. Igual al informe:
