@@ -69,6 +69,27 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## SEGURO-2: aceptada sobre `d160738`, sin integrar (2026-11-08 PM)
+
+Evidencia: `docs/pm/REPRODUCCION-SEGURO-2-2026-11-08.md`. Igual al informe:
+242 passed en las suites de la entrega; `seguro2.sh` 19 ROJO, `seguro1.sh`
+12 ROJO, `valor1c.sh` en curso (lo completo en el acta). Un adversario Sonnet alto manejó la
+pantalla real y no logró un TXT con seguro sin leer ni con el 1 % bajo CIF.
+
+- **D125 → (a)**, **D126 → (a)**, decididas por la PM.
+- **AVISOS-1 suma dos cosas** (mismo tema: lo que la persona lee):
+  1. calcular con FOB y pasar a CIF dice «no pudimos leerlo de la factura»,
+     que es falso; el freno queda, el texto tiene que decir lo que pasó;
+  2. tras el 400 «no pudimos leerlo», la revisión no muestra el motivo (queda
+     en la pantalla de generar, oculta) y la pista del campo dice «Dejar en 0
+     si no aplica» con el campo vacío. El motivo tiene que verse donde la
+     persona cae. Caso de la familia: cada 400 que cambia de pantalla.
+- El arnés roto de `separadores1b.sh` (de antes) va a la cola de limpieza.
+
+Seguí con **AVISOS-1** (D123 a + lo de arriba). Corte hoy 15:50 UTC: si no
+llegás, commit y push de lo que tengas y anotá en `PARA-PM-2.md` dónde
+quedaste. Próxima D libre: D127.
+
 ## SUFIJOS-2+SEGURO-1: aceptada sobre `ad2d0f8`, sin integrar (2026-11-08 PM)
 
 Evidencia: `docs/pm/REPRODUCCION-SUFIJOS-2-SEGURO-1-2026-11-08.md`. Igual al
@@ -264,43 +285,6 @@ abre ninguna puerta; nada serio introducido. Acta:
 
 El rojo de `despacho1b`: falló una vez en la suite entera y pasa solo;
 diagnosticar la causa (el diff no toca el lector).
-
-## PYPDF-1: aceptada sobre `974263e`, sin integrar (2026-11-06 PM)
-
-Acta: `REPRODUCCION-PYPDF-1-2026-11-06.md`. Coincide con tu informe: las
-cuatro suites de PDF dan `324 passed`, `rendimiento1c.sh` 18 en rojo sin
-falla y el sabotaje de D87 da los 2 rojos que nombrás. Probé seis PDF
-distintos de los tuyos: uno cortado, uno basura y uno con `/Pages` en ciclo
-siguen dando «PDF inválido» sin colgarse; uno de 600 bytes con `xref 0 999999`
-da «demasiado pesado». Es justo D90. Bien que no se fijara una versión vieja.
-
-- **D89: (a)**, el tope de memoria del hijo queda como respaldo, sin bomba
-  más grande. Decidido por la PM.
-- **D90: (a)**, toda `LimitReachedError` es «demasiado pesado». Decidido por
-  la PM.
-- Los comentarios «más que lineal» y el trato distinto del tope en
-  `_leer_hojas` los paso yo a `COLA-LIMPIEZA.md`.
-- `despacho1b.sh` entero queda como puerta mía antes de publicar.
-
-**Tu orden:** RESET-2 → ABUSO-1. Tus próximas D siguen en D91.
-
-## RESET-1: aceptada sobre `02a21e7`, sin integrar (2026-11-06 PM)
-
-Acta: `REPRODUCCION-RESET-1-2026-11-06.md`. Coincide con tu informe:
-`test_reset1.py` 6 passed (4 rojos en la base, 1 en `82130a8`), Postgres
-`fallas: 0` (base 3, `82130a8` 1), 8 sabotajes en rojo, chequeo-6 `+23/−15`
-sin avisos. La suite da `5 failed, 4951 passed`: los 5 de D73, que dan igual
-sobre la base. Probé un ejemplo distinto: el email va a otro y vuelve al
-original, y el link de antes sigue muerto (en la base revive). Dos
-adversarios con contexto nuevo no encontraron cómo entrar ni cómo trabar al
-dueño. Bien también que avisaras el orden y por qué.
-
-- **D82:** (a), queda así. Decidido por la PM.
-- **D83:** (a), queda así: sólo corre con la variable prendida y con emails
-  de la lista de prueba. Decidido por la PM.
-
-RESET-2 (en `ROADMAP.md`): el link vuelve en la respuesta sólo en el entorno
-de prueba, nunca por un `ENVIRONMENT` que falta.
 
 ## CATALOGO-LARGO-2: aceptada sobre `d5bc7c1` (pruebas `b0bbd8c`), sin integrar (2026-11-06 PM)
 
