@@ -11,6 +11,7 @@ Datos inventados, con la forma de la factura del 24/10.
 import pytest
 
 from proyecto_maria.core import maria_generator as mg
+from proyecto_maria.core.controles_maria import INCOTERMS_ACEPTADOS
 from tests.test_maria7_rechazos_24_10 import LONA, _registrar_con_cuit, _valor
 from tests.test_valor1 import VALOR, _pantalla, _pedido_con
 
@@ -40,6 +41,12 @@ def test_con_los_cinco_no_hay_sugerencia(incoterm):
 def test_con_los_demas_sigue_el_uno_por_ciento(incoterm):
     v = _cuentas(incoterm)
     assert v["seguro_sugerido"] == SUGERIDO and v["seguro_en_el_precio"] is False
+
+
+def test_sin_sugerencia_son_los_cinco_y_ninguno_mas():
+    # Entre todos los que se aceptan: sumar DAT o DDU a la lista da rojo.
+    sin_sugerencia = {i for i in INCOTERMS_ACEPTADOS if _cuentas(i)["seguro_sugerido"] is None}
+    assert sin_sugerencia == set(LOS_CINCO)
 
 
 @pytest.mark.parametrize("incoterm", ["cif", " Cif ", "\tdap\n", "dDp "])
@@ -87,6 +94,21 @@ def test_un_seguro_calculado_con_cif_no_genera(client):
     assert r.status_code == 400, r.text
     assert r.json()["detail"] == EN_EL_PRECIO
     assert EN_EL_PRECIO in client.post("/generate_maria/avisos", json=pedido).json()["avisos"]
+
+
+@pytest.mark.parametrize("incoterm,en_el_precio", [
+    pytest.param("CIF\x00", True, id="nul"),
+    pytest.param("\x01cif", True, id="control_adelante"),
+    pytest.param("C\nIF", False, id="salto_en_el_medio"),
+])
+def test_avisos_y_generar_leen_el_incoterm_igual(client, incoterm, en_el_precio):
+    _registrar_con_cuit(client, f"seguro1_igual_{en_el_precio}_{len(incoterm)}_{ord(incoterm[-1])}")
+    pedido = _pedido_con([LONA], incoterm=incoterm, seguro=SUGERIDO, seguro_calculado=True)
+    avisos = client.post("/generate_maria/avisos", json=pedido).json()
+    assert avisos["valor"]["seguro_en_el_precio"] is en_el_precio
+    assert (EN_EL_PRECIO in avisos["avisos"]) is en_el_precio
+    r = client.post("/generate_maria", json=pedido)
+    assert (r.json().get("detail") == EN_EL_PRECIO) is en_el_precio, r.text
 
 
 def test_con_cif_y_las_cuentas_en_error_dice_lo_del_incoterm(client):
