@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: la copia de la base no da por buena una base vacía ni deja restos al cortarse (BACKUP-1a)
+
+- **fix(datos):** una copia sin filas sale con error y no queda verificada. Una orden que pasa `COPIA_PLAZO_S` (por defecto, una hora) o recibe una señal borra la base descartable, corta pg_dump o pg_restore y sale con error. La copia, su huella y su marca sólo las lee quien corre el script.
+
 ## 2026-11-07 · fix: cancelar sin respuesta de Mercado Pago no afirma que el plan sigue igual (COBRO-MP-2)
 
 - **fix(cobro):** si Mercado Pago no contesta a tiempo al cancelar, el aviso dice que no se pudo confirmar la cancelación, sin afirmar que el plan sigue igual: Mercado Pago pudo haberla cancelado.
@@ -171,7 +175,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-28 · feat: copia de la base que se restaura y se compara antes de darla por buena (BACKUP-1a)
 
-- **feat(datos):** `scripts/datos/copia_base.py` saca la copia de Postgres (`pg_dump -Fc`), la restaura en una base descartable y compara, tabla por tabla, la cantidad de filas y un resumen del contenido; si no da igual, sale con error y no la marca como verificada.
+- **feat(datos):** `scripts/datos/copia_base.py` saca la copia de Postgres (`pg_dump -Fc`), la restaura en una base descartable y compara, tabla por tabla, la cantidad de filas y un resumen del contenido (no índices, restricciones, secuencias ni objetos grandes); si no da igual, sale con error y no la marca como verificada.
 - `enviar` lleva sólo una copia verificada y sin cambios a una carpeta local de prueba. Adónde va de verdad y cuándo corre lo define Emi; todavía no corre en producción.
 
 ## 2026-10-28 · fix: los roles guardados como texto no dan administrador por una parte (AISLAMIENTO-2)
