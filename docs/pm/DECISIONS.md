@@ -563,3 +563,7 @@ AVISOS-2b aceptada sobre `aa115f4`, sin integrar (D136). D137 (a): el smoke qued
 ### 2026-11-08 21:40 UTC (PM principal)
 
 RESET-3 aceptada sobre `8fda3d2`, sin integrar (D136). D138 (a), decidida por la PM: el tope por cuenta puede dejar a la cuenta sin links una hora, igual que recuperar. Riesgos bajos del adversario (ventana fija, emails viejos repetidos en mayúsculas) quedan anotados en el acta. MARIA ya entregó SMOKE-1.
+
+### 2026-11-08 21:55 UTC (PM principal)
+
+SMOKE-1 aceptada sobre `00df4de`, sin integrar (D136): el smoke espera el rechazo sin sesión; sabotajes en rojo. MARIA sigue OBSERVABILIDAD-1. Numeración: MARIA D139, técnica D140 en adelante.

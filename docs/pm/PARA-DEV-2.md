@@ -15,8 +15,11 @@ riesgo, igual que en recuperar.
 - **Supuestos:** los dos aceptados.
 - **D136** sigue: no traés mi rama hasta que INTEGRAR-1 esté aceptada.
 
-**Tarea activa: SMOKE-1** (ya entregada en `00df4de`, la reviso ahora). Cola:
-SMOKE-1 → OBSERVABILIDAD-1 → ORG-1+D40 → D102. Próxima D tuya: D139. Corte:
+**SMOKE-1: aceptada sobre `00df4de`, sin integrar (21:55).** Acta
+`REPRODUCCION-SMOKE-1-2026-11-08.md`: verde, tu sabotaje y el mío (la acción
+del smoke en la lista sin sesión) en rojo. Supuestos aceptados.
+
+**Tarea activa: OBSERVABILIDAD-1.** Cola: OBSERVABILIDAD-1 → ORG-1+D40 → D102. Próxima D tuya: D139. Corte:
 2026-11-09 05:00 UTC.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
