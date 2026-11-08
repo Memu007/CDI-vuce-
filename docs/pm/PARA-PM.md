@@ -2,6 +2,174 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## EXCEL-2d, entregada en `84fd9f2` (informe en el commit de arriba)
+
+Base: `dca338a`. En el medio está `285d224` (el informe de COBRO, sólo `docs/pm`) y, encima de `5eab286`, un merge de tu rama (`9b3391a`, trae `3060fd0`, sólo `docs/pm`). Encima del merge, `9c25e15` a `84fd9f2`: el arreglo del hallazgo 3 de seguridad, sus casos y sabotajes, y un comentario.
+
+### Resultado
+
+- **Qué cambia:** antes de abrir un `.xlsx` o un `.xls`, se rechaza con 400 un libro con:
+  - un formato de número de más de 255 caracteres o más de 32 «[»;
+  - más de 65 490 formatos de celda (`cellXfs`), aunque haya un `cellXfs` vacío adentro;
+  - más de 64 000 rangos en la primera hoja, sumando los `sqref` (formato condicional, validación), las celdas combinadas y los vínculos.
+- **En un `.xls`** se lee el texto de cada registro FORMAT (BIFF8, en UTF-16 si lo dice), así un formato en chino no cuenta como «[». Si el registro no cuadra o es de otra versión, se cuentan los «[» de todos sus bytes.
+- **Los topes:** 255 caracteres y 65 490 formatos de celda son los de Excel. 32 «[» deja entrar los formatos que guarda Excel (`[Red][<=100]0.00;[Blue][>100]0.00;[Green]0;@` tiene 5).
+- **Las celdas combinadas** dentro de las filas con datos: cada columna se rellena una sola vez, y el tope de filas las corta en ~1 s. Fuera de las filas, cada combinada y cada vínculo cuentan como un rango (lo encontró la revisión de seguridad, abajo).
+- **Los libros del adversario**, por la subida entera (`pytest --durations=0`, solo, sobre `84fd9f2`; el tiempo incluye armar el libro):
+
+| Libro | Antes | Ahora | Resultado |
+|---|---|---|---|
+| 120 000 «[» en un formato, ~5 KB | 9 s, con todos los hilos frenados | 0.03 s | 400 «formato» |
+| 640 000 rangos en un `sqref` | 4 s | 0.32 s | 400 «rangos» |
+| 2499 combinadas en 4998 filas | 10.95 s | 0.67 s | 200 |
+| 9995 combinadas en 19 990 filas | 5.6 s sólo en asignarlas | 1.28 s | 400 «filas» |
+| 300 000 combinadas fuera de las filas, 1.4 MB | 5.09 s | 0.59 s | 400 «rangos» |
+| 200 000 vínculos, 0.5 MB | 2.48 s | 0.39 s | 400 «rangos» |
+| tres formatos de 60 000 «[» en un `.xls` | 38.7 s con 65 000 «[», con el GIL retenido | 0.01 s | 400 «formato» |
+
+- En cada uno, otro hilo que marca el paso cada 10 ms no queda parado más de 0.5 s.
+- **Archivos de producto:**
+  - `proyecto_maria/security/file_security.py`;
+  - `proyecto_maria/main.py` (sólo el relleno de las combinadas en `try_extract_with_mapping`);
+  - `CHANGELOG.md`.
+
+**producto +97/−6**. Suma 91 netas: los topes son chequeos nuevos y no salen restando código. El `.xls` suma la lectura del registro FORMAT (`_formato_xls_caro`), porque contar bytes daba falsos positivos con texto en UTF-16.
+
+### Decisiones
+
+Nada para decidir. Supuestos que se pueden revertir:
+- un formato de más de 32 «[» se rechaza, no va al carril pesado: el carril pesado no alcanza, porque el GIL frena a todos los hilos;
+- en un `.xls` no hay tope de largo para un FORMAT que no cuadra: ahí sólo se cuentan «[», y el largo no es caro en xlrd;
+- los vínculos (`hyperlink`) cuentan en el tope de rangos aunque la tarea no los nombra: cuestan lo mismo que una combinada;
+- dos casos de `tests/test_excel2.py` armaban 230 000 y 600 000 `<xf/>`, que ahora se rechazan por el tope de formatos de celda. Ahora usan `<font/>`, que sigue probando el mismo control (las etiquetas de `styles.xml`).
+
+D123 la tomó la Dev 2 (AVISOS-1), aunque `PARA-DEV.md` decía que era mi próxima libre. No la usé.
+
+### Sabotajes
+
+- `excel2d.sh` corrió sobre `49be32c`; entre `49be32c` y `84fd9f2` sólo cambia un comentario (`git diff 49be32c 84fd9f2 --stat` da `file_security.py | 5 ++---`).
+- `excel2.sh` corrió sobre `066bd00`; después sólo cambian `excel2d.sh` y ese comentario.
+- En mi primera corrida sobre `066bd00`, el sabotaje de vínculos dio `ROJO?`: buscaba `[vínculos]` y pytest escribe el id como `[v\xednculos]`. El rojo estaba (`E   Failed: DID NOT RAISE ExcelDemasiadoGrande`); lo que fallaba era la línea esperada. Arreglado en `49be32c`.
+
+| Script | ROJO | Fallas | Salida |
+|---|---|---|---|
+| `excel2d.sh` | 20 de 20 | `sabotajes con falla: 0` | `salida excel2d 0` |
+| `excel2.sh` | 42 | `sabotajes con falla: 0` | `salida excel2 0` |
+
+**El ROTO de `excel2.sh`** apunta ahora al bucle de hoy (`nuevas[col][i:j] = valor`) y da rojo:
+
+```
+ROJO  | una combinada vuelve a recorrerse hasta su última fila (la función de 3e6e63e, con las celdas rellenadas): dice «FAILED tests/test_excel2.py::test_una_combinada_gigante_repetida_no_traba_la_lectura» (90 s, cortado a los 90 s)
+```
+
+Los 20 de `excel2d.sh`:
+
+```
+ROJO  | un formato largo vuelve a abrirse: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[largo]» (3 s)
+ROJO  | un formato con muchos corchetes vuelve a abrirse: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[corchetes]» (4 s)
+ROJO  | los corchetes vuelven a contarse en los bytes, sin las entidades: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[corchetes escritos como &#91;]» (4 s)
+ROJO  | muchos formatos de celda vuelven a abrirse: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[formatos de celda]» (3 s)
+ROJO  | los estilos de celda vuelven a contar como formatos de celda: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[formatos de celda]» (4 s)
+ROJO  | un cellXfs vacío vuelve a cortar la cuenta de formatos de celda: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[formatos de celda tras un cellXfs sin hijos]» (3 s)
+ROJO  | los formatos vuelven a no mirarse antes de abrir: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[120 000 corchetes en un formato]» (13 s)
+ROJO  | muchos rangos vuelven a abrirse: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[640 000 rangos de formato condicional]» (16 s)
+ROJO  | los sqref vuelven a contarse por elemento y no por rango: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[rangos]» (4 s)
+ROJO  | un sqref vuelve a partirse entero aunque pase el tope: dice «FAILED tests/test_excel2d.py::test_un_sqref_largo_se_parte_hasta_el_tope» (3 s)
+ROJO  | las celdas combinadas vuelven a no contar como rangos: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[combinadas]» (4 s)
+ROJO  | los vínculos vuelven a no contar como rangos: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[v\xednculos]» (4 s)
+ROJO  | los formatos de un .xls vuelven a no mirarse antes de abrir: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[tres formatos de 60 000 corchetes en un .xls]» (28 s)
+ROJO  | un .xls vuelve a contar los «[» en los bytes y no en el texto: dice «FAILED tests/test_excel2d.py::test_un_formato_de_excel_sigue_entrando[texto chino]» (3 s)
+ROJO  | un .xls vuelve a no mirar el largo del formato: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[largo en un .xls]» (3 s)
+ROJO  | un FORMAT de .xls que no cuadra vuelve a decodificarse igual: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[corchetes en un FORMAT de .xls que no cuadra]» (4 s)
+ROJO  | un .xls en OLE vuelve a no leerse por dentro: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[corchetes en un .xls]» (4 s)
+ROJO  | un .xls sin OLE vuelve a no mirarse: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[corchetes en un .xls sin OLE]» (3 s)
+ROJO  | cada combinada vuelve a asignarse aparte en pandas: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[9995 combinadas en 19 990 filas]» (20 s)
+ROJO  | las celdas rellenadas vuelven a copiarse en cada fila: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[2499 combinadas en 4998 filas]» (7 s)
+```
+
+### Pruebas
+
+- **`tests/test_excel2d.py`** sobre `84fd9f2`: `26 passed in 5.58s`.
+- **Suites de Excel y de rendimiento** sobre `84fd9f2` (`test_excel1_lectura`, `test_excel1_rendimiento`, `test_excel1_txt`, `test_excel2`, `test_excel2b`, `test_excel2c`, `test_excel2d`, `test_excel3`, `test_maria1b_controles`, `test_maria1b_devolucion`, `test_rendimiento1`, `test_rendimiento1b`): `1455 passed in 120.80s (0:02:00)`.
+- La suite completa no corrió.
+
+### chequeo-6
+
+```
+chequeo-6 dca338a..84fd9f2: avisos para mirar, no un veredicto
+producto +97/−6
+  AVISO producto suma 91 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +356/−9
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/main.py: 11362 → 11372
+  AVISO creció una función de más de 150: proyecto_maria/main.py:5153 try_extract_with_mapping 309 → 312, 3 en su propio cuerpo (§6: lo nuevo va aparte)
+  proyecto_maria/security/file_security.py: 715 → 796
+avisos: 2
+```
+
+- El primer AVISO tiene su porqué en «Resultado».
+- El segundo: las 3 líneas no son una rama nueva; cambian sobre qué recorre el bucle de las combinadas. Partir `try_extract_with_mapping` va a la cola de limpieza.
+- Un tercer AVISO, por un comentario de tres líneas, lo arreglé en `84fd9f2`.
+
+### Revisiones
+
+**Adversario: `adversario-opus-alto` (Opus, esfuerzo alto).**
+
+| Hallazgo | Qué pasó |
+|---|---|
+| Los formatos de un `.xls` no se miraban: 65 000 «[» tardaban 38.7 s con el GIL retenido | Arreglado en `55c5ea0` |
+| Un `cellXfs` vacío antes del real cortaba la cuenta de formatos de celda | Arreglado en `55c5ea0` |
+| 9995 combinadas en 19 990 filas: 5.6 s asignándolas de a una | Arreglado en `55c5ea0`: cada columna, una vez |
+| Un libro de ~10 MB en el carril pesado tarda 3.1–3.8 s | Riesgo: es el carril pesado, no frena a los livianos |
+
+**`/code-review high`** (Opus 5.5, esfuerzo alto): 10 hallazgos.
+
+| # | Hallazgo | Qué pasó |
+|---|---|---|
+| 3 | Un `.xls` no tenía tope de largo | Arreglado en `5f76f1a` |
+| 4 | En UTF-16, un «字» lleva un byte 0x5B y contaba como «[» | Arreglado en `5f76f1a`, con el caso «texto chino» |
+| 9 | Un comentario con historia | Arreglado |
+| 10 | Los dos AVISOS de chequeo-6 | Su porqué, arriba |
+| 1 | Con pandas 3, `df.at` copiaría los `attrs` | Riesgo bajo: pandas está fijo en 2.3.2. No lo reproduje |
+| 2 | El conjunto de celdas rellenadas queda en los `attrs` | Riesgo bajo |
+| 5 | En los topes justos, el peor caso tarda ~1.3 s | Riesgo bajo |
+| 6 | `styles.xml` se lee tres veces | Riesgo bajo, de rendimiento |
+| 7 | El `sqref` se parte por elemento | Riesgo bajo: se corta en el tope, con pico de memoria medido por debajo de 35 MB |
+| 8 | El OLE de un `.xls` se lee dos veces | Riesgo bajo, de rendimiento |
+
+El tope de largo exacto del registro FORMAT tiene su caso; con el chequeo revertido daba `UnicodeDecodeError ... truncated data` / `1 failed, 21 passed in 3.86s`.
+
+**Seguridad: `adversario-sonnet-alto` (Sonnet, esfuerzo alto).**
+
+| # | Hallazgo | Confianza | Qué pasó |
+|---|---|---|---|
+| 1 | `_rellenar_combinadas` usa `searchsorted`: con un índice desordenado o repetido rellenaría filas equivocadas | 9 | No se llega: el único llamador le pasa el índice de `read_excel`, o un recorte con `iloc` de ese índice, que siempre es creciente y sin repetidos |
+| 2 | El 400 de un `.xls` roto lleva el texto crudo de xlrd | 8 | De antes: es el mismo `Invalid Excel file: {str(e)}` de `file_security.py`. Riesgo bajo |
+| 3 | 300 000 combinadas fuera de las filas (1.4 MB) y 200 000 vínculos pasaban sin tope | — | Lo medí por la subida: 5.09 s y 2.48 s, con 200, y otro hilo frenado como mucho 0.19 s. Arreglado en `9c25e15`: cada combinada y cada vínculo cuentan como un rango en el tope de 64 000. En el tope justo (63 999), la subida tarda 1.07 s y 0.94 s |
+
+- Rojo antes del arreglo: `4 failed, 22 passed in 11.85s`, con `DID NOT RAISE ExcelDemasiadoGrande` en `[combinadas]` y `[vínculos]`, y `assert 200 == 400` en las dos subidas.
+- **Lo que verificó y está bien:** los topes aguantan prefijos de espacio de nombres, `&#91;`, `cellXfs` anidados y 100 `numFmt`; no hay XXE; una entrada repetida en el zip no cambia nada; el registro FORMAT con texto enriquecido cae bien al conteo de bytes; el fuzzing de `.xls` nunca se traba. Corrió `1094 passed, 5 deselected, 3 warnings in 80.24s`.
+- **Lo que no miró:** `services/migration_service.py` llama a `pd.read_excel` sin esta validación. Queda afuera de la pieza; te lo dejo para que decidas si va a una pieza aparte.
+
+### Riesgos y supuestos
+
+- **Riesgos:**
+  - el del adversario sobre el carril pesado con ~10 MB;
+  - los riesgos bajos del code-review;
+  - de antes y ya anotados: el `.xls` sin medir su forma y la memoria de iterparse con 1.7 M de filas.
+- **Supuestos que se pueden revertir:** los de «Decisiones».
+
+### Para reproducir
+
+```bash
+scripts/testing/sabotajes/excel2d.sh 84fd9f2   # 20 ROJO, «sabotajes con falla: 0»
+scripts/testing/sabotajes/excel2.sh 84fd9f2    # 42 ROJO, «sabotajes con falla: 0»
+DATABASE_URL=sqlite+aiosqlite:///./rep.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
+  python -m pytest -q --no-cov --durations=0 tests/test_excel2d.py   # «26 passed»; los de subida, en menos de 1.5 s
+docs/pm/herramientas/chequeo-6.py dca338a 84fd9f2   # «producto +97/−6», «avisos: 2»
+```
+
 ## COBRO-MP-2+3 (vuelta 3), PERMISOS-1 y BACKUP-1a, entregadas en `ca84c5f` (informe en el commit de arriba)
 
 Bases:
@@ -453,4 +621,4 @@ DATABASE_URL=sqlite+aiosqlite:///./rep.db GEMINI_API_KEY=test-key ENVIRONMENT=te
 docs/pm/herramientas/chequeo-6.py ac52d6f ca84c5f # «producto +19/−15», «avisos: 0»
 ```
 
-/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. COBRO-MP-2+3 vuelta 3, PERMISOS-1 y BACKUP-1a entregadas en ca84c5f (informe en el commit de arriba). Abiertas D119 (recomiendo b, pieza aparte), D120 (b), D121 (a); D8 contestada. Sigue EXCEL-2d; frenar 2026-11-08 15:50 UTC. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.
+/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. EXCEL-2d entregada en 84fd9f2 (informe en el commit de arriba). COBRO-MP-2+3 vuelta 3, PERMISOS-1 y BACKUP-1a entregadas en ca84c5f. Abiertas D119 (recomiendo b, pieza aparte), D120 (b), D121 (a); D8 contestada. Sigue lo que diga PARA-DEV.md; frenar 2026-11-08 15:50 UTC. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.
