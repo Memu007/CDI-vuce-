@@ -97,6 +97,14 @@ sabotaje $F "un sqref vuelve a partirse entero aunque pase el tope" \
   '            rangos += len(elemento.get("sqref", "").split(None, _EXCEL_MAX_RANGOS))' \
   '            rangos += len(elemento.get("sqref", "").split())' \
   "FAILED $T::test_un_sqref_largo_se_parte_hasta_el_tope"
+sabotaje $F "las celdas combinadas vuelven a no contar como rangos" \
+  '            rangos += etiqueta in ("mergeCell", "hyperlink")' \
+  '            rangos += etiqueta in ("hyperlink",)' \
+  "FAILED $T::test_un_formato_que_excel_no_guarda_se_rechaza[combinadas]"
+sabotaje $F "los vínculos vuelven a no contar como rangos" \
+  '            rangos += etiqueta in ("mergeCell", "hyperlink")' \
+  '            rangos += etiqueta in ("mergeCell",)' \
+  "FAILED $T::test_un_formato_que_excel_no_guarda_se_rechaza[vínculos]"
 
 # .xls
 sabotaje $F "los formatos de un .xls vuelven a no mirarse antes de abrir" \
