@@ -9,6 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-08 · fix: una cuenta recibe hasta 3 links de cambio de clave por hora, aunque los pedidos lleguen de IPs distintas (RESET-3)
 
 - Desde el cuarto pedido de la hora la respuesta es la misma, pero no se manda el mail ni se crea un link: uno nuevo anularía el que la persona sí pidió.
+- La cuenta del tope no se puede gastar con pedidos que inventan su IP: se lleva aparte de los contadores por IP.
 
 ## 2026-11-08 · fix: la destinación que llega al TXT es un código de 4 letras o números, y la exportación sólo genera con una EC (AVISOS-2)
 

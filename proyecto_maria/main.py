@@ -1800,8 +1800,9 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
     mensaje = {"message": "Si el email existe, se envió un link."}
     # 1. Buscar usuario
     user = await _cuenta_por_email(db, request.email)
-    # Antes de trabar la cuenta: contar hace commit y soltaría la traba.
-    if user and await _tope_por_cuenta(db, f"reset:cuenta:{user.username}"):
+    # Antes de trabar la cuenta: contar hace commit y soltaría la traba. Fuera
+    # de «reset:», que es de la IP y la IP puede traer cualquier texto.
+    if user and await _tope_por_cuenta(db, f"reset-cuenta:{user.username}"):
         return mensaje
     if user:
         # Trabar la cuenta con el email leído: un cambio de clave o email a la vez barre este link o lo impide.
