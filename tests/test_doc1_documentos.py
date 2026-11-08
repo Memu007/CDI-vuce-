@@ -54,11 +54,18 @@ def test_endpoint_rechaza_antes_de_heuristica(auth_override, client, monkeypatch
 
 
 @pytest.mark.parametrize("ruta", ["/generate_maria", "/generate_maria/avisos"])
-@pytest.mark.parametrize("destinacion", ["EC02", " ec01 ", "EC99"])
-def test_ec_directa_nunca_entra_a_importacion(auth_override, client, ruta, destinacion):
+@pytest.mark.parametrize("destinacion, es_exportacion", [
+    ("EC02", True), (" ec01 ", True), ("EC99", True),
+    # Lo que va adelante del código no lo vuelve de importación.
+    *((adelante + "EC01", True) for adelante in
+      ("\x00", "\x1f", "\x85", "\t", "\xa0", "\u2028", "\u200b", "\u2060", "\ufeff", "\u200b ")),
+    ("\u200bIC04", False), ("IC04", False),
+])
+def test_ec_directa_nunca_entra_a_importacion(auth_override, client, ruta, destinacion, es_exportacion):
     r = client.post(ruta, json={"operation_id": "SINTETICA", "items": [], "tipo_destinacion": destinacion})
-    assert r.status_code == 400, r.text
-    assert "exportación" in r.json()["detail"]
+    assert ("exportación" in str(r.json().get("detail"))) is es_exportacion, r.text
+    if es_exportacion:
+        assert r.status_code == 400, r.text
 
 
 @pytest.mark.parametrize("destinacion", ["EC02", " ec01 ", "EC99"])
