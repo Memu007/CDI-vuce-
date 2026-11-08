@@ -71,9 +71,9 @@ echo "BASE  | en verde"
 # --- Cancelar (C2)
 sabotaje $M "cancelar no llama a Mercado Pago" \
   "FAILED $T::test_cancelar_cancela_la_suscripcion_en_mp_y_sigue_hasta_el_fin" \
-  "key=paga.get):
+  "key=lambda c: (paga[c], c is db_user)):
         try:
-            await _en_hilo_mp(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)" "key=paga.get):
+            await _en_hilo_mp(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)" "key=lambda c: (paga[c], c is db_user)):
         try:
             pass"
 sabotaje $M "si Mercado Pago falla, se cancela igual en CDI" \
@@ -93,7 +93,7 @@ sabotaje $M "si el PUT falla no se pregunta el estado" \
     if _leer_suscripcion_mp(sid)"
 sabotaje $M "cancelar sin suscripción llama a Mercado Pago" \
   "FAILED $T::test_cancelar_sin_suscripcion_no_llama_a_mp" \
-  "    for cuenta in sorted(con_sid, key=paga.get):" "    for cuenta in con_sid or [db_user]:"
+  "    for cuenta in sorted(con_sid, key=lambda c: (paga[c], c is db_user)):" "    for cuenta in con_sid or [db_user]:"
 sabotaje $B "la cancelada no sigue hasta el fin del período" \
   "FAILED $T2::test_la_cancelada_genera_hasta_el_fin_del_periodo" \
   "    return fin > (ahora or datetime.now(timezone.utc))" "    return False"
@@ -190,7 +190,7 @@ sabotaje $M "en una org, quien abrió una suscripción pausada no la cancela" \
   "estado in _ESTADOS_QUE_PAGAN for cuenta, estado in estados.items()}" "estado in (\"authorized\",) for cuenta, estado in estados.items()}"
 sabotaje $M "al cancelar, la que paga no va última" \
   "FAILED $T::test_al_cancelar_la_que_paga_se_cancela_ultima[duena-pendiente]" \
-  "    for cuenta in sorted(con_sid, key=paga.get):" "    for cuenta in con_sid:"
+  "    for cuenta in sorted(con_sid, key=lambda c: (paga[c], c is db_user)):" "    for cuenta in con_sid:"
 sabotaje $M "en una org, si no se lee la del miembro, cancela igual" \
   "FAILED $T::test_un_miembro_cuya_suscripcion_no_paga_no_cancela_el_plan_del_estudio[_contesta_500-503]" \
   "    except _SuscripcionMPError as e:
@@ -319,7 +319,7 @@ sabotaje $M "con la suya cancelada, un miembro cancela la pendiente de otro" "$C
 sabotaje $M "con otra cancelada, un miembro cancela la suya pendiente" "$C[cancela_con_la_suya_pendiente]" \
   "$TODAS" '"cancelled" in estados.values()'
 sabotaje $M "reactivar acepta una suscripción propia ya cancelada" "$C[reactiva_con_la_suya_cancelada]" \
-  "    reintento = cancelar and " "    reintento = "
+  "    reintento = (cancelar and " "    reintento = ("
 
 # --- Lo que dicen los 503: nada que Mercado Pago no confirmó
 sabotaje $M "si Mercado Pago no contesta, sacar dice que el miembro ya salió" \
