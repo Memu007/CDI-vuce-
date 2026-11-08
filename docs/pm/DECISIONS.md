@@ -527,3 +527,7 @@ SEGURO-2 aceptada sobre `d160738`, sin integrar (`REPRODUCCION-SEGURO-2-2026-11-
 ### 2026-11-08 14:10 UTC (PM principal)
 
 PERMISOS-2 aceptada sobre `a1db966`, sin integrar (`REPRODUCCION-PERMISOS-2-2026-11-08.md`). Decidido por la PM: PERMISOS-3 (el `\n` final y las mayúsculas que esquivan la reserva de `ADMIN_USERNAMES`) sigue en la técnica. La cuenta demo admin fuera de `ENVIRONMENT=production` refuerza la D99 para Emi.
+
+### 2026-11-08 14:45 UTC (PM principal)
+
+PERMISOS-3 aceptada sobre `9428e00`, sin integrar (`REPRODUCCION-PERMISOS-3-2026-11-08.md`). Decidido por la PM: D127 (b), nombres únicos sin mayúsculas para todas las cuentas como pieza aparte, propuesta a Emi después de mirar producción. La técnica sigue con el arnés `separadores1b.sh` de la cola de limpieza hasta el corte.
