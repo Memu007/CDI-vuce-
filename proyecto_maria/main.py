@@ -688,6 +688,7 @@ async def _migrate_add_user_billing_columns():
         ("payment_method_last4", "VARCHAR(4)"),
         ("payment_method_brand", "VARCHAR(20)"),
         ("mp_preapproval_id", "VARCHAR(100)"),
+        ("cancelar_sin_confirmar", "VARCHAR(100)"),
         ("mp_plan_id", "VARCHAR(100)"),
         ("ops_used_this_period", "INTEGER DEFAULT 0"),
         ("extra_ops_remaining", "INTEGER DEFAULT 0"),
@@ -2102,16 +2103,19 @@ async def cancel_billing(
             detail=f"No se puede cancelar desde el estado actual: {entidad.billing_status}",
         )
 
-    # La que paga va última: si otra falla, la que paga queda sin tocar.
-    for cuenta in sorted(con_sid, key=paga.get):
+    # La que paga va última, y la de quien pide después de las otras: si una falla, la que
+    # paga queda sin tocar y quien pide sigue en el estudio con suscripción para reintentar.
+    for cuenta in sorted(con_sid, key=lambda c: (paga[c], c is db_user)):
         try:
             await _en_hilo_mp(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)
         except _SuscripcionMPError as e:
             print(f"⚠️ No se pudo cancelar la suscripción de {cuenta.username} en MP: {e}")
+            db_user.cancelar_sin_confirmar = cuenta.mp_preapproval_id
             # Una cancelada en Mercado Pago no vuelve: anotada, el perfil diría que renueva.
             await db.commit()
             raise HTTPException(status_code=503, detail=no_se_pudo)
         cuenta.mp_preapproval_id = None
+    db_user.cancelar_sin_confirmar = None
 
     ahora = datetime.now(timezone.utc)
     corta = billing_service.cancelar_corta_acceso(entidad, ahora)
@@ -10952,9 +10956,10 @@ async def _quien_toca_el_plan(db_user, org, con_sid, accion: str, no_se_pudo: st
         print(f"⚠️ {db_user.username} no pudo {accion}: {e}")
         raise HTTPException(status_code=503, detail=no_se_pudo)
     paga = {cuenta: estado in _ESTADOS_QUE_PAGAN for cuenta, estado in estados.items()}
-    # Si Mercado Pago canceló sin confirmarlo, la suya ya no paga: el reintento concilia,
-    # sólo con todas canceladas (cancelar deja la que paga para el final).
-    reintento = cancelar and all(estado == "cancelled" for estado in estados.values())
+    # Si Mercado Pago canceló sin confirmarlo, la suya ya no paga: concilia el reintento quien
+    # recibió ese 503, sólo con todas canceladas (cancelar deja la que paga para el final).
+    reintento = (cancelar and all(estado == "cancelled" for estado in estados.values())
+                 and db_user.cancelar_sin_confirmar in {c.mp_preapproval_id for c in con_sid})
     if miembro and not (paga[db_user] or reintento):
         raise sin_permiso
     return paga

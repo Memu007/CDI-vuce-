@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: en un estudio, sólo quien recibió el 503 de cancelar o la dueña concilian el reintento (COBRO-MP-4)
+
+- **fix(cobro):** si Mercado Pago canceló sin confirmarlo, el 503 queda anotado en la cuenta que lo recibió (columna nueva `users.cancelar_sin_confirmar`, la agrega el arranque) y la marca se borra al conciliar. Un miembro sin esa marca recibe 403 y no cambia nada. Volver atrás: `alter table users drop column if exists cancelar_sin_confirmar` (se pierden las marcas pendientes).
+
 ## 2026-11-08 · fix: un Excel chico armado para costar segundos ya no traba el servidor (EXCEL-2d)
 
 - **fix(excel):** antes de abrir, se rechaza un libro con un formato de número de más de 255 caracteres o 32 «[» (en un `.xls` se lee el texto del formato, así un formato en chino no cuenta como «[»), más de 65 490 formatos de celda (aunque haya un `cellXfs` vacío adentro), o más de 64 000 rangos en la primera hoja, sumando los `sqref` (formato condicional, validación), las celdas combinadas y los vínculos.
