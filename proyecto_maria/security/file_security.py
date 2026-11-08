@@ -256,6 +256,34 @@ def _mas_elementos_que(z, parte: str, tope: int) -> bool:
             cola = trozo[-1:] if trozo.endswith(b"<") else b""
 
 
+# Los topes de Excel. openpyxl mira al abrir si el formato de cada formato de
+# celda es de fecha, con una expresión cuadrática en los «[» que retiene el GIL.
+_FORMATO_MAX_LARGO, _FORMATO_MAX_CORCHETES, _MAX_FORMATOS_DE_CELDA = 255, 32, 65_490
+
+
+def _formatos_que_excel_no_guarda(z, parte: str) -> bool:
+    from xml.etree import ElementTree as ET
+    en_celdas, celdas = False, 0
+    with z.open(parte) as f:
+        for evento, e in ET.iterparse(f, events=("start", "end")):
+            nombre = e.tag.rpartition("}")[2]
+            if evento == "start":
+                en_celdas = en_celdas or nombre == "cellXfs"
+                continue
+            if nombre == "numFmt":
+                codigo = e.get("formatCode", "")
+                if len(codigo) > _FORMATO_MAX_LARGO or codigo.count("[") > _FORMATO_MAX_CORCHETES:
+                    return True
+            elif nombre == "xf" and en_celdas:
+                celdas += 1
+                if celdas > _MAX_FORMATOS_DE_CELDA:
+                    return True
+            elif nombre == "cellXfs":
+                en_celdas = False
+            e.clear()
+    return False
+
+
 def _contar_hojas_xlsx(contents: bytes) -> tuple[int, bool]:
     """Devuelve (hojas, caro): caro si la forma del libro pide el carril pesado.
     Cuenta las hojas desde xl/workbook.xml y mira, antes de abrir el libro,
@@ -290,6 +318,10 @@ def _contar_hojas_xlsx(contents: bytes) -> tuple[int, bool]:
                 raise ExcelDemasiadoGrande(
                     "Una parte del Excel es demasiado grande. Guardalo de nuevo desde Excel o "
                     "cargá los productos a mano.")
+        if ARC_STYLE in nombres and _formatos_que_excel_no_guarda(z, ARC_STYLE):
+            raise ExcelDemasiadoGrande(
+                "El Excel tiene formatos de celda que Excel no guarda (demasiados o demasiado "
+                "largos). Guardalo de nuevo desde Excel o cargá los productos a mano.")
         if hojas and hojas[0][1] not in nombres:
             raise ValueError("falta la primera hoja dentro del archivo")
         # 10 MB son unas 9.400 filas de 20 columnas con texto, o 3.100 de 60
@@ -323,14 +355,16 @@ def _contar_hojas_xlsx(contents: bytes) -> tuple[int, bool]:
 
 # Las columnas que puede usar la primera hoja (IV, el límite del Excel viejo).
 _EXCEL_MAX_COLUMNAS = 256
+_EXCEL_MAX_RANGOS = 64_000
 
 
 def _medida_hoja(xml: bytes) -> tuple[int, float, int]:
     """(columna, fila, ancho) máximos; sin «r», la fila o celda es la siguiente, como en
-    openpyxl. «ancho» suma la <dimension>, que Excel guarda a veces como A1:XFD1048576."""
+    openpyxl. «ancho» suma la <dimension>, que Excel guarda a veces como A1:XFD1048576.
+    Rechaza la hoja con más de _EXCEL_MAX_RANGOS rangos en sus sqref."""
     from xml.etree import ElementTree as ET
     from openpyxl.utils.cell import coordinate_to_tuple, range_boundaries
-    columna = fila = ancho = fila_actual = columna_actual = 0
+    columna = fila = ancho = fila_actual = columna_actual = rangos = 0
     # XML normaliza comillas, espacios y entidades en los atributos. No se
     # conserva el árbol de la hoja ni se expanden filas hasta esa columna.
     with io.BytesIO(xml) as fuente:
@@ -339,6 +373,13 @@ def _medida_hoja(xml: bytes) -> tuple[int, float, int]:
                 elemento.clear()
                 continue
             etiqueta = elemento.tag.rsplit("}", 1)[-1]
+            # openpyxl arma un objeto por rango de cada sqref (formato condicional,
+            # validación, selección): 640 000 rangos en 1.4 MB tardan 4 s al leer.
+            rangos += len(elemento.get("sqref", "").split())
+            if rangos > _EXCEL_MAX_RANGOS:
+                raise ExcelDemasiadoGrande(
+                    "La primera hoja del Excel tiene demasiados rangos con formato condicional o "
+                    "validación. Sacáselos o cargá los productos a mano.")
             try:
                 if etiqueta == "row":
                     columna_actual = 0

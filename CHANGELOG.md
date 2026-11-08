@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: un Excel chico armado para costar segundos ya no traba el servidor (EXCEL-2d)
+
+- **fix(excel):** antes de abrir, se rechaza un libro con un formato de número de más de 255 caracteres o 32 «[», más de 65 490 formatos de celda, o más de 64 000 rangos en los `sqref` de la primera hoja (formato condicional, validación).
+- **fix(excel):** miles de filas rellenadas desde celdas combinadas ya no hacen la lectura cuadrática: 2499 combinadas en 4998 filas se leen en ~1 s.
+
 ## 2026-11-08 · fix: un Excel chico con forma cara se lee en el carril pesado (EXCEL-2c)
 
 - **fix(excel):** antes de leer, se miden la fila y la columna máximas de la primera hoja (celdas, filas y `<dimension>`), los elementos de `styles.xml` y los del sst. Más de 20 000 filas, 64 columnas, 5 000 elementos de estilos o 40 000 del sst (unos 20 000 textos) mandan la lectura a los hilos pesados aunque el archivo pese poco; los topes se cambian con `EXCEL_LIVIANO_FILAS`, `_COLUMNAS`, `_ESTILOS` y `_TEXTOS`.

@@ -3674,6 +3674,13 @@ def _xlsx_solo_primera_hoja(ruta, max_filas=None) -> tuple:
 _COMBINADAS_SE_COPIAN = {"descripcion", "origen", "pieza"}
 
 
+class _Compartido(dict):
+    """pandas copia entero df.attrs en cada fila o columna que saca del df: con
+    miles de filas rellenadas eso era cuadrático. Se llena una vez y después sólo se lee."""
+    def __deepcopy__(self, memo):
+        return self
+
+
 def _rellenar_combinadas(df, combinadas, mapeo=None):
     """El texto de una celda combinada vale para todas sus filas, sólo en su
     propia columna: «China» combinada en C4:C5 es el origen de las dos filas;
@@ -3708,7 +3715,7 @@ def _rellenar_combinadas(df, combinadas, mapeo=None):
     # Qué celdas son copia de una combinada: no son el rótulo ni el origen
     # propios de la fila (un origen combinado hasta el flete no lo vuelve
     # producto; EXCEL-3b).
-    rellenadas = df.attrs.setdefault("celdas_rellenadas", {})
+    rellenadas = df.attrs.setdefault("celdas_rellenadas", _Compartido())
     for f1, c1, f2, _c2 in sorted(set(combinadas)):
         if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:
             continue
@@ -8543,8 +8550,8 @@ async def upload_excel_v2(
             # Las celdas copiadas de una combinada siguen a su columna
             # renombrada («Origin» pasa a «origen»; EXCEL-3b).
             if "celdas_rellenadas" in df.attrs:
-                df.attrs["celdas_rellenadas"] = {
-                    rename.get(c, c): f for c, f in df.attrs["celdas_rellenadas"].items()}
+                df.attrs["celdas_rellenadas"] = _Compartido({
+                    rename.get(c, c): f for c, f in df.attrs["celdas_rellenadas"].items()})
             avisos = _peso_por_unidad(df, pesos, columna_de, clases)
 
         descartes: list = []
