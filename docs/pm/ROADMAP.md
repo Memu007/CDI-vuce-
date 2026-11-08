@@ -167,7 +167,7 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | ✅ AISLAMIENTO-2 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ LIMPIEZA-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ PERMISOS-1 | Dev técnica | Sumada por la PM el 08/11 («arreglos chicos de seguridad», Emi; D116): ningún usuario llega a admin por un email que él puso |
-| ⏳ COBRO-MP-4 | Dev técnica | Sumada por la PM el 08/11 (D119 b, seguridad de MP, Emi): sólo quien recibió el 503 de cancelar, o la dueña, concilia el reintento |
+| ✅ COBRO-MP-4 | Dev técnica | Sumada por la PM el 08/11 (D119 b, seguridad de MP, Emi): sólo quien recibió el 503 de cancelar, o la dueña, concilia el reintento |
 | ⏳ PERMISOS-2 | Dev técnica | Sumada por la PM el 08/11 (D120 b, «arreglos chicos de seguridad», Emi): sólo los roles guardados dan admin; el registro rechaza un nombre de `ADMIN_USERNAMES` |
 | 🔵 OBSERVABILIDAD-1 | Dev MARIA | La columna `api_logs.owner_username` que falta en producción, con migración probada en Postgres descartable |
 | ✅ CATALOGO-LARGO-1 | Dev MARIA | Sumada por Emi el 04/11: una descripción larga (301 a 2000 caracteres) no se pierde en silencio en la memoria del cliente ni en el catálogo (`product_key` de 300); con migración probada en Postgres descartable si hace falta |
