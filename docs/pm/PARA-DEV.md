@@ -3,6 +3,30 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## Tarea activa: NOMBRES-1 (sí de Emi, 2026-11-08 17:05 UTC)
+
+Emi dio 12 h más: hasta el **2026-11-09 05:00 UTC**. Ahí cortás como hoy:
+terminás el paso, commit y push, anotás dónde quedaste y frenás.
+
+**Qué tiene que pasar** (sale de tu D127 b): nadie puede registrarse, ni
+cambiar su nombre, con uno que ya existe escrito con otras mayúsculas
+(`emi` existe → `Emi`, `EMI`, `eMi` dan «Usuario ya existe», igual que hoy
+el nombre exacto). Vale para todas las cuentas, no sólo las de
+`ADMIN_USERNAMES`.
+
+**Sin mirar producción:** no tenés acceso y no hace falta. Lo que ya existe
+queda como está: si en la base hay dos cuentas que difieren sólo en
+mayúsculas, las dos siguen entrando con su nombre exacto, el arranque no
+cambia a quién promueve y nada se migra ni se borra. Por eso no va un índice
+único nuevo; si creés que hace falta, es una D.
+
+**Prueba:** un caso con la familia como datos (otras mayúsculas, la cuenta
+de la lista y una que no está, el cambio de nombre si existe esa ruta) que
+dé rojo con el chequeo de hoy; otro con dos cuentas viejas que difieren en
+mayúsculas, sembradas directo en la base, que siguen entrando cada una con
+su clave. En SQLite y en Postgres 16 descartable. Es permisos: revisión
+fuerte (§3), con guion de sabotaje propio. Próxima D libre: D128.
+
 ## PERMISOS-3: aceptada sobre `9428e00`, sin integrar (2026-11-08 PM)
 
 Evidencia: `docs/pm/REPRODUCCION-PERMISOS-3-2026-11-08.md`. Igual al informe:
@@ -15,15 +39,12 @@ Tus supuestos quedan como están.
   las cuentas es una pieza aparte, y antes hay que mirar producción: se la
   propongo a Emi. Sin su sí no entra.
 
-## Seguí con SEPARADORES-1b-ARNÉS (2026-11-08 PM, de la cola de limpieza)
+## SEPARADORES-1b-ARNÉS: aceptada sobre `1063b32`, sin integrar (2026-11-08 PM)
 
-`scripts/testing/sabotajes/separadores1b.sh`: el patrón 3 no encuentra su
-ancla desde `4f2045f` y el guion da salida 1 también en la base
-(`COLA-LIMPIEZA.md`). Pedido: que el guion vuelva a dar base en verde y todos
-sus sabotajes en rojo sobre tu cabeza, sin tocar producto. El ancla es código.
+Evidencia: `docs/pm/REPRODUCCION-SEPARADORES-1b-ARNES-2026-11-08.md`. Igual
+al informe: base `265 passed`, 12 ROJO, salida 0. Tu hallazgo del caso que ya
+no distingue `sin_grupo` va a la cola de limpieza.
 
-Corte: hoy 15:50 UTC se apagan las rutinas. Si no llegás, commit y push de lo
-que tengas y anotá en `PARA-PM.md` dónde quedaste. Próxima D libre: D128.
 
 ## AISLAMIENTO-2 y LIMPIEZA-1: aceptadas sobre `c86f3ff`, sin integrar (2026-11-08 PM)
 

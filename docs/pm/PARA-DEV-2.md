@@ -69,26 +69,45 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## SEGURO-2: aceptada sobre `d160738`, sin integrar (2026-11-08 PM)
+## EMAIL-1 (D45 (1)): aceptada sobre `40423be`, sin cambio de producto ni integrar (2026-11-08 PM)
 
-Evidencia: `docs/pm/REPRODUCCION-SEGURO-2-2026-11-08.md`. Igual al informe:
-242 passed en las suites de la entrega; `seguro2.sh` 19 ROJO, `seguro1.sh`
-12 ROJO, `valor1c.sh` en curso (lo completo en el acta). Un adversario Sonnet alto manejó la
-pantalla real y no logró un TXT con seguro sin leer ni con el 1 % bajo CIF.
+Emi dio 12 h más: corte el **2026-11-09 05:00 UTC**, como el de hoy.
 
-- **D125 → (a)**, **D126 → (a)**, decididas por la PM.
-- **AVISOS-1 suma dos cosas** (mismo tema: lo que la persona lee):
-  1. calcular con FOB y pasar a CIF dice «no pudimos leerlo de la factura»,
-     que es falso; el freno queda, el texto tiene que decir lo que pasó;
-  2. tras el 400 «no pudimos leerlo», la revisión no muestra el motivo (queda
-     en la pantalla de generar, oculta) y la pista del campo dice «Dejar en 0
-     si no aplica» con el campo vacío. El motivo tiene que verse donde la
-     persona cae. Caso de la familia: cada 400 que cambia de pantalla.
-- El arnés roto de `separadores1b.sh` (de antes) va a la cola de limpieza.
+Evidencia: `docs/pm/REPRODUCCION-EMAIL-1-D45-2026-11-08.md`. Igual al informe,
+ahora también sobre `40423be`: chequeo-6 sin avisos; `email1.sh` 15 ROJO, sin
+rojo 0; en PG 16 con `C.UTF-8`, la familia da 1 letra (U+0130), `und-x-icu` 0
+y `ucs_basic` 1407; `abuso2_postgres.py` fallas 0; `abuso2.sh` 20 ROJO.
+Aceptás bien la premisa caída y admitir que `email1.sh` estaba roto.
 
-Seguí con **AVISOS-1** (D123 a + lo de arriba). Corte hoy 15:50 UTC: si no
-llegás, commit y push de lo que tengas y anotá en `PARA-PM-2.md` dónde
-quedaste. Próxima D libre: D127.
+- **D131 → (a)**, va a Emi. Sumo una prueba a tu favor: con una base mía en
+  `C`/`SQL_ASCII`, las variantes con İ mandan 1 mail en vez de 3. La base no
+  las encuentra.
+- **D132 → (a)**, decidida por la PM: pieza **RESET-3**, después de AVISOS-2.
+  Pedir el reset tiene tope por cuenta, como `recuperar:cuenta:`. El rojo es
+  con IPs distintas y lleva sabotaje propio.
+- Las cuatro líneas «EMAIL-1» de `main.py` van a la cola de limpieza.
+
+**Tarea activa: AVISOS-2**, con lo de arriba (D129 (a), D130 (a) y las tres
+bajas). Después, RESET-3. Próxima D libre: D133.
+
+## AVISOS-1: aceptada sobre `0aed334`, sin integrar (2026-11-08 PM)
+
+Evidencia: `docs/pm/REPRODUCCION-AVISOS-1-2026-11-08.md`. Igual al informe:
+chequeo-6 con los tres avisos explicados; `avisos1.sh` 22 ROJO y `seguro2.sh`
+19 ROJO, sin rojo 0. Las seis suites dan `256 passed`, no 199: el número del
+informe quedó de una corrida anterior. Sonnet alto: ninguna importación
+frenada por error y ninguna exportación que genere; sin 500.
+
+- **D129 → (a)**, decidida por la PM: el predicado único antes de limpiar.
+- **D130 → (a)**, decidida por la PM: pieza **AVISOS-2**, después de EMAIL-1.
+  Suma tres bajas del adversario:
+  1. `es_exportacion` normaliza el texto entero (2 millones de caracteres,
+     unos 5 s con el proceso trabado): que un texto enorme no cueste;
+  2. con el seguro borrado y de vuelta a FOB, el 400 dice «al pasar a un
+     incoterm que ya lo lleva en el precio»: tiene que decir lo que pasó,
+     como la nota;
+  3. `/generate_maria_export` acepta `IC04` o `TRAN` en un TXT de exportación.
+- Al dar números, el del SHA que entregás.
 
 ## SUFIJOS-2+SEGURO-1: aceptada sobre `ad2d0f8`, sin integrar (2026-11-08 PM)
 
