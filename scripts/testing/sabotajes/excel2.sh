@@ -237,8 +237,8 @@ sabotaje $F "los .rels vuelven a no tener tope" \
   '            if False:' \
   "FAILED $T::test_un_rels_de_hoja_enorme_se_rechaza"
 sabotaje $F "una celda en la columna XFD vuelve a pasar" \
-  '        if hojas and _ultima_columna(z.read(hojas[0][1])) > _EXCEL_MAX_COLUMNAS:' \
-  '        if False:' \
+  $'        if columna > _EXCEL_MAX_COLUMNAS:\n            raise' \
+  $'        if False:\n            raise' \
   "FAILED $T::test_una_celda_en_la_ultima_columna_se_rechaza_antes_de_abrir"
 
 echo "sabotajes con falla: $FALLAS"

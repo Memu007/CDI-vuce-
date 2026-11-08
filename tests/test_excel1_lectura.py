@@ -300,7 +300,7 @@ def test_xlsx_que_se_descomprime_a_gigas_se_rechaza_antes_de_abrirlo(monkeypatch
     import zipfile
     from proyecto_maria.security import file_security
     abrir = []
-    monkeypatch.setattr(file_security, "_contar_hojas_excel", lambda *a: abrir.append(1) or 1)
+    monkeypatch.setattr(file_security, "_contar_hojas_excel", lambda *a: abrir.append(1) or (1, False))
     # Un .xlsx de verdad (pasa el control de tipo) con un relleno que
     # descomprimido ocupa 150 MB.
     import openpyxl
