@@ -4,8 +4,8 @@ openpyxl y xlrd evalúan, al abrir, cada formato con una expresión que crece
 con el cuadrado de los «[» y retiene el GIL: 120 000 «[» en 5 KB frenaban a
 todos los hilos 9 s. Antes de abrir, se rechaza un formato de más de 32 «[»
 (en un .xlsx, también de más de 255 caracteres), más de 65 490 formatos de
-celda y más de 64 000 rangos en los sqref de la primera hoja. Las celdas
-combinadas no tienen tope propio: el de filas las corta en ~1 s.
+celda y más de 64 000 rangos entre los sqref, las celdas combinadas y los
+vínculos de la primera hoja: openpyxl arma un objeto por cada uno.
 """
 import io
 import re
@@ -52,6 +52,13 @@ def _con_rangos(n):
     rangos = " ".join(f"A{i}" for i in range(1, n + 1))
     return _tras_las_filas(_normal(), f'<conditionalFormatting sqref="{rangos}"><cfRule type="expression" '
                                       'priority="1"><formula>1</formula></cfRule></conditionalFormatting>')
+
+
+def _con_refs(etiqueta, n):
+    """`n` celdas combinadas o vínculos, fuera de las filas con datos."""
+    contenedor = {"mergeCell": "mergeCells", "hyperlink": "hyperlinks"}[etiqueta]
+    refs = "".join(f'<{etiqueta} ref="A{i}:B{i}"/>' for i in range(30, 30 + n))
+    return _tras_las_filas(_normal(), f"<{contenedor}>{refs}</{contenedor}>")
 
 
 def _con_combinadas(filas):
@@ -106,6 +113,8 @@ CAUSAS = {
     "formatos de celda": (lambda: _con_formato("0.00", 65_490), lambda: _con_formato("0.00", 65_491), True),
     "formatos de celda tras un cellXfs sin hijos": (lambda: _anidado(65_490), lambda: _anidado(65_491), True),
     "rangos": (lambda: _con_rangos(63_999), lambda: _con_rangos(64_000), False),
+    "combinadas": (lambda: _con_refs("mergeCell", 63_999), lambda: _con_refs("mergeCell", 64_000), False),
+    "vínculos": (lambda: _con_refs("hyperlink", 63_999), lambda: _con_refs("hyperlink", 64_000), False),
     "corchetes en un .xls": (lambda: _xls("[" * 32), lambda: _xls("[" * 33), False),
     "corchetes en un .xls sin OLE": (lambda: _xls("[" * 32, en_ole=False), lambda: _xls("[" * 33, en_ole=False),
                                      False),
@@ -156,6 +165,8 @@ SUBIDAS = {
     "2499 combinadas en 4998 filas": (lambda: _con_combinadas(4_998), 200, None, 3),
     "9995 combinadas en 19 990 filas": (lambda: _con_combinadas(19_990), 400, "filas", 3),
     "640 000 rangos de formato condicional": (lambda: _con_rangos(640_000), 400, "rangos", 1),
+    "300 000 combinadas fuera de las filas": (lambda: _con_refs("mergeCell", 300_000), 400, "rangos", 1),
+    "200 000 vínculos": (lambda: _con_refs("hyperlink", 200_000), 400, "rangos", 1),
     "tres formatos de 60 000 corchetes en un .xls": (lambda: _xls("[" * 60_000, 3), 400, "formato", 1),
 }
 
