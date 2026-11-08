@@ -49,7 +49,7 @@ def _formas(n):
 
 @pytest.fixture
 def nombre(monkeypatch):
-    limiter.enabled = False
+    monkeypatch.setattr(limiter, "enabled", False)
     monkeypatch.delenv("ADMIN_USERNAMES", raising=False)
     monkeypatch.setattr(main, "_email_verification_enabled", lambda: False)
     n = f"n1_{uuid.uuid4().hex[:8]}"
