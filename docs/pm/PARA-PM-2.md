@@ -2,286 +2,189 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## SEGURO-2: **entregada**, producto y pruebas en `d160738` (2026-11-08)
+## AVISOS-1: **entregada**, producto y pruebas en `0aed334` (2026-11-08)
 
-Base `3366ca5`. Lo que SEGURO-1 sólo avisaba ahora frena la generación hasta
-que se corrige, en `/generate_maria` (400) y en `/generate_maria/avisos` (el
-mismo texto). Hay dos frenos:
+Base `e6adea1`. Son tres cosas, y no cambia lo que sale en un TXT que se
+genera: cambia cuándo no se genera y lo que la persona lee.
 
-1. **El seguro para completar.** Si la factura traía seguro y no se pudo
-   leer, no se genera mientras no se complete. El 400 dice: «Seguro: no
-   pudimos leerlo de la factura. Completalo en la revisión; si la factura no
-   trae seguro, escribí 0.» Cualquier valor escrito en la revisión lo
-   completa, 0 incluido. En la revisión ese campo se ve vacío: un 0 a la
-   vista parecía leído, y escribir el mismo 0 no disparaba el cambio. Si el
-   servidor frena por esto, la pantalla vuelve a la revisión.
-2. **El 1 % dejado con un incoterm que ya lleva el seguro en el precio**
-   (D30 b). «Dejar el seguro como está» ahora lo marca como dejado. Con CIF
-   (o cualquiera de los cinco), ese 1 % frena igual que el calculado. Con
-   otro incoterm, dejarlo es elegirlo y genera, aunque las cuentas de ahora
-   den otro número. Recalcularlo, escribirlo a mano o el borrado al pasar a
-   CIF le sacan la marca.
-
-No cambia lo que sale en el TXT: sólo cuándo no se genera. Un 0 escrito sale
-`0.00` como antes, y el 1 % dejado con CFR sale igual que antes.
+1. **Exportación con algo adelante (D123).** `EC01` con un invisible
+   (`​`, `﻿`, `⁠`), un nulo, un relleno Hangul (`ㅤ`,
+   `ﾠ`), un espacio, un guion o escrito en ancho completo (`ＥＣ01`)
+   generaba 200 con un TXT de importación (`ISTA=​EC0`). Ahora generar,
+   los avisos y el generador usan un solo predicado (`es_exportacion`:
+   NFKC, mayúsculas, se saltea lo que no es letra o número ASCII adelante) y
+   dan el 400 de siempre. **No lo puse donde dijo D123: va D129.**
+2. **El seguro borrado al pasar a CIF.** Calcular el 1 % con FOB y pasar a
+   un incoterm con el seguro en el precio lo borra (el freno sigue). Antes el
+   400, los avisos, la nota y el semáforo decían «no pudimos leerlo de la
+   factura». Ahora el pedido manda `seguro_borrado` y todos dicen: «Seguro:
+   el que calculó el sistema se borró al pasar a un incoterm que ya lo lleva
+   en el precio. Cargá el de la factura en la revisión; si la factura no trae
+   seguro, escribí 0.» La marca se va al recalcularlo o escribir un valor;
+   vaciar el campo no la saca. De vuelta a FOB la nota sigue diciendo que se
+   borró.
+3. **El motivo donde cae la persona.** Ante el 400 del seguro la pantalla
+   vuelve a la revisión y el motivo queda debajo del campo, marcado en rojo y
+   llevado a la vista (`marcarEnLaRevision`). La pista dice «Si la factura no
+   trae seguro, escribí 0.» en vez de «Dejar en 0 si no aplica». Caso de la
+   familia, cada 400 que cambia de pantalla: sub-ítem (NCM), sufijo (generar),
+   seguro en el precio, seguro sin leer, seguro borrado.
 
 | SHA | qué |
 |---|---|
-| `2bfbee9` | fix: el seguro sin completar y el 1 % dejado con CIF frenan la generación + CHANGELOG |
-| `e0aa49c` | test: casos del seguro para completar y del 1 % dejado; arnés `seguro2.sh`; anclas de `valor1c`, `separadores1b` y `seguro1` al nombre nuevo |
-| `836f131` | merge de tu rama |
-| `e464a6e` | fix: el seguro para completar se ve vacío y el 400 vuelve a la revisión |
-| `e88435b` | test: esos dos |
-| `9949e89` | fix: la revisión usa el mismo predicado de finalize y sólo vacía el seguro |
-| `b5cc881` | test: el flete sin leer se ve como vino; las anclas siguen al predicado compartido |
-| `6546870` | test: la revisión encuentra el predicado que exporta `finalize.js` |
-| `332750c` | fix: el porqué del freno en dos líneas |
-| `d160738` | merge de tu rama (sólo docs) |
+| `7a2961f` | fix: EC con un invisible adelante (primera versión) |
+| `8df6d91` | test: lo que va delante de EC, caso y arnés `avisos1.sh` |
+| `a94ed02` | test: el arnés compara el id de pytest con la barra escrita |
+| `e2864dc` | merge de tu rama (SEGURO-2 aceptada) |
+| `d7345fa` | fix: un solo predicado de exportación (generar, avisos, generador) |
+| `2ebf5b0` | test: rellenos, ancho completo, generador directo |
+| `efb9c07` | fix: el seguro borrado dice lo que pasó; el motivo en la revisión; la pista + CHANGELOG |
+| `491f2a3` | test: sus casos y sabotajes |
+| `cec3564` | fix: el semáforo y la nota de FOB; vaciar el campo no saca la marca; el campo a la vista + CHANGELOG |
+| `0aed334` | test: esos casos y sabotajes; un patrón de `seguro2.sh` sigue al código |
+| `3af69c0` | merge de tu rama (sólo `docs/pm/`; producto y pruebas iguales a `0aed334`) |
+| `dc2943d` | test: EMAIL-1 empezada (un email vacío no encuentra la cuenta sin email); fuera de esta entrega |
 | este commit | docs: este informe |
 
-`producto +46/−20`. Suma 26 netas, y estas son las razones:
-
-- el freno nuevo en el servidor: la constante del texto, los dos campos del
-  pedido y las ramas de `_seguro_por_corregir`, que reemplaza a
-  `_seguro_calculado_viejo`;
-- las dos marcas en el pedido y la de dejado, que se pone y se saca en los
-  cuatro lugares donde cambia el seguro;
-- la vista vacía en la revisión (`valorEnLaRevision`) y la vuelta a la
-  revisión ante el 400.
+`producto +54/−16`. Suma 38 netas: el predicado único con su constante (y
+el import en `main.py`), el texto del borrado y su campo en el pedido, la
+marca que se pone y se saca en la pantalla y en el semáforo, y
+`marcarEnLaRevision`, que va aparte.
 
 ## Decisiones
 
-**D125.** Un 1 % que llega sin marcas (ni `seguro_calculado` ni
-`seguro_dejado`) genera 200 con CIF. Es el caso de un cliente viejo, de la
-API sin la pantalla, o de alguien que lo escribió a mano. El servidor no
-tiene cómo distinguirlo de una factura que trae exactamente el 1 %.
+**D129.** D123 (a) dice que el rechazo de exportación va después de limpiar
+los textos. No lo moví. Evidencia: `limpiar_texto` sólo saca el nulo; no
+saca `​`, `ㅤ` ni el espacio, así que moverlo no arregla la
+familia. Y después de `_textos_como_van_al_txt` el chequeo queda detrás del
+400 `SIN_PRODUCTOS` cuando `items: []`, y esa exportación recibía otro
+motivo. Lo que sí resuelve la familia es el predicado (NFKC + saltear lo que
+no es letra o número adelante), que es el mismo en los dos endpoints y en el
+generador.
 
-- (a) aceptarlo así: el freno mira cómo llegó el seguro, no cuánto vale;
-- (b) que el servidor recalcule el 1 % y frene si coincide. Frenaría
-  facturas reales que traen exactamente el 1 %, y la persona no tendría
-  cómo pasar.
+- (a) dejarlo antes, con el predicado único (lo entregado; recomiendo);
+- (b) además moverlo después de limpiar, como dijo D123, aceptando que el
+  pedido sin ítems diga `SIN_PRODUCTOS`.
 
-Recomiendo (a). Con (b), el falso rojo no tiene salida; con (a), el agujero
-necesita saltear la pantalla.
+**D130.** Una lista blanca para `tipo_destinacion`: `^[A-Z]{2}\d{2}$` después
+de NFKC, o 400. Hoy `​IC04` (importación, no se frena) sale con un ISTA
+corrupto, y `0EC01` o `XEC01` pasan cortados a 4 (`0EC0`). Entraría también
+`pdf_extractor.py:2035`, que sigue con `strip`. Hay precedente en
+`_sanitize_op_default` (`main.py:2415`).
 
-**D126.** La nota «si la factura no trae seguro, escribí 0» del 400 sale
-también con FOB o CFR. Ahí un 0 está bien, pero el sistema podría ofrecer
-calcular el 1 %.
+- (a) pieza chica aparte con la lista blanca (recomiendo: es lo que cierra
+  los homoglifos de abajo);
+- (b) no hacerlo.
 
-- (a) dejarla igual para los cinco incoterms;
-- (b) con FOB y CFR, decir además que se puede calcular en «Ajustes y
-  seguro».
+Supuesto reversible: `-EC01` frena a propósito (es una exportación mal
+escrita, no una importación).
 
-Recomiendo (a): un texto para todos, y el botón de calcular ya está en esa
-pantalla. (b) es un cambio de texto chico, si lo querés.
-
-## Riesgos
-
-- **La marca es la palabra del cliente.** `seguro_para_completar` y
-  `seguro_dejado` los manda la pantalla. Un cliente que no los manda genera
-  como antes de SEGURO-2: es D125 y lo mismo que ya pasaba con
-  `seguro_calculado`.
-- **Con CIF y el 1 % dejado, el 400 dice «lo calculó el sistema»** y lleva a
-  `validating`, que es el mismo texto y el mismo camino que el calculado. Es
-  cierto (el número lo calculó el sistema), pero no menciona que se dejó.
-- **`borrarSeguroCalculado`**, al pasar a CIF, agrega el seguro a
-  `campos_sin_leer`. Desde ahí cuenta como «no se pudo leer», aunque la
-  factura no lo trajera, y para generar hace falta escribir un valor (0
-  sirve). Es la dirección segura: pide un dato en vez de dejar pasar el 1 %.
-- **El `startsWith('Seguro: no pudimos leerlo')` de `finalize.js`** repite
-  el comienzo de la constante del servidor. Si alguien cambia ese texto, el
-  400 se queda en la pantalla de generar en vez de volver a la revisión. Lo
-  cubre `test_si_el_servidor_pide_completarlo_se_vuelve_a_la_revision`, que
-  usa el texto del servidor copiado: falla si cambia la pantalla, no si
-  cambia el servidor.
-- **La revisión depende de `finalize.js`**: llama a `CDI.seguroSinLeer`. Si
-  la exportación se pierde, la revisión tira un error al abrirse. Lo cubre
-  `test_la_revision_tiene_el_predicado_de_finalize`; sin ese caso, quitar la
-  exportación daba todo verde (lo encontré yo, abajo).
-- **La firma del pedido incluye los campos nuevos.** Un cambio de marca
-  vuelve a pedir las cuentas, como cualquier otro cambio del pedido.
-- **«abc no es un importe» con el seguro para completar** frena por el
-  importe primero (400 de SEPARADORES-1b) y se queda en la pantalla de
-  generar, como antes.
-- **Con CIF y el seguro sin leer, la pantalla de valor muestra tres
-  instrucciones** (la nota, el aviso y el 400), que dicen lo mismo con otras
-  palabras. Es un riesgo de UX y no lo toqué.
-- **Sólo API:** dejado + seguro 0 + CIF da 400 «lo calculó el sistema». La
-  pantalla no puede armar ese pedido: escribir el 0 saca la marca.
-
-## Hallazgos de la autorrevisión
-
-| quién | modelo y esfuerzo | hallazgo | qué hice |
-|---|---|---|---|
-| adversario | Sonnet alto | MEDIA: escribir el seguro sin leer no tenía prueba de que lo completa | `e88435b`: `test_escribir_el_seguro_sin_leer_lo_completa` + sabotaje |
-| adversario | Sonnet alto | BAJA: el seguro sin leer se veía 0 en la revisión | `e464a6e` + caso + sabotaje |
-| adversario | Sonnet alto | BAJA: `borrarSeguroCalculado` lo marca «sin leer» | riesgo, arriba |
-| adversario | Sonnet alto | INFORMATIVA: el freno depende de lo que manda el cliente | riesgo, arriba (D125) |
-| adversario | Opus alto | MEDIA: el 1 % sin marcas genera 200 con CIF | D125 |
-| adversario | Opus alto | MEDIA: el 0 a la vista | `e464a6e` (el mismo de arriba) |
-| adversario | Opus alto | BAJA: el 400 del seguro para completar terminaba en la pantalla de generar | `e464a6e`: vuelve a la revisión + caso + sabotaje |
-| adversario | Opus alto | BAJA: «escribí 0» también con FOB o CFR | D126 |
-| adversario | Opus alto | BAJA, sólo API: dejado + 0 + CIF da 400 | riesgo, arriba |
-| adversario | Opus alto | INFORMATIVO: con un importe roto frena primero por SEPARADORES-1b | riesgo, arriba |
-| `/code-review` | high | `borrarSeguroCalculado` marca el seguro como sin leer | riesgo, arriba |
-| `/code-review` | high | el freno depende del booleano del cliente | riesgo, arriba (D125) |
-| `/code-review` | high | el `startsWith` repite la constante | riesgo, arriba |
-| `/code-review` | high | dejado + CIF dice «lo calculó el sistema» y lleva a `validating` | riesgo, arriba |
-| `/code-review` | high | el predicado del seguro sin leer, repetido en la revisión | `9949e89`: la revisión usa el de `finalize.js` |
-| `/code-review` | high | la vista vacía alcanzaba también al flete y los gastos sin leer | `9949e89`: sólo el seguro; caso `[flete_sin_leer]` |
-| `/code-review` | high | dos `if` iguales en `onFieldChange` | `9949e89`: uno solo |
-| `/code-review` | high | instrucción triple con CIF | riesgo de UX, arriba |
-| `/security-review` | — | 0 hallazgos con confianza ≥ 8 | — |
-| yo | — | sin la exportación de `CDI.seguroSinLeer` todo quedaba verde (`429 passed`); en el navegador, la revisión tiraba un error | `6546870`: `test_la_revision_tiene_el_predicado_de_finalize`; su rojo: `TypeError: undefined is not a function` |
-
-## Rojos antes del arreglo
-
-Producto de `3366ca5` con los casos de `d160738` (`test_seguro2`,
-`test_seguro1` y `test_valor1c`), en un worktree aparte:
-`22 failed, 85 passed, 5 warnings in 32.21s`, salida 1.
-
-| caso | por qué falla en la base |
-|---|---|
-| `test_un_seguro_sin_leer_no_genera_y_los_avisos_lo_dicen` `[CIF-]`, `[CIF-0]`, `[FOB-]`, `[CFR-14.88]` | `assert 200 == 400`: genera el TXT |
-| `test_el_uno_por_ciento_dejado_no_genera_con_cif` | `assert 200 == 400` |
-| `test_el_pedido_dice_si_el_seguro_sigue_para_completar`, los 4 | `JSONDecodeError`: el campo no existe y no sale JSON |
-| `test_si_el_servidor_pide_completarlo_se_vuelve_a_la_revision` | `assert None == 'review'` |
-| `test_la_revision_tiene_el_predicado_de_finalize` | error de node: `window.CDI.seguroSinLeer` no existe |
-| `test_un_campo_sin_leer_se_ve_vacio_en_la_revision`, los 4 | `no está valorEnLaRevision en review.js` |
-| `test_la_revision_muestra_vacio_el_seguro_sin_leer_y_lo_deja_en_0` | `no está valorEnLaRevision en review.js` |
-| `test_el_pedido_dice_si_el_seguro_se_dejo` | `assert [None] == [True]` |
-| `test_el_dejado_se_borra_al_pasar_a_cif_y_queda_para_completar` | `assert (14.88 == '')` |
-| `test_recalcularlo_ya_no_es_el_dejado` | `'seguro_dejado' not in {'seguro': 93.13, 'seguro_dejado': True, 'seguro_calculado': True}` |
-| `test_escribirlo_a_mano_ya_no_es_el_dejado` | `{'seguro': 15...dejado': True} == {'seguro': 15}` |
-| `test_seguro1::test_con_cif_y_un_seguro_sin_leer_la_nota_lo_pide` | `'Con CIF el s... la revisión.' == 'Con CIF el s...o, escribí 0.'` |
-| `test_valor1c::test_dejarlo_lo_marca_como_dejado_y_pide_las_cuentas_de_nuevo` | `{'seguro': 14.88} == {'seguro': 14...dejado': True}` |
-
-Pasan en la base, y tienen que pasar: `test_el_cero_escrito_a_proposito_genera`,
-`test_el_uno_por_ciento_dejado_genera_con_cfr` y
-`test_escribir_el_seguro_sin_leer_lo_completa` (la revisión ya marcaba un campo
-escrito como completado). Son los que vigilan que el freno no alcance de más;
-sus rojos salen en los sabotajes «un 0 también frena», «el dejado se compara
-con las cuentas de ahora» y «escribirlo no lo completa».
-
-## Puertas
-
-Todas sobre `d160738`, el último commit de producto y pruebas (este informe
-sólo agrega docs). Corrieron desde un worktree limpio y de a una, y los logs
-están en el scratchpad.
-
-| puerta | salida exacta |
-|---|---|
-| `compileall -q proyecto_maria` | `compileall 0` |
-| suite, SQLite (`ENVIRONMENT=test`, `--timeout=300`) | `5294 passed, 335 skipped, 3 xfailed, 98 warnings in 1030.50s (0:17:10)`, salida 0 |
-| suite como la CI (`ENVIRONMENT=testing`, sin `DATABASE_URL`) | `5294 passed, 335 skipped, 3 xfailed, 92 warnings in 1038.71s (0:17:18)`, salida 0 |
-| `test_seguro2` + `test_seguro1` + `test_valor1` + `test_valor1c` + `test_maria7_rechazos_24_10` | `194 passed, 3 warnings in 49.42s` |
-| sabotajes `seguro2.sh` | `BASE \| 78 passed, 5 warnings in 20.65s`, 19 `ROJO`, `sabotajes sin rojo: 0` |
-| sabotajes `seguro1.sh` | `BASE \| 52 passed, 5 warnings in 15.55s`, 12 `ROJO`, `sabotajes sin rojo: 0` |
-| sabotajes `sabotaje_valor1c.sh` | `OK: los 25 sabotajes dan rojo por la razón esperada`, salida 0 |
-| sabotajes `sabotaje_separadores1b.sh` | salida 1, idéntica a la de la base `3366ca5`: las dos fallas previas (`factura_multiplica` y el patrón 3 de `montos_ar.js`, roto desde `4f2045f`), y el corte por el patrón roto deja sin correr el 3b y del 4 al 10. Abajo, la corrida sin el 3 |
-| grep de historia de §6 | vacío |
-
-`seguro2.sh`, entero:
-
-```
-Preparing worktree (detached HEAD d160738)
-BASE  | ======================= 78 passed, 5 warnings in 20.65s ========================
-ROJO  | el servidor no mira si sigue para completar: «FAILED tests/test_seguro2.py::test_un_seguro_sin_leer_no_genera_y_los_avisos_lo_dicen[CIF-]» «FAILED tests/test_seguro2.py::test_un_seguro_sin_leer_no_genera_y_los_avisos_lo_dicen[FOB-]» 
-ROJO  | un 0 también frena: «FAILED tests/test_seguro2.py::test_el_cero_escrito_a_proposito_genera» 
-ROJO  | generar sólo avisa: «FAILED tests/test_seguro2.py::test_un_seguro_sin_leer_no_genera_y_los_avisos_lo_dicen[CIF-]» «FAILED tests/test_seguro2.py::test_el_uno_por_ciento_dejado_no_genera_con_cif» 
-ROJO  | el pedido no dice que sigue para completar: «FAILED tests/test_seguro2.py::test_el_pedido_dice_si_el_seguro_sigue_para_completar[sin_leer]» 
-ROJO  | escribirlo no lo completa: «FAILED tests/test_seguro2.py::test_escribir_el_seguro_sin_leer_lo_completa[0-True]» «FAILED tests/test_seguro2.py::test_escribir_el_seguro_sin_leer_lo_completa[15-True]» 
-ROJO  | el seguro sin leer se ve en 0: «FAILED tests/test_seguro2.py::test_un_campo_sin_leer_se_ve_vacio_en_la_revision[sin_leer]» 
-ROJO  | finalize no exporta el predicado: «FAILED tests/test_seguro2.py::test_la_revision_tiene_el_predicado_de_finalize» 
-ROJO  | la revisión no lo usa: «FAILED tests/test_seguro2.py::test_la_revision_muestra_vacio_el_seguro_sin_leer_y_lo_deja_en_0» 
-ROJO  | otro monto sin leer también se vacía: «FAILED tests/test_seguro2.py::test_un_campo_sin_leer_se_ve_vacio_en_la_revision[flete_sin_leer]» 
-ROJO  | el 400 se queda en la pantalla de generar: «FAILED tests/test_seguro2.py::test_si_el_servidor_pide_completarlo_se_vuelve_a_la_revision» 
-ROJO  | el dejado no frena con CIF: «FAILED tests/test_seguro2.py::test_el_uno_por_ciento_dejado_no_genera_con_cif» 
-ROJO  | el dejado se compara con las cuentas de ahora: «FAILED tests/test_seguro2.py::test_el_uno_por_ciento_dejado_genera_con_cfr» 
-ROJO  | el pedido no dice que se dejó: «FAILED tests/test_seguro2.py::test_el_pedido_dice_si_el_seguro_se_dejo» 
-ROJO  | dejarlo no lo marca: «FAILED tests/test_valor1c.py::test_dejarlo_lo_marca_como_dejado_y_pide_las_cuentas_de_nuevo» 
-ROJO  | el dejado no se borra al pasar a CIF: «FAILED tests/test_seguro2.py::test_el_dejado_se_borra_al_pasar_a_cif_y_queda_para_completar» 
-ROJO  | el borrado deja la marca: «FAILED tests/test_seguro2.py::test_el_dejado_se_borra_al_pasar_a_cif_y_queda_para_completar» 
-ROJO  | recalcularlo deja la marca: «FAILED tests/test_seguro2.py::test_recalcularlo_ya_no_es_el_dejado» 
-ROJO  | escribirlo a mano deja la marca: «FAILED tests/test_seguro2.py::test_escribirlo_a_mano_ya_no_es_el_dejado» 
-ROJO  | la nota no pide el 0: «FAILED tests/test_seguro1.py::test_con_cif_y_un_seguro_sin_leer_la_nota_lo_pide» 
-sabotajes sin rojo: 0
-rc=0
-```
-
-`sabotaje_separadores1b.sh` corta en el primer patrón que no encuentra. Su
-sabotaje 3 (`montos_ar.js`) no encuentra el suyo desde `4f2045f`, así que en
-la base y acá no corrían ni el 3b ni del 4 al 10, y ahí está el ancla 8 que
-`e0aa49c` movió. Para verla corrí una copia del arnés sin los sabotajes 3 y 3b
-(borrados con `sed`, en el scratchpad, sin subirla), sobre `d160738`:
-
-```
-FALLA  factura_multiplica (la misma falla previa: 5 failed, todos de test_en_la_factura_con_grupos_de_espacio_tambien)
-ROJO   factura_ignora_la_pista: 3 failed, 262 passed, 5 warnings in 48.96s
-ROJO   factura_grupo_con_espacio: 5 failed, 260 passed, 6 warnings in 49.55s
-ROJO   pedido_monto_cero: 5 failed, 260 passed, 5 warnings in 49.41s
-ROJO   pedido_ajuste_nada: 7 failed, 258 passed, 3 warnings in 49.16s
-ROJO   servidor_lee_como_python: 25 failed, 240 passed, 3 warnings in 49.74s
-ROJO   flete_solo_numero: 13 failed, 252 passed, 4 warnings in 50.21s
-ROJO   generar_sin_normalizar: 1 failed, 264 passed, 3 warnings in 51.60s
-ROJO   avisos_sin_mirar: 4 failed, 261 passed, 3 warnings in 51.72s
-ROJO   blanco_no_es_cero: 1 failed, 264 passed, 3 warnings in 51.46s
-FALLAN 1 sabotajes
-rc=1
-```
-
-El ancla 8 nueva (`generar_sin_normalizar`) da rojo. La única falla es la
-previa. El 3b no lo corrí: no sé si su patrón sigue vivo. Arreglar el arnés
-de SEPARADORES-1b no es de esta pieza.
-
-No corrí `smoke_friccion.sh` ni `ataque_aislamiento.sh`. La pieza agrega un
-400 a la generación y cambia dos pantallas, y eso lo miden los casos y los
-sabotajes. No toca sesión, permisos ni datos de otro usuario.
-
-chequeo-6, entero:
-
-```
-chequeo-6 3366ca5..d160738: avisos para mirar, no un veredicto
-producto +46/−20
-  AVISO producto suma 26 líneas netas: el informe dice por qué (§6: más de 20)
-arnés +343/−9
-historia (grep de §6, sin líneas movidas): vacío
-archivos de producto:
-  proyecto_maria/main.py: 12063 → 12072
-  proyecto_maria/static/v2/screens/finalize.js: 1425 → 1436
-  AVISO creció una función de más de 150: proyecto_maria/static/v2/screens/finalize.js:9 <anónima> 1417 → 1428, 2 en su propio cuerpo (§6: lo nuevo va aparte)
-  proyecto_maria/static/v2/screens/review.js: 1175 → 1181
-  AVISO creció una función de más de 150: proyecto_maria/static/v2/screens/review.js:7 <anónima> 1169 → 1175, 3 en su propio cuerpo (§6: lo nuevo va aparte)
-avisos: 3
-```
-
-Los tres `AVISO`:
-
-- **26 netas:** explicado arriba, junto a la tabla de SHAs.
-- **Las dos funciones de más de 150 líneas** son la IIFE que envuelve cada
-  archivo entero (`finalize.js:9` y `review.js:7`). Lo nuevo va en
-  funciones aparte (`valorEnLaRevision`) o en líneas dentro de las que ya
-  cambian el seguro (`dejarSeguro`, `calcularSeguro`,
-  `borrarSeguroCalculado`, `buildMariaRequest`, `onFieldChange`). Partir la
-  IIFE no es de esta pieza.
+Próxima D libre: D131 (la Dev técnica ya usó D127 y su próxima es D128; por eso las mías son D129 y D130).
 
 ## Comandos
 
 ```bash
-git fetch origin claude/dev-maria && git checkout d160738
-<venv>/bin/python -m pytest -q --no-cov -p no:randomly tests/test_seguro2.py tests/test_seguro1.py tests/test_valor1c.py   # todo passed
-PY=<venv>/bin/python bash scripts/testing/sabotajes/seguro2.sh d160738   # 19 ROJO, «sabotajes sin rojo: 0»
-PY=<venv>/bin/python bash scripts/testing/sabotajes/seguro1.sh d160738   # 12 ROJO, «sabotajes sin rojo: 0»
-bash scripts/testing/sabotaje_valor1c.sh d160738 <venv>                  # «OK: los 25 sabotajes dan rojo por la razón esperada»
+git checkout 0aed334
+# los casos de la pieza: tiene que dar «199 passed»
+GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
+DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=. ENVIRONMENT=test \
+DATABASE_URL=sqlite+aiosqlite:///./test.db python -m pytest -q --no-cov -p no:randomly \
+  tests/test_doc1_documentos.py tests/test_generar_maria_txt.py tests/test_avisos1_seguro.py \
+  tests/test_seguro2.py tests/test_seguro1.py tests/test_valor1c.py
+# negativos: cada uno «sabotajes sin rojo: 0»
+PY=python scripts/testing/sabotajes/avisos1.sh 0aed334
+PY=python scripts/testing/sabotajes/seguro2.sh 0aed334
+python docs/pm/herramientas/chequeo-6.py e6adea1 0aed334
 ```
 
-## Archivos de producto tocados
+## Puertas sobre `0aed334`
 
-- `proyecto_maria/main.py`
-- `proyecto_maria/static/v2/screens/finalize.js`
-- `proyecto_maria/static/v2/screens/review.js`
-- `CHANGELOG.md`
+| puerta | resultado |
+|---|---|
+| rojo antes del arreglo, EC (sobre la base) | `20 failed, 23 passed, 29 deselected` (`﻿EC01`, `​ EC01`, `ㅤEC01`, `ﾠEC01`, `-EC01`, `ＥＣ01`, generador directo) |
+| rojo antes del arreglo, seguro y motivo | `12 failed, 1 passed` |
+| rojo antes del segundo arreglo (semáforo, FOB, vaciar, a la vista) | `4 failed, 13 passed` |
+| casos de la pieza | `199 passed, 3 warnings in 50.22s` |
+| `avisos1.sh` (22 sabotajes) | `BASE 149 passed, 18 warnings in 11.30s`, 22 `ROJO`, «sabotajes sin rojo: 0», rc=0 |
+| `seguro2.sh` (19 sabotajes) | `BASE 78 passed, 5 warnings in 20.72s`, 19 `ROJO`, «sabotajes sin rojo: 0», rc=0 |
+| `node --check` de los tres JS | sin error |
+| compileall | salida 0 (sólo los `SyntaxWarning` de `pdf_extractor.py:927` y `:936`, de antes) |
+| suite completa (SQLite, `--timeout=300`) | `5345 passed, 335 skipped, 3 xfailed, 97 warnings in 1017.67s (0:16:57)`, salida 0 |
+| suite como la CI (`ENVIRONMENT=testing`, sin `DATABASE_URL`; sin deseleccionar los presupuestos compartidos) | `5345 passed, 335 skipped, 3 xfailed, 94 warnings in 998.54s (0:16:38)`, salida 0 |
+| smoke_friccion, ataque_aislamiento | **no corridos** (no toca sesión, datos ni permisos) |
 
-Sigo con AVISOS-1.
+Cambio en un arnés viejo: en `seguro2.sh`, «escribirlo a mano deja la marca»
+ahora busca `delete op.seguro_calculado; delete op.seguro_dejado;` (la línea
+sumó la marca de borrado detrás). El rojo que pide es el mismo.
 
-/compact conservar: Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi), rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM session_01B7FVQspcEHF7PqNv797wNM con send_message next. SEGURO-2 entregada, producto y pruebas en d160738 (base 3366ca5), D125 y D126 abiertas. Próxima D libre D127. Sigue AVISOS-1 (D123 a: el rechazo de exportación después de `_textos_como_van_al_txt` en los dos endpoints, con su caso), después EMAIL-1, CONEXIONES-1, OBSERVABILIDAD-1, ORG-1+D40 y D102. Corte de rutinas 2026-11-08 15:50 UTC. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; TXT y proforma reales nunca en el repo.
+`separadores1b.sh` está roto de antes: va a la cola de limpieza (te paso la
+línea, `COLA-LIMPIEZA.md` no lo toco).
+
+## chequeo-6
+
+```
+chequeo-6 e6adea1..0aed334: avisos para mirar, no un veredicto
+producto +54/−16
+  AVISO producto suma 38 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +331/−8
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/core/maria_generator.py: 2321 → 2331
+  proyecto_maria/main.py: 12072 → 12075
+  proyecto_maria/static/v2/screens/finalize.js: 1436 → 1444
+  AVISO comentario nuevo de 3 líneas: proyecto_maria/static/v2/screens/finalize.js:410 (§6: una o dos)
+  proyecto_maria/static/v2/screens/review.js: 1181 → 1195
+  AVISO creció una función de más de 150: proyecto_maria/static/v2/screens/review.js:7 <anónima> 1175 → 1189, 3 en su propio cuerpo (§6: lo nuevo va aparte)
+  proyecto_maria/static/v2/screens/semaforo.js: 407 → 410
+avisos: 3
+```
+
+- **38 netas:** arriba, junto a `producto +54/−16`.
+- **Comentario de 3 líneas en `finalize.js:410`:** reescribe en el lugar uno
+  de 4 que ya estaba (el de `borrarSeguroCalculado`), para que diga la marca.
+- **Función de más de 150 en `review.js:7`:** es la IIFE del módulo, no una
+  función. Lo nuevo (`marcarEnLaRevision`) va aparte; lo que creció adentro
+  son las tres líneas de la marca en `onFieldChange`.
+
+## Hallazgos de la autorrevisión
+
+`/code-review high` y `adversario-sonnet-alto` (Sonnet, alto). Todos
+reproducidos con su rojo y arreglados en `d7345fa` y `cec3564`:
+
+| hallazgo | arreglo |
+|---|---|
+| el patrón con `\W` dejaba pasar rellenos Hangul y ancho completo | NFKC + saltear lo no ASCII alnum |
+| el generador directo seguía con `strip` | el mismo predicado |
+| el semáforo decía «no pudimos leer» para el borrado | dice que se borró |
+| de vuelta a FOB la nota decía «no pudimos leer» | dice que se borró |
+| vaciar el campo sacaba la marca y el servidor volvía a «no pudimos leerlo» | sólo un valor escrito la saca |
+| el motivo quedaba debajo de un campo fuera de la vista | se lleva a la vista |
+
+## Riesgos
+
+- Pasan como importación: homoglifos cirílicos o griegos de E y C,
+  `E​C01`, `ÉC01`. Lo cierra D130.
+- `pdf_extractor.py:2035` sigue con `strip` (D130).
+- Al volver a la revisión, `populate`/`validateAll` y el `validateField` de
+  continuar pueden limpiar el motivo marcado (`review.js` 241, 352, 988,
+  1014, 1057, 1079, 1108, 1184). El caso cubre la entrada a la revisión, no
+  cada uno de esos caminos.
+- Qué pantalla toma el 400 se decide por regex sobre el texto del servidor:
+  si cambia el texto, cambia el destino.
+- `marcarEnLaRevision` repite el código de mostrar de `validateField`
+  (va a la cola si querés unificarlos).
+- Los casos de la exportación en el HTML y de la pista son búsquedas de
+  texto; la fila «seguro en el precio» de la familia sólo mira la pantalla
+  (el texto lo pintan los avisos).
+- Con FOB y la marca de borrado, el 400 del servidor sigue diciendo «al
+  pasar a un incoterm que ya lo lleva»: es verdad, pero ya no es el
+  incoterm de ahora.
+- Siguen sin tocar `31/02/2026` y `٥`.
+
+## Archivos de producto
+
+`proyecto_maria/main.py`, `proyecto_maria/core/maria_generator.py`,
+`proyecto_maria/static/v2/screens/finalize.js`, `review.js`, `semaforo.js`,
+`proyecto_maria/templates/dashboard_v2.html`, `CHANGELOG.md`.
+
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797WNM (send_message next, «Dev MARIA: …»), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. AVISOS-1 entregada en 0aed334 (informe en este archivo), D129 y D130 abiertas, próxima D libre D131. Sigue EMAIL-1, después CONEXIONES-1, OBSERVABILIDAD-1, ORG-1+D40 y D102. Nunca main, nada se publica sin el «dale» de Emi para el SHA, sin secretos, sólo datos inventados.
