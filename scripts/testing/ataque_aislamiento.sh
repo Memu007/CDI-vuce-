@@ -114,20 +114,21 @@ PY="./venv/bin/python"; [ -x "$PY" ] || PY="python3"
 
 paso "Levantando la app con configuración de producción"
 mkdir -p "$TMP/datos"
-# Un tercer usuario es administrador, para comprobar que las rutas de admin
-# existen y que el 403 de Beto es por no serlo. El dólar apunta a un puerto
-# cerrado: el presupuesto usa su valor de reserva sin salir a internet.
-# FRONTEND_URL: en producción el link de invitación la exige.
+# El dólar apunta a un puerto cerrado: el presupuesto usa su valor de reserva
+# sin salir a internet. FRONTEND_URL: en producción el link de invitación la exige.
 JEFE="jefe$RANDOM"
+levantar() {
 ENVIRONMENT=production JWT_SECRET_KEY="$CLAVE" ALLOWED_ORIGINS="https://cdi-prueba.example.com" \
 FRONTEND_URL="https://cdi-prueba.example.com" \
 DATABASE_URL="$DB_URL" EMAIL_VERIFICATION_REQUIRED=false CDI_DATA_DIR="$TMP/datos" \
-API_RATE_LIMIT="100000/minute" RATE_LIMIT_PREMIUM="100000/minute" ADMIN_USERNAMES="$JEFE" \
+API_RATE_LIMIT="100000/minute" RATE_LIMIT_PREMIUM="100000/minute" ADMIN_USERNAMES="$1" \
 DOLARAPI_BASE="http://127.0.0.1:9/v1/dolares" \
 PYTHONPATH=. nohup "$PY" -m uvicorn proyecto_maria.main:app \
     --host 127.0.0.1 --port "$PUERTO" > "$TMP/app.log" 2>&1 &
 APP_PID=$!
 esperar_health || { echo -e "${RED}❌ La app no arrancó:${NC}"; tail -30 "$TMP/app.log"; exit 1; }
+}
+levantar ""
 echo -e "${GREEN}✅ App viva${NC}"
 
 # ------------------------------------------------------- los dos usuarios
@@ -140,6 +141,16 @@ registrar() {
     curl -s -m 20 -c "$2" -X POST "${BASE}/auth/register" -H 'Content-Type: application/json' \
         -d "{\"username\":\"$1\",\"password\":\"Clave-Larga-Prueba-1\",\"email\":\"$1@ejemplo.com\"${INV}}"
 }
+
+# Un tercer usuario es administrador, para comprobar que las rutas de admin
+# existen y que el 403 de Beto es por no serlo. Como la cuenta de Emi: existe
+# antes de estar en ADMIN_USERNAMES y el arranque le pone el rol.
+paso "Registrando a ${JEFE} y reiniciando la app con él en ADMIN_USERNAMES"
+CK_J="$TMP/jefe.txt"
+registrar "$JEFE" "$CK_J" >/dev/null
+kill "$APP_PID"; wait "$APP_PID" 2>/dev/null
+levantar "$JEFE"
+echo -e "${GREEN}✅ App reiniciada${NC}"
 
 paso "Creando dos despachantes distintos: ${ANA} y ${BETO}"
 registrar "$ANA"  "$COOKIE_A" >/dev/null
@@ -471,8 +482,7 @@ organizaciones() {
 
 administrador() {
     paso "14· Un despachante común no entra a lo de administrador"
-    local CK_J="$TMP/jefe.txt" RUTA METODO
-    registrar "$JEFE" "$CK_J" >/dev/null
+    local RUTA METODO
     for RUTA in "GET /api/admin/stats/summary" "GET /api/admin/logs/recent/5" "GET /api/admin/errors/insights" \
                 "GET /api/dev/stats" "GET /dev/dashboard"; do
         METODO="${RUTA%% *}"; RUTA="${RUTA#* }"

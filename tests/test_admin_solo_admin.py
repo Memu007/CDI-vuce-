@@ -246,15 +246,15 @@ def test_admin_sigue_entrando(rutas, ruta):
 
 
 @pytest.mark.parametrize("ruta", RUTAS_ADMIN_LECTURA)
-def test_admin_por_admin_usernames_entra(rutas, ruta, monkeypatch):
-    """Quien es admin por ADMIN_USERNAMES (sin el rol) entra a lo mismo (ADMIN-2)."""
+def test_en_admin_usernames_sin_el_rol_no_entra(rutas, ruta, monkeypatch):
+    """ADMIN_USERNAMES sólo sirve al arranque, para ponerle el rol a la cuenta."""
     monkeypatch.setenv("ADMIN_USERNAMES", "jefe_admin1")
     _con_usuario({**USUARIO_COMUN, "username": "jefe_admin1", "effective_owner": "jefe_admin1"})
     try:
         r = TestClient(main.app).get(ruta)
     finally:
         main.app.dependency_overrides.pop(main.get_current_user, None)
-    assert r.status_code == 200, f"{ruta}: {r.status_code} {r.text[:200]}"
+    assert r.status_code == 403, f"{ruta}: {r.status_code} {r.text[:200]}"
 
 
 def test_admin_borra_errores_viejos(rutas):

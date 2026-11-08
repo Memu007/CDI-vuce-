@@ -390,7 +390,7 @@ def test_si_no_se_puede_leer_la_suscripcion_mercado_pago_reintenta(client):
     assert _get_user(usuario)["billing_status"] == "past_due"
 
 
-def test_emi_ve_los_pagos_rechazados_y_un_usuario_comun_no(client, monkeypatch):
+def test_emi_ve_los_pagos_rechazados_y_un_usuario_comun_no(client):
     """D29, condición 3: un pago rechazado es un cliente que pagó y no
     recibió nada; el admin lo ve en el panel."""
     usuario = _unique("mp2_ve")
@@ -399,8 +399,8 @@ def test_emi_ve_los_pagos_rechazados_y_un_usuario_comun_no(client, monkeypatch):
     assert _aviso_pago(client, pid).status_code == 200
 
     admin = _unique("mp2_admin")
-    monkeypatch.setenv("ADMIN_USERNAMES", admin)
     _register(client, admin)
+    _set_user(admin, roles=["admin"])
     r = client.get("/api/dev/pagos-mp-rechazados")
     assert r.status_code == 200, r.text
     fila = next(p for p in r.json()["pagos"] if p["payment_id"] == pid)

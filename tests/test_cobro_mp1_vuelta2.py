@@ -363,7 +363,7 @@ def test_el_registro_de_un_pago_de_organizacion_dice_que_es_una_organizacion(cli
     assert _leer_pago(pid).get("cuenta") == f"org:{org_id}", _leer_pago(pid)
 
 
-def test_el_panel_muestra_los_ultimos_200_rechazados_del_mas_nuevo_al_mas_viejo(client, monkeypatch):
+def test_el_panel_muestra_los_ultimos_200_rechazados_del_mas_nuevo_al_mas_viejo(client):
     from sqlalchemy import delete
     from proyecto_maria.database.models import PagoMercadoPagoAplicado
     prefijo = _unique("v2_panel")
@@ -380,8 +380,8 @@ def test_el_panel_muestra_los_ultimos_200_rechazados_del_mas_nuevo_al_mas_viejo(
     _en_la_base(_sembrar)
     try:
         admin = _unique("v2_admin")
-        monkeypatch.setenv("ADMIN_USERNAMES", admin)
         _register(client, admin)
+        _set_user(admin, roles=["admin"])
         r = client.get("/api/dev/pagos-mp-rechazados")
     finally:
         _en_la_base(_retirar)
