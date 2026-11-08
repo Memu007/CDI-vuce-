@@ -118,6 +118,8 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | 1 | ✅ GUARDAR-2 | La sugerencia de posición: si el historial del cliente tiene 8 dígitos y el proveedor la SIM completa que empieza con esos 8, gana la del proveedor (D32 b; sin migración; Postgres descartable) |
 | 2 | ✅ ORDEN-1 | Reordenar los productos arrastrando, en la pantalla de revisión |
 | 2b | ✅ ORDEN-1b | Una pestaña que ya no es de la sesión del navegador no manda escrituras al servidor a nombre de quien entró después (D12 de ORDEN-1; arreglo de esa pieza, no cuenta aparte; decidido por la PM, 29/10) |
+| 2c | ✅ EXCEL-2c | Un Excel chico con forma cara (fila lejana, muchas columnas, estilos o textos) se lee en el carril pesado (D32 b de EXCEL-2b; arreglo de esa pieza, no cuenta aparte; decidido por la PM) |
+| 2d | ⏳ EXCEL-2d | Un formato de número armado (miles de «[») no traba el proceso entero (D122 a, «arreglos chicos de seguridad», Emi; decidido por la PM, 08/11) |
 | 3 | COBRO-MP-1 | Primera pieza de la Fase 2 (ver abajo) |
 
 **Cierre de la Fase 1c (cierra G4):** dos sesiones con el despachante, 3 o
