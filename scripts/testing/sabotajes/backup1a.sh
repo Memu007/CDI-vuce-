@@ -6,7 +6,7 @@
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/backup1a.sh [SHA]
 # Trabaja en un worktree descartable: no toca tu copia. Cada corrida levanta su
 # propio Postgres 16 con scripts/testing/con_pg16.sh (un sabotaje que deja bases
-# colgadas no ensucia al siguiente). Unos cinco minutos.
+# colgadas no ensucia al siguiente). Unos ocho minutos.
 # Sale con error si un sabotaje no encuentra su patrón, no pone rojo, el rojo
 # no dice lo esperado o alguna prueba se saltea.
 set -uo pipefail
@@ -119,7 +119,7 @@ sabotaje "una huella que no se entiende llega a la base" "huella_que_no_se_entie
   reemplazar $C 'if not re.fullmatch(r"[A-Z0-9_]+", str(datos.get("codificacion", ""))):' 'if False:'
 
 echo "== un corte"
-sabotaje "sin plazo" "un_corte" "copia verificada" \
+sabotaje "sin plazo" "un_corte" "LA COPIA NO SIRVE|falta en la restauración" \
   reemplazar $C 'loop.call_later(int(plazo), cortar, f"no terminó en {plazo} s")' 'pass'
 sabotaje "un plazo que no se entiende corre igual" "plazo_que_no_se_entiende" "no terminó en 0 s|no terminó en -5 s" \
   reemplazar $C 'if not re.fullmatch(r"[0-9]+", plazo) or int(plazo) == 0:' 'if not plazo.lstrip("-").isdigit():'
