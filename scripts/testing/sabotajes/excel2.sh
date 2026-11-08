@@ -118,7 +118,7 @@ sabotaje $M "sin columna de origen deja de avisarse" \
   '        if False:' \
   "FAILED $T::test_sin_columna_de_origen_entra_con_el_origen_vacio_y_avisa"
 sabotaje $M "una celda combinada vuelve a valer sólo en su primera fila" \
-  '            df.loc[filas, col] = valor' \
+  '            nuevas[col][i:j] = valor' \
   '            pass' \
   "FAILED $T::test_una_celda_combinada_hacia_abajo_vale_para_todas_sus_filas"
 # Aviso de mapeo

@@ -12,6 +12,7 @@ import re
 import struct
 import threading
 import time
+import tracemalloc
 from xml.sax.saxutils import quoteattr
 
 import pytest
@@ -98,7 +99,7 @@ CAUSAS = {
     "corchetes": (lambda: _con_formato("[" * 32), lambda: _con_formato("[" * 33), False),
     "corchetes escritos como &#91;": (lambda: _con_referencias(32), lambda: _con_referencias(33), False),
     "formatos de celda": (lambda: _con_formato("0.00", 65_490), lambda: _con_formato("0.00", 65_491), True),
-    "formatos de celda tras un cellXfs vacío": (lambda: _anidado(65_490), lambda: _anidado(65_491), True),
+    "formatos de celda tras un cellXfs sin hijos": (lambda: _anidado(65_490), lambda: _anidado(65_491), True),
     "rangos": (lambda: _con_rangos(63_999), lambda: _con_rangos(64_000), False),
     "corchetes en un .xls": (lambda: _xls(32), lambda: _xls(33), False),
     "corchetes en un .xls sin OLE": (lambda: _xls(32, en_ole=False), lambda: _xls(33, en_ole=False), False),
@@ -122,6 +123,19 @@ def test_un_formato_que_excel_no_guarda_se_rechaza(causa):
 ])
 def test_un_formato_de_excel_sigue_entrando(codigo):
     assert fs._abrir_excel(_con_formato(codigo), ".xlsx") == (1, False)
+
+
+def test_un_sqref_largo_se_parte_hasta_el_tope():
+    # Partirlo entero arma 640 000 textos: ~46 MB de pico, contra ~27 MB.
+    libro = _con_rangos(640_000)
+    tracemalloc.start()
+    try:
+        with pytest.raises(fs.ExcelDemasiadoGrande, match="rangos"):
+            fs._abrir_excel(libro, ".xlsx")
+        pico = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    assert pico < 35_000_000, pico
 
 
 # Los libros del adversario: (libro, status, palabra del rechazo, segundos).

@@ -77,7 +77,7 @@ sabotaje $F "los estilos de celda vuelven a contar como formatos de celda" \
 sabotaje $F "un cellXfs vacío vuelve a cortar la cuenta de formatos de celda" \
   '                en_celdas -= 1' \
   '                en_celdas = 0' \
-  "FAILED $T::test_un_formato_que_excel_no_guarda_se_rechaza[formatos de celda tras un cellXfs vacío]"
+  "FAILED $T::test_un_formato_que_excel_no_guarda_se_rechaza[formatos de celda tras un cellXfs sin hijos]"
 sabotaje $F "los formatos vuelven a no mirarse antes de abrir" \
   '        if ARC_STYLE in nombres and _formatos_que_excel_no_guarda(z, ARC_STYLE):' \
   '        if False:' \
@@ -96,7 +96,7 @@ sabotaje $F "los sqref vuelven a contarse por elemento y no por rango" \
 sabotaje $F "un sqref vuelve a partirse entero aunque pase el tope" \
   '            rangos += len(elemento.get("sqref", "").split(None, _EXCEL_MAX_RANGOS))' \
   '            rangos += len(elemento.get("sqref", "").split())' \
-  "FAILED $T::test_la_subida_cara_no_frena_a_nadie[640 000 rangos de formato condicional]"
+  "FAILED $T::test_un_sqref_largo_se_parte_hasta_el_tope"
 
 # .xls
 sabotaje $F "los formatos de un .xls vuelven a no mirarse antes de abrir" \
