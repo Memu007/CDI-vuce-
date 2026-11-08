@@ -1592,9 +1592,16 @@ async def _migrate_add_api_logs_owner_column():
                     if IS_SQLITE else
                     "ALTER TABLE api_logs ADD COLUMN IF NOT EXISTS owner_username VARCHAR(50)"
                 )
-        if agrega_columna:
-            print("✅ Migracion: agregada columna api_logs.owner_username")
+    except Exception:
+        logging.exception(
+            "no se pudo agregar api_logs.owner_username; "
+            "la app arranca igual, pero las métricas no se graban hasta que exista"
+        )
+        return
+    if agrega_columna:
+        print("✅ Migracion: agregada columna api_logs.owner_username")
 
+    try:
         # Un índice cuya primera columna sea owner_username alcanza, se
         # llame como lo nombra create_all o como `ix_api_logs_owner`, el
         # de scripts/migrate_add_owner.py.
@@ -1619,13 +1626,14 @@ async def _migrate_add_api_logs_owner_column():
                     "CREATE INDEX IF NOT EXISTS ix_api_logs_owner_username "
                     "ON api_logs (owner_username)"
                 )
-        if not tiene_indice:
-            print("✅ Migracion: agregado indice ix_api_logs_owner_username")
     except Exception:
         logging.exception(
-            "[OBSERVABILIDAD-1] no se pudo agregar api_logs.owner_username; "
-            "la app arranca igual, pero las métricas no se graban hasta que exista"
+            "no se pudo crear el índice ix_api_logs_owner_username; "
+            "la app arranca igual y las métricas se graban, sin índice"
         )
+        return
+    if not tiene_indice:
+        print("✅ Migracion: agregado indice ix_api_logs_owner_username")
 
 
 @asynccontextmanager
