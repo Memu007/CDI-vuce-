@@ -3,31 +3,30 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## COBRO-MP-4 (con D124): aceptada sobre `0fb991c`, sin integrar (2026-11-08 PM)
+## PERMISOS-2: aceptada sobre `a1db966`, sin integrar (2026-11-08 PM)
 
-Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-4-2026-11-08.md`. Igual al informe:
-chequeo-6 `+14/−6` sin avisos; `cobro_mp4_postgres.py` `fallas: 0`; suites de
-cobro + `excel2d` + `excel3` `1492 passed`, sin `SKIPPED`; `cobro_mp4.sh` 8
-ROJO, falla 0. Tus tres supuestos (orden, borrar todas, el segundo 503 pisa)
-quedan como están. Los `.xls` en la CI de GitHub se ven en su primera corrida.
+Evidencia: `docs/pm/REPRODUCCION-PERMISOS-2-2026-11-08.md`. Igual al informe:
+chequeo-6 `+15/−15` sin avisos; `permisos2.sh` 7 ROJO y `cobro_mp4.sh` 9 ROJO,
+falla 0; `35 passed`; ataque `47 · 0 · 0`. Tus supuestos (sacar el sabotaje de
+`admin2.sh`, que el ataque frene sin admin, que el arranque arregle roles con
+otro formato) quedan como están.
 
-Adversario Sonnet alto: la mutación `key=lambda c: (c is db_user, paga[c])`
-deja verde todo `test_cobro_mp2.py`. Ningún caso tiene a quien pide con una
-suscripción propia que no paga mientras otra cuenta paga; con ese orden, la
-que paga se cancelaría antes de fallar la propia. Tu código lo hace bien; falta
-la prueba.
+Adversario Opus alto: ningún camino a admin sin el rol. Dos bajas sin permisos,
+que van a la pieza siguiente.
 
-## Seguí con PERMISOS-2 (2026-11-08 PM)
+## Seguí con PERMISOS-3 (2026-11-08 PM, decidido por la PM)
 
-1. **Primero, en un commit de pruebas aparte:** el caso de arriba (la dueña
-   con sid propio que no paga, otra cuenta autorizada, falla el PUT de la
-   dueña: 503 y la que paga sigue `authorized`) y su sabotaje en
-   `cobro_mp4.sh` (el desempate invertido da ROJO). Sin cambio de producto.
-2. **PERMISOS-2** (D120 b): `_es_admin` mira sólo los roles guardados y el
-   registro rechaza un nombre de `ADMIN_USERNAMES`. Caso que no se puede
-   romper: una cuenta que ya existe y está en `ADMIN_USERNAMES` sigue siendo
-   admin después de reiniciar (así entra hoy la de Emi); mostralo con el
-   arranque, no sólo con un rol puesto a mano.
+«Arreglos chicos de seguridad» (Emi). Hoy se puede registrar un nombre que se
+ve igual que el de una admin:
+
+- `'emi\n'` da 200 en `/auth/register` y en `/api/organizations/create`
+  (`re.match(r'^…$')` acepta un `\n` final) y se guarda con el `\n`;
+- con `jefe` en `ADMIN_USERNAMES`, `Jefe` y `JEFE` se registran.
+
+Pedido: en los dos caminos, un nombre con cualquier carácter fuera de la regex
+(el `\n` final incluido) da 400 sin crear nada, y un nombre de la lista con
+otras mayúsculas da el mismo 400 «Usuario ya existe». La familia va como datos
+en un caso. No cambia quién es admin ni las cuentas que ya existen.
 
 Corte: hoy 15:50 UTC se apagan las rutinas. Si no llegás, commit y push de lo
 que tengas y anotá en `PARA-PM.md` dónde quedaste. Próxima D libre: D127.
