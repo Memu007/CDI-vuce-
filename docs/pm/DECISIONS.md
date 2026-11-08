@@ -487,3 +487,7 @@ AISLAMIENTO-2 y LIMPIEZA-1 aceptadas sobre `c86f3ff`, sin integrar. D116 (b), de
 ### 2026-11-08 05:56 UTC (PM principal)
 
 ENTRADAS-3 aceptada sobre `cf5309a`, sin integrar. D115 (a), decidido por la PM: el tope frena lo nuevo; una fila vieja enorme se limpia a mano si aparece, pasando por Emi (dato de producción). D117 (a), decidido por la PM: pieza ENTRADAS-4 (NUL en campos `Form`), después de ENTORNO-4. La D117 de MARIA queda; la técnica toma la próxima libre (D118 en adelante).
+
+### 2026-11-08 07:11 UTC (PM principal)
+
+ENTORNO-4 aceptada sobre `44b9759`, sin integrar. Publicarla pide `FRONTEND_URL` en Railway antes (sin ella no arranca): va a la lista de Emi junto con `ENVIRONMENT=production` y `ALLOWED_ORIGINS`.
