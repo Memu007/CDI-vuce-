@@ -21,7 +21,7 @@ Base: `4087b46` (merge de tu rama con NOMBRES-1 en la tarea activa).
 2. **No hay ruta para cambiar el nombre de usuario.** Busqué todas las altas de `User(`: el registro, crear un estudio y las cuentas de demostración del arranque, que existen sólo fuera de producción. La landing arma el nombre a partir del email en minúsculas.
 3. **Lo que ya existe queda como está.** El login y la promoción del arranque siguen comparando exacto. Dos cuentas viejas que difieren sólo en mayúsculas entran cada una con su clave, y el arranque promueve sólo la que coincide exacto. No hay migración, borrado ni índice nuevo.
 
-Nada para decidir. No propongo índice único, así que D128 queda libre.
+Nada para decidir. No propongo índice único, así que no abro ninguna D.
 
 ### Riesgos (quedan, sin arreglo)
 
@@ -118,4 +118,4 @@ python docs/pm/herramientas/chequeo-6.py 4087b46 ccded98
 
 `<venv>` es el entorno virtual del proyecto.
 
-/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. NOMBRES-1 entregada en ccded98, esperando veredicto; corte 2026-11-09 05:00 UTC. Sin pieza «apenas entregues». Próxima D libre: D128. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.
+/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. NOMBRES-1 entregada en ccded98, esperando veredicto; corte 2026-11-09 05:00 UTC. Sin pieza «apenas entregues». No abrí ninguna D. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.
