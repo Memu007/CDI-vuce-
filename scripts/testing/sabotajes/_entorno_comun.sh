@@ -10,9 +10,9 @@ trap 'git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMP
 cd "$WT" || exit 2
 export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
        DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=.
-# Clave y orígenes propios: el contrapunto cierra desarrollo y sin ellos pytest no llega a importar la app.
+# Clave, orígenes y URL propios: el contrapunto cierra desarrollo y sin ellos pytest no llega a importar la app.
 export JWT_SECRET_KEY=clave-larga-de-cuarenta-y-dos-caracteres-para-sabotaje \
-       ALLOWED_ORIGINS=http://cdi.example.com
+       ALLOWED_ORIGINS=http://cdi.example.com FRONTEND_URL=http://cdi.example.com
 FALLAS=0
 
 pytest_e1() {
