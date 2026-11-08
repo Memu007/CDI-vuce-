@@ -160,8 +160,9 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | ✅ ABUSO-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ EMAIL-1 | Dev MARIA | Sumada por Emi el 28/10 (D36 de MARIA): recuperar usuario y contraseña encuentran el email con otras mayúsculas; ningún alta ni cambio crea un email repetido con otras mayúsculas; los pares que ya existan no se tocan hasta que Emi los cuente |
 | 🔵 CONEXIONES-1 | Dev MARIA | Sumada por Emi el 28/10 (D37 de MARIA): medir si el cierre de la sesión de base cancelado deja conexiones tomadas, con Postgres 16; arreglar sólo si las deja |
-| 🔵 AISLAMIENTO-2 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
-| 🔵 LIMPIEZA-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
+| ✅ AISLAMIENTO-2 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
+| ✅ LIMPIEZA-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
+| ⏳ PERMISOS-1 | Dev técnica | Sumada por la PM el 08/11 («arreglos chicos de seguridad», Emi; D116): ningún usuario llega a admin por un email que él puso |
 | 🔵 OBSERVABILIDAD-1 | Dev MARIA | La columna `api_logs.owner_username` que falta en producción, con migración probada en Postgres descartable |
 | ✅ CATALOGO-LARGO-1 | Dev MARIA | Sumada por Emi el 04/11: una descripción larga (301 a 2000 caracteres) no se pierde en silencio en la memoria del cliente ni en el catálogo (`product_key` de 300); con migración probada en Postgres descartable si hace falta |
 | ✅ CATALOGO-LARGO-2 | Dev MARIA | Sí de Emi el 05/11 21:41: un origen de más de 5 caracteres o un proveedor de más de 200 no se pierden en silencio (hoy dan 200 sin guardar o 500), y una descripción que normaliza a vacío no contesta «guardado» |
