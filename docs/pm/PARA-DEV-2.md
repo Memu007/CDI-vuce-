@@ -69,6 +69,43 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## ENTRADAS-2: aceptada sobre `b8aa9bd`, sin integrar (2026-11-08 PM)
+
+Reproducido igual al informe: chequeo-6 (`+115/−49`, el aviso de 66 netas
+alcanza), `36 passed`, PG 33 OK con `fallas: 0`, `entradas2.sh` 24 ROJO con
+falla 0. Mis 21 negativos (NaN e infinito como texto, números fuera de
+int32, cuerpo vacío o lista, claves de estudio sin número, NUL en `/static`)
+dan lo esperado. Sonnet alto: nada nuevo de la pieza. Acta:
+`REPRODUCCION-ENTRADAS-2-2026-11-08.md`.
+
+**D109: (a), decidido por la PM.** Pieza ENTRADAS-3, después de ENTORNO-3.
+Lleva: `tiene_medio_par` fuera del try (~8734 y ~8889), el NUL en el query
+string, el log de `api_logs` con NUL o ruta de más de 200 caracteres, y
+además:
+- **D110 (a):** un campo del cliente que no es texto da 400;
+- un número finito enorme (`1e308`) que hoy se guarda y después tira 500 en
+  `GET /api/clientes` y en las métricas del cliente (Postgres, suma de
+  `total_value`): que no se guarde o que la suma no reviente. Caso de la
+  familia, no sólo el ejemplo.
+
+Riesgos que quedan: el texto nuevo de change-password; la clave de estudio
+de 8 letras ahora rechazada (va a la mirada en navegador antes de
+publicar); 40000 ítems lentos al guardar al cliente.
+
+Tu orden: **ENTORNO-3** (D107) → ENTRADAS-3 → SUFIJOS-2+SEGURO-1 → el resto.
+Próxima D: D111.
+
+## FRONT-422: aceptada sobre `4dbdb0b`, sin integrar (2026-11-08 PM)
+
+Reproducido igual al informe: chequeo-6 (`+73/−31`, el aviso de +42 alcanza),
+`33 passed`, `front422.sh` 17 ROJO, con falla 0. Mis negativos en node
+(lista vacía, texto en blanco, `string_too_short`, `loc` anidado y de query,
+`value_error`) dan lo esperado. Acta: `REPRODUCCION-FRONT-422-2026-11-08.md`.
+
+**D108: (a), decidido por la PM.** Queda en el front. El script de sabotajes
+se queda. R1 a R5 quedan como riesgos; R1 va a la mirada en el navegador
+antes de publicar.
+
 ## ENTORNO-2: aceptada sobre `bf92bf9`, sin integrar (2026-11-08 PM)
 
 Reproducido igual al informe: chequeo-6 (`+24/−26`, avisos 0), `22 passed`,
@@ -85,7 +122,6 @@ mismo que ENTORNO-2: sabotajes en el arnés de `test_entorno1`. Los
 monkeypatches de `main_mod.IS_PRODUCTION` que quedaron en tests viejos van a
 la cola de limpieza, no a esta pieza.
 
-Tu orden: **D100 (FRONT-422)** → ENTRADAS-2 → ENTORNO-3 → el resto. Próxima D: D108.
 
 ## Rojo de `despacho1b`: aceptado sobre `d69233c`, sin integrar (2026-11-07 PM)
 

@@ -463,3 +463,11 @@ ABUSO-2 aceptada sobre `1f79a8e` (vuelta sólo de pruebas; producto `8ad47ee`), 
 ### 2026-11-08 01:12 UTC (PM principal)
 
 ENTORNO-2 aceptada sobre `bf92bf9`, sin integrar. D107 decidida por la PM: (a), pieza ENTORNO-3 de MARIA después de ENTRADAS-2 (FRONTEND_URL, ALLOWED_ORIGINS, HSTS y el pase de rate limit de 127.0.0.1 con la regla de `es_desarrollo()`), dentro de «arreglos chicos de seguridad a cero» (Emi). Riesgo para publicar: Railway necesita `ENVIRONMENT=production` exacto (D99).
+
+### 2026-11-08 01:54 UTC (PM principal)
+
+FRONT-422 aceptada sobre `4dbdb0b`, sin integrar. D108 decidida por la PM: (a), el 422 se traduce en el front (`static/errores.js`); el contrato de la API no cambia.
+
+### 2026-11-08 03:55 UTC (PM principal)
+
+ENTRADAS-2 aceptada sobre `b8aa9bd`, sin integrar. D109 (a) y D110 (a), decididas por la PM: pieza ENTRADAS-3 de MARIA después de ENTORNO-3 (lo que quedó afuera de ENTRADAS-2 más el `1e308` que se guarda y rompe la suma de clientes y métricas), dentro de «arreglos chicos de seguridad a cero» (Emi). Acta: `REPRODUCCION-ENTRADAS-2-2026-11-08.md`.
