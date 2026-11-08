@@ -15,6 +15,10 @@ sabotaje $B "el cobro vuelve a su URL con localhost" \
   $'from proyecto_maria.config import get_frontend_url\n' \
   $'def get_frontend_url():\n    return os.environ.get("FRONTEND_URL", "").rstrip("/") or "http://127.0.0.1:8000"\n' \
   "$C[frontend_en_localhost]" "frontend_en_localhost no queda cerrada: {None: 'sin medir'"
+sabotaje $B "la recarga arma su vuelta con localhost" \
+  $'f"{username}:topup"\n    base_url = get_frontend_url()\n' \
+  $'f"{username}:topup"\n    base_url = os.environ.get("FRONTEND_URL", "http://127.0.0.1:8000")\n' \
+  "$C[frontend_en_localhost]" "frontend_en_localhost no queda cerrada: {None: 'sin medir'"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

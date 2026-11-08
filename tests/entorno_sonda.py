@@ -47,18 +47,36 @@ def _vuce_simulado():
 
 
 def _frontend_por_defecto():
-    from proyecto_maria.services import billing_service
+    """La URL de los links y la de vuelta de los dos cobros, sin FRONTEND_URL o sólo con espacios."""
+    from proyecto_maria.services import billing_service as bs
+    enviados = []
+    preferencia = types.SimpleNamespace(create=lambda d: enviados.append(d) or {"status": 201, "response": {}})
+    bs._get_sdk = lambda: types.SimpleNamespace(preference=lambda: preferencia)
+    usuario = types.SimpleNamespace(email="", username="sonda")
+
+    def vuelta(cobro):
+        cobro()
+        return enviados.pop()["back_urls"]["failure"].removesuffix("/dashboard?billing=failure")
+
     guardada = os.environ.pop("FRONTEND_URL", None)
     try:
-        return [_url_o_rechazo(f) for f in (m.get_frontend_url, billing_service.get_frontend_url)]
+        medidas = []
+        for valor in (None, "   "):
+            if valor is not None:
+                os.environ["FRONTEND_URL"] = valor
+            medidas += [_url_o_rechazo(f) for f in (m.get_frontend_url,
+                        lambda: vuelta(lambda: bs.create_checkout(usuario, "premium")),
+                        lambda: vuelta(lambda: bs.create_topup_checkout(usuario)))]
+        return medidas
     finally:
+        os.environ.pop("FRONTEND_URL", None)
         if guardada is not None:
             os.environ["FRONTEND_URL"] = guardada
 
 
-def _url_o_rechazo(get_frontend_url):
+def _url_o_rechazo(medir):
     try:
-        return get_frontend_url()
+        return medir()
     except RuntimeError:
         return "rechaza"
 
