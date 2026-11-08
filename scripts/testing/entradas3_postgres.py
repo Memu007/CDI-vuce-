@@ -103,11 +103,11 @@ try:
 
         # 1. registro de pedidos
         sin_ruta = ("endpoint = '<sin ruta>' and status_code = 404", None)
-        for cuantos, (nombre, ruta) in enumerate([("NUL en la ruta", "/api/nul-a%00b"),
-                                                  ("ruta de 300 caracteres", LARGA)], 1):
+        for nombre, ruta in [("NUL en la ruta", "/api/nul-a%00b"), ("ruta de 300 caracteres", LARGA)]:
+            antes = registrados(*sin_ruta)
             r = c.get(ruta, headers=sesion)
-            chequear(r.status_code < 500 and esperar_registros(*sin_ruta, cuantos),
-                     f"{nombre}: {r.status_code}; como <sin ruta>: {registrados(*sin_ruta)}")
+            chequear(r.status_code < 500 and esperar_registros(*sin_ruta, antes + 1),
+                     f"{nombre}: {r.status_code}; como <sin ruta>: {registrados(*sin_ruta) - antes}")
         camino = ("endpoint like '/api/nul-a%' or endpoint like '/x/x%'", None)
         chequear(registrados(*camino) == 0, f"el camino no queda en api_logs: {registrados(*camino)}")
 
