@@ -5,6 +5,7 @@ import asyncio
 import json
 import os
 import sys
+import types
 
 import dotenv
 
@@ -46,20 +47,23 @@ def _vuce_simulado():
 
 
 def _frontend_por_defecto():
-    guardada = os.environ.pop("FRONTEND_URL")
+    guardada = os.environ.pop("FRONTEND_URL", None)
     try:
         return m.get_frontend_url()
     except RuntimeError:
         return "rechaza"
     finally:
-        os.environ["FRONTEND_URL"] = guardada
+        if guardada is not None:
+            os.environ["FRONTEND_URL"] = guardada
 
 
 async def _limite_desde_127():
-    from proyecto_maria.security.security_middleware import RateLimitByEndpointMiddleware
+    from proyecto_maria.security import security_middleware as sm
     async def siguiente(_):
         return Response("ok")
-    limite = RateLimitByEndpointMiddleware(app=None)
+    # Reloj quieto: la ventana es por minuto y los 11 pedidos no pueden partirse entre dos.
+    sm.time = types.SimpleNamespace(time=lambda: 600.0)
+    limite = sm.RateLimitByEndpointMiddleware(app=None)
     pedido = lambda: Request({"type": "http", "method": "POST", "path": "/upload_pdf", "headers": [],
                               "query_string": b"", "client": ("127.0.0.1", 1)})
     # El tope de las rutas pesadas es 10 por minuto: el pedido 11 pasa sólo con el pase.
