@@ -1731,12 +1731,11 @@ async def current_user_info(user=Depends(get_current_user)):
 
 
 # --- ADMIN DEPENDENCY ---
-# Un user es admin sólo si tiene "admin" en sus roles guardados; el arranque se
-# lo pone a la cuenta de ADMIN_USERNAMES (env, separado por comas). Protege
-# /api/dev/*, /dev/*, /api/admin/* y las funciones globales (las que no actúan
-# sobre un estudio), que además llevan tags=["admin"].
-# tests/test_admin_solo_admin.py recorre las rutas y falla si alguna de esas
-# deja pasar a un usuario común.
+# Un user es admin sólo si tiene "admin" en roles; el arranque se lo pone a la
+# cuenta de ADMIN_USERNAMES. Protege /api/dev/*, /dev/*, /api/admin/*
+# y las funciones globales (las que no actúan sobre un estudio), que además
+# llevan tags=["admin"]. tests/test_admin_solo_admin.py recorre las rutas y
+# falla si alguna de esas deja pasar a un usuario común.
 def _admin_usernames() -> set:
     raw = os.getenv("ADMIN_USERNAMES", "")
     return {u.strip() for u in raw.split(",") if u.strip()}
