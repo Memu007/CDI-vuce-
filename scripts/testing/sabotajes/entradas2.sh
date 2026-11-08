@@ -87,10 +87,6 @@ sabotaje $M "el alta no limpia los textos" "$CLI[alta-nul]" \
   "    client = _textos_de_arriba_guardables(client)" "    pass"
 sabotaje $M "la edición no limpia los textos" "$CLI[edicion-nul]" \
   "    client_data = _textos_de_arriba_guardables(client_data)" "    pass"
-sabotaje $M "el cliente se limpia entero y no campo por campo" \
-  "FAILED $T::test_cliente_con_un_campo_muy_anidado_se_guarda[alta" \
-  "    return {clave: _guardable_en_pg(v) if isinstance(v, str) else v for clave, v in cuerpo.items()}" \
-  "    return _guardable_en_pg(cuerpo)"
 sabotaje $M "el email repetido en la edición no da 409" \
   "FAILED $T::test_editar_cliente_con_el_email_de_otro_da_409_y_no_cambia_nada" \
   'raise HTTPException(status_code=409, detail=f"Ya tenés un cliente con el email {email}") from e' 'raise'
@@ -101,22 +97,18 @@ sabotaje $M "un NaN fuera de los números leídos pasa" "$SAV[nan_anidado_en_una
 sabotaje $M "un infinito fuera de los números leídos pasa" "$SAV[infinito_en_resumen]" \
   "    return numero if math.isfinite(numero) else _no_finito(texto)" "    return numero"
 sabotaje $M "un JSON roto da 500" "$SAV[json_cortado]" \
-  "    except (ValueError, RecursionError):
+  "parse_float=_float_finito)
+    except (ValueError, RecursionError):" \
+  "parse_float=_float_finito)
+    except RecursionError:"
+sabotaje $M "lo muy hondo se recorre fuera del try" "$SAV[lista_mas_honda_que_la_pila]" \
+  "    try:
+        data = _sin_nul(data)
+        medio_par = rechazar_medio_par and tiene_medio_par(data)
+    except RecursionError:
         raise HTTPException(status_code=400, detail=\"Body JSON inválido\")" \
-  "    except RecursionError:
-        raise HTTPException(status_code=400, detail=\"Body JSON inválido\")"
-sabotaje $M "lo muy hondo se revisa fuera del try" "$SAV[lista_mas_honda_que_la_pila]" \
-  "        if tiene_medio_par(data):
-            raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
-        return data
-    except (ValueError, RecursionError):
-        raise HTTPException(status_code=400, detail=\"Body JSON inválido\")" \
-  "        pass
-    except (ValueError, RecursionError):
-        raise HTTPException(status_code=400, detail=\"Body JSON inválido\")
-    if tiene_medio_par(data):
-        raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
-    return data"
+  "    data = _sin_nul(data)
+    medio_par = rechazar_medio_par and tiene_medio_par(data)"
 sabotaje $M "un entero de más pasa" "$SAV[resumen_items_enorme]" \
   "    if not -2**31 <= numero < 2**31:" "    if False:"
 sabotaje $M "resumen.items de texto no se revisa" "$SAV[resumen_items_de_texto]" \

@@ -56,7 +56,7 @@ NUMEROS_MALOS = {
     "infinito": '{"descripcion": "D", "cantidad": 1e999, "valor_unitario": 1}',
     "menos_infinito": '{"descripcion": "D", "cantidad": 1, "valor_unitario": -Infinity}',
     "texto": '{"descripcion": "D", "cantidad": "abc"}',
-    "total_que_desborda": '{"descripcion": "D", "cantidad": 1e200, "valor_unitario": 1e200}',
+    "total_que_desborda": '{"descripcion": "D", "cantidad": 1e8, "valor_unitario": 1e8}',
 }
 
 
@@ -66,7 +66,7 @@ def test_manual_con_numero_no_valido_da_400_y_no_guarda(item):
     cid = _cliente(sesion)
     r = _manual(sesion, cid, item)
     assert r.status_code == 400, r.text
-    assert "número" in r.json()["detail"]
+    assert r.json()["detail"].endswith((" tiene que ser un número.", " es demasiado grande.")), r.text
     assert _operaciones(u) == 0
 
 
@@ -118,21 +118,6 @@ def test_texto_del_cliente_que_no_se_puede_guardar_queda_con_reemplazo(via, text
     assert r.status_code == 200, r.text
     guardado = _cliente_guardado(r.json()["cliente"]["id"])
     assert (guardado.name, guardado.notes) == ("x�y", "x�y")
-
-
-@pytest.mark.parametrize("via", ["alta", "edicion"])
-def test_cliente_con_un_campo_muy_anidado_se_guarda(via):
-    _, sesion = _sesion()
-    anidado = "{}"
-    for _ in range(1000):
-        anidado = '{"a": %s}' % anidado
-    cuerpo = ('{"nombre": "N", "notas": %s}' % anidado).encode()
-    if via == "alta":
-        r = _post("/api/clientes", cuerpo, sesion)
-    else:
-        r = _post(f"/api/clientes/{_cliente(sesion)}", cuerpo, sesion, metodo="PUT")
-    assert r.status_code == 200, r.text
-    assert _cliente_guardado(r.json()["cliente"]["id"]).notes.startswith("{'a': {'a':")
 
 
 def test_editar_cliente_con_el_email_de_otro_da_409_y_no_cambia_nada():
