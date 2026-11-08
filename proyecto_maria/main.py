@@ -4868,9 +4868,8 @@ def _rechazar_exportacion_en_importacion(request: MariaRequest) -> None:
 
 
 def _textos_como_van_al_txt(request: MariaRequest) -> None:
-    """Los textos como los lleva el TXT, para que los avisos y la generación
-    miren lo mismo: sin saltos de línea ni «=», moneda e incoterm en
-    mayúsculas y sin espacios, el CUIT sin guiones."""
+    """Los textos como los lleva el TXT, para que avisos y generación miren lo mismo: sin saltos
+    de línea ni «=», moneda e incoterm en mayúsculas y sin espacios, el CUIT sin guiones."""
     from proyecto_maria.core.controles_maria import CAMPOS_DE_TEXTO, CAMPOS_DE_TEXTO_DEL_ITEM, limpiar_texto
     for campo in CAMPOS_DE_TEXTO:
         setattr(request, campo, limpiar_texto(getattr(request, campo)))

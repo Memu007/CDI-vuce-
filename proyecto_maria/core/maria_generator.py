@@ -339,10 +339,8 @@ SUFIJO_MAXIMO = 120  # el mismo tope que valida /generate_maria
 # cantidades (peso, %, capacidad, cantidad…) y los que empiezan con A son
 # texto (marca, modelo, código); el archivo aceptado de 2026 los trae enteros.
 PIDE_NUMERO = ("Z",)
-# Una palabra con números cuyo separador el MARIA no acepta (sale espacio) se
-# lee igual sólo si es una fecha, números con guion o un código con letras
-# en el que, después de un dígito, sólo hay guion, punto o «°», y ningún
-# punto parece de miles.
+# Un separador que el MARIA cambia por espacio deja la palabra igual sólo en una fecha, números con
+# guion o un código con letras sin punto de miles y con sólo «-», «.» o «°» después de un dígito.
 _PALABRA = re.compile(r"[A-Za-z0-9]+(?:[^A-Za-z0-9\s][A-Za-z0-9]+)*")
 _SE_LEE_IGUAL = re.compile(
     r"(?:0?[1-9]|[12][0-9]|3[01])([./-])(?:0?[1-9]|1[0-2])\1(?:[0-9]{2}|[0-9]{4})"
