@@ -1080,15 +1080,21 @@ def es_exportacion(tipo_destinacion) -> bool:
     return re.match(r"[^A-Z0-9]*EC", texto) is not None
 
 
+def codigo_de_destinacion(texto) -> str:
+    """Las 4 letras o números ASCII en mayúsculas, o "" si no es un código."""
+    codigo = str(texto or "").strip()
+    return codigo.upper() if re.fullmatch(r"[A-Za-z0-9]{4}", codigo) else ""
+
+
 def destinacion_del_txt(tipo_destinacion, exportacion: bool = False) -> str:
     """La destinación como va al ISTA: cuatro letras o números ASCII, o ValueError."""
     if es_exportacion(tipo_destinacion) != exportacion:
         raise ValueError(IMPORTACION_EN_EXPORTACION if exportacion else EXPORTACION_EN_IMPORTACION)
-    codigo = str(tipo_destinacion or "").strip() or ("" if exportacion else "IC04")
-    if not re.fullmatch(r"[A-Za-z0-9]{4}", codigo):
+    codigo = codigo_de_destinacion(str(tipo_destinacion or "").strip() or ("" if exportacion else "IC04"))
+    if not codigo:
         ejemplo = "EC01" if exportacion else "IC04"
         raise ValueError(f"Destinación: va un código de 4 letras o números, como {ejemplo}.")
-    return codigo.upper()
+    return codigo
 
 
 def generate_maria_txt(operation_id: str, items: list, 

@@ -2429,7 +2429,8 @@ async def update_user_profile(
     if "default_puerto_destino" in body:
         u.default_puerto_destino = _sanitize_op_default(body.get("default_puerto_destino"))
     if "default_tipo_destinacion" in body:
-        u.default_tipo_destinacion = _sanitize_op_default(body.get("default_tipo_destinacion"))
+        destinacion = str(body.get("default_tipo_destinacion") or "").strip()
+        u.default_tipo_destinacion = _destinacion_o_400(destinacion) if destinacion else None
 
     if not cambia_email:
         await db.commit()

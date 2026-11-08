@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: el lector y el perfil sólo dejan pasar una destinación que es un código (AVISOS-2b)
+
+- El lector de facturas deja vacía la destinación que no es un código de 4 letras o números ASCII, en vez de pasarla en mayúsculas a la revisión.
+- Guardar en el perfil una destinación por defecto que no es un código de importación (de más o de menos, con guion bajo, una EC) da 400 y no cambia nada del perfil; vaciarla sigue limpiándola.
+
 ## 2026-11-08 · fix: una cuenta recibe hasta 3 links de cambio de clave por hora, aunque los pedidos lleguen de IPs distintas (RESET-3)
 
 - Desde el cuarto pedido de la hora la respuesta es la misma, pero no se manda el mail ni se crea un link: uno nuevo anularía el que la persona sí pidió.
