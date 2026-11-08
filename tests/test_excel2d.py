@@ -66,15 +66,20 @@ def _anidado(xfs):
         b'<xf numFmtId="164"/>', b'<cellXfs/><xf numFmtId="164"/>', 1)})
 
 
-def _xls(corchetes, registros=1, en_ole=True):
-    """Un .xls con `registros` FORMAT (BIFF 0x041E) de `corchetes` «[». xlwt corta cada
-    registro en 8224 bytes, pero xlrd lee el largo de 16 bits que diga el archivo."""
+def _xls(texto, registros=1, en_ole=True, cabecera=None):
+    """Un .xls con `registros` FORMAT (BIFF8, 0x041E) de `texto`, en UTF-16 si no entra en
+    latin-1; `cabecera` pisa (cuenta, bandera). xlwt corta cada registro en 8224 bytes, pero
+    xlrd lee el largo de 16 bits."""
     xlwt = pytest.importorskip("xlwt")
     from xlwt.CompoundDoc import XlsDoc
     libro = xlwt.Workbook()
     libro.add_sheet("Factura").write(0, 0, "x")
     biff, salida = libro.get_biff_data(), bytearray()
-    formato = struct.pack("<HHHHB", 0x041E, 5 + corchetes, 200, corchetes, 0) + b"[" * corchetes
+    try:
+        crudo, utf16 = texto.encode("latin-1"), 0
+    except UnicodeEncodeError:
+        crudo, utf16 = texto.encode("utf-16-le"), 1
+    formato = struct.pack("<HHHHB", 0x041E, 5 + len(crudo), 200, *(cabecera or (len(texto), utf16))) + crudo
     pos = 0
     while pos < len(biff):
         tipo, largo = struct.unpack_from("<HH", biff, pos)
@@ -101,8 +106,13 @@ CAUSAS = {
     "formatos de celda": (lambda: _con_formato("0.00", 65_490), lambda: _con_formato("0.00", 65_491), True),
     "formatos de celda tras un cellXfs sin hijos": (lambda: _anidado(65_490), lambda: _anidado(65_491), True),
     "rangos": (lambda: _con_rangos(63_999), lambda: _con_rangos(64_000), False),
-    "corchetes en un .xls": (lambda: _xls(32), lambda: _xls(33), False),
-    "corchetes en un .xls sin OLE": (lambda: _xls(32, en_ole=False), lambda: _xls(33, en_ole=False), False),
+    "corchetes en un .xls": (lambda: _xls("[" * 32), lambda: _xls("[" * 33), False),
+    "corchetes en un .xls sin OLE": (lambda: _xls("[" * 32, en_ole=False), lambda: _xls("[" * 33, en_ole=False),
+                                     False),
+    "corchetes en UTF-16 en un .xls": (lambda: _xls("€" + "[" * 32), lambda: _xls("€" + "[" * 33), False),
+    "largo en un .xls": (lambda: _xls("0" * 255), lambda: _xls("0" * 256), False),
+    "corchetes en un FORMAT de .xls que no cuadra": (lambda: _xls("[" * 32, cabecera=(0, 1)),
+                                                     lambda: _xls("[" * 33, cabecera=(0, 1)), False),
 }
 
 
@@ -120,9 +130,11 @@ def test_un_formato_que_excel_no_guarda_se_rechaza(causa):
     "[Red][<=100]0.00;[Blue][>100]0.00;[Green]0;@",
     '#,##0.00 "USD";[Red]-#,##0.00 "USD"',
     "[h]:mm:ss",
-])
+    '0 "' + "字" * 40 + '"',  # en UTF-16, cada 字 lleva un byte 0x5B, el de «[»
+], ids=["fecha", "colores", "moneda", "horas", "texto chino"])
 def test_un_formato_de_excel_sigue_entrando(codigo):
     assert fs._abrir_excel(_con_formato(codigo), ".xlsx") == (1, False)
+    assert fs._abrir_excel(_xls(codigo), ".xls") == (1, False)
 
 
 def test_un_sqref_largo_se_parte_hasta_el_tope():
@@ -144,7 +156,7 @@ SUBIDAS = {
     "2499 combinadas en 4998 filas": (lambda: _con_combinadas(4_998), 200, None, 3),
     "9995 combinadas en 19 990 filas": (lambda: _con_combinadas(19_990), 400, "filas", 3),
     "640 000 rangos de formato condicional": (lambda: _con_rangos(640_000), 400, "rangos", 1),
-    "tres formatos de 60 000 corchetes en un .xls": (lambda: _xls(60_000, 3), 400, "formato", 1),
+    "tres formatos de 60 000 corchetes en un .xls": (lambda: _xls("[" * 60_000, 3), 400, "formato", 1),
 }
 
 
