@@ -71,7 +71,23 @@ sabotaje "el login busca sin distinguir mayúsculas" \
 sabotaje "el arranque promueve sin distinguir mayúsculas" \
   'select(User).where(User.username == identifier))' \
   'select(User).where(func.lower(User.username) == identifier.lower()))' \
-  'assert roles.count("admin") == (1 if username == admin else 0)' "$T[mayusculas-/auth/register]"
+  'assert roles.count("admin") == (1 if fila and username == admin else 0)' "$T[mayusculas-/auth/register]"
+ARRANQUE='                user = result.scalars().first()
+                roles = roles_de'
+sabotaje "el arranque prueba exacto y si no hay, sin distinguir mayúsculas" "$ARRANQUE" \
+  '                user = result.scalars().first() or (await session.execute(select(User).where(
+                    func.lower(User.username) == identifier.lower()))).scalars().first()
+                roles = roles_de' \
+  "$V[sola_y_la_lista_en_mayusculas]" "$V[minusculas]"
+LOGIN='    user = result.scalars().first()
+    
+    # Función auxiliar para manejar fallo'
+sabotaje "el login prueba exacto y si no hay, sin distinguir mayúsculas" "$LOGIN" \
+  '    user = result.scalars().first() or (await db.execute(select(User).where(
+        func.lower(User.username) == username.lower()))).scalars().first()
+    
+    # Función auxiliar para manejar fallo' \
+  "$V[sola_y_la_lista_en_mayusculas]" "$V[minusculas]"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"

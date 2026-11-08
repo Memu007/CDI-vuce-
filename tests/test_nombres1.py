@@ -92,26 +92,35 @@ def _entrar(c, username, clave):
     return c.post("/auth/login", json={"username": username, "password": clave})
 
 
-# Cada una de las dos cuentas es la de la lista: el arranque tiene que promover la exacta
-# aunque la base devuelva primero la otra.
-@pytest.mark.parametrize("de_la_lista", [str.lower, str.upper], ids=["minusculas", "mayusculas"])
-def test_dos_cuentas_viejas_que_difieren_en_mayusculas_siguen_entrando(monkeypatch, nombre, de_la_lista):
+# Las cuentas sembradas y la de la lista van como datos: el arranque y el login tienen que
+# encontrar sólo la exacta, aunque la base devuelva primero la otra o la exacta no exista.
+@pytest.mark.parametrize("sembradas,de_la_lista", [
+    ((str.lower, str.upper), str.lower),
+    ((str.lower, str.upper), str.upper),
+    ((str.lower,), str.upper),
+], ids=["minusculas", "mayusculas", "sola_y_la_lista_en_mayusculas"])
+def test_dos_cuentas_viejas_que_difieren_en_mayusculas_siguen_entrando(monkeypatch, nombre, sembradas, de_la_lista):
     claves = {nombre: "Minus#123", nombre.upper(): "Mayus#456"}
-    for username, clave in claves.items():
+    existen = {f(nombre): claves[f(nombre)] for f in sembradas}
+    for username, clave in existen.items():
         _run(_sembrar(username, clave))
     monkeypatch.setattr(main, "login_attempts", {})
     c = TestClient(main.app)
-    for username, clave in claves.items():
-        r = _entrar(c, username, clave)
-        assert r.status_code == 200, r.text[:200]
-        me = c.get("/auth/me", headers={"Authorization": f"Bearer {r.json()['access_token']}"})
-        assert me.json()["username"] == username
-    assert _entrar(c, nombre, claves[nombre.upper()]).status_code == 401
+    for username in claves:
+        for clave in existen.values():
+            r = _entrar(c, username, clave)
+            if existen.get(username) != clave:
+                assert r.status_code == 401, (username, r.status_code)
+                continue
+            assert r.status_code == 200, r.text[:200]
+            me = c.get("/auth/me", headers={"Authorization": f"Bearer {r.json()['access_token']}"})
+            assert me.json()["username"] == username
 
     admin = de_la_lista(nombre)
     monkeypatch.setenv("ADMIN_USERNAMES", admin)
     with TestClient(main.app):
         pass
     for username in claves:
-        roles = main.roles_de({"roles": _run(_fila(username)).roles})
-        assert roles.count("admin") == (1 if username == admin else 0), (username, roles)
+        fila = _run(_fila(username))
+        roles = main.roles_de({"roles": fila.roles}) if fila else []
+        assert roles.count("admin") == (1 if fila and username == admin else 0), (username, roles)
