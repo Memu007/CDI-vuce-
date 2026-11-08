@@ -368,7 +368,8 @@ _EXCEL_MAX_RANGOS = 64_000
 def _medida_hoja(xml: bytes) -> tuple[int, float, int]:
     """(columna, fila, ancho) máximos; sin «r», la fila o celda es la siguiente, como en
     openpyxl. «ancho» suma la <dimension>, que Excel guarda a veces como A1:XFD1048576.
-    Rechaza la hoja con más de _EXCEL_MAX_RANGOS rangos en sus sqref."""
+    Rechaza la hoja con más de _EXCEL_MAX_RANGOS rangos entre sus sqref, celdas
+    combinadas y vínculos."""
     from xml.etree import ElementTree as ET
     from openpyxl.utils.cell import coordinate_to_tuple, range_boundaries
     columna = fila = ancho = fila_actual = columna_actual = rangos = 0
@@ -381,12 +382,14 @@ def _medida_hoja(xml: bytes) -> tuple[int, float, int]:
                 continue
             etiqueta = elemento.tag.rsplit("}", 1)[-1]
             # openpyxl arma un objeto por rango de cada sqref (formato condicional,
-            # validación, selección): 640 000 rangos en 1.4 MB tardan 4 s al leer.
+            # validación, selección), combinada o vínculo: 640 000 rangos o
+            # 300 000 combinadas en 1.4 MB tardan 3-4 s al leer.
             rangos += len(elemento.get("sqref", "").split(None, _EXCEL_MAX_RANGOS))
+            rangos += etiqueta in ("mergeCell", "hyperlink")
             if rangos > _EXCEL_MAX_RANGOS:
                 raise ExcelDemasiadoGrande(
-                    "La primera hoja del Excel tiene demasiados rangos con formato condicional o "
-                    "validación. Sacáselos o cargá los productos a mano.")
+                    "La primera hoja del Excel tiene demasiados rangos con formato condicional, "
+                    "validación, celdas combinadas o vínculos. Sacáselos o cargá los productos a mano.")
             try:
                 if etiqueta == "row":
                     columna_actual = 0
