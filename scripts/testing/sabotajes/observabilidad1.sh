@@ -111,7 +111,7 @@ sabotaje pytest_o1 "no agrega la columna" 1 \
   "FAILED $T::test_base_vieja_recibe_columna_nullable_con_indice_y_conserva_filas" "la columna tiene que quedar VARCHAR(50)"
 sabotaje arranque_pg "en Postgres no agrega la columna" 1 \
   '"ALTER TABLE api_logs ADD COLUMN IF NOT EXISTS owner_username VARCHAR(50)"' '"SELECT 1"' \
-  "FALLA | al arrancar la columna existe" "FALLA | suelta la tabla, el próximo arranque la agrega"
+  "FALLA | al arrancar la columna existe" "FALLA | suelta la tabla, el próximo arranque agrega lo que faltaba"
 
 # --- nullable, sin tocar filas
 sabotaje pytest_o1 "la columna es NOT NULL con un dueño por defecto" 1 \
@@ -163,7 +163,8 @@ sabotaje pytest_o1 "la falla va al log sin el motivo" 1 \
   $'        logging.exception(\n            "no se pudo agregar' $'        logging.error(\n            "no se pudo agregar' \
   "FAILED $T::test_si_falla_no_levanta_y_deja_el_motivo_en_el_log" "el log tiene que traer el motivo"
 sabotaje arranque_pg "en Postgres espera el lock sin límite" 1 \
-  $'await conn.exec_driver_sql("SET LOCAL lock_timeout = \'5s\'")' 'pass' \
+  $'            await conn.exec_driver_sql("SET LOCAL lock_timeout = \'5s\'")\n        await conn.exec_driver_sql(sql)' \
+  $'            pass\n        await conn.exec_driver_sql(sql)' \
   "FALLA | la app arranca igual ("
 sabotaje arranque_pg "en Postgres el índice espera el lock sin límite" 1 \
   $'                await ddl(conn,\n                    "CREATE INDEX' $'                await conn.exec_driver_sql(\n                    "CREATE INDEX' \
