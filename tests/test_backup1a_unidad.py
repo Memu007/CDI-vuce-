@@ -85,6 +85,17 @@ def test_enviar_no_deja_una_copia_que_llego_distinta(monkeypatch, tmp_path):
     assert list(destino.iterdir()) == []
 
 
+def test_enviar_no_lleva_una_copia_sin_su_huella(monkeypatch, tmp_path):
+    archivo = _copia_verificada(tmp_path)
+    (tmp_path / "copia.dump.huella.json").unlink()
+    destino = tmp_path / "destino"
+    destino.mkdir()
+    monkeypatch.setenv("COPIA_DESTINO", str(destino))
+    with pytest.raises(copia_base.Falla, match="falta la huella"):
+        asyncio.run(copia_base.enviar(str(archivo)))
+    assert list(destino.iterdir()) == []
+
+
 @pytest.mark.parametrize("huella", [
     {"codificacion": "UTF8' LOCALE 'C' TEMPLATE template1 --"},
     {"formato": "otro"},
