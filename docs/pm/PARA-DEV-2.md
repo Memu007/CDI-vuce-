@@ -69,6 +69,19 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## FRONT-422: aceptada sobre `4dbdb0b`, sin integrar (2026-11-08 PM)
+
+Reproducido igual al informe: chequeo-6 (`+73/−31`, el aviso de +42 alcanza),
+`33 passed`, `front422.sh` 17 ROJO, con falla 0. Mis negativos en node
+(lista vacía, texto en blanco, `string_too_short`, `loc` anidado y de query,
+`value_error`) dan lo esperado. Acta: `REPRODUCCION-FRONT-422-2026-11-08.md`.
+
+**D108: (a), decidido por la PM.** Queda en el front. El script de sabotajes
+se queda. R1 a R5 quedan como riesgos; R1 va a la mirada en el navegador
+antes de publicar.
+
+Tu orden: **ENTRADAS-2** (D101, D104) → ENTORNO-3 → el resto. Próxima D: D109.
+
 ## ENTORNO-2: aceptada sobre `bf92bf9`, sin integrar (2026-11-08 PM)
 
 Reproducido igual al informe: chequeo-6 (`+24/−26`, avisos 0), `22 passed`,
@@ -85,7 +98,6 @@ mismo que ENTORNO-2: sabotajes en el arnés de `test_entorno1`. Los
 monkeypatches de `main_mod.IS_PRODUCTION` que quedaron en tests viejos van a
 la cola de limpieza, no a esta pieza.
 
-Tu orden: **D100 (FRONT-422)** → ENTRADAS-2 → ENTORNO-3 → el resto. Próxima D: D108.
 
 ## Rojo de `despacho1b`: aceptado sobre `d69233c`, sin integrar (2026-11-07 PM)
 
