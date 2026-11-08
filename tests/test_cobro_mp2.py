@@ -945,6 +945,8 @@ def test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope(client, monkeypatc
     antes = _leer_org(org_id), {k: _leer(u) for k, u in nombres.items()}
     # La que ya figura cancelada en Mercado Pago deja de figurar aunque después falle.
     antes[1]["abrio"]["mp_preapproval_id"] = None if estado == "cancelled" else sid
+    if pedido == _CANCELAR and traba == "PUT":
+        antes[1][quien]["cancelar_sin_confirmar"] = sid  # Mercado Pago pudo haberla cancelado
     metodo, ruta = pedido
     _NoContesta.soltar.clear()
     try:
@@ -1012,6 +1014,8 @@ def test_el_tope_es_uno_para_todos_los_pedidos_a_mp(client, monkeypatch, pedido,
     antes = _leer_org(org_id), {k: _leer(u) for k, u in nombres.items()}
     if pedido == _CHECKOUT and fase == 4:
         antes[1]["abrio"]["mp_preapproval_id"] = None  # ya cancelada en Mercado Pago
+    if pedido == _CANCELAR and fase == 3:
+        antes[1][quien]["cancelar_sin_confirmar"] = antes[1]["abrio"]["mp_preapproval_id"]
     metodo, ruta = pedido
     inicio = time.monotonic()
     r = getattr(client, metodo)(ruta.format(**nombres), **({"json": {"plan": "premium"}} if pedido == _CHECKOUT else {}))
