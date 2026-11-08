@@ -74,6 +74,7 @@ def test_un_nombre_de_admin_usernames_no_se_registra(monkeypatch, nombre, ruta, 
     c = TestClient(main.app)
     r = _registrar(c, ruta, nombre)
     assert r.status_code == 400, r.text[:200]
+    assert r.json()["detail"] == "Usuario ya existe"
     assert _run(_fila(nombre)) is None
 
 

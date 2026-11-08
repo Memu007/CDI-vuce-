@@ -79,17 +79,6 @@ async def _simulate_webhook_de_vuelta(request: Request):
 
 @app.get("/api/billing/plans")' \
   "assert 'active' == 'trial'"
-sabotaje $R "cohort-retention vuelve a pedir el rol" \
-  '    db: AsyncSession = Depends(get_db),
-) -> Dict[str, Any]:
-    """
-    Extrae datos' \
-  '    db: AsyncSession = Depends(get_db),
-    user: dict = Depends(__import__("proyecto_maria.auth.roles", fromlist=["x"]).require_role("admin")),
-) -> Dict[str, Any]:
-    """
-    Extrae datos' \
-  'FAILED tests/test_admin_solo_admin.py::test_admin_por_admin_usernames_entra[/api/admin/cohort-retention]'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"

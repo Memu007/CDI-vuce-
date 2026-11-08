@@ -271,7 +271,7 @@ ataques() {
         raise HTTPException(status_code=403, detail="Solo el administrador puede remover miembros")' \
     "Un miembro (no administrador) saca a otro miembro de su estudio" "El miembro que quiso sacar otro miembro sigue en el estudio A"
   ataque $M "admin: cualquier usuario es administrador" \
-    '    return user["username"] in _admin_usernames() or "admin" in roles_de(user)' \
+    '    return "admin" in roles_de(user)' \
     '    return True' \
     "Beto en GET /api/admin/stats/summary" "Beto en GET /api/dev/stats" "Beto en GET /dev/dashboard"
   # Un 201 también es fuga en los ataques directos, no sólo el 200.
