@@ -55,16 +55,16 @@ fi
 
 # formatCode y formatos de celda
 sabotaje $F "un formato largo vuelve a abrirse" \
-  '                if len(codigo) > _FORMATO_MAX_LARGO or codigo.count("[") > _FORMATO_MAX_CORCHETES:' \
-  '                if codigo.count("[") > _FORMATO_MAX_CORCHETES:' \
+  '    return len(codigo) > _FORMATO_MAX_LARGO or codigo.count("[") > _FORMATO_MAX_CORCHETES' \
+  '    return codigo.count("[") > _FORMATO_MAX_CORCHETES' \
   "FAILED $T::test_un_formato_que_excel_no_guarda_se_rechaza[largo]"
 sabotaje $F "un formato con muchos corchetes vuelve a abrirse" \
-  '                if len(codigo) > _FORMATO_MAX_LARGO or codigo.count("[") > _FORMATO_MAX_CORCHETES:' \
-  '                if len(codigo) > _FORMATO_MAX_LARGO:' \
+  '    return len(codigo) > _FORMATO_MAX_LARGO or codigo.count("[") > _FORMATO_MAX_CORCHETES' \
+  '    return len(codigo) > _FORMATO_MAX_LARGO' \
   "FAILED $T::test_un_formato_que_excel_no_guarda_se_rechaza[corchetes]"
 sabotaje $F "los corchetes vuelven a contarse en los bytes, sin las entidades" \
-  '                if len(codigo) > _FORMATO_MAX_LARGO or codigo.count("[") > _FORMATO_MAX_CORCHETES:' \
-  '                if len(codigo) > _FORMATO_MAX_LARGO or z.read(parte).count(b"[") > _FORMATO_MAX_CORCHETES:' \
+  '                if _formato_caro(e.get("formatCode", "")):' \
+  '                if z.read(parte).count(b"[") > _FORMATO_MAX_CORCHETES:' \
   "FAILED $T::test_un_formato_que_excel_no_guarda_se_rechaza[corchetes escritos como &#91;]"
 sabotaje $F "muchos formatos de celda vuelven a abrirse" \
   '                if celdas > _MAX_FORMATOS_DE_CELDA:' \
@@ -103,6 +103,18 @@ sabotaje $F "los formatos de un .xls vuelven a no mirarse antes de abrir" \
   '    if _formatos_xls_que_excel_no_guarda(contents):' \
   '    if False:' \
   "FAILED $T::test_la_subida_cara_no_frena_a_nadie[tres formatos de 60 000 corchetes en un .xls]"
+sabotaje $F "un .xls vuelve a contar los «[» en los bytes y no en el texto" \
+  '            return _formato_caro(registro[5:].decode("utf-16-le" if ancho == 2 else "latin-1"))' \
+  '            return registro.count(b"[") > _FORMATO_MAX_CORCHETES' \
+  "FAILED $T::test_un_formato_de_excel_sigue_entrando[texto chino]"
+sabotaje $F "un .xls vuelve a no mirar el largo del formato" \
+  '            return _formato_caro(registro[5:].decode("utf-16-le" if ancho == 2 else "latin-1"))' \
+  '            return registro[5:].decode("utf-16-le" if ancho == 2 else "latin-1").count("[") > _FORMATO_MAX_CORCHETES' \
+  "FAILED $T::test_un_formato_que_excel_no_guarda_se_rechaza[largo en un .xls]"
+sabotaje $F "un FORMAT de .xls que no cuadra vuelve a decodificarse igual" \
+  '        if len(registro) == 5 + ancho * cuenta:' \
+  '        if True:' \
+  "FAILED $T::test_un_formato_que_excel_no_guarda_se_rechaza[corchetes en un FORMAT de .xls que no cuadra]"
 sabotaje $F "un .xls en OLE vuelve a no leerse por dentro" \
   '        datos = doc.get_named_stream("Workbook") or doc.get_named_stream("Book") or b""' \
   '        datos = b""' \
