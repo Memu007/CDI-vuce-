@@ -63,6 +63,7 @@ def test_un_numero_que_no_es_ascii_no_entra_al_txt():
     # «٣.٥» son dígitos para Python, no para el MARIA: saldrían espacio.
     with pytest.raises(ValueError, match="cambiaría de valor"):
         mg.limpiar_sufijo("AF(2.5 X\u0663.\u0665)-")
+    assert sufijos_arca.valor_de_sufijo("X\u0663.\u0665").isascii()
 
 
 def test_el_aviso_dice_que_el_numero_sale_con_coma():
@@ -172,7 +173,9 @@ CAMBIA_EN_UNO_LIBRE = ["AF(-2.5)-", "AF(-5)-", "AJ(ROLLO .5 M)-", "AJ(ROLLO 1.50
                        "AJ(½)-", "AJ(1\u20442)-", "AJ(1 / 2)-", "AJ(1E-3)-", "AJ(1E+3)-",
                        "AJ(10\u207b\u00b3)-", "AJ(1'500)-", "AJ(1/2 KG)-", "AJ(2.5-3.5)-",
                        "AF(- 5)-", "AJ(10 %)-", "AF(2.5 X\u0663.\u0665)-", "AI(1.2.3)-",
-                       "AA(100%ALGODON)-", "AJ(5/KG)-", "AJ(1 - 2)-"]
+                       "AA(100%ALGODON)-", "AJ(5/KG)-", "AJ(1 - 2)-", "AJ(X\u3007)-",
+                       "AJ(2.500KG)-", "AJ(16.384.000KG)-", "AJ(ROLLO 1.500M)-", "AJ(1.500x5)-",
+                       "AJ(AB-1.500)-", "AR(12.50.2026)-", "AR(1.50.000)-", "AR(32/12/2026)-"]
 
 
 @pytest.mark.parametrize("malo", CAMBIA_EN_UNO_LIBRE)

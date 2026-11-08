@@ -99,6 +99,7 @@ def test_un_seguro_calculado_con_cif_no_genera(client):
 @pytest.mark.parametrize("incoterm,en_el_precio", [
     pytest.param("CIF\x00", True, id="nul"),
     pytest.param("\x01cif", True, id="control_adelante"),
+    # Un salto en el medio no es CIF: las dos rutas lo rechazan como incoterm.
     pytest.param("C\nIF", False, id="salto_en_el_medio"),
 ])
 def test_avisos_y_generar_leen_el_incoterm_igual(client, incoterm, en_el_precio):
@@ -108,7 +109,10 @@ def test_avisos_y_generar_leen_el_incoterm_igual(client, incoterm, en_el_precio)
     assert avisos["valor"]["seguro_en_el_precio"] is en_el_precio
     assert (EN_EL_PRECIO in avisos["avisos"]) is en_el_precio
     r = client.post("/generate_maria", json=pedido)
-    assert (r.json().get("detail") == EN_EL_PRECIO) is en_el_precio, r.text
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == (EN_EL_PRECIO if en_el_precio else {"errors": [
+        "El incoterm «C IF» no es válido (CFR, CIF, CIP, CPT, DAF, DAP, DAT, DDP, DDU, DEQ, DES, "
+        "DPU, EXW, FAS, FCA, FOB)."]}), r.text
 
 
 def test_con_cif_y_las_cuentas_en_error_dice_lo_del_incoterm(client):

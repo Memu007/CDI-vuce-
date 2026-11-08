@@ -120,8 +120,7 @@ sabotaje $G "un número que cambiaría sale igual en un libre" \
   "test_el_numero_que_cambiaria_no_genera_y_dice_donde"
 sabotaje $G "un dígito que no es ASCII pasa" \
   'if c.isdecimal() or not de_unidad or valor[i + 1:i + 2].isnumeric():' 'if False:' \
-  "test_un_numero_que_cambiaria_no_se_genera[AF(1.5\xb2)-]" \
-  "test_un_numero_que_cambiaria_no_se_genera[AJ(10\u207b\xb3)-]"
+  "test_un_numero_que_cambiaria_no_se_genera[AF(1.5\xb2)-]"
 sabotaje $G "todo ² o \xb3 se toma como de una unidad" \
   'de_unidad = i > 0 and valor[i - 1].isascii() and valor[i - 1].isalpha()' 'de_unidad = True' \
   "test_un_numero_que_cambiaria_no_se_genera[AF(1.5\xb2)-]"
@@ -130,7 +129,15 @@ sabotaje $G "ningún ² o \xb3 se toma como de una unidad" \
   "test_lo_que_no_cambia_un_numero_sale_como_antes[AJ(1,5 M\xb2)--AJ(1,5 M2)-]"
 sabotaje $G "un dígito que no es ASCII y queda espacio pasa" \
   'if antes.isnumeric() or ' 'if ' \
-  "test_un_numero_que_cambiaria_no_se_genera[AF(2.5 X\u0663.\u0665)-]"
+  "test_un_numero_que_cambiaria_no_se_genera[AJ(X\u3007)-]"
+sabotaje $G "un punto de miles en una palabra con letras pasa" \
+  '(?!.*[0-9]\.[0-9]{3})' '' \
+  "test_un_numero_que_cambiaria_no_se_genera[AJ(2.500KG)-]" \
+  "test_un_numero_que_cambiaria_no_se_genera[AJ(AB-1.500)-]"
+sabotaje $G "una fecha con día o mes fuera de rango pasa" \
+  '(?:0?[1-9]|[12][0-9]|3[01])([./-])(?:0?[1-9]|1[0-2])\1(?:[0-9]{2}|[0-9]{4})' '[0-9]{1,2}([./-])[0-9]{1,2}\1[0-9]{2,4}' \
+  "test_un_numero_que_cambiaria_no_se_genera[AR(12.50.2026)-]" \
+  "test_un_numero_que_cambiaria_no_se_genera[AR(32/12/2026)-]"
 sabotaje $G "un signo suelto entre dos números pasa" \
   'if digito_antes and digito_despues:' 'if False:' \
   "test_un_numero_que_cambiaria_no_se_genera[AJ(1 - 2)-]"
