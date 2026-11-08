@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Negativos de LIMPIEZA-1: cada sabotaje vuelve a sacar pruebas de la CI o
-# vuelve a abrir un camino de publicación a Google Cloud, y
-# tests/test_limpieza1.py tiene que fallar por ese motivo. Los controles
-# cambian algo que no saca pruebas ni publica, y tienen que quedar verdes.
+# Negativos de LIMPIEZA-1: cada sabotaje vuelve a sacar pruebas de la CI (en
+# el paso o en pytest.ini), esconde su resultado o vuelve a abrir un camino de
+# publicación a Google Cloud, y tests/test_limpieza1.py tiene que fallar por
+# ese motivo. Los controles cambian algo que no saca pruebas ni publica, y
+# tienen que quedar verdes.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/limpieza1.sh [SHA]
 # Trabaja en un worktree descartable: no toca tu copia. Los archivos nuevos se
@@ -105,6 +106,41 @@ sabotaje "un -k por PYTEST_ADDOPTS" "ci.yml le pasa opciones a pytest por PYTEST
   reemplazar $CI '          EMAIL_VERIFICATION_REQUIRED: "false"' '          EMAIL_VERIFICATION_REQUIRED: "false"
           PYTEST_ADDOPTS: "-k not quote"'
 
+sabotaje "un -k dentro de un grupo de cortas" "la CI saca pruebas de la suite: ['-vknot quotes']" \
+  reemplazar $CI "$RUN" "$RUN -vk\"not quotes\""
+sabotaje "un --co: junta las pruebas y no las corre" "la CI saca pruebas de la suite: ['--co']" \
+  reemplazar $CI "$RUN" "$RUN --co"
+sabotaje "un --setup-only" "la CI saca pruebas de la suite: ['--setup-only']" \
+  reemplazar $CI "$RUN" "$RUN --setup-only"
+sabotaje "un --override-ini que cambia qué archivos junta" "la CI saca pruebas de la suite: ['--override-ini=python_files=test_l*.py']" \
+  reemplazar $CI "$RUN" "$RUN --override-ini=python_files=test_l*.py"
+sabotaje "un -o que borra addopts" "la CI saca pruebas de la suite: ['-o', 'addopts=']" \
+  reemplazar $CI "$RUN" "$RUN -o addopts="
+sabotaje "un || true que tapa el rojo" "la CI saca pruebas de la suite: ['||']" \
+  reemplazar $CI "$RUN" "$RUN||true"
+sabotaje "el paso con continue-on-error" "la CI puede esconder el resultado de la suite: ['continue-on-error: true']" \
+  reemplazar $CI "      - name: Suite completa" "      - name: Suite completa
+        continue-on-error: true"
+sabotaje "el job con continue-on-error" "la CI puede esconder el resultado de la suite: ['continue-on-error: true']" \
+  reemplazar $CI "    timeout-minutes: 20" "    timeout-minutes: 20
+    continue-on-error: true"
+sabotaje "el paso con if: false" "la CI puede esconder el resultado de la suite: ['if: false']" \
+  reemplazar $CI "      - name: Suite completa" "      - name: Suite completa
+        if: false"
+sabotaje "el paso corre en otra carpeta" "la CI puede esconder el resultado de la suite: ['working-directory: proyecto_maria']" \
+  reemplazar $CI "      - name: Suite completa" "      - name: Suite completa
+        working-directory: proyecto_maria"
+
+echo "== pytest.ini vuelve a sacar pruebas"
+sabotaje "un --deselect en addopts" "pytest.ini saca pruebas en addopts: ['--deselect=tests/test_pilar_b_quotes.py::test_share_quote_valid']" \
+  reemplazar pytest.ini "addopts =" "addopts =
+    --deselect=tests/test_pilar_b_quotes.py::test_share_quote_valid"
+sabotaje "un -k en addopts" "pytest.ini saca pruebas en addopts: ['-k', 'not quotes']" \
+  reemplazar pytest.ini "addopts =" "addopts =
+    -k \"not quotes\""
+sabotaje "testpaths más chico" "pytest.ini cambia qué pruebas junta" \
+  reemplazar pytest.ini "testpaths = tests" "testpaths = tests/unit"
+
 echo "== vuelve un camino a Google Cloud"
 sabotaje "vuelve cloudbuild.yaml" "queda un camino a Google Cloud: ['cloudbuild.yaml'" \
   git checkout -q 8b45207 -- cloudbuild.yaml
@@ -120,6 +156,7 @@ sabotaje "un archivo setup_gcp.sh sin gcloud adentro" "queda un camino a Google 
 echo "== controles"
 control "un .md que nombra gcloud" nuevo docs/deployment/NOTAS.md 'Antes se usaba gcloud run deploy.'
 control "la suite con -q y --timeout" reemplazar $CI "$RUN" "$RUN -q --timeout=120"
+control "la suite con -p, -W y -rA, que toman valor y no filtran" reemplazar $CI "$RUN" "$RUN -p no:cacheprovider -W ignore -rA"
 
 limpiar
 echo "sabotajes con falla: $FALLAS"
