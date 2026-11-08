@@ -93,7 +93,7 @@ sabotaje $M "el email repetido en la edición no da 409" \
 
 # --- Guardar al cliente
 sabotaje $M "un no finito fuera de los números leídos pasa" "$SAV[nan_en_resumen_que_va_crudo_al_json]" \
-  "        if _tiene_no_finito(data):" "        if False:"
+  "    if _tiene_no_finito(data):" "    if False:"
 sabotaje $M "un entero de más pasa" "$SAV[resumen_items_enorme]" \
   "    if not -2**31 <= numero < 2**31:" "    if False:"
 sabotaje $M "resumen.items de texto no se revisa" "$SAV[resumen_items_de_texto]" \
