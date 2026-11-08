@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Negativos de RESET-3: cada sabotaje afloja el tope de pedidos de reset por
-# cuenta (lo saca, lo ata a la IP, lo sube, lo cuenta tarde o le cambia la
-# ventana) y el caso tiene que fallar por ese motivo. Con PG_URL (un Postgres
+# cuenta (lo saca, lo ata a la IP, lo mete entre las claves de la IP, lo sube,
+# lo cuenta tarde o le cambia la ventana) y el caso tiene que fallar por ese motivo. Con PG_URL (un Postgres
 # local y descartable), también que contar antes de trabar la cuenta no
 # suelte la traba, contra scripts/testing/reset1_postgres.py.
 #
@@ -74,7 +74,7 @@ salida="$(casos_sqlite)" || { echo "BASE  | los casos no pasan sin sabotaje"; ta
 echo "BASE  | $(tail -1 <<<"$salida")"
 
 M=proyecto_maria/main.py
-TOPE='    if user and await _tope_por_cuenta(db, f"reset:cuenta:{user.username}"):
+TOPE='    if user and await _tope_por_cuenta(db, f"reset-cuenta:{user.username}"):
         return mensaje
 '
 TOKEN='    db.add(reset_token)
@@ -86,7 +86,11 @@ MAIL=("FAILED $T" "AssertionError: el cuarto pedido de la hora mandó el mail")
 
 sabotaje $M "sin el tope por cuenta" "$TOPE" '' "${MAIL[@]}"
 sabotaje $M "el tope por cuenta cuenta la IP" \
-  'f"reset:cuenta:{user.username}"' 'f"reset:cuenta:{get_client_ip(req)}"' "${MAIL[@]}"
+  'f"reset-cuenta:{user.username}"' 'f"reset-cuenta:{get_client_ip(req)}"' "${MAIL[@]}"
+sabotaje $M "la clave de la cuenta cae dentro de las de la IP" \
+  'f"reset-cuenta:{user.username}"' 'f"reset:cuenta:{user.username}"' \
+  "FAILED tests/test_abuso1.py::test_reset_una_ip_inventada_no_gasta_el_tope_de_la_cuenta" \
+  "AssertionError: una IP inventada gastó el tope de la cuenta"
 sabotaje $M "el tope deja pasar cuatro" \
   'contar(db, clave, 3600) > 3' 'contar(db, clave, 3600) > 4' "${MAIL[@]}"
 MOVER=("$TOKEN" "$TOKEN$TOPE")
@@ -106,7 +110,7 @@ if [ -n "$PG_URL" ]; then
     echo "BASE  | la prueba en Postgres ya está en rojo sin sabotaje"; grep -E "^FALLA" <<<"$salida"; FALLAS=$((FALLAS+1))
   else
     echo "BASE  | Postgres: $(tail -1 <<<"$salida")"
-    TOPE_TRABADO='        if user and await _tope_por_cuenta(db, f"reset:cuenta:{user.username}"):
+    TOPE_TRABADO='        if user and await _tope_por_cuenta(db, f"reset-cuenta:{user.username}"):
             return mensaje
 '
     MOVER=("$TRABA" "$TRABA$TOPE_TRABADO")

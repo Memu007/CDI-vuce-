@@ -166,7 +166,7 @@ try:
 
         async def contar_y_cambiar_email(db, clave, ventana):
             n = await contar(db, clave, ventana)
-            if clave.startswith("reset:cuenta:") and not perfil:
+            if clave.startswith("reset-cuenta:") and not perfil:
                 perfil.append(await asyncio.wait_for(asyncio.to_thread(cambiar_email), 30))
             return n
         main_mod.limites_auth.contar, limiter.enabled = contar_y_cambiar_email, True
