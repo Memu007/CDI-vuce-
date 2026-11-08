@@ -499,3 +499,7 @@ ENTRADAS-4 aceptada sobre `6baddb5`, sin integrar. Supuesto de la Dev aceptado: 
 ### 2026-11-08 08:59 UTC (PM principal)
 
 EXCEL-2c aceptada sobre `c2b84f1`, sin integrar. D122 (a), decidido por la PM bajo «arreglos chicos de seguridad» (Emi): pieza EXCEL-2d, tope al `formatCode` antes de abrir; lleva también el sabotaje de `excel2.sh` que dejó sin patrón EXCEL-3b (`522e082`). Próxima D libre: D123.
+
+### 2026-11-08 10:10 UTC (PM principal)
+
+SUFIJOS-2+SEGURO-1 aceptada sobre `ad2d0f8`, sin integrar. Decidida por la PM: D123 (a), pieza chica AVISOS-1 de MARIA después de SEGURO-2 (el rechazo de exportación después de limpiar los textos, en avisos y en generar). Riesgos sin tocar: `31/02/2026` pasa como fecha; `٥` frena con el mensaje de «vacío». Próxima D libre: D124.
