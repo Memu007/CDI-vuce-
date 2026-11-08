@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: un miembro con una suscripción cancelada no toca el plan del estudio (COBRO-MP-2)
+
+- **fix(cobro):** reintentar cancelar después de un corte concilia sólo si todas las suscripciones del estudio ya están canceladas en Mercado Pago. Un miembro con la suya cancelada ya no cancela la pendiente de otro ni reactiva el plan.
+
 ## 2026-11-08 · fix: un email que puso el usuario ya no da admin (PERMISOS-1)
 
 - **fix(permisos):** al arrancar, `ADMIN_USERNAMES` da el rol de admin sólo por username. Antes también lo daba al usuario cuyo email coincidía, y el email cada uno lo cambia sin verificarlo.

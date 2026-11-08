@@ -10942,8 +10942,9 @@ async def _quien_toca_el_plan(db_user, org, con_sid, accion: str, no_se_pudo: st
         print(f"⚠️ {db_user.username} no pudo {accion}: {e}")
         raise HTTPException(status_code=503, detail=no_se_pudo)
     paga = {cuenta: estado in _ESTADOS_QUE_PAGAN for cuenta, estado in estados.items()}
-    # Si Mercado Pago canceló sin confirmarlo, la suya ya no paga: el reintento concilia.
-    reintento = cancelar and estados.get(db_user) == "cancelled" and not any(paga.values())
+    # Si Mercado Pago canceló sin confirmarlo, la suya ya no paga: el reintento concilia,
+    # sólo con todas canceladas (cancelar deja la que paga para el final).
+    reintento = cancelar and all(estado == "cancelled" for estado in estados.values())
     if miembro and not (paga[db_user] or reintento):
         raise sin_permiso
     return paga
