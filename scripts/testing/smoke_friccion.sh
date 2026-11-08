@@ -14,12 +14,13 @@ curl -sf "${BASE}/health" | grep -q '"database"' || fail "/health incompleto"
 # Sin sesión sólo se guardan las acciones previas al login; el resto se rechaza.
 rechaza_sin_sesion() {
   local r
-  r=$(curl -s -X POST "${BASE}$1" -H 'Content-Type: application/json' -d "$2")
+  r=$(curl -sS -X POST "${BASE}$1" -H 'Content-Type: application/json' -d "$2") \
+    || fail "POST $1: curl no pudo completar el pedido"
   echo "$r" | grep -qF '"ok":false,"detail":"Evento sin sesión no admitido"' \
     || fail "POST $1 sin sesión debería rechazarse, obtuvo: ${r}"
 }
 
-rechaza_sin_sesion /api/ui/event '{"action":"smoke_wave1","screen":"scripts","dry":true}'
+rechaza_sin_sesion /api/ui/event '{"action":"smoke_wave1","screen":"scripts"}'
 rechaza_sin_sesion /api/session/state '{"action":"smoke_session_state_alias","screen":"scripts"}'
 
 CODE=$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/api/clientes/by-cuit/20123456789")
