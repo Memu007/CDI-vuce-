@@ -117,3 +117,4 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   edición del cliente; `DataStore.add_operation` (`core/datastore.py`) parece
   código muerto.
 - `docker-compose.yml:61`: el mensaje `:?` de `JWT_SECRET_KEY` lleva «:» y compose lo corta.
+- Arnés de sabotajes y helpers de `scripts/testing/*_postgres.py` (crear y borrar base, registrar usuario, `chequear`) copiados entre piezas: unificar.
