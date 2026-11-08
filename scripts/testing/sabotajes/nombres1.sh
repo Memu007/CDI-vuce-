@@ -80,13 +80,11 @@ sabotaje "el arranque prueba exacto y si no hay, sin distinguir mayúsculas" "$A
                 roles = roles_de' \
   "$V[sola_y_la_lista_en_mayusculas]" "$V[minusculas]"
 LOGIN='    user = result.scalars().first()
-    
-    # Función auxiliar para manejar fallo'
+    if not user and "@" in (username or ""):'
 sabotaje "el login prueba exacto y si no hay, sin distinguir mayúsculas" "$LOGIN" \
   '    user = result.scalars().first() or (await db.execute(select(User).where(
         func.lower(User.username) == username.lower()))).scalars().first()
-    
-    # Función auxiliar para manejar fallo' \
+    if not user and "@" in (username or ""):' \
   "$V[sola_y_la_lista_en_mayusculas]" "$V[minusculas]"
 
 git checkout -q -- proyecto_maria/
