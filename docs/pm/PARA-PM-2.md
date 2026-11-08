@@ -2,169 +2,217 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ENTORNO-2 (D98): **entregada** en `bf92bf9` (2026-11-08)
+## FRONT-422 (D100): **en curso**: falta el resultado de las dos suites sobre `4dbdb0b` (2026-11-08)
 
 | Qué | SHAs |
 |---|---|
-| Rojo antes del arreglo | `4183666` |
-| Producto y CHANGELOG | `c8afa6f`, `fb91f5c` (refactor: un solo import de `config` en `main.py`) |
-| Pruebas y sabotajes | `cac8924`, `65a689d`, `1b44897`, `633551d` |
-| Merge de tu rama (sólo `docs/pm/`) | `bf92bf9` = `0855bee` traído con merge |
-| Informe | el commit `docs:` que sigue a `bf92bf9` |
-| Base | `1e1f60d` |
+| Base | `19b7764` |
+| Producto y CHANGELOG | `37ceeed`, `9ee40b8`, `8decbfc` |
+| Pruebas y sabotajes | `ca54f74`, `1b93976`, `4dbdb0b` |
+| Merge de tu rama (sólo `docs/pm/`) | `038a42d` = `ff88333` traído con merge |
+| Informe | el commit `docs:` que sigue a `038a42d` |
 
-**Resultado.** Con `ENVIRONMENT` ausente o con un valor desconocido, los seis controles que pediste se portan como en producción:
-- el CSRF bloquea;
-- las cookies de sesión y la de CSRF van `Secure`;
-- `/docs`, `/redoc` y `/openapi.json` dan 404;
-- sin `DATABASE_URL`, la app no arranca en vez de caer a SQLite;
-- el VUCE simulado no responde;
-- el cobro simulado da 404 aunque esté `ENABLE_SIMULATE_CHARGE=true`.
+**Resultado.** Un 422 de pydantic (`detail` en lista) ya no muestra «[object Object]», el texto en inglés ni un genérico que tapa el motivo. Pasa en las cuatro entradas que leen `detail`:
+- `CDI.api` (`app_v2.js`), que usan todas las pantallas del panel, entre ellas revisión y finalizar;
+- el login, el registro y el recuperar de la landing;
+- el reset de contraseña.
 
-Todos preguntan a `config.es_desarrollo()`, que vale `True` sólo para `development`, `test` y `testing`, escritos exactos. Esa es tu sugerencia, y además deja una sola definición en lugar de dos. Las suites completas desde base limpia están verdes (abajo).
+Las cuatro pasan el `detail` por un solo traductor, `static/errores.js`. Dice qué campo falla y por qué, en castellano:
+- falta un campo;
+- no es JSON;
+- no es un objeto;
+- no es texto o no es un número;
+- es más largo que el tope;
+- el `value_error` del backend, sin el «Value error, ».
+
+Si el error viene de una lista, agrega «(ítem N)». Un motivo que no está en esa lista dice «Revisá el campo «x».». Un `detail` de texto se muestra tal cual, como antes.
 
 ## Decisiones
 
-**D107. `IS_PRODUCTION` y lo que cuelga de él.** Hay controles que todavía preguntan «¿es `production`?» en vez de «¿no es desarrollo?»:
-- `main.py:105`: `IS_PRODUCTION = os.getenv("ENVIRONMENT", "development") == "production"`.
-- De él cuelgan dos cosas:
-  - el fallo por falta de `FRONTEND_URL` (`main.py:223`);
-  - el fallo por `ALLOWED_ORIGINS` vacío o `*` (`main.py:406`).
-- En `security/security_middleware.py` pasa lo mismo con HSTS (`:62`) y con el pase libre del rate-limit para `127.0.0.1` (`:211`).
+**D108. Traducir el 422 en el backend en vez de en el front.** Lo levantó `/code-review`.
+- (a) **Recomendada.** Dejarlo como está. Hoy el único `detail` en lista sale de `main.py:490` (el handler de `RequestValidationError`); el adversario lo verificó. Un solo traductor en el front cubre todas las pantallas, con prueba que corre las plantillas reales en node.
+- (b) Pieza aparte. El handler de `main.py:490` devuelve `detail` como texto en castellano y `errores.js` queda para el texto.
+  - Costo: cambia el contrato de la API para todo cliente que lea la lista. Hay tests viejos que leen `detail[0]["loc"]`; no los conté.
+  - Ventaja: un cliente sin este JS (curl, otra app) también lee castellano.
 
-Con `ENVIRONMENT` ausente, CORS y FRONTEND_URL caen a localhost en vez de fallar, no se manda HSTS, y desde 127.0.0.1 no hay rate-limit.
-- (a) **Recomendada.** Pieza aparte, ENTORNO-3, después de ENTRADAS-2: esos cuatro lugares preguntan a `es_desarrollo()`, con su caso en `test_entorno1` y su sabotaje.
-  - Costo: sin `ENVIRONMENT`, la app no arranca hasta que estén `ALLOWED_ORIGINS` y `FRONTEND_URL`. Es lo que pide el criterio de esta pieza, aplicado a dos controles más.
-  - Por qué aparte: no estaban en la lista de esta tarea, y el arranque con CORS es una puerta más que hay que probar.
-- (b) Dejarlo así, como riesgo. Ninguno de los cuatro abre una puerta de desarrollo: todos dejan menos protegido un despliegue mal configurado.
+**D107: ya la decidiste (a), ENTORNO-3 después de ENTRADAS-2.** La anoto en mi orden.
 
-Próxima D libre: D108.
+Próxima D libre: D109.
 
-**Supuesto reversible.** `ENABLE_SIMULATE_CHARGE` ya no se lee en ningún lugar del producto (`grep` en `proyecto_maria/` da vacío). Un despliegue de demostración fuera de desarrollo ya no puede simular el cobro con la bandera. Si hace falta, se vuelve a leer, pero sólo dentro de `es_desarrollo()`.
+**Supuesto reversible.** `CAMPOS` traduce sólo los nombres de los formularios de sesión:
+- `username`, `email`, `name` y `password`;
+- `new_password` y `current_password`.
+
+Cualquier otro campo se nombra técnico: «el campo «grupo_id»». Ampliar la tabla es una línea por campo.
 
 ## Archivos de producto que toqué
 
-- `proyecto_maria/config.py` (+6/−0): `es_desarrollo()`.
-- `proyecto_maria/main.py` (+10/−17): docs/redoc/openapi, el valor por omisión de CSRF, `secure=` de las dos cookies y el cobro simulado.
-- `proyecto_maria/database/connection.py` (+4/−6): sin `DATABASE_URL`, `RuntimeError` fuera de desarrollo.
-- `proyecto_maria/core/vuce_connector.py` (+4/−3): el VUCE simulado, sólo en desarrollo.
+- `proyecto_maria/static/errores.js` (nuevo, 55 líneas): `textoDeError(detail, genérico)`.
+- `proyecto_maria/static/v2/app_v2.js` (+9): `CDI.api` traduce el `detail` y conserva `status`.
+- `proyecto_maria/static/v2/screens/finalize.js` (−11) y `review.js` (−11): su traductor propio sale; usan el común.
+- `proyecto_maria/templates/dashboard_v2.html` (+1): carga `errores.js`.
+- `proyecto_maria/templates/landing.html` (+3/−5): login, registro y recuperar.
+- `proyecto_maria/templates/reset_password.html` (+2/−1): carga `errores.js`; el reset lo usa.
 - `CHANGELOG.md`: una entrada.
 
-`producto +24/−26`.
+`producto +73/−31`. Suma 42 líneas netas porque `errores.js` es el único traductor compartido: reemplaza las dos copias que tenían `finalize.js` y `review.js`, y cubre además la landing, el reset y `CDI.api`, que no tenían ninguno.
 
 ## Casos
 
-Siguen el patrón de `test_entorno1`: la sonda (`tests/entorno_sonda.py`) arranca la app en otro proceso con cada `ENVIRONMENT`. Las puertas nuevas se suman como datos al dict `PUERTAS`:
-- `csrf_que_solo_avisa`;
-- `cookies_sin_secure`;
-- `docs_y_openapi`;
-- `sqlite_sin_database_url`;
-- `vuce_simulado`;
-- `cobro_simulado`, que ahora arranca con la bandera puesta.
+`tests/test_front422.py` pide el 422 real al backend (TestClient) y se lo pasa al arnés `tests/front422_pantalla.js`. Ese arnés corre en node el código real de cada pantalla, cada una con su DOM mínimo:
+- `api`: `CDI.api` de `app_v2.js`;
+- `landing`: el submit del login de `landing.html`;
+- `reset`: el submit de `reset_password.html`.
 
-Los mismos dos casos de siempre las recorren:
-- `test_puerta_cerrada_fuera_de_desarrollo`, con los valores `None`, `""`, `production`, `prod`, `staging`, `Development`, `" development"` y `TESTING`;
-- `test_puerta_abierta_en_desarrollo`, con `development`, `test` y `testing`.
+Devuelve lo que la persona lee. Un caso por causa, `test_el_422_de_pydantic_se_lee_en_castellano`, con estas entradas como datos, cada una en las tres pantallas:
 
-La sonda arranca con `ENABLE_SIMULATE_CHARGE=true`. Así, una lectura de la bandera al importar también se ve.
+| Entrada | Ruta | Lo que tiene que leer |
+|---|---|---|
+| `falta_campo` | `/auth/login` `{}` | «Falta el usuario. Falta la contraseña.» |
+| `no_es_json` | `/auth/login` `nope` | JSON |
+| `tipo_equivocado` | `/auth/login` `username: 1` | texto |
+| `no_es_objeto` | `/auth/login` `[1]` | objeto |
+| `nombre_largo` | `/auth/register` nombre de 101 | 100 |
+| `clave_73_bytes` | `/auth/reset-password` | 72 bytes |
+| `no_es_numero` | desagrupar `grupo_id: "x"` | número |
+| `sin_texto_propio` | desagrupar `grupo_id: 2**40` | «Revisá el campo «grupo_id».» |
+| `item_de_lista` | agrupar `item_ids: ["a", 2, 3]` | ítem 3 |
+| `cambio_de_clave` | `/api/user/change-password` `{}` | «Falta la contraseña actual. Falta la contraseña nueva.» |
 
-## Puertas (sobre `bf92bf9`)
+Cada entrada verifica además:
+- que el texto es un `str` y no dice `[object Object]`, `Field required` ni `Input should`;
+- que `CDI.api` devuelve `status` 422.
+
+`test_un_detail_de_texto_se_muestra_tal_cual` cubre las tres pantallas con un `detail` de texto. Total: `33 passed`.
+
+## Rojos, copiados de la salida
+
+- **Base `19b7764`, con los casos y sin el producto:** `18 failed, 3 passed, 3 warnings in 1.51s`. El primero:
+  `AssertionError: [{'type': 'missing', 'loc': ['body', 'username'], 'msg': 'Field required'}, {'type': 'missing', 'loc': ['body', 'password'], 'msg': 'Field required'}]`.
+  Los 3 verdes eran el `detail` de texto, que ya se mostraba bien.
+- **Sobre `9ee40b8`, con la entrada `cambio_de_clave` nueva:** `3 failed, 30 passed`, con `assert 'Falta la contraseña actual. Falta la contraseña nueva.' in 'Falta la contraseña.'`.
+  - Causa: las dos claves se traducían igual y el `Set` que saca repetidos las juntaba en una.
+  - Arreglo: `8decbfc`.
+- La ronda de `9ee40b8` (número, ítem de lista, motivo sin texto propio) también tuvo su rojo antes del arreglo. Esa salida no la conservé al compactar el chat, así que no la copio. Sus tres sabotajes de abajo muestran el rojo con el arreglo revertido.
+
+## Puertas (sobre `4dbdb0b`)
 
 | Puerta | Salida |
 |---|---|
-| `tests/test_entorno1.py` | `22 passed, 3 warnings in 13.20s` |
-| `entorno1.sh bf92bf9` | 10 `ROJO`, `sabotajes sin rojo: 0` |
-| `entorno2.sh bf92bf9` | 8 `ROJO`, `sabotajes sin rojo: 0` |
-| Suite completa, la mía (`ENVIRONMENT=test`, SQLite), worktree limpio | `bf92bf9`: `5124 passed, 335 skipped, 3 xfailed, 96 warnings in 819.82s (0:13:39)`, `SALIDA suite_mia 0` |
-| Suite completa, la de CI (`env -u DATABASE_URL ENVIRONMENT=testing …`), worktree limpio | `bf92bf9`: `5124 passed, 335 skipped, 3 xfailed, 93 warnings in 806.27s (0:13:26)`, `SALIDA suite_ci 0` |
-| `chequeo-6.py 1e1f60d bf92bf9` | abajo, `avisos: 0` |
-| grep de historia de §6 | vacío |
-| `/code-review high` y `/security-review` | abajo |
+| `tests/test_front422.py` | `33 passed` |
+| `front422.sh 4dbdb0b` | `BASE \| en verde`, 17 `ROJO`, `sabotajes con falla: 0` |
+| Suite completa, la mía (`ENVIRONMENT=test`, SQLite), worktree limpio | corriendo; no la doy por verde hasta copiar su salida |
+| Suite completa, la de CI (`env -u DATABASE_URL ENVIRONMENT=testing …`), worktree limpio | corriendo; no la doy por verde hasta copiar su salida |
+| `chequeo-6.py 19b7764 4dbdb0b` | abajo, 1 aviso (las +42, explicado arriba) |
+| grep de historia de §6 sobre `proyecto_maria/` | vacío |
+| `/code-review high` y adversario Opus alto | abajo |
 
 ```
-chequeo-6 1e1f60d..bf92bf9: avisos para mirar, no un veredicto
-producto +24/−26
-arnés +166/−80
+chequeo-6 19b7764..4dbdb0b: avisos para mirar, no un veredicto
+producto +73/−31
+  AVISO producto suma 42 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +264/−0
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/config.py: 45 → 51
-  proyecto_maria/core/vuce_connector.py: 228 → 229
-  proyecto_maria/database/connection.py: 163 → 161
-  proyecto_maria/main.py: 11988 → 11981
-avisos: 0
+  proyecto_maria/static/errores.js: nuevo, 55
+  proyecto_maria/static/v2/app_v2.js: 1190 → 1199
+  proyecto_maria/static/v2/screens/finalize.js: 1436 → 1425
+  proyecto_maria/static/v2/screens/review.js: 1186 → 1175
+avisos: 1
 ```
 
 Sabotajes, salida entera:
 
 ```
-Preparing worktree (detached HEAD bf92bf9)
-ROJO  | usuarios demo salvo en producción: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[demo]» «demo no queda cerrada: {None: 'abierta', '': 'abierta', 'prod': 'abierta', 'staging': 'abierta', 'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}» 
-ROJO  | login con la contraseña guardada salvo en producción: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[login_con_lo_guardado]» «login_con_lo_guardado no queda cerrada: {None: 'abierta', '': 'abierta', 'prod': 'abierta', 'staging': 'abierta', 'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}» 
-ROJO  | webhook sin secreto acepta salvo en producción: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[webhook_sin_secreto]» «webhook_sin_secreto no queda cerrada: {None: 'abierta', '': 'abierta', 'prod': 'abierta', 'staging': 'abierta', 'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}» 
-ROJO  | link de reset por consola salvo en producción: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[link_de_reset_en_stdout]» «link_de_reset_en_stdout no queda cerrada: {None: 'abierta', '': 'abierta', 'prod': 'abierta', 'staging': 'abierta', 'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}» 
-ROJO  | cobro simulado salvo en producción: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[cobro_simulado]» «cobro_simulado no queda cerrada: {None: 'abierta', '': 'abierta', 'prod': 'abierta', 'staging': 'abierta', 'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}» 
-ROJO  | clave JWT de desarrollo salvo en producción: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[clave_jwt_de_desarrollo]» «clave_jwt_de_desarrollo no queda cerrada: {None: 'abierta', '': 'abierta', 'prod': 'abierta', 'staging': 'abierta', 'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}» 
-ROJO  | desarrollo sin mirar mayúsculas ni espacios: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[demo]» «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[cobro_simulado]» «cobro_simulado no queda cerrada: {'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}» 
-ROJO  | staging cuenta como desarrollo: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[webhook_sin_secreto]» «webhook_sin_secreto no queda cerrada: {'staging': 'abierta'}» 
-ROJO  | variable ausente cuenta como desarrollo: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[login_con_lo_guardado]» «login_con_lo_guardado no queda cerrada: {None: 'abierta'}» 
-ROJO  | ninguna puerta abre ni en desarrollo: «FAILED tests/test_entorno1.py::test_puerta_abierta_en_desarrollo[demo]» «FAILED tests/test_entorno1.py::test_puerta_abierta_en_desarrollo[cobro_simulado]» «demo no queda abierta: {'development': 'cerrada', 'test': 'cerrada', 'testing': 'cerrada'}» 
-sabotajes sin rojo: 0
-Preparing worktree (detached HEAD bf92bf9)
-ROJO  | la bandera abre el cobro simulado fuera de desarrollo: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[cobro_simulado]» 
-ROJO  | CSRF sólo avisa salvo en producción: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[csrf_que_solo_avisa]» «csrf_que_solo_avisa no queda cerrada: {None: 'abierta', '': 'abierta', 'prod': 'abierta', 'staging': 'abierta', 'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}» 
-ROJO  | cookie de sesión sin Secure salvo en producción: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[cookies_sin_secure]» 
-ROJO  | cookie CSRF sin Secure salvo en producción: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[cookies_sin_secure]» 
-ROJO  | openapi abierto salvo en producción: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[docs_y_openapi]» 
-ROJO  | docs, redoc y openapi abiertos salvo en producción: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[docs_y_openapi]» «docs_y_openapi no queda cerrada: {None: 'abierta', '': 'abierta', 'prod': 'abierta', 'staging': 'abierta', 'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}» 
-ROJO  | SQLite sin DATABASE_URL salvo en producción: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[sqlite_sin_database_url]» «sqlite_sin_database_url no queda cerrada: {None: 'abierta', '': 'abierta', 'prod': 'abierta', 'staging': 'abierta', 'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}» 
-ROJO  | VUCE simulado salvo en producción: «FAILED tests/test_entorno1.py::test_puerta_cerrada_fuera_de_desarrollo[vuce_simulado]» «vuce_simulado no queda cerrada: {None: 'abierta', '': 'abierta', 'prod': 'abierta', 'staging': 'abierta', 'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}» 
-sabotajes sin rojo: 0
+Preparing worktree (detached HEAD 4dbdb0b)
+BASE  | en verde
+ROJO  | CDI.api deja la lista como llegó: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[api-falta_campo]»
+ROJO  | CDI.api devuelve el 422 como un 200: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[api-falta_campo]»
+ROJO  | el login tapa el motivo con el texto genérico: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[landing-falta_campo]»
+ROJO  | el reset muestra la lista cruda: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[reset-clave_73_bytes]»
+ROJO  | sólo se muestra el primer error: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[api-falta_campo]»
+ROJO  | el campo se dice con su nombre técnico: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[landing-falta_campo]»
+ROJO  | las dos claves del cambio de clave se leen como una: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[reset-cambio_de_clave]»
+ROJO  | falta un campo se dice con el msg de pydantic: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[reset-falta_campo]»
+ROJO  | un tipo equivocado se dice en genérico: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[api-tipo_equivocado]»
+ROJO  | el tope de largo no se dice: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[landing-nombre_largo]»
+ROJO  | el value_error conserva el prefijo en inglés: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[api-clave_73_bytes]»
+ROJO  | un JSON roto se dice en genérico: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[landing-no_es_json]»
+ROJO  | un cuerpo que no es objeto se dice en genérico: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[reset-no_es_objeto]»
+ROJO  | un número equivocado se dice en genérico: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[api-no_es_numero]»
+ROJO  | dos ítems de una lista se leen como uno: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[landing-item_de_lista]»
+ROJO  | un motivo sin texto propio se dice sin concordar: dice «FAILED tests/test_front422.py::test_el_422_de_pydantic_se_lee_en_castellano[reset-sin_texto_propio]»
+ROJO  | un detail de texto se reemplaza por el genérico: dice «FAILED tests/test_front422.py::test_un_detail_de_texto_se_muestra_tal_cual[landing]»
+sabotajes con falla: 0
+SALIDA 0
 ```
 
-Lo primero es `entorno1.sh` y lo segundo `entorno2.sh`. Las dos cargan el arnés común `scripts/testing/sabotajes/_entorno_comun.sh`.
+Esta pieza no es de revisión fuerte (§3), pero dejo un script de sabotajes propio, `scripts/testing/sabotajes/front422.sh`, en vez de mostrar un rojo una sola vez. Es porque son 17 reglas de texto, una por motivo. Si preferís que no quede, se saca sin tocar los casos.
 
 ## Autorrevisión
 
 | Quién (modelo, esfuerzo) | Hallazgo | Qué hice |
 |---|---|---|
-| `/code-review high` | 1. CORS y `FRONTEND_URL` siguen colgando de `IS_PRODUCTION` (`main.py:223`, `:406`) | Fuera de la lista de la tarea: D107 |
-| | 2. HSTS (`security_middleware.py:62`) y el pase libre del rate-limit para 127.0.0.1 (`:211`) preguntan por `production` | Igual: D107 |
-| | 3, 5, 6 y 7 | Arreglados dentro de la pieza. Su texto no lo conservé al compactar el chat, así que no los detallo de memoria |
-| | 4. La raíz es `IS_PRODUCTION` (`main.py:105`); la opción es `IS_PRODUCTION = not es_desarrollo()` | D107 (a). Costo: sin `ENVIRONMENT`, la app no arranca sin `ALLOWED_ORIGINS` y `FRONTEND_URL` |
-| | 8 | Tomé sólo la parte del import, en `fb91f5c`. El resto del hallazgo quedaba fuera de alcance |
-| | 9. Costo: cerca de 33 imports de la app por corrida de `test_entorno1` y unos 300 por corrida de `entorno2.sh` | Queda. Es el patrón de ENTORNO-1, una sonda por valor; el caso tarda 13 s |
-| | 10. `cobro_mp2` manda un header `None` | Es sólo de prueba y no cambia lo que se mide. Queda |
-| adversario-opus-alto | Ningún defecto de producto | — |
-| | a. Si la bandera se leyera al importar, el caso no lo veía: la sonda la ponía tarde | La sonda arranca con la bandera puesta, en `1b44897`. El sabotaje que lee la bandera al importar da `1 failed` |
-| | b. `import os` sin uso en la sonda | Lo saqué, en `633551d` |
-| | c. `CSRF_ENFORCE=false` puesto a mano apaga el CSRF en cualquier entorno | Es un override documentado; no es un valor por omisión. Queda, R1 |
-| | d. Tarifar simulado no depende del entorno | Pasa por `get_ncm_data`, que ahora bloquea el VUCE simulado. Queda, R2 |
-| `/security-review` (subagente, Opus alto) | Ningún hallazgo con confianza ≥ 8. Con `production`, todo queda igual o más estricto; sin `ENVIRONMENT` o con uno desconocido, lo que estaba abierto ahora está cerrado. No queda ninguna lectura de `ENABLE_SIMULATE_CHARGE` | Nota: que Railway defina `ENVIRONMENT` y `DATABASE_URL`. R3 |
+| `/code-review high` | 1. Dos ítems de una lista se leían como uno | Arreglado (`9ee40b8`), con su sabotaje |
+| | 2. Tipos de pydantic sin texto (números, entre otros) | Números agregados (`9ee40b8`). El resto cae a «Revisá X.»; el CHANGELOG lo dice |
+| | 3. `CAMPOS` sólo cubre los campos de sesión | Supuesto reversible, arriba |
+| | 4. «X no es válido» no concordaba en género | Arreglado: «Revisá X.» |
+| | 5. Un `value_error` en inglés se mostraría en inglés | Queda, R3. Los `value_error` del backend están en castellano |
+| | 6. Traducir en el backend | D108 |
+| | 7. Traducir dos veces (backend y front) | No: no hay traducción en el backend que se pise |
+| | 8. Otras pantallas con su helper propio de error | A la cola de limpieza, propuesto, no dentro del arreglo |
+| | 9. `errores.js` sin `?v=` de caché | Queda, R5. Misma convención que `csrf.js` |
+| | 10. Script de sabotajes propio en una pieza que no es §3 | Queda, explicado arriba |
+| adversario-opus-alto (sobre `ca54f74`) | Ningún hallazgo alto | — |
+| | 1. media. No se miraba el `status` que devuelve `CDI.api` | Arreglado en los casos (`4dbdb0b`), con su sabotaje |
+| | 2. media. `review.js:1000`, `:1065` y `finalize.js:1129` no se ejercitan: un `ReferenceError` ahí queda verde | Queda, R1 |
+| | 3. baja, latente. `CAMPOS[nombre]` sin `hasOwnProperty`: un campo llamado `constructor` o `toString` daría un texto raro | Queda, R2. El backend no tiene campos con esos nombres |
+| | 4. baja, latente. `value_error` en inglés | R3 |
+| | 5. baja, latente. Un `msg` vacío daría «.» | R3 |
+| | 6. baja. «La contraseña no es válido.» | Ya arreglado por «Revisá X.» |
+| | 7. baja. `too_long` de una lista dice «caracteres» | R3. Ninguna ruta tiene hoy un tope de largo de lista |
+| | 8. baja. `current_password` y `new_password` se leen igual | Arreglado (`8decbfc`), con su caso y su sabotaje |
+| | 9. baja. Sacar `CAMPOS` queda verde | Arreglado: el caso pide «el usuario», con su sabotaje |
+| | 10. baja. Mostrar sólo el primer error queda verde | Arreglado: el caso pide los dos, con su sabotaje |
+| | 11. baja. `CDI.api` depende de que `errores.js` cargue antes | Queda, R4 |
+
+El adversario verificó como bien hechos tres puntos:
+- el único `detail` en lista del backend es `main.py:490`;
+- el orden de carga de los scripts;
+- ningún `innerHTML` recibe este texto: va por `textContent` o por el `toast` que ya escapaba.
+
+Lo que miré y dejé afuera:
+- `public_quote.html:223`: `hash` es `str` y no puede dar un 422 de lista.
+- `topbar_financials`, `tour` y `dev_dashboard`: no leen `detail`.
 
 ## Riesgos
 
-- **R1, baja.** `CSRF_ENFORCE=false` puesto a mano sigue apagando el CSRF también fuera de desarrollo. Es un override explícito, no un valor por omisión.
-- **R2, baja.** El modo simulado de Tarifar no mira el entorno. Hoy llega por `get_ncm_data`, que sí bloquea el VUCE simulado. No lo probé por separado.
-- **R3, media, para antes de publicar.** Si Railway no define `ENVIRONMENT` o `DATABASE_URL`, desde esta pieza la app no arranca, en vez de arrancar con controles de desarrollo. Es lo pedido, pero conviene confirmar las dos variables en Railway antes del «dale». Yo no tengo acceso a Railway.
-- **R4, baja.** Lo que cubre D107 sigue igual que antes de la pieza.
-- **R5, baja.** Lo que mide `test_entorno1` cuesta unos 33 arranques de la app por corrida, porque son subprocesos. Hoy son 13 s.
+- **R1, media.** Tres lugares de `review.js` (`:1000`, `:1065`) y `finalize.js` (`:1129`) llaman a `textoDeError` y no tienen prueba que los corra. Un error de nombre ahí no lo ve ninguna prueba. Esos módulos dependen mucho del DOM y no hay arnés de node para ellos; armarlo no era proporcional a la pieza. Una mirada en el navegador los cubriría.
+- **R2, baja, latente.** Un campo llamado `constructor`, `toString` u otra propiedad heredada daría un texto raro. Hoy no hay ninguno.
+- **R3, baja, latente.** El texto en inglés sólo pasa si el backend manda un `value_error` en inglés. Un `msg` vacío daría «.». Un tope de lista diría «caracteres».
+- **R4, baja.** Si `errores.js` no carga, `CDI.api` falla con `ReferenceError` en vez de mostrar el genérico.
+- **R5, baja.** `errores.js` sin `?v=`: un navegador con caché vieja lo actualiza cuando vence la caché, como `csrf.js`.
+
+## Lo que no corrí
+
+- Ningún navegador real ni capturas. El arnés de node corre el código real de las plantillas con un DOM mínimo, no la página entera.
+- Las tres llamadas de R1.
+- `smoke_friccion.sh` y `ataque_aislamiento.sh`: no toqué backend, datos, sesión ni permisos.
 
 ## Comandos copiables
 
 ```bash
-# desde la raíz, con el venv del proyecto
+# desde la raíz, con el venv del proyecto; necesita node
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-rm -f test.db; python -m pytest -q --no-cov -p no:cacheprovider tests/test_entorno1.py
-#   → 22 passed
-PY=$(command -v python) scripts/testing/sabotajes/entorno2.sh bf92bf9
-#   → 8 líneas ROJO, «sabotajes sin rojo: 0»
-PY=$(command -v python) scripts/testing/sabotajes/entorno1.sh bf92bf9
-#   → 10 líneas ROJO, «sabotajes sin rojo: 0»
-python3 docs/pm/herramientas/chequeo-6.py 1e1f60d bf92bf9
-#   → producto +24/−26, avisos: 0
-grep -rn ENABLE_SIMULATE_CHARGE proyecto_maria/
+rm -f test.db; python -m pytest -q --no-cov -p no:cacheprovider tests/test_front422.py
+#   → 33 passed
+PY=$(command -v python) scripts/testing/sabotajes/front422.sh 4dbdb0b
+#   → «BASE | en verde», 17 líneas ROJO, «sabotajes con falla: 0»
+python3 docs/pm/herramientas/chequeo-6.py 19b7764 4dbdb0b
+#   → producto +73/−31, avisos: 1 (las +42)
+git grep -n 'object Object' 4dbdb0b -- proyecto_maria/static proyecto_maria/templates
 #   → vacío
 ```
 
-/compact conservar: Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi), rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM session_01B7FVQspcEHF7PqNv797wNM con send_message next. ENTORNO-2 entregada en bf92bf9 (base 1e1f60d), D107 abierta (recomendé a: ENTORNO-3 después de ENTRADAS-2), próxima D libre D108. Sigue D100 (FRONT-422) y después ENTRADAS-2 (D101, D104). Corte de rutinas 2026-11-08 15:50 UTC. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; TXT y proforma reales nunca en el repo.
+/compact conservar: Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi), rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM session_01B7FVQspcEHF7PqNv797wNM con send_message next. FRONT-422 (D100) entregada en 4dbdb0b (base 19b7764), D108 abierta (recomendé a: dejar la traducción en el front), próxima D libre D109. D107 decidida (a): ENTORNO-3 después de ENTRADAS-2. Sigue ENTRADAS-2 (D101, D104) y después ENTORNO-3. Corte de rutinas 2026-11-08 15:50 UTC. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; TXT y proforma reales nunca en el repo.
