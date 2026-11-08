@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Negativos de PERMISOS-1: el arranque da admin por username y nunca por email.
+# Negativos de PERMISOS-1: el arranque da admin por username y nunca por email ni nombre.
 # Cada sabotaje rompe una de las dos y la prueba tiene que ponerse roja por ese caso.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/permisos1.sh [SHA]
@@ -44,13 +44,16 @@ PYEOF
 
 M=proyecto_maria/main.py
 BUSCA='                result = await session.execute(select(User).where(User.username == identifier))'
-T='FAILED tests/test_admin_bootstrap.py::test_el_email_que_puso_el_usuario_no_da_admin'
+T='FAILED tests/test_admin_bootstrap.py::test_lo_que_puso_el_usuario_en_su_perfil_no_da_admin'
 sabotaje $M "el arranque busca también por email" "$BUSCA" \
   '                result = await session.execute(select(User).where((User.username == identifier) | (User.email == identifier)))' \
   "$T[tal_cual]"
 sabotaje $M "el arranque busca el email sin mirar mayúsculas" "$BUSCA" \
   '                result = await session.execute(select(User).where((User.username == identifier) | (func.lower(User.email) == identifier.lower())))' \
   "$T[mayusculas]"
+sabotaje $M "el arranque busca también por nombre" "$BUSCA" \
+  '                result = await session.execute(select(User).where((User.username == identifier) | (User.name == identifier)))' \
+  "$T[tal_cual]"
 sabotaje $M "el arranque no da admin a nadie" "$BUSCA" \
   '                result = await session.execute(select(User).where(User.username == identifier, False))' \
   'FAILED tests/test_admin_bootstrap.py::test_bootstrap_admin_promotes_by_username'

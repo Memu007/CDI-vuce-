@@ -86,8 +86,8 @@ ADMIN_EMAIL = "jefe@estudio.test"
     (f"  {ADMIN_EMAIL}  ", False),
     (ADMIN_EMAIL, True),
 ], ids=["tal_cual", "mayusculas", "espacios", "de_una_cuenta_borrada"])
-def test_el_email_que_puso_el_usuario_no_da_admin(monkeypatch, en_admin_usernames, cuenta_previa):
-    """Quien pone en su perfil un email de ADMIN_USERNAMES sigue sin admin después de reiniciar."""
+def test_lo_que_puso_el_usuario_en_su_perfil_no_da_admin(monkeypatch, en_admin_usernames, cuenta_previa):
+    """Quien pone en su perfil, como email o como nombre, algo de ADMIN_USERNAMES sigue sin admin al reiniciar."""
     from proyecto_maria.main import get_current_user
 
     async def _cuenta_borrada():
@@ -103,7 +103,7 @@ def test_el_email_que_puso_el_usuario_no_da_admin(monkeypatch, en_admin_username
     monkeypatch.setenv("DISABLE_DB_INIT", "true")
     app.dependency_overrides[get_current_user] = lambda: {"username": "admin_by_email", "roles": []}
     try:
-        r = TestClient(app).put("/api/user/profile", json={"email": ADMIN_EMAIL})
+        r = TestClient(app).put("/api/user/profile", json={"email": ADMIN_EMAIL, "name": ADMIN_EMAIL})
     finally:
         app.dependency_overrides.pop(get_current_user, None)
     assert r.status_code == 200, r.text[:200]
