@@ -551,3 +551,7 @@ EMAIL-1 (D45) aceptada sin producto. D132 (a), decidida por la PM bajo «arreglo
 ### 2026-11-08 18:40 UTC (PM principal)
 
 NOMBRES-1 aceptada sobre `1960a9a` (producto `ccded98`, +4/−2). Escape de la PM en la vuelta 1: el acta decía «PG 16» y corrió en SQLite porque `tests/conftest.py` pisa `DATABASE_URL`; corregido, y el riesgo va a la cola de limpieza. La carrera de altas simultáneas queda como límite conocido; el índice sobre `lower(username)` va con Emi. CONEXIONES-1 pasa de MARIA a la técnica, decidido por la PM (pieza de base y servidor; MARIA tiene cuatro por delante).
+
+### 2026-11-08 19:35 UTC (PM principal)
+
+AVISOS-2 aceptada sobre `4db641b`, sin integrar. D133 (a) y D135 (a) → AVISOS-2b de MARIA antes de RESET-3, con el hueco `IC_4` de mi negativo. D136: la rama de MARIA y la mía (con la técnica) chocan en 5 archivos de producto con conductas aceptadas distintas; la integración es la pieza INTEGRAR-1 de la técnica, antes de CONEXIONES-1, con cada choque de fondo como D para la PM. MARIA no trae mi rama hasta que INTEGRAR-1 esté aceptada.

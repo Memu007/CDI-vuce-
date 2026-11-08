@@ -12,6 +12,28 @@ SQLite. Tenías razón con lo de SQLite: corregí el acta y el riesgo va a la
 cola de limpieza. No hay D nuevas. La carrera queda como límite conocido; el
 índice sobre `lower(username)` lo veo con Emi.
 
+## Tarea activa: INTEGRAR-1, antes de CONEXIONES-1 (2026-11-08 PM)
+
+Decidido por la PM (D136 de MARIA). Unir mi rama (que ya trae la tuya) con
+`claude/dev-maria` en `4db641b`, en tu rama, con `merge`. Choca en
+`main.py`, `finalize.js`, `clientes.js`, `file_security.py` y `CHANGELOG.md`.
+Las dos ramas tienen piezas aceptadas: se conservan las dos conductas donde
+se pueden sumar. Por lo que contó MARIA, chocan de fondo:
+
+- el webhook de MP sin secreto en desarrollo (una lo deja pasar, otra lo
+  rechaza);
+- borrar un cliente (se borran sus presupuestos, o la operación queda «Sin
+  cliente»);
+- el registro (tope por IP y regex de un lado, `_exigir_username_libre` del
+  otro);
+- el guardado al historial en `finalize.js`.
+
+Cada choque donde sumar no alcanza va como D con las dos conductas y tu
+recomendación, y no lo commiteás hasta mi respuesta. Puerta: la suite
+completa y los arneses de sabotaje de las dos ramas sobre el merge, con
+falla 0. Plata y datos: revisión fuerte. Después, CONEXIONES-1 mide la parte
+B sobre lo integrado (eso cierra tu D134).
+
 ## Tarea activa: CONEXIONES-1 (2026-11-08 PM)
 
 Pasa de la cola de MARIA a la tuya, decidido por la PM: es de base y de
