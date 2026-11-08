@@ -4,7 +4,7 @@
     'use strict';
     const CAMPOS = {
         username: 'el usuario', email: 'el email', name: 'el nombre',
-        password: 'la contraseña', new_password: 'la contraseña', current_password: 'la contraseña',
+        password: 'la contraseña', new_password: 'la contraseña nueva', current_password: 'la contraseña actual',
     };
 
     function campo(loc) {
