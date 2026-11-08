@@ -48,6 +48,10 @@ for viejo, nuevo in zip(pares[::2], pares[1::2]):
     if s.count(viejo) != 1:
         sys.exit(f"patrón no encontrado una sola vez ({s.count(viejo)}): {viejo!r}")
     s = s.replace(viejo, nuevo)
+try:
+    compile(s, p, "exec")
+except SyntaxError as e:
+    sys.exit(f"el sabotaje deja {p} sin compilar: {e}")
 open(p, "w", encoding="utf-8").write(s)
 PYEOF
 }
@@ -77,7 +81,7 @@ sabotaje() {
   fi
   git checkout -q -- proyecto_maria/
   if ! aplicar "$M" "${pares[@]}"; then
-    echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return
+    echo "ROTO  | $nombre: el sabotaje no se pudo aplicar"; FALLAS=$((FALLAS+1)); return
   fi
   local salida codigo
   salida="$($corredor)"; codigo=$?
@@ -159,7 +163,7 @@ sabotaje pytest_o1 "la falla va al log sin el motivo" 1 \
   $'        logging.exception(\n            "no se pudo agregar' $'        logging.error(\n            "no se pudo agregar' \
   "FAILED $T::test_si_falla_no_levanta_y_deja_el_motivo_en_el_log" "el log tiene que traer el motivo"
 sabotaje arranque_pg "en Postgres espera el lock sin límite" 1 \
-  $'            await conn.exec_driver_sql("SET LOCAL lock_timeout = \'5s\'")\n        await conn.exec_driver_sql(sql)' $'        await conn.exec_driver_sql(sql)' \
+  $'await conn.exec_driver_sql("SET LOCAL lock_timeout = \'5s\'")' 'pass' \
   "FALLA | la app arranca igual ("
 sabotaje arranque_pg "en Postgres el índice espera el lock sin límite" 1 \
   $'                await ddl(conn,\n                    "CREATE INDEX' $'                await conn.exec_driver_sql(\n                    "CREATE INDEX' \
@@ -167,10 +171,10 @@ sabotaje arranque_pg "en Postgres el índice espera el lock sin límite" 1 \
 
 # --- columna e índice se confirman por separado y el log lo dice después
 sabotaje arranque_pg "columna e índice en una sola transacción" 3 \
-  $'        async with engine.begin() as conn:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA table_info' \
-  $'        conn = await engine.connect()\n        await conn.begin()\n        if True:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA table_info' \
-  $'        async with engine.begin() as conn:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA index_list' \
-  $'        if True:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA index_list' \
+  $'        async with engine.begin() as conn:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA table_info(api_logs)' \
+  $'        conn = await engine.connect()\n        await conn.begin()\n        if True:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA table_info(api_logs)' \
+  $'        async with engine.begin() as conn:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA index_list(api_logs)' \
+  $'        if True:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA index_list(api_logs)' \
   $'    if not tiene_indice:\n        print(' $'    await conn.commit()\n    if not tiene_indice:\n        print(' \
   "FALLA | la columna queda: None"
 sabotaje arranque_pg "anuncia la columna antes de confirmarla" 2 \

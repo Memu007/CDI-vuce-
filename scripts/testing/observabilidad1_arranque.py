@@ -19,7 +19,8 @@ y ya tiene filas, como la de producción. Comprueba:
   lo dice y no anuncia el índice.
 
 uso (Postgres local y descartable, nunca el de producción; el usuario tiene
-que poder crear bases; sin URL corre sólo SQLite):
+que ser superusuario, porque las fallas al confirmar usan un EVENT TRIGGER;
+sin URL corre sólo SQLite):
   python scripts/testing/observabilidad1_arranque.py [postgresql://cdi@127.0.0.1:55432/postgres]
 Necesita uvicorn (y psycopg2 para Postgres) en el mismo Python.
 """
@@ -330,8 +331,9 @@ def base_con_falla(b, con_columna=False):
                  f"con la tabla tomada no agregó nada: {b.columna()} {b.indices()}")
         app = App(b, "suelta")
         try:
-            chequear(app.arranco and b.columna() == ("VARCHAR(50)", True, None),
-                     "suelta la tabla, el próximo arranque la agrega")
+            chequear(app.arranco and b.columna() == ("VARCHAR(50)", True, None)
+                     and b.indices() == ["ix_api_logs_owner_username"],
+                     f"suelta la tabla, el próximo arranque agrega lo que faltaba: {b.columna()} {b.indices()}")
         finally:
             app.parar()
 

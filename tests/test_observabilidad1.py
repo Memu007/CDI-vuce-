@@ -252,7 +252,9 @@ def test_la_metrica_guarda_el_molde_de_la_ruta_y_no_el_camino(monkeypatch):
         monkeypatch.delenv("PYTEST_CURRENT_TEST")
         esperado = {}
         for molde in moldes:
-            esperado[_camino_de_ejemplo(molde, rutas[molde])] = molde
+            camino = _camino_de_ejemplo(molde, rutas[molde])
+            assert camino not in esperado, f"{molde} y {esperado.get(camino)} dan el mismo camino {camino}"
+            esperado[camino] = molde
         esperado["/no-existe-zq9"] = "<sin ruta>"
         for camino in esperado:
             cliente.get(camino)
