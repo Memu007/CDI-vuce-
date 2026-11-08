@@ -20,6 +20,10 @@ sabotaje $B "la recarga arma su vuelta con localhost" \
   $'f"{username}:topup"\n    base_url = os.environ.get("FRONTEND_URL", "http://127.0.0.1:8000")\n' \
   "$C[frontend_en_localhost]" "frontend_en_localhost no queda cerrada: {None: 'sin medir'"
 
+sabotaje proyecto_maria/config.py "una FRONTEND_URL de espacios pasa como URL" \
+  'os.getenv("FRONTEND_URL") or "").strip().rstrip("/")' 'os.getenv("FRONTEND_URL") or "").rstrip("/")' \
+  "$C[frontend_en_localhost]" "frontend_en_localhost no queda cerrada: {None: 'sin medir'"
+
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
