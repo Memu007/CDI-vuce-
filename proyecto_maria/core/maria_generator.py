@@ -363,7 +363,7 @@ def _signo_de_un_numero(t: str, i: int) -> bool:
         return True
     if digito_antes:                                    # «10%», pero no «5, AZUL»
         return not (t[i] in ",.;:-" and t[i + 1:i + 2] in ("", " "))
-    signo = t[i] in "+-" or unicodedata.category(t[i]) in ("Pd", "Sm")
+    signo = unicodedata.category(t[i]) in ("Pd", "Sm")   # «+» es Sm y «-» es Pd
     return signo and digito_despues and not antes[-1:].isalnum()   # «- 5»
 
 
