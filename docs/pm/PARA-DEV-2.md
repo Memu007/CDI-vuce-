@@ -69,6 +69,27 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## ENTORNO-3: aceptada sobre `fd545c1`, sin integrar (2026-11-08 PM)
+
+Reproducido igual al informe: chequeo-6 (`+11/−10`, avisos 0), `30 passed`,
+`entorno1.sh` 10, `entorno2.sh` 8 y `entorno3.sh` 4 ROJO, sin rojo 0. Mis
+negativos (`prod`, `Production`, `staging`, vacío; `*` y blanco en
+`ALLOWED_ORIGINS`) cierran, y `development` abre. Acta:
+`REPRODUCCION-ENTORNO-3-2026-11-08.md`.
+
+- **D111: (a), decidido por la PM.** A la cola de limpieza (ya anotado).
+- **D112: (c), decidido por la PM**, con **D113 (b)**: pieza chica
+  **ENTORNO-4**, después de ENTRADAS-3. Fuera de desarrollo, sin
+  `FRONTEND_URL` la app no arranca (como `ALLOWED_ORIGINS`), y
+  `billing_service.py` usa la misma URL, sin caer a localhost. Sabotajes en
+  el arnés de ENTORNO.
+- **Numeración:** la Dev técnica también usó D112 para otra cosa; la suya
+  queda registrada como D114. Tu próxima D libre: **D115**. Desde ahora,
+  antes de numerar, mirá la última D de `DECISIONS.md` y de los dos canales.
+
+Tu orden: **ENTRADAS-3** (D109, D110) → ENTORNO-4 → SUFIJOS-2+SEGURO-1 → el
+resto.
+
 ## ENTRADAS-2: aceptada sobre `b8aa9bd`, sin integrar (2026-11-08 PM)
 
 Reproducido igual al informe: chequeo-6 (`+115/−49`, el aviso de 66 netas
@@ -91,9 +112,6 @@ además:
 Riesgos que quedan: el texto nuevo de change-password; la clave de estudio
 de 8 letras ahora rechazada (va a la mirada en navegador antes de
 publicar); 40000 ítems lentos al guardar al cliente.
-
-Tu orden: **ENTORNO-3** (D107) → ENTRADAS-3 → SUFIJOS-2+SEGURO-1 → el resto.
-Próxima D: D111.
 
 ## FRONT-422: aceptada sobre `4dbdb0b`, sin integrar (2026-11-08 PM)
 

@@ -103,3 +103,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - Tests viejos (email1, prelaunch_block2/3, cobro_mp1/2 y los scripts
   `cobro_mp1*_postgres.py`) parchean `main_mod.IS_PRODUCTION`, que ya no
   controla lo que dicen probar: parchear `ENVIRONMENT` (ENTORNO-2).
+- `RateLimitByEndpointMiddleware` (`security_middleware.py`) no está montado
+  en la app: hoy no limita nada; borrarlo o montarlo es decisión aparte (D111).
+- `main.py` todavía define `IS_PRODUCTION`; cuando ningún test lo parchee,
+  sacarlo.
