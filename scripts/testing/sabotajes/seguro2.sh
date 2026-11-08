@@ -91,6 +91,25 @@ sabotaje $F "el pedido no dice que sigue para completar" \
 ' '' \
   "FAILED $T::test_el_pedido_dice_si_el_seguro_sigue_para_completar[sin_leer]"
 
+sabotaje $R "escribirlo no lo completa" \
+  "if (String(el.value).trim() !== '') completados.add(el.name);" 'if (false) completados.add(el.name);' \
+  "FAILED $T::test_escribir_el_seguro_sin_leer_lo_completa[0-True]" \
+  "FAILED $T::test_escribir_el_seguro_sin_leer_lo_completa[15-True]"
+sabotaje $R "el campo sin leer se ve en 0" \
+  "return sinLeer ? '' : normalizeValueForField(name, op[name]);" 'return normalizeValueForField(name, op[name]);' \
+  "FAILED $T::test_un_campo_sin_leer_se_ve_vacio_en_la_revision[sin_leer]" \
+  "FAILED $T::test_un_campo_sin_leer_se_ve_vacio_en_la_revision[flete_sin_leer]"
+sabotaje $R "la revisión no lo usa" \
+  'const normalized = valorEnLaRevision(key, op);' 'const normalized = normalizeValueForField(key, op[key]);' \
+  "FAILED $T::test_la_revision_muestra_vacio_el_seguro_sin_leer_y_lo_deja_en_0"
+sabotaje $R "un texto sin leer también se vacía" \
+  'const sinLeer = MONTOS.includes(name) && ' 'const sinLeer = ' \
+  "FAILED $T::test_un_campo_sin_leer_se_ve_vacio_en_la_revision[texto]"
+sabotaje $F "el 400 se queda en la pantalla de generar" \
+  "                    CDI.goTo('review');
+                    throw new Error(detail);" '                    throw new Error(detail);' \
+  "FAILED $T::test_si_el_servidor_pide_completarlo_se_vuelve_a_la_revision"
+
 # 2. El 1 % dejado frena sólo con un incoterm que ya lleva el seguro en el precio.
 sabotaje $M "el dejado no frena con CIF" \
   'if not (request.seguro_calculado or request.seguro_dejado):' 'if not request.seguro_calculado:' \

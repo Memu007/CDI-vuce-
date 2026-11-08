@@ -13,6 +13,7 @@ import pytest
 from tests.test_maria7_rechazos_24_10 import LONA, _registrar_con_cuit, _valor
 from tests.test_seguro1 import EN_EL_PRECIO, SUGERIDO, VALOR_CIF
 from tests.test_valor1 import VALOR, _correr, _funciones, _pantalla, _pedido_con
+from tests.test_valor1c import _generar_en_pantalla
 
 COMPLETAR = "Seguro: no pudimos leerlo de la factura. Completalo en la revisión; si la factura no trae seguro, escribí 0."
 
@@ -50,6 +51,51 @@ def test_el_cero_escrito_a_proposito_genera(client):
 def test_el_pedido_dice_si_el_seguro_sigue_para_completar(op, manda):
     pedido = "console.log(JSON.stringify(buildMariaRequest().seguro_para_completar));"
     assert _pantalla({"incoterm": "CIF", **op}, pedido, VALOR_CIF, salida_propia=True) is manda
+
+
+def test_si_el_servidor_pide_completarlo_se_vuelve_a_la_revision():
+    assert _generar_en_pantalla(COMPLETAR)["fueA"] == "review"
+
+
+@pytest.mark.parametrize("op,campo,se_ve", [
+    pytest.param({"seguro": 0, "campos_sin_leer": ["seguro"]}, "seguro", "", id="sin_leer"),
+    pytest.param({"flete": 0, "campos_sin_leer": ["flete"]}, "flete", "", id="flete_sin_leer"),
+    pytest.param({"seguro": 0, "campos_sin_leer": ["seguro"], "campos_completados": ["seguro"]}, "seguro", "0",
+                 id="cero_escrito"),
+    pytest.param({"seguro": 0, "campos_sin_leer": ["flete"]}, "seguro", "0", id="leido"),
+    pytest.param({"vendedor_pais": "CN", "campos_sin_leer": ["vendedor_pais"]}, "vendedor_pais", "CN", id="texto"),
+])
+def test_un_campo_sin_leer_se_ve_vacio_en_la_revision(op, campo, se_ve):
+    # Un 0 a la vista parece leído, y escribir el mismo 0 no lo completaría.
+    codigo = "const MONTOS = ['flete', 'seguro', 'gastos_anteriores_fob'];\n" + _funciones(
+        "review.js", ["normalizeValueForField", "valorEnLaRevision"]) + (
+        f"\nconsole.log(JSON.stringify(valorEnLaRevision({campo!r}, CDI.state.operacion)));")
+    assert _correr(codigo, op) == se_ve
+
+
+def test_la_revision_muestra_vacio_el_seguro_sin_leer_y_lo_deja_en_0():
+    codigo = (
+        "const FIELDS = ['seguro', 'flete'];\nlet initialPdfValues = {}, fieldsFromUserDefaults = {};\n"
+        "const campos = {seguro: {type: 'number', value: ''}, flete: {type: 'number', value: ''}};\n"
+        "const form = {querySelector: s => campos[s.match(/name=\"(\\w+)\"/)[1]]};\n"
+        "function init() {} function applyClienteActivo() {} function maybeShowPendingImporterBanner() {}\n"
+        "function $() { return null; } function hasTransportData() { return false; }\n"
+        "function hasAduanaCustom() { return false; } function renderMetaPill() {} function recomputeHints() {}\n"
+        "function validateAll() {} function renderIncotermWarning() {} function renderProrrateoPanel() {}\n"
+        "const MONTOS = ['flete', 'seguro', 'gastos_anteriores_fob'];\n"
+        + _funciones("review.js", ["montoDelCampo", "normalizeValueForField", "valorEnLaRevision",
+                                   "applyUserDefaults", "populate"])
+        + "\npopulate();\nconsole.log(JSON.stringify([campos.seguro.value, campos.flete.value, "
+          "CDI.state.operacion.seguro]));")
+    assert _correr(codigo, {"seguro": 0, "flete": 30, "campos_sin_leer": ["seguro"]}) == ["", "30", 0]
+
+
+@pytest.mark.parametrize("valor,completado", [("0", True), ("15", True), ("", False)])
+def test_escribir_el_seguro_sin_leer_lo_completa(valor, completado):
+    codigo = _stubs_de_la_revision() + (
+        f"\nonFieldChange({{target: {{name: 'seguro', type: 'number', value: {valor!r}}}}});"
+        "\nconsole.log(JSON.stringify(CDI.state.operacion.campos_completados));")
+    assert _correr(codigo, {"seguro": 0, "campos_sin_leer": ["seguro"]}) == (["seguro"] if completado else [])
 
 
 # ----------------------------------------------------------- 2. el 1 % dejado
@@ -94,12 +140,16 @@ def test_recalcularlo_ya_no_es_el_dejado():
     assert "seguro_dejado" not in r["op"]
 
 
-def test_escribirlo_a_mano_ya_no_es_el_dejado():
+def _stubs_de_la_revision():
     stubs = ("let form = {}; const initialPdfValues = {};\n"
              "function updateFieldHint() {} function validateField() {} function renderMissingCount() {}\n"
              "function updateContinueEnabled() {} function renderIncotermWarning() {} function renderProrrateoPanel() {}\n")
-    codigo = stubs + "const MONTOS = ['flete', 'seguro', 'gastos_anteriores_fob'];\n" + _funciones(
-        "review.js", ["montoDelCampo", "onFieldChange"]) + (
+    return stubs + "const MONTOS = ['flete', 'seguro', 'gastos_anteriores_fob'];\n" + _funciones(
+        "review.js", ["montoDelCampo", "onFieldChange"])
+
+
+def test_escribirlo_a_mano_ya_no_es_el_dejado():
+    codigo = _stubs_de_la_revision() + (
         "\nonFieldChange({target: {name: 'seguro', type: 'number', value: '15'}});"
         "\nconsole.log(JSON.stringify(CDI.state.operacion));")
     assert _correr(codigo, {"seguro": 14.88, "seguro_dejado": True}) == {"seguro": 15}
