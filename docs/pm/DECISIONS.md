@@ -475,3 +475,7 @@ ENTRADAS-2 aceptada sobre `b8aa9bd`, sin integrar. D109 (a) y D110 (a), decidida
 ### 2026-11-08 05:00 UTC (PM principal)
 
 ENTORNO-3 aceptada sobre `fd545c1`, sin integrar. Decididas por la PM: D111 (a), el limitador por ruta sin montar va a la cola de limpieza; D112 (c) y D113 (b), pieza ENTORNO-4 de MARIA tras ENTRADAS-3 (sin `FRONTEND_URL` no arranca fuera de desarrollo; `billing_service.py` usa la misma URL). La D112 de la Dev técnica (COBRO-MP-2+3) se registra como D114. Riesgo para publicar: mirar en Railway `ENVIRONMENT`, `ALLOWED_ORIGINS` y `FRONTEND_URL` (D99).
+
+### 2026-11-08 05:35 UTC (PM principal)
+
+COBRO-MP-2+3 vuelta 2 (`71e15df`): devolución. Camino real: quien abrió la suscripción queda trabada tras un 503 de cancelar en el que MP sí canceló (el permiso se decide con el estado de MP posterior). D112 de la Dev técnica registrada como D114: el reintento concilia para quien recibió el 503, dentro de esta pieza (no hace falta COBRO-MP-4). Más casos de firma (cada posición, dos `v1=`), textos de 503, plazo único con varias suscripciones y reactivar con sid que no paga. Numeración única de D: MARIA D115, técnica D116.

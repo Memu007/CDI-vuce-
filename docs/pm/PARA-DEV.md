@@ -3,52 +3,47 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Veredicto de COBRO-MP-2 vuelta + COBRO-MP-3 (2026-11-07 PM): devolución de pruebas
+## Veredicto de COBRO-MP-2+3, vuelta 2 (2026-11-08 PM): devolución
 
-Sobre `cb740f3` (producto `6ecfe06`, informe `a06c0c8`). Evidencia:
-`docs/pm/REPRODUCCION-COBRO-MP-2-3-2026-11-07.md`. Lo que dice el informe se
-reproduce: chequeo-6 igual, `420 passed` en cobro, Postgres `fallas: 0`,
-`cobro_mp3.sh` 13 ROJO sin falla. Los riesgos de Opus ya estaban en tu
-informe, bien escritos. Vuelve sólo por pruebas, más un texto falso.
+Sobre `71e15df` (informe `335d287b`). Evidencia y el caso para copiar:
+`docs/pm/REPRODUCCION-COBRO-MP-2-3-v2-2026-11-08.md`. Se reproduce lo tuyo
+(`211 passed`, `cobro_mp3.sh` 18 ROJO). Lo de la vuelta anterior quedó
+arreglado. Vuelve por una cosa de producto y por pruebas que todavía no
+distinguen.
 
-**Causa: las pruebas de lo que esta pieza protege no distinguen un cambio
-que lo rompe.** Cada uno de estos cambios, de a uno, deja verde
-mp1+mp2+mp3+org1+g7+firma+ipn (lo corrí yo):
+**Producto, con camino de hoy.** Quien abrió la suscripción cancela; MP
+cancela pero la respuesta se pierde y la relectura falla → 503 «Probá de
+nuevo». Al reintentar, 403: ya no es «quien abrió la que paga», porque MP ya
+no la cobra. La org queda `active` con el sid anotado y `/billing/me` dice
+`renueva: True`. Sólo la dueña lo destraba. **Causa:** el permiso se decide
+con el estado de MP *después* del cambio que se quiere confirmar. Pido:
+quien tiene anotada la suscripción puede reintentar cancelar y CDI concilia
+(sin sid, el plan como en una cancelación confirmada). Lo mismo con
+cualquier dato de la familia: el reintento lo hace quien recibió el 503.
+Esto responde tu **D112**, que registro como **D114**: el reintento concilia
+para todos los que pudieron pedirla; no hace falta pieza aparte.
 
-| | cambio | qué deja pasar |
-|---|---|---|
-| a | borrar `if not MP_WEBHOOK_SECRET: return False` | sin secreto, un aviso firmado con clave vacía |
-| b | comparar sólo los 8 primeros de la firma | una firma casi buena |
-| c | sacar `organization_id == org.id` al buscar a quién sacar | la dueña de A saca a alguien de B y le cancela su pendiente en MP |
-| d | `fail_after(_TOPE_MP)` por llamada en vez del plazo único | cancelar con varias llamadas lentas pasa el tope con el candado tomado |
-| e | reactivar con `con_sid` vacío | quien abrió la que paga no puede reactivar con su suscripción anotada |
+**Pruebas, la misma causa que la vez pasada** (un cambio que rompe lo que la
+pieza protege deja verde). Cada fila es una mutación del adversario que hoy
+pasa:
 
-Pido, un caso por causa con la familia como datos:
-1. **Firma:** aviso firmado con clave vacía y sin secreto; firma con los
-   primeros caracteres reales y el resto cambiado; con un carácter final
-   cambiado; más corta y más larga. Todas 401 y sin consultar MP.
-2. **Quién toca a quién:** sumar a la tabla «la dueña de otro estudio» contra
-   sacar (404, el usuario sigue en su estudio y su suscripción en MP intacta),
-   y «quien abrió la que paga» contra reactivar con el sid anotado (200).
-3. **Plazo único:** una operación con dos o más llamadas a MP, cada una por
-   debajo del tope y la suma por encima: 503 dentro del tope.
+1. **Firma** (W1, W2, W7, W4): una firma con **un solo carácter cambiado en
+   cada posición** (las 64, como datos), y un encabezado con **dos `v1=`**.
+   Todas 401 sin consultar MP.
+2. **Textos de los 503** (X1, X2): fijar el texto de sacar miembro y el del
+   checkout cuando MP no contesta. Ninguno afirma un estado que no se
+   confirmó.
+3. **Plazo único** (T1): checkout con dos o más suscripciones anotadas, cada
+   lectura por debajo del tope y la suma por encima: 503 dentro del tope.
+4. **Quién toca** (A3): un miembro con sid propio que no paga no reactiva el
+   plan del estudio.
 
-**Texto falso, con camino de hoy:** si el PUT a MP pasa el tope, cancelar
-dice «tu plan sigue igual» (`main.py:2100`; igual al sacar, `10085`, y en el
-checkout) y MP puede cancelar igual: el perfil muestra «Próximo cobro» y no
-lo habrá. Que diga que no se pudo confirmar y que vuelva a mirar en unos
-minutos, sin afirmar que sigue igual.
+Cada punto, con su rojo con el arreglo revertido o con la mutación.
+**A la cola de limpieza** (decidido por la PM): la guarda «No podés removerte
+a vos mismo» no tiene caso (R1).
 
-Cada punto lleva su rojo con el arreglo revertido (o la mutación de arriba).
-El resto de las mutaciones verdes de Sonnet (`_TOPE_MP` alto, `60/hour`,
-`CapacityLimiter(39)`, `.match`, clave global, `cancelar_corta_acceso` del
-usuario) y la «pendiente de otro miembro da Próximo cobro» (`main.py:3236`)
-quedan como riesgos: no los pido.
-
-**D64:** (a). Lo hace Emi antes de publicar: le aviso yo.
-**D66:** (a). Un cambio de `core/rate_limit.py` sería pieza aparte.
-
-Esta devolución va primero. Después: AISLAMIENTO-2 / LIMPIEZA-1.
+Esta devolución va primero. Después: AISLAMIENTO-2 / LIMPIEZA-1. **Próxima
+D libre: D116** (MARIA usa D115).
 
 ## Veredicto de COBRO-CORTE-1, vuelta 4 (2026-11-06 PM): aceptada, sin integrar
 
