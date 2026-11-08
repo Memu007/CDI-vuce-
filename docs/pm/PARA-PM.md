@@ -2,623 +2,143 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## EXCEL-2d, entregada en `84fd9f2` (informe en el commit de arriba)
+## COBRO-MP-4 (con D124), entregada en `0fb991c` (informe en el commit de arriba)
 
-Base: `dca338a`. En el medio está `285d224` (el informe de COBRO, sólo `docs/pm`) y, encima de `5eab286`, un merge de tu rama (`9b3391a`, trae `3060fd0`, sólo `docs/pm`). Encima del merge, `9c25e15` a `84fd9f2`: el arreglo del hallazgo 3 de seguridad, sus casos y sabotajes, y un comentario.
+Base: `3be86b7`. El código está en `0fb991c`, un merge de tu rama que trae `9eef8a2` y sólo toca `docs/pm`. El informe va en el commit de arriba.
+
+| Commit | Qué |
+|---|---|
+| `f152a7a` | producto: la marca del 503 y quién concilia |
+| `674da8f` | casos, `cobro_mp4.sh` y `cobro_mp4_postgres.py` |
+| `83a2957` | producto: conciliar borra las marcas de todo el estudio; en el CHANGELOG, la vuelta atrás va después del código |
+| `31da854` | casos de la marca de otra cuenta y del borrado |
+| `b5c9dc0` | merge de tu rama (`docs/pm`) |
+| `162468e` | D124: la CI instala `xlwt` |
+| `7cb4918` | dos casos de tiempo de `test_cobro_mp2.py` esperan la marca nueva (abajo, «Un BASE en rojo») |
+| `0fb991c` | merge de tu rama (`docs/pm`) |
+
+COBRO-MP-2+3 vuelta 3, PERMISOS-1 y BACKUP-1a: leí que las aceptaste sobre `ca84c5f`, sin integrar. EXCEL-2d, aceptada sobre `84fd9f2`.
 
 ### Resultado
 
-- **Qué cambia:** antes de abrir un `.xlsx` o un `.xls`, se rechaza con 400 un libro con:
-  - un formato de número de más de 255 caracteres o más de 32 «[»;
-  - más de 65 490 formatos de celda (`cellXfs`), aunque haya un `cellXfs` vacío adentro;
-  - más de 64 000 rangos en la primera hoja, sumando los `sqref` (formato condicional, validación), las celdas combinadas y los vínculos.
-- **En un `.xls`** se lee el texto de cada registro FORMAT (BIFF8, en UTF-16 si lo dice), así un formato en chino no cuenta como «[». Si el registro no cuadra o es de otra versión, se cuentan los «[» de todos sus bytes.
-- **Los topes:** 255 caracteres y 65 490 formatos de celda son los de Excel. 32 «[» deja entrar los formatos que guarda Excel (`[Red][<=100]0.00;[Blue][>100]0.00;[Green]0;@` tiene 5).
-- **Las celdas combinadas** dentro de las filas con datos: cada columna se rellena una sola vez, y el tope de filas las corta en ~1 s. Fuera de las filas, cada combinada y cada vínculo cuentan como un rango (lo encontró la revisión de seguridad, abajo).
-- **Los libros del adversario**, por la subida entera (`pytest --durations=0`, solo, sobre `84fd9f2`; el tiempo incluye armar el libro):
-
-| Libro | Antes | Ahora | Resultado |
-|---|---|---|---|
-| 120 000 «[» en un formato, ~5 KB | 9 s, con todos los hilos frenados | 0.03 s | 400 «formato» |
-| 640 000 rangos en un `sqref` | 4 s | 0.32 s | 400 «rangos» |
-| 2499 combinadas en 4998 filas | 10.95 s | 0.67 s | 200 |
-| 9995 combinadas en 19 990 filas | 5.6 s sólo en asignarlas | 1.28 s | 400 «filas» |
-| 300 000 combinadas fuera de las filas, 1.4 MB | 5.09 s | 0.59 s | 400 «rangos» |
-| 200 000 vínculos, 0.5 MB | 2.48 s | 0.39 s | 400 «rangos» |
-| tres formatos de 60 000 «[» en un `.xls` | 38.7 s con 65 000 «[», con el GIL retenido | 0.01 s | 400 «formato» |
-
-- En cada uno, otro hilo que marca el paso cada 10 ms no queda parado más de 0.5 s.
+- **La marca.** Cuando cancelar recibe un 503, la cuenta que pidió queda anotada en `users.cancelar_sin_confirmar` con la suscripción que Mercado Pago no confirmó. La columna es nueva, de 100 caracteres y puede quedar vacía; la agrega el arranque.
+- **Quién concilia.** Al reintentar, con todas las suscripciones canceladas, concilian sólo la dueña o quien tenga una marca igual a una suscripción del estudio que sigue anotada. Un miembro sin la marca recibe 403 y no cambia nada. El caso cubre que su suscripción venga cancelada, con 404 en MP o sin sid, y además que la marca sea de una suscripción que ya no está.
+- **Se borra al conciliar.** Se borra la marca de quien pide y la de cada cuenta del estudio cuya suscripción se cancela.
+- **El orden de cancelar.** Ahora cancela primero las de otras cuentas, después la de quien pide y al final la que paga. Así, si falla una de otra cuenta, quien pide sigue teniendo su suscripción anotada y puede volver a conciliar (`test_el_reintento_que_falla_en_otra_deja_la_suya_para_volver_a_conciliar`).
+- **La migración** se probó en un Postgres 16 descartable (`cobro_mp4_postgres.py`): el arranque agrega la columna a una base con datos, el 503 guarda la marca, el reintento concilia y la borra, y un segundo arranque no cambia nada. La vuelta atrás se corrió dos veces.
+- **Vuelta atrás.** Primero el código anterior y después `alter table users drop column if exists cancelar_sin_confirmar`. Se pierden las marcas pendientes: después de volver atrás, el reintento de un miembro vuelve a la regla anterior. Está en el CHANGELOG.
+- **D124.** La CI instala `xlwt==1.3.0` en un paso aparte, después de `requirements.txt` (`162468e`). Producción no lo instala.
 - **Archivos de producto:**
-  - `proyecto_maria/security/file_security.py`;
-  - `proyecto_maria/main.py` (sólo el relleno de las combinadas en `try_extract_with_mapping`);
-  - `CHANGELOG.md`.
+  - `proyecto_maria/main.py`: `cancel_billing`, `_quien_toca_el_plan` y la lista de `_migrate_add_user_billing_columns`;
+  - `proyecto_maria/database/models.py`;
+  - `CHANGELOG.md`;
+  - `.github/workflows/ci.yml` (D124).
 
-**producto +97/−6**. Suma 91 netas: los topes son chequeos nuevos y no salen restando código. El `.xls` suma la lectura del registro FORMAT (`_formato_xls_caro`), porque contar bytes daba falsos positivos con texto en UTF-16.
+**producto +14/−6**.
 
 ### Decisiones
 
 Nada para decidir. Supuestos que se pueden revertir:
-- un formato de más de 32 «[» se rechaza, no va al carril pesado: el carril pesado no alcanza, porque el GIL frena a todos los hilos;
-- en un `.xls` no hay tope de largo para un FORMAT que no cuadra: ahí sólo se cuentan «[», y el largo no es caro en xlrd;
-- los vínculos (`hyperlink`) cuentan en el tope de rangos aunque la tarea no los nombra: cuestan lo mismo que una combinada;
-- dos casos de `tests/test_excel2.py` armaban 230 000 y 600 000 `<xf/>`, que ahora se rechazan por el tope de formatos de celda. Ahora usan `<font/>`, que sigue probando el mismo control (las etiquetas de `styles.xml`).
 
-D123 la tomó la Dev 2 (AVISOS-1), aunque `PARA-DEV.md` decía que era mi próxima libre. No la usé.
+- **El orden de cancelar** cambió (arriba, «El orden de cancelar»). La tarea no lo pedía. Sin él, cuando falla la suscripción de otra cuenta, la de quien pide ya se canceló y su marca no coincide con ninguna anotada: no podría volver a conciliar. Si preferís el orden de antes, ese caso pasa a esperar 403.
+- **Conciliar borra las marcas de todo el estudio**, no sólo la de quien pide (`83a2957`). Una marca que queda apunta a una suscripción que ya no está anotada, así que no sirve para nada; borrarla deja la fila limpia.
+- **Un segundo 503 pisa la marca** con la suscripción que falló esta vez. Es la que sigue anotada, así que la marca sigue sirviendo.
+
+### Un BASE en rojo, arreglado en las pruebas
+
+`cobro_mp2.sh` dio BASE en rojo sobre `31da854`. Dos casos de tiempo, `test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope` y `test_el_tope_es_uno_para_todos_los_pedidos_a_mp`, comparaban la fila de quien pidió antes y después del 503 y veían la marca nueva. La marca es justamente lo que la pieza agrega. `7cb4918` los ajusta para esperarla en el 503 de cancelar y para seguir exigiendo que nada más cambie. El producto no se tocó.
 
 ### Sabotajes
 
-- `excel2d.sh` corrió sobre `49be32c`; entre `49be32c` y `84fd9f2` sólo cambia un comentario (`git diff 49be32c 84fd9f2 --stat` da `file_security.py | 5 ++---`).
-- `excel2.sh` corrió sobre `066bd00`; después sólo cambian `excel2d.sh` y ese comentario.
-- En mi primera corrida sobre `066bd00`, el sabotaje de vínculos dio `ROJO?`: buscaba `[vínculos]` y pytest escribe el id como `[v\xednculos]`. El rojo estaba (`E   Failed: DID NOT RAISE ExcelDemasiadoGrande`); lo que fallaba era la línea esperada. Arreglado en `49be32c`.
+`cobro_mp4.sh` sobre `0fb991c`: `BASE  | en verde`, 8 `ROJO`, `sabotajes con falla: 0`, salida 0.
 
-| Script | ROJO | Fallas | Salida |
-|---|---|---|---|
-| `excel2d.sh` | 20 de 20 | `sabotajes con falla: 0` | `salida excel2d 0` |
-| `excel2.sh` | 42 | `sabotajes con falla: 0` | `salida excel2 0` |
+| Sabotaje | El rojo dice |
+|---|---|
+| el 503 de cancelar no anota quién lo recibió | «FAILED tests/test_cobro_mp2.py::test_si_mp_cancelo_sin_confirmar_el_reintento_concilia[abrio» |
+| conciliar no borra la marca de la dueña | «FAILED tests/test_cobro_mp2.py::test_si_mp_cancelo_sin_confirmar_el_reintento_concilia[duena» |
+| un miembro sin la marca concilia | «FAILED tests/test_cobro_mp2.py::test_un_miembro_sin_la_marca_no_concilia[cancelada]» |
+| una marca de una suscripción que ya no está concilia | «FAILED tests/test_cobro_mp2.py::test_un_miembro_sin_la_marca_no_concilia[marca_de_otra]» |
+| conciliar deja las marcas de las otras cuentas | «FAILED tests/test_cobro_mp2.py::test_conciliar_borra_las_marcas_de_todo_el_estudio» |
+| la marca de otra cuenta del estudio concilia | «FAILED tests/test_cobro_mp2.py::test_la_marca_de_otra_cuenta_no_concilia[abrio-miembro]» |
+| cancelar empieza por la suscripción de quien pide | «FAILED tests/test_cobro_mp2.py::test_el_reintento_que_falla_en_otra_deja_la_suya_para_volver_a_conciliar» |
+| el arranque no agrega la columna a una base que ya existe | la línea `FALLA` de «el arranque agrega cancelar_sin_confirmar» |
 
-**El ROTO de `excel2.sh`** apunta ahora al bucle de hoy (`nuevas[col][i:j] = valor`) y da rojo:
-
-```
-ROJO  | una combinada vuelve a recorrerse hasta su última fila (la función de 3e6e63e, con las celdas rellenadas): dice «FAILED tests/test_excel2.py::test_una_combinada_gigante_repetida_no_traba_la_lectura» (90 s, cortado a los 90 s)
-```
-
-Los 20 de `excel2d.sh`:
-
-```
-ROJO  | un formato largo vuelve a abrirse: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[largo]» (3 s)
-ROJO  | un formato con muchos corchetes vuelve a abrirse: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[corchetes]» (4 s)
-ROJO  | los corchetes vuelven a contarse en los bytes, sin las entidades: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[corchetes escritos como &#91;]» (4 s)
-ROJO  | muchos formatos de celda vuelven a abrirse: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[formatos de celda]» (3 s)
-ROJO  | los estilos de celda vuelven a contar como formatos de celda: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[formatos de celda]» (4 s)
-ROJO  | un cellXfs vacío vuelve a cortar la cuenta de formatos de celda: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[formatos de celda tras un cellXfs sin hijos]» (3 s)
-ROJO  | los formatos vuelven a no mirarse antes de abrir: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[120 000 corchetes en un formato]» (13 s)
-ROJO  | muchos rangos vuelven a abrirse: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[640 000 rangos de formato condicional]» (16 s)
-ROJO  | los sqref vuelven a contarse por elemento y no por rango: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[rangos]» (4 s)
-ROJO  | un sqref vuelve a partirse entero aunque pase el tope: dice «FAILED tests/test_excel2d.py::test_un_sqref_largo_se_parte_hasta_el_tope» (3 s)
-ROJO  | las celdas combinadas vuelven a no contar como rangos: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[combinadas]» (4 s)
-ROJO  | los vínculos vuelven a no contar como rangos: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[v\xednculos]» (4 s)
-ROJO  | los formatos de un .xls vuelven a no mirarse antes de abrir: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[tres formatos de 60 000 corchetes en un .xls]» (28 s)
-ROJO  | un .xls vuelve a contar los «[» en los bytes y no en el texto: dice «FAILED tests/test_excel2d.py::test_un_formato_de_excel_sigue_entrando[texto chino]» (3 s)
-ROJO  | un .xls vuelve a no mirar el largo del formato: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[largo en un .xls]» (3 s)
-ROJO  | un FORMAT de .xls que no cuadra vuelve a decodificarse igual: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[corchetes en un FORMAT de .xls que no cuadra]» (4 s)
-ROJO  | un .xls en OLE vuelve a no leerse por dentro: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[corchetes en un .xls]» (4 s)
-ROJO  | un .xls sin OLE vuelve a no mirarse: dice «FAILED tests/test_excel2d.py::test_un_formato_que_excel_no_guarda_se_rechaza[corchetes en un .xls sin OLE]» (3 s)
-ROJO  | cada combinada vuelve a asignarse aparte en pandas: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[9995 combinadas en 19 990 filas]» (20 s)
-ROJO  | las celdas rellenadas vuelven a copiarse en cada fila: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[2499 combinadas en 4998 filas]» (7 s)
-```
+`cobro_mp2.sh`, en una copia enfocada (el entero tardaba demasiado), sobre `0fb991c`: `BASE  | en verde`, `BASE  | los cruces en Postgres, en verde`, 87 `ROJO`, ninguno sin rojo, `sabotajes con falla: 0`, salida 0. El script entero lo corriste vos sobre `ca84c5f`.
 
 ### Pruebas
 
-- **`tests/test_excel2d.py`** sobre `84fd9f2`: `26 passed in 5.58s`.
-- **Suites de Excel y de rendimiento** sobre `84fd9f2` (`test_excel1_lectura`, `test_excel1_rendimiento`, `test_excel1_txt`, `test_excel2`, `test_excel2b`, `test_excel2c`, `test_excel2d`, `test_excel3`, `test_maria1b_controles`, `test_maria1b_devolucion`, `test_rendimiento1`, `test_rendimiento1b`): `1455 passed in 120.80s (0:02:00)`.
-- La suite completa no corrió.
+**El rojo de los casos nuevos.** Los casos de `0fb991c` contra el producto de `3be86b7` (`main.py` y `models.py` de la base): `11 failed, 110 deselected`.
+
+- Cinco fallan por la regla: `assert 200 == 403`, el miembro concilia con `{"success":true,"billing_status":"canceled",...}`. Son `test_un_miembro_sin_la_marca_no_concilia[cancelada]`, `[404_en_mp]` y `[marca_de_otra]`, y `test_la_marca_de_otra_cuenta_no_concilia[abrio-miembro]` y `[duena-abrio]`.
+- Seis fallan sólo porque falta la columna (`AttributeError: 'User' object has no attribute 'cancelar_sin_confirmar'`): los tres de `test_si_mp_cancelo_sin_confirmar_el_reintento_concilia`, `[sin_sid]`, `test_conciliar_borra_las_marcas_de_todo_el_estudio` y `test_el_reintento_que_falla_en_otra_deja_la_suya_para_volver_a_conciliar`. Ese rojo no distingue la regla; lo que la distingue son los sabotajes de arriba, que dejan la columna y rompen una línea por vez. `[sin_sid]` no tiene sabotaje propio: con o sin el arreglo da 403.
+
+| Prueba, sobre `0fb991c` | Resultado |
+|---|---|
+| suites de cobro: `tests/test_cobro_*.py`, `test_billing_checkout`, `test_billing_ola4`, `test_billing_autoservicio`, `test_api_clientes_billing`, `test_g7_cobro`, `test_g7_3_corte_active`, `test_mp_webhook_signature`, `test_webhook_ipn`, `test_migration_import` | `508 passed in 282.70s (0:04:42)` |
+| D124, local, con `xlwt 1.3.0`: `-rs tests/test_excel2d.py tests/test_excel3.py` | `984 passed in 32.07s`, ninguna línea `SKIPPED` |
+| `cobro_mp4_postgres.py` en un Postgres 16 descartable | 8 `OK`, `fallas: 0` |
 
 ### chequeo-6
 
 ```
-chequeo-6 dca338a..84fd9f2: avisos para mirar, no un veredicto
-producto +97/−6
-  AVISO producto suma 91 líneas netas: el informe dice por qué (§6: más de 20)
-arnés +356/−9
+chequeo-6 3be86b7..0fb991c: avisos para mirar, no un veredicto
+producto +14/−6
+arnés +336/−8
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/main.py: 11362 → 11372
-  AVISO creció una función de más de 150: proyecto_maria/main.py:5153 try_extract_with_mapping 309 → 312, 3 en su propio cuerpo (§6: lo nuevo va aparte)
-  proyecto_maria/security/file_security.py: 715 → 796
-avisos: 2
-```
-
-- El primer AVISO tiene su porqué en «Resultado».
-- El segundo: las 3 líneas no son una rama nueva; cambian sobre qué recorre el bucle de las combinadas. Partir `try_extract_with_mapping` va a la cola de limpieza.
-- Un tercer AVISO, por un comentario de tres líneas, lo arreglé en `84fd9f2`.
-
-### Revisiones
-
-**Adversario: `adversario-opus-alto` (Opus, esfuerzo alto).**
-
-| Hallazgo | Qué pasó |
-|---|---|
-| Los formatos de un `.xls` no se miraban: 65 000 «[» tardaban 38.7 s con el GIL retenido | Arreglado en `55c5ea0` |
-| Un `cellXfs` vacío antes del real cortaba la cuenta de formatos de celda | Arreglado en `55c5ea0` |
-| 9995 combinadas en 19 990 filas: 5.6 s asignándolas de a una | Arreglado en `55c5ea0`: cada columna, una vez |
-| Un libro de ~10 MB en el carril pesado tarda 3.1–3.8 s | Riesgo: es el carril pesado, no frena a los livianos |
-
-**`/code-review high`** (Opus 5.5, esfuerzo alto): 10 hallazgos.
-
-| # | Hallazgo | Qué pasó |
-|---|---|---|
-| 3 | Un `.xls` no tenía tope de largo | Arreglado en `5f76f1a` |
-| 4 | En UTF-16, un «字» lleva un byte 0x5B y contaba como «[» | Arreglado en `5f76f1a`, con el caso «texto chino» |
-| 9 | Un comentario con historia | Arreglado |
-| 10 | Los dos AVISOS de chequeo-6 | Su porqué, arriba |
-| 1 | Con pandas 3, `df.at` copiaría los `attrs` | Riesgo bajo: pandas está fijo en 2.3.2. No lo reproduje |
-| 2 | El conjunto de celdas rellenadas queda en los `attrs` | Riesgo bajo |
-| 5 | En los topes justos, el peor caso tarda ~1.3 s | Riesgo bajo |
-| 6 | `styles.xml` se lee tres veces | Riesgo bajo, de rendimiento |
-| 7 | El `sqref` se parte por elemento | Riesgo bajo: se corta en el tope, con pico de memoria medido por debajo de 35 MB |
-| 8 | El OLE de un `.xls` se lee dos veces | Riesgo bajo, de rendimiento |
-
-El tope de largo exacto del registro FORMAT tiene su caso; con el chequeo revertido daba `UnicodeDecodeError ... truncated data` / `1 failed, 21 passed in 3.86s`.
-
-**Seguridad: `adversario-sonnet-alto` (Sonnet, esfuerzo alto).**
-
-| # | Hallazgo | Confianza | Qué pasó |
-|---|---|---|---|
-| 1 | `_rellenar_combinadas` usa `searchsorted`: con un índice desordenado o repetido rellenaría filas equivocadas | 9 | No se llega: el único llamador le pasa el índice de `read_excel`, o un recorte con `iloc` de ese índice, que siempre es creciente y sin repetidos |
-| 2 | El 400 de un `.xls` roto lleva el texto crudo de xlrd | 8 | De antes: es el mismo `Invalid Excel file: {str(e)}` de `file_security.py`. Riesgo bajo |
-| 3 | 300 000 combinadas fuera de las filas (1.4 MB) y 200 000 vínculos pasaban sin tope | — | Lo medí por la subida: 5.09 s y 2.48 s, con 200, y otro hilo frenado como mucho 0.19 s. Arreglado en `9c25e15`: cada combinada y cada vínculo cuentan como un rango en el tope de 64 000. En el tope justo (63 999), la subida tarda 1.07 s y 0.94 s |
-
-- Rojo antes del arreglo: `4 failed, 22 passed in 11.85s`, con `DID NOT RAISE ExcelDemasiadoGrande` en `[combinadas]` y `[vínculos]`, y `assert 200 == 400` en las dos subidas.
-- **Lo que verificó y está bien:** los topes aguantan prefijos de espacio de nombres, `&#91;`, `cellXfs` anidados y 100 `numFmt`; no hay XXE; una entrada repetida en el zip no cambia nada; el registro FORMAT con texto enriquecido cae bien al conteo de bytes; el fuzzing de `.xls` nunca se traba. Corrió `1094 passed, 5 deselected, 3 warnings in 80.24s`.
-- **Lo que no miró:** `services/migration_service.py` llama a `pd.read_excel` sin esta validación. Queda afuera de la pieza; te lo dejo para que decidas si va a una pieza aparte.
-
-### Riesgos y supuestos
-
-- **Riesgos:**
-  - el del adversario sobre el carril pesado con ~10 MB;
-  - los riesgos bajos del code-review;
-  - de antes y ya anotados: el `.xls` sin medir su forma y la memoria de iterparse con 1.7 M de filas.
-- **Supuestos que se pueden revertir:** los de «Decisiones».
-
-### Para reproducir
-
-```bash
-scripts/testing/sabotajes/excel2d.sh 84fd9f2   # 20 ROJO, «sabotajes con falla: 0»
-scripts/testing/sabotajes/excel2.sh 84fd9f2    # 42 ROJO, «sabotajes con falla: 0»
-DATABASE_URL=sqlite+aiosqlite:///./rep.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
-  python -m pytest -q --no-cov --durations=0 tests/test_excel2d.py   # «26 passed»; los de subida, en menos de 1.5 s
-docs/pm/herramientas/chequeo-6.py dca338a 84fd9f2   # «producto +97/−6», «avisos: 2»
-```
-
-## COBRO-MP-2+3 (vuelta 3), PERMISOS-1 y BACKUP-1a, entregadas en `ca84c5f` (informe en el commit de arriba)
-
-Bases:
-- COBRO-MP-2+3 y PERMISOS-1: `ac52d6f`, el merge de tu rama antes de empezar.
-- BACKUP-1a: `b831905`, la punta de LIMPIEZA-1, sobre la que arrancó.
-
-Encima de `ca84c5f` hay merges de tu rama, que traen `docs/pm` (el último trae tu `6f9d0c1`, con EXCEL-2c aceptada), los commits de EXCEL-2c y los de EXCEL-2d (`ac11cd8` a `e02dd76`). EXCEL-2d está subida pero no entregada: su informe va aparte. Ninguna de las dos toca los archivos de estas tres piezas, salvo `CHANGELOG.md`. El producto y las pruebas que se entregan acá son los de `ca84c5f`.
-
-### Resultado
-
-1. **COBRO-MP-2+3: el reintento de cancelar concilia.**
-   - Si quien abrió la suscripción, o la dueña, recibe el 503 y Mercado Pago sí la canceló, al reintentar recibe 200.
-   - El estudio queda `canceled`, el sid se borra y `/billing/me` da `renueva: False`.
-   - Si otra suscripción del estudio sigue pagando, el reintento da 403 y no cambia nada.
-   - Cancelar deja la suscripción que paga para el final. Un corte a mitad deja canceladas las demás, y el reintento legítimo concilia igual.
-   - Los cuatro puntos de pruebas tienen su caso y su rojo (abajo).
-   - La regla para reintentar es «todas las suscripciones anotadas del estudio están canceladas». No es «quien recibió el 503»: ver **D119**.
-2. **PERMISOS-1: el arranque da admin por `ADMIN_USERNAMES` sólo por username.**
-   - Un email que puso el usuario no da admin, con o sin mayúsculas, con espacios o igual al de una cuenta borrada.
-   - Un nombre tampoco da admin.
-   - Hay un problema de antes que sigue: **D120**.
-3. **BACKUP-1a:** `scripts/datos/copia_base.py` tiene tres órdenes: `copiar`, `verificar` y `enviar`.
-   - **Qué hace:**
-     - saca la copia con `pg_dump -Fc`;
-     - la restaura en una base descartable;
-     - compara filas y contenido por tabla, y si no coinciden sale con error.
-   - **Qué no compara:** índices, restricciones, secuencias ni objetos grandes. Así figura también en `CHANGELOG.md`.
-   - **Cuándo falla:**
-     - con 0 tablas o 0 filas en total, y lo dice;
-     - si la verificación falla, `copiar` sale con 1.
-   - **Archivos:** quedan en 0600 y la carpeta en 0700.
-   - **Ante `COPIA_PLAZO_S` o una señal:** borra la base descartable, corta `pg_dump` o `pg_restore` y sale con error.
-   - **`enviar`:** es un paso aparte, que lleva a una carpeta local sólo una copia verificada, con su huella y sin cambios.
-   - Los siete puntos del adversario están atendidos, en el producto o en riesgos (abajo).
-
-**producto +19/−15** en `proyecto_maria/main.py` contra `ac52d6f` (chequeo-6 entero, abajo).
-
-| Archivo | Contra la base de su pieza | Por qué tanto |
-|---|---|---|
-| `scripts/datos/copia_base.py` | +525/−0 contra `b831905` (archivo nuevo); +113/−26 en esta vuelta contra `ac52d6f` | chequeo-6 no lo cuenta porque mira `proyecto_maria/`. Las 113 líneas de esta vuelta son el borrado con tope ante un corte, la señal y el aviso de la base que quedó: cada una tiene su caso y su sabotaje |
-| `CHANGELOG.md` | +18/−1 contra `ac52d6f` | — |
-
-Los archivos de producto abiertos para `NOW.md` son `proyecto_maria/main.py`, `scripts/datos/copia_base.py` y `CHANGELOG.md`.
-
-### Decisiones
-
-**Numeración.** D118 queda salteada:
-- mi canal decía «Próxima D libre: D117»;
-- MARIA usó D117;
-- D118 es de la Dev 2.
-
-Arranco en D119. El mensaje de `495e601` dice «va como D117»; vale lo de acá.
-
-**D119. El reintento de cancelar lo puede hacer cualquier miembro del estudio con una suscripción anotada, si todas las anotadas del estudio están canceladas en Mercado Pago.**
-
-Esto no es exactamente lo que pediste. Pediste que el reintento lo haga «quien recibió el 503», y CDI no anota quién lo recibió.
-
-Cuando no hay ninguna suscripción que pague, un miembro puede pasar el estudio a `canceled` en estos casos:
-- con una suscripción vieja suya cancelada, o una que Mercado Pago contesta con 404;
-- en gracia;
-- en un estudio `active` sin suscripciones que paguen.
-
-No mueve plata, porque no hay nada que cobre. Pero corta el acceso del estudio.
-
-Lo encontraron el adversario (media) y `/security-review` (confianza 4-5).
-
-Además, si entre el 503 y el reintento aparece una pendiente que abrió otra persona del estudio, el reintento da 403, y sólo la dueña lo destraba.
-
-Opciones:
-- **(a)** Dejarlo así, como riesgo.
-- **(b)** Anotar en la cuenta que recibió el 503 de cancelar. Sólo esa cuenta, o la dueña, reconcilian, y la marca se borra al conciliar. Es un campo nuevo, así que lleva migración.
-- **(c)** Que el reintento de un miembro sólo concilie si el estudio tenía una suscripción que pagaba y era la suya. Esto exige guardar cuál pagaba antes del corte, que es casi lo mismo que (b).
-
-**Recomiendo (b) como pieza aparte.** Es lo que pediste y toca plata y migración. Meterlo acá agranda el producto sin que lo decidieras.
-
-**D120. Un username de `ADMIN_USERNAMES` sin cuenta se puede registrar y queda admin.** Esto es de antes de PERMISOS-1.
-
-`_es_admin` da admin en cada pedido por username (`main.py:1744`), no sólo al arrancar. Quien registre primero ese nombre es admin.
-
-PERMISOS-1 cierra el camino por email, que es lo que pediste. Este otro camino sigue abierto.
-
-Opciones:
-- **(a)** Riesgo, que lo cuide Emi: que cada nombre de `ADMIN_USERNAMES` tenga su cuenta creada antes de publicar.
-- **(b)** Pieza chica: `_es_admin` mira sólo los roles guardados, y el registro rechaza un nombre de `ADMIN_USERNAMES`.
-
-**Recomiendo (b).** Es el mismo tipo de arreglo chico de seguridad que D116. Antes de cambiarlo hay que confirmar con Emi cómo entra hoy su admin.
-
-**D121. Restos de la vieja regla por email.**
-- Un usuario que ya ganó admin por email lo conserva, porque el arranque no saca roles.
-- Una entrada con forma de email en `ADMIN_USERNAMES` ya no hace nada.
-- El bucle se podría borrar si D120 va por (b).
-
-Opciones:
-- **(a)** A la cola de limpieza, y que Emi revise los roles admin guardados en producción.
-- **(b)** Una pieza que quite el admin a quien no está por username.
-
-**Recomiendo (a).** Sacar roles guardados en producción es un cambio de datos que decide Emi.
-
-**D8 (BACKUP-1a). Nada chocó.** En el punto 4 elegí manejar la señal y poner un tope, en vez de limpiar al empezar las `cdi_restauracion_*` viejas:
-- limpiar al empezar podría borrar la base de otra corrida en curso;
-- con la señal y el tope, la corrida que la creó la borra.
-
-Lo que queda tras un `SIGKILL` está en riesgos.
-
-### SHAs
-
-| SHA | Qué |
-|---|---|
-| `b831905` | base de BACKUP-1a (LIMPIEZA-1) |
-| `9459754` | producto: la copia no da por buena una base vacía ni deja restos al cortarse |
-| `1154be3` | arnés: copia vacía, corte por plazo o señal, permisos, enviar sin huella; `con_pg16.sh` usa `PG_PUERTO` |
-| `fb7b73c` | producto: el corte mata a `pg_dump`, limpia aunque falle el CREATE y respeta nohup; el plazo «²» se rechaza |
-| `f7086a9` | arnés: corte con `pg_restore` colgado, SIGHUP ignorado, plazo «²» |
-| `8410cf6` | merge de tu rama |
-| `ac52d6f` | base de COBRO-MP-2+3 y PERMISOS-1 |
-| `495e601` | producto: el reintento de cancelar concilia y una firma con una clave repetida da 401 |
-| `a0b34ac` | arnés: reintento, firma carácter por carácter y `v1` repetido, textos 503, plazo único con dos lecturas, reactivar con una propia que no paga |
-| `a7dd38b` | arnés: sabotajes de cobro |
-| `756fed2` | producto: el arranque da admin por `ADMIN_USERNAMES` sólo por username |
-| `7baaeae` | arnés: PERMISOS-1 y `permisos1.sh` |
-| `22eecd8` | merge de tu rama |
-| `171c6d7` | producto: el reintento concilia sólo con todas las suscripciones del estudio canceladas |
-| `8174f01` | arnés: un miembro con una cancelada no toca el plan |
-| `6d2eee3` | arnés: un nombre tampoco da admin |
-| `28a826b` | producto: copiar no deja una copia vacía, y el borrado de la restauración aguanta un corte (tope de 60 s) |
-| `767c689` | arnés: copia vacía sin restos, borrado ante un corte y con tope, SIGHUP sin carrera |
-| `5dc946b` | arnés: el sabotaje «sin plazo» espera el rojo real (~8 min la corrida) |
-| `622bcf7` | producto: la base que no se pudo borrar se avisa también al cortarse y no deja marcar la copia |
-| `ca84c5f` | arnés de BACKUP-1a; **SHA que se entrega** |
-| `a87b4f7` | merge de tu rama, sólo `docs/pm` |
-
-`cobro_mp2.sh` corrió en dos tramos:
-- los primeros 43 sabotajes sobre `8174f01`; ahí corté la corrida;
-- el resto sobre `ca84c5f`, con una copia del script que saltea los primeros 43. La copia suma una sola línea (cuenta los sabotajes y saltea hasta `SALTEAR`) y no está en el repo.
-
-Entre `8174f01` y `ca84c5f`, `git diff --stat` sobre `proyecto_maria/`, `tests/test_cobro*`, `conftest.py`, `mp_firma.py`, `cobro_mp2.sh` y `cobro_mp2_postgres.py` da vacío. El diff entero son 7 archivos, ninguno de cobro (`7 files changed, 195 insertions(+), 22 deletions(-)`). Los 87 rojos de los dos tramos no se repiten.
-
-`permisos1.sh` corrió sobre `ca84c5f`.
-
-### COBRO-MP-2+3: cada punto con su rojo
-
-**El reintento concilia.** Casos en `tests/test_cobro_mp2.py`:
-
-- **`test_si_mp_cancelo_sin_confirmar_el_reintento_concilia`.** El PUT cancela en Mercado Pago pero contesta 500, y la relectura falla. Hay tres filas:
-  - `abrio-False-200` y `duena-False-200`: el reintento concilia;
-  - `abrio-True-403`: otra suscripción paga, y no cambia nada.
-- **`test_un_miembro_con_una_cancelada_no_toca_el_plan_del_estudio`.** Da 403 y no cambia nada. Hay tres filas:
-  - `cancela_la_pendiente_de_otro`;
-  - `cancela_con_la_suya_pendiente`;
-  - `reactiva_con_la_suya_cancelada`.
-
-```
-ROJO  | el reintento no concilia: dice «FAILED tests/test_cobro_mp2.py::test_si_mp_cancelo_sin_confirmar_el_reintento_concilia[abrio-False-200]»
-ROJO  | cancelar no avisa que es un reintento: dice «FAILED tests/test_cobro_mp2.py::test_si_mp_cancelo_sin_confirmar_el_reintento_concilia[abrio-False-200]»
-ROJO  | el reintento concilia aunque otra suscripción pague: dice «FAILED tests/test_cobro_mp2.py::test_si_mp_cancelo_sin_confirmar_el_reintento_concilia[abrio-True-403]»
-ROJO  | con la suya cancelada, un miembro cancela la pendiente de otro: dice «FAILED tests/test_cobro_mp2.py::test_un_miembro_con_una_cancelada_no_toca_el_plan_del_estudio[cancela_la_pendiente_de_otro]»
-ROJO  | con otra cancelada, un miembro cancela la suya pendiente: dice «FAILED tests/test_cobro_mp2.py::test_un_miembro_con_una_cancelada_no_toca_el_plan_del_estudio[cancela_con_la_suya_pendiente]»
-ROJO  | reactivar acepta una suscripción propia ya cancelada: dice «FAILED tests/test_cobro_mp2.py::test_un_miembro_con_una_cancelada_no_toca_el_plan_del_estudio[reactiva_con_la_suya_cancelada]»
-```
-
-**1. Firma** (`tests/test_cobro_mp3.py`):
-- cada una de las 64 posiciones cambiada, una por vez, como datos;
-- dos `v1=`, con la buena primero y con la buena al final.
-
-Todas dan 401 y no consultan a Mercado Pago (`LLAMADAS == []`). En el producto, un encabezado con una clave repetida da 401.
-
-```
-ROJO  | se atiende un IPN por la URL, sin firma: dice «('ipn', 200»
-ROJO  | un cuerpo que no es un objeto rompe la verificación: dice «'cuerpo que no es un objeto'»
-ROJO  | un data que no es un objeto rompe la verificación: dice «'data que no es un objeto'»
-ROJO  | la firma se compara como texto: dice «'firma con letras no ascii'»
-ROJO  | sin clave configurada, se verifica con la clave vacía: dice «('firmado con clave vacía', 200»
-ROJO  | la firma se compara a medias (sólo los primeros caracteres): dice «('sólo los primeros caracteres', 200»
-ROJO  | la firma se compara a medias (firma más corta): dice «('firma más corta', 200»
-ROJO  | la firma se compara a medias (firma más larga): dice «('firma más larga', 200»
-ROJO  | la firma se compara a medias (el carácter 0 cambiado): dice «('el carácter 0 cambiado', 200»
-ROJO  | la firma se compara a medias (el carácter 8 cambiado): dice «('el carácter 8 cambiado', 200»
-ROJO  | la firma se compara a medias (el carácter 30 cambiado): dice «('el carácter 30 cambiado', 200»
-ROJO  | la firma se compara a medias (el carácter 63 cambiado): dice «('el carácter 63 cambiado', 200»
-ROJO  | con dos v1 vale el último: dice «('dos v1, la buena al final', 200»
-```
-
-**2. Textos de los 503** (`test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope`). Cada texto se compara exacto. Ninguno afirma algo que no se confirmó.
-
-| Dónde | Texto |
-|---|---|
-| cancelar | «No se pudo confirmar la cancelación en Mercado Pago. Probá de nuevo en unos minutos.» |
-| checkout, lectura o PUT de la vieja | «No pudimos confirmar tu suscripción actual con Mercado Pago. Probá de nuevo en unos minutos.» |
-| checkout, al crear la nueva | «Mercado Pago no contestó. Probá de nuevo en unos minutos.» |
-| sacar a un miembro | «No se pudo confirmar en Mercado Pago la suscripción de {username}; sigue en el estudio. Probá de nuevo en unos minutos.» |
-
-```
-ROJO  | si Mercado Pago no contesta, cancelar dice que el plan sigue igual: dice «FAILED tests/test_cobro_mp2.py::test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope[cancelar_lee]»
-ROJO  | si Mercado Pago no contesta, sacar dice que el miembro ya salió: dice «FAILED tests/test_cobro_mp2.py::test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope[sacar_lee]»
-ROJO  | si Mercado Pago no crea la nueva, el checkout dice que el plan sigue igual: dice «FAILED tests/test_cobro_mp2.py::test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope[checkout_crea]»
-```
-
-**3. Plazo único.** Nueva fila `checkout_lee_dos` en `test_el_tope_es_uno_para_todos_los_pedidos_a_mp`. El checkout lee dos suscripciones anotadas, la de la dueña y la de quien la abrió. Cada lectura queda por debajo del tope y la suma por encima, y da 503 dentro del tope.
-
-```
-ROJO  | las lecturas iniciales del checkout tienen su propio plazo: dice «FAILED tests/test_cobro_mp2.py::test_el_tope_es_uno_para_todos_los_pedidos_a_mp[checkout_lee_dos]»
-```
-
-**4. Quién toca.** Nueva fila `reactivar_con_una_propia_que_no_paga`: un miembro con un sid propio pendiente, en un estudio cancelado, intenta reactivar. Da 403.
-
-```
-ROJO  | reactivar acepta a quien abrió una suscripción que no paga: dice «FAILED tests/test_cobro_mp2.py::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[reactivar_con_una_propia_que_no_paga-abrio]»
-```
-
-**R1** («No podés removerte a vos mismo» sin caso) queda en la cola, como decidiste.
-
-### PERMISOS-1: el caso y su rojo
-
-**`tests/test_admin_bootstrap.py::test_lo_que_puso_el_usuario_en_su_perfil_no_da_admin`.** El caso:
-1. un usuario común cambia por `PUT /api/user/profile` su email y su nombre a `jefe@estudio.test`, que está en `ADMIN_USERNAMES` y no tiene cuenta;
-2. se reinicia;
-3. `admin` no está en sus roles.
-
-La familia va como datos:
-- `tal_cual`;
-- `mayusculas` (`Jefe@Estudio.TEST`);
-- `espacios`;
-- `de_una_cuenta_borrada`.
-
-Saqué `test_bootstrap_admin_promotes_by_email`, que pedía lo contrario. `test_bootstrap_admin_promotes_by_username` sigue verde.
-
-Sabotaje propio, `scripts/testing/sabotajes/permisos1.sh`, corrido sobre `ca84c5f`:
-
-```
-ROJO  | el arranque busca también por email: dice «FAILED tests/test_admin_bootstrap.py::test_lo_que_puso_el_usuario_en_su_perfil_no_da_admin[tal_cual]»
-ROJO  | el arranque busca el email sin mirar mayúsculas: dice «FAILED tests/test_admin_bootstrap.py::test_lo_que_puso_el_usuario_en_su_perfil_no_da_admin[mayusculas]»
-ROJO  | el arranque busca también por nombre: dice «FAILED tests/test_admin_bootstrap.py::test_lo_que_puso_el_usuario_en_su_perfil_no_da_admin[tal_cual]»
-ROJO  | el arranque no da admin a nadie: dice «FAILED tests/test_admin_bootstrap.py::test_bootstrap_admin_promotes_by_username»
-sabotajes con falla: 0
-```
-
-Dos filas no distinguen nada por sí mismas, así que las dejo dicho:
-- `espacios` da lo mismo que `tal_cual`, porque `_admin_usernames()` recorta los espacios;
-- `de_una_cuenta_borrada` casi no prueba nada, porque una cuenta borrada no deja rastro que el arranque pueda leer.
-
-Quedan como datos porque los pediste.
-
-### BACKUP-1a: los puntos del adversario
-
-| Punto | Qué quedó | Caso |
-|---|---|---|
-| 1. Copia vacía | `copiar` y `verificar` fallan con 0 tablas o 0 filas, y lo dicen. `copiar` no deja la copia ni su huella | `test_una_copia_vacia_da_error`, `test_una_huella_sin_filas_no_llega_a_la_base` |
-| 2. El código de salida | `copiar` sale con 1 si la verificación falla | `test_copiar_sale_con_error_si_la_verificacion_falla` |
-| 3. Permisos | archivos en 0600 y carpeta en 0700, también en `enviar` | en `test_la_copia_de_todas_las_tablas_se_restaura_igual` y `test_enviar_lleva_la_copia_verificada_al_destino` |
-| 4. Señal y tope | `COPIA_PLAZO_S` (3600 por defecto) o una señal no ignorada borran la base descartable, cortan al hijo y salen con error. El borrado aguanta otro corte y tiene un tope de 60 s. Si no se pudo borrar, avisa y no marca la copia | `test_un_corte_no_deja_la_base_ni_el_pg_restore`, `test_un_plazo_que_no_se_entiende_no_copia`, `test_un_corte_durante_el_borrado_no_lo_deja_a_medias`, `test_un_borrado_colgado_tiene_tope_y_avisa`, `test_una_restauracion_que_quedo_no_marca_la_copia` |
-| 5. Lo que se promete | compara filas y contenido por tabla; no índices, restricciones, secuencias ni objetos grandes | `CHANGELOG.md` y este informe |
-| 6. Mutantes | la huella mira todos los esquemas; `enviar` no lleva una copia sin su huella | `test_otro_esquema_entra_en_la_huella`, `test_enviar_no_lleva_una_copia_sin_su_huella` |
-| 7. Restos que traban el reintento | a riesgos | — |
-
-El rename de `PUERTO` a `PG_PUERTO` en `con_pg16.sh`, que estaba en la cola, quedó hecho en `1154be3`.
-
-**Lo que tiene que cargar Emi para activarlo:**
-
-- `COPIA_ORIGEN_URL`: la base de producción. Idealmente con un usuario de sólo lectura.
-- `COPIA_PRUEBA_URL`: un Postgres descartable donde se restaura. El usuario necesita `CREATEDB`.
-- `COPIA_DESTINO`: hoy sólo acepta una carpeta local, absoluta y que ya exista. Un servicio externo (S3 u otro) es otra pieza.
-- `COPIA_PG_BIN`: la carpeta de un `pg_dump` y un `pg_restore` de la misma versión del servidor o más nueva.
-- `COPIA_PLAZO_S`: opcional. Por defecto, 3600 s.
-- Dónde se programa (cron u otro) y quién recibe la alerta cuando sale distinto de 0.
-- Cuántas copias se guardan. Hoy `copiar` no pisa una que ya existe, y no borra copias viejas.
-
-### Sabotajes
-
-| Script | Sobre | ROJO | Fallas | Salida |
-|---|---|---|---|---|
-| `cobro_mp2.sh`, primer tramo | `8174f01` | 43 | la corté ahí | — |
-| `cobro_mp2.sh`, el resto | `ca84c5f` | 44 | `sabotajes con falla: 0` | `salida 0` |
-| `cobro_mp3.sh` | `ca84c5f` | 22 | `sabotajes con falla: 0` | `salida 0` |
-| `permisos1.sh` | `ca84c5f` | 4 de 4 | `sabotajes con falla: 0` | `salida 0` |
-| `backup1a.sh` | `ca84c5f` | 48 de 48 | `sabotajes con falla: 0` | `salida 0` |
-
-Las líneas de base, copiadas:
-
-```
-BASE  | en verde                                (cobro_mp2.sh, primer tramo)
-BASE  | en verde                                (cobro_mp2.sh, el resto)
-BASE  | los cruces en Postgres, en verde        (cobro_mp2.sh, el resto)
-BASE  | tests/test_cobro_mp3.py en verde        (cobro_mp3.sh)
-VERDE | base: 47 passed, 5 warnings in 45.78s
-```
-
-La última es la base de `backup1a.sh`: las pruebas sin sabotear, en verde. No es un sabotaje verde.
-
-En las salidas de los cinco scripts no hay ninguna línea `VERDE`, `ROTO` ni `ROJO?`, salvo esa base de `backup1a.sh`. El primer tramo de `cobro_mp2.sh` no tiene línea final porque lo corté.
-
-Los 48 de `backup1a.sh`:
-
-```
-ROJO  | no compara el contenido: dice «FAILED» y «copia verificada»
-ROJO  | no compara las filas: dice «public.ncm_cache: el contenido no coincide»
-ROJO  | sólo mira las tablas de la copia: dice «[CREATE TABLE de_mas» y «copia verificada»
-ROJO  | sólo mira las tablas restauradas: dice «[DROP TABLE ncm_cache» y «copia verificada»
-ROJO  | ignora que pg_restore falló: dice «falta en la restauración»
-ROJO  | no borra la base de restauración: dice «cdi_restauracion_»
-ROJO  | pg_dump no usa el instante de la huella: dice «public.ncm_cache: 3 filas al copiar, 2 al restaurar»
-ROJO  | la huella usa el orden alfabético de la base: dice «public.orden: el contenido no coincide»
-ROJO  | la sesión no fija «SET TimeZone TO 'UTC'»: dice «public.tipos_extra: el contenido no coincide»
-ROJO  | la sesión no fija «SET DateStyle TO 'ISO, YMD'»: dice «public.tipos_extra: el contenido no coincide»
-ROJO  | la sesión no fija «SET IntervalStyle TO 'postgres'»: dice «public.tipos_extra: el contenido no coincide»
-ROJO  | la sesión no fija «SET extra_float_digits TO 3»: dice «public.tipos_extra: el contenido no coincide»
-ROJO  | la sesión no fija «SET bytea_output TO 'hex'»: dice «public.tipos_extra: el contenido no coincide»
-ROJO  | verificar no borra la marca vieja: dice «quedó marcada como verificada»
-ROJO  | una copia vacía queda verificada: dice «copia verificada: 0 tablas, 0 filas» y «copia verificada: 2 tablas, 0 filas»
-ROJO  | copiar fija una copia vacía: dice «vuelta 1: quedó algo»
-ROJO  | verificar acepta una huella sin filas: dice «falta la variable COPIA_PRUEBA_URL»
-ROJO  | copiar sale bien aunque la verificación falle: dice «LA COPIA NO SIRVE» y «pg_restore falló (salida 1)»
-ROJO  | la huella sólo mira public: dice «copia verificada»
-ROJO  | una huella que no se entiende llega a la base: dice «falta la variable COPIA_PRUEBA_URL»
-ROJO  | sin plazo: dice «LA COPIA NO SIRVE» y «falta en la restauración»
-ROJO  | un plazo que no se entiende corre igual: dice «no terminó en 0 s» y «no terminó en -5 s»
-ROJO  | un plazo con «²» rompe: dice «ValueError: invalid literal for int()»
-ROJO  | la señal mata sin limpiar: dice «(-15 == 1»
-ROJO  | una señal ignorada corta igual: dice «se cortó por SIGHUP»
-ROJO  | cortar no mata al hijo: dice «pg_restore quedó corriendo»
-ROJO  | la limpieza no está protegida del corte: dice «close']»
-ROJO  | el borrado no tiene tope: dice «Timeout»
-ROJO  | al cortar, la base que quedó no se avisa: dice «hay que borrarla a mano' in ''»
-ROJO  | la base que quedó no da error: dice «assert 0 == 1»
-ROJO  | copiar no avisa antes de copiar: dice «'no se pisa una copia' in 'error: ya existe /»
-ROJO  | _fijar pisa: dice «DID NOT RAISE»
-ROJO  | sin COPIA_ORIGEN_URL no lo dice: dice «COPIA_ORIGEN_URL no es una dirección postgresql://»
-ROJO  | copia antes de saber dónde probarla: dice «copió sin saber dónde probarla»
-ROJO  | argparse repite la dirección: dice «el error repite la clave»
-ROJO  | la clave va en la URL de pg_dump: dice «la clave va en pg_dump»
-ROJO  | tapar no tapa: dice «queda la clave escrita como»
-ROJO  | tapar no mira ?password=: dice «en_la_consulta» y «queda la clave escrita como»
-ROJO  | los archivos los lee cualquiera: dice «copia.dump: 0o100644»
-ROJO  | enviar sin huella: dice «copia.dump.huella.json»
-ROJO  | enviar sin marca la da por verificada: dice «destino/copia.dump»
-ROJO  | enviar no mira si cambió: dice «la copia llegó distinta»
-ROJO  | enviar no mira lo que llegó: dice «DID NOT RAISE»
-ROJO  | enviar no mira el destino antes: dice «error: ya existe /»
-ROJO  | enviar a un servicio: dice «[s3:» y «tiene que ser una carpeta local»
-ROJO  | enviar a una ruta relativa: dice «[relativo» y «enviada a»
-ROJO  | enviar a una carpeta que no existe: dice «no_existe» y «FileNotFoundError»
-ROJO  | sin COPIA_DESTINO no lo dice: dice «[-falta la variable COPIA_DESTINO]» y «tiene que ser una carpeta local»
-```
-
-**Cómo corrió MP-2:** ~2 min por sabotaje. Una corrida de MP-2 quedó cortada a mitad porque edité el script mientras corría: terminó con un fin de archivo inesperado. No la cuento. Desde entonces corro una copia del script.
-
-### Puertas, sobre `ca84c5f`
-
-| Puerta | Salida |
-|---|---|
-| suite completa, desde un worktree limpio | `4604 passed, 110 skipped, 3 xfailed in 760.18s (0:12:40)`, salida 0 |
-| `python -m compileall -q proyecto_maria` | salida 0, sin texto |
-| `con_pg16.sh` con `test_backup1a.py` y `test_backup1a_unidad.py` | `47 passed in 43.81s`, salida 0 |
-| chequeo-6 | abajo, entero |
-| `/code-review high` y `/security-review` | en «Revisión» |
-
-La suite deja líneas `Task was destroyed but it is pending!` al cerrar. Ya pasaba antes, y no lo diagnostiqué en esta pieza.
-
-### chequeo-6, `ac52d6f ca84c5f`
-
-```
-chequeo-6 ac52d6f..ca84c5f: avisos para mirar, no un veredicto
-producto +19/−15
-arnés +511/−28
-historia (grep de §6, sin líneas movidas): vacío
-archivos de producto:
-  proyecto_maria/main.py: 11358 → 11362
+  proyecto_maria/database/models.py: 570 → 573
+  proyecto_maria/main.py: 11372 → 11377
 avisos: 0
 ```
 
-Con `ac52d6f a87b4f7` da lo mismo. chequeo-6 no cuenta `scripts/datos/copia_base.py`; está en la tabla de «Resultado».
+### Revisiones
 
-### Revisión
-
-**Adversarios**, uno por pieza:
-
-| Pieza | Agente (modelo, esfuerzo) | Sobre |
-|---|---|---|
-| COBRO-MP-2+3 | `adversario-sonnet-alto` (Sonnet, alto) | `8410cf6..a0b34ac` |
-| PERMISOS-1 | `adversario-sonnet-alto` (Sonnet, alto) | `756fed2..7baaeae` |
-| BACKUP-1a | `adversario-opus-alto` (Opus, alto) | `9459754` |
-
-| Pieza | Hallazgo | Severidad | Reproducido | Qué hice |
-|---|---|---|---|---|
-| COBRO | Un miembro con un sid viejo cancelado podía cancelar la pendiente de otro miembro, y con ella el plan | Alta | Sí | Arreglado en `171c6d7` y `8174f01`: el reintento exige todas canceladas |
-| COBRO | Un sid viejo corta el acceso en gracia o en un estudio sin suscripción que pague | Media | Por código | D119 |
-| COBRO | Sobrevivían los mutantes «sin `cancelar and`» y «`"cancelled" in estados.values()`» | Media (pruebas) | Sí | Cubiertos en `8174f01` por `reactiva_con_la_suya_cancelada` y `cancela_con_la_suya_pendiente`, con sus sabotajes |
-| COBRO | No encontró cómo saltear la firma. La repetición por ts viene de antes | Info | — | Riesgo 2 |
-| PERMISOS | H1: un nombre de `ADMIN_USERNAMES` sin cuenta se registra y es admin | Alta, de antes | Por código | D120 |
-| PERMISOS | H2: admin ya guardado; entradas de email que no hacen nada | Media | Por código | D121 |
-| PERMISOS | H3: `de_una_cuenta_borrada` casi no prueba nada; `espacios` da igual que `tal_cual` | Baja | Sí | Dicho arriba; quedan como datos |
-| PERMISOS | H4: el nombre también daba admin | Alta | Sí | Arreglado: el arranque busca sólo por username. Caso en `6d2eee3` |
-| BACKUP | 1: el DROP sin tope después del primer corte | Media | Sí | Arreglado en `28a826b` y `622bcf7` |
-| BACKUP | 2, 3, 4: el corte no mataba a `pg_dump`, el CREATE fallido no limpiaba, nohup | Media | Sí | Arreglado en `fb7b73c` |
-| BACKUP | 5: la base que quedó no se avisaba al cortarse | Baja | Sí | Arreglado en `622bcf7` |
-| BACKUP | Mi corrida de sabotajes sobre `f7086a9` dio «sabotajes con falla: 2»: VERDE en «una señal ignorada corta igual» y ROJO? en «sin plazo» | — | Sí | Arreglados en `767c689` (SIGHUP sin carrera) y `5dc946b` (espera el rojo real) |
-
-Lo que queda abierto en BACKUP: si el DROP no termina dentro de su tope, la base queda. Se avisa y la copia no se marca (riesgo 8).
-
-**`/code-review high`**, en dos corridas:
-- **BACKUP-1a:**
-  - **Arreglados:** 1, 2, 3, 5, 6, 7 y 8.
-  - **4:** el sabotaje de SIGHUP podía dar verde a veces. Arreglado en `767c689`.
-  - **9:** la segunda vuelta de `test_una_copia_vacia_da_error` es redundante. Queda: no cambia lo que se prueba.
-  - **10:** `copiar` mira `_filas` después de `pg_dump`. Es a propósito: la huella se toma con el mismo instante que la copia.
-- **Cobro y permisos:**
-  - **1, 5 y 8 (el parámetro `cancelar`):** D119.
-  - **2, 3 y 4:** D121.
-  - **6:** `v1` repetido y rotación de clave. Una clave repetida da 401. Rotar la clave con dos firmas válidas a la vez no está soportado.
-  - **7:** la repetición, de antes. Riesgo 2.
-  - **9:** `cancel_billing` vuelve a mandar el PUT a suscripciones ya canceladas. Para la cola.
-  - **10:** el arranque de admin está dentro del `try` de los usuarios demo. Es de antes: si falla la creación de demos, no se da admin.
-
-**`/security-review`:** subagente `general-purpose` (Sonnet, alto), sobre `171c6d7` y `756fed2`. Sin hallazgos con confianza 8 o más. Anotó con confianza 4-5 que un estudio `active` sin sids puede pasar a `canceled`. Va en D119.
-
-### Error propio
-
-- Edité `cobro_mp2.sh` mientras corría, y esa corrida se cortó (arriba). No cambió ningún resultado entregado.
-- Mi primera corrida de `backup1a.sh` sobre `f7086a9` tuvo dos sabotajes que no distinguían. Están en la tabla de revisión y quedaron arreglados antes de este SHA.
+| Revisión | Modelo y esfuerzo | Encontró | Qué hice |
+|---|---|---|---|
+| `adversario-opus-alto` | Opus, alto | No encontró cómo un miembro sin la marca concilie. Riesgos: si el proceso muere o falla el commit entre el 503 y la marca, no queda marca; la migración sin `lock_timeout` y con la excepción tragada (de antes); la vuelta atrás no sirve en SQLite; el texto del 403 confunde; la marca no vence | Van a «Riesgos». Producción es Postgres; el CHANGELOG no aclara que en SQLite la vuelta atrás no corre |
+| `/code-review high` | el de la sesión | Baja: un segundo 503 pisa la marca. El caso `sin_sid` no distingue el defecto (con o sin el arreglo da 403). Repetición en el arnés | La marca pisada queda como supuesto. `sin_sid` queda porque la tarea lo pide en la familia; los otros tres sí distinguen (abajo, el rojo) |
+| `/security-review` (subagente general) | Opus, alto; sólo leyó código | Nada con confianza 8 o más. Endurecimiento opcional: borrar la marca al sacar a un miembro | A «Riesgos»: la marca de quien salió no coincide con nada, porque al sacarlo se borra su suscripción |
 
 ### Riesgos
 
-1. **Firma:** hay dos variantes sin rojo: sin el `x-request-id`, y con `compare_digest` cambiado por `==`. La segunda filtra tiempo, pero no acepta firmas falsas.
-2. **Firma:** no se mira la frescura del ts, así que un aviso firmado se puede repetir. Hoy repetir un pago ya anotado no cambia nada.
-3. **El hilo abandonado sigue hasta 20 s** con un tope de 15 s, y ocupa uno de los 8 cupos mientras tanto.
-4. **La firma usa el `data.id` del cuerpo.** Es de antes.
-5. **`copiar` cortado entre `_fijar` y la escritura de la huella** deja la copia sin huella. El reintento con el mismo nombre dice «ya existe».
-6. **`copiar` que falla al verificar** deja la copia y su huella, y el reintento dice «ya existe». Es a propósito: se puede volver a correr `verificar` sobre esa copia.
-7. **`enviar` cortado** deja el destino a medio escribir, y el reintento da «ya existe en el destino».
-8. **Un `SIGKILL`**, o un DROP que no termina en 60 s, deja `.parcial-*` y `cdi_restauracion_*`. En el caso del DROP lo avisa. Las `cdi_restauracion_*` viejas no se limpian al empezar (D8).
-9. **La huella no está cubierta por el `.sha256`.**
-10. **D119, D120 y D121.**
+- **La marca no vence.** Queda hasta que alguien concilie. Sólo sirve mientras su suscripción siga anotada en el estudio.
+- **Sin marca si se corta en el medio.** Si el proceso muere o falla el commit entre el 503 y la marca, quien pidió no queda anotado y su reintento recibe 403. La dueña igual puede conciliar.
+- **Sacar a un miembro no borra su marca.** Al sacarlo se borra su suscripción, y los sid de MP no se repiten, así que esa marca no coincide con nada.
+- **La vuelta atrás pierde las marcas pendientes.** `drop column if exists` es de Postgres; en SQLite da error de sintaxis.
+- **La migración** sigue sin `lock_timeout` y traga la excepción, como las columnas de antes en la misma lista.
+- **El 403** de un miembro sin la marca dice lo mismo que antes; no explica que puede conciliar quien recibió el 503.
 
 ### Lo que no se corrió
 
-- Los sabotajes de piezas anteriores: los corrés vos antes de publicar.
-- Nada contra Mercado Pago real ni contra una base de producción.
-- `backup1a.sh` con un `pg_dump` de versión distinta a la del servidor: sólo Postgres 16 local.
-- El ataque de aislamiento: estas piezas no tocan clientes ni descargas.
+- **La CI de GitHub no corrió.** Se dispara con `main` y con PR, y esta rama no tiene PR. Lo de D124 en la CI (los `.xls` corriendo, no salteados) no lo pude mostrar ahí: lo mostré local, con el mismo `xlwt==1.3.0`. Queda para cuando corra la CI.
+- **La suite completa** no corrió; sí las suites de cobro (arriba).
+- **`cobro_mp2.sh` entero** no corrió: corrí una copia enfocada (arriba). Vos lo corriste entero sobre `ca84c5f`.
+- **flake8** no corrió.
+- **`smoke_friccion.sh` y `ataque_aislamiento.sh`** no corrieron: la pieza no toca pantallas ni aislamiento de datos.
 
 ### Para reproducir
 
 ```bash
-scripts/testing/sabotajes/cobro_mp2.sh ca84c5f    # cada línea «ROJO …», «sabotajes con falla: 0», «salida 0» (~2 min por sabotaje)
-scripts/testing/sabotajes/cobro_mp3.sh ca84c5f    # lo mismo
-scripts/testing/sabotajes/permisos1.sh ca84c5f    # 4 ROJO, «sabotajes con falla: 0»
-scripts/testing/sabotajes/backup1a.sh ca84c5f     # 48 ROJO, «sabotajes con falla: 0» (~8 min por «sin plazo»)
-DATABASE_URL=sqlite+aiosqlite:///./rep.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
-  python -m pytest -q --no-cov tests/test_cobro_mp2.py -k "reintento or cancelada or lee_dos"   # «18 passed, 95 deselected»
-docs/pm/herramientas/chequeo-6.py ac52d6f ca84c5f # «producto +19/−15», «avisos: 0»
+git fetch origin claude/dev-tecnica && git checkout --detach 0fb991c
+export DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
+
+# Los 8 sabotajes de esta pieza: «sabotajes con falla: 0» y 8 ROJO (el último, la migración en Postgres)
+PY=$(command -v python) scripts/testing/sabotajes/cobro_mp4.sh 0fb991c
+
+# La migración contra un Postgres 16 descartable: «fallas: 0»
+PY=python scripts/testing/con_pg16.sh bash -c '"$0" scripts/testing/cobro_mp4_postgres.py "$BACKUP1A_PG_URL"' python
+
+# Los casos nuevos: todos passed
+DATABASE_URL=sqlite+aiosqlite:///./t.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
+  python -m pytest -q --no-cov tests/test_cobro_mp2.py -k "cancelo_sin_confirmar or sin_la_marca or marca_de_otra or conciliar_borra or reintento_que_falla"
+
+# D124: con xlwt instalado, ningún caso de .xls salteado (sin «SKIPPED ... xlwt»)
+pip install xlwt==1.3.0
+DATABASE_URL=sqlite+aiosqlite:///./t.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
+  python -m pytest -q --no-cov -rs tests/test_excel2d.py tests/test_excel3.py
+
+# Los números de §6: la salida de abajo
+python docs/pm/herramientas/chequeo-6.py 3be86b7 0fb991c
 ```
 
-/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. EXCEL-2d entregada en 84fd9f2 (informe en el commit de arriba). COBRO-MP-2+3 vuelta 3, PERMISOS-1 y BACKUP-1a entregadas en ca84c5f. Abiertas D119 (recomiendo b, pieza aparte), D120 (b), D121 (a); D8 contestada. Sigue lo que diga PARA-DEV.md; frenar 2026-11-08 15:50 UTC. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.
+/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. EXCEL-2d aceptada en 84fd9f2; ca84c5f aceptada. COBRO-MP-4 (con D124) entregada en 0fb991c (informe en el commit de arriba). D119, D120, D121 y D124 contestadas. Sigue PERMISOS-2; frenar 2026-11-08 15:50 UTC. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.
