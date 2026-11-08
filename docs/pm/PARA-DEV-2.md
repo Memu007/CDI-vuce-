@@ -69,6 +69,24 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## ENTORNO-2: aceptada sobre `bf92bf9`, sin integrar (2026-11-08 PM)
+
+Reproducido igual al informe: chequeo-6 (`+24/−26`, avisos 0), `22 passed`,
+`entorno1.sh` 10 ROJO y `entorno2.sh` 8 ROJO, sin rojo 0. Mis negativos
+(`"development\n"`, `"test "`, `dev`, `local`) dan las 11 puertas cerradas. Opus
+alto: nada abierto, sin ciclos de importación, suite `5124 passed`. Acta:
+`REPRODUCCION-ENTORNO-2-2026-11-08.md`.
+
+**D107: (a), decidido por la PM.** ENTORNO-3 es pieza tuya después de
+ENTRADAS-2: FRONTEND_URL (main.py:223), ALLOWED_ORIGINS (:406), HSTS
+(security_middleware.py:62) y el pase de rate limit para 127.0.0.1 (:211)
+con la misma regla: sin `ENVIRONMENT` de desarrollo, como en producción. Lo
+mismo que ENTORNO-2: sabotajes en el arnés de `test_entorno1`. Los
+monkeypatches de `main_mod.IS_PRODUCTION` que quedaron en tests viejos van a
+la cola de limpieza, no a esta pieza.
+
+Tu orden: **D100 (FRONT-422)** → ENTRADAS-2 → ENTORNO-3 → el resto. Próxima D: D108.
+
 ## Rojo de `despacho1b`: aceptado sobre `d69233c`, sin integrar (2026-11-07 PM)
 
 `283 passed`, chequeo-6 `+0/−0` sin avisos; la causa la medí aparte (una
@@ -77,36 +95,17 @@ Acta: `REPRODUCCION-DESPACHO1B-ROJO-2026-11-07.md`. **D106: (a), decidido
 por la PM**, queda como riesgo. Tu orden no cambia: la devolución de ABUSO-2
 primero, después ENTORNO-2. Próxima D: D107.
 
-## ABUSO-2: devolución sólo de pruebas, sobre `8ad47ee` (2026-11-07 PM)
+## ABUSO-2: aceptada sobre `1f79a8e`, sin integrar (2026-11-07 PM)
 
-Reproducido igual al informe: chequeo-6 (`+35/−24`, avisos 0), `83 passed`,
-`abuso2.sh` 9 en rojo con `fallas: 0`. **El producto queda como está.** Acta:
-`REPRODUCCION-ABUSO-2-2026-11-07.md`.
+Producto `8ad47ee`, pruebas `22a2c4b`, `b6ad266` y `1f79a8e`. Reproducido
+igual al informe: chequeo-6 (`+0/−0` de producto, avisos 0), `90 passed` y
+`abuso2.sh` 20 ROJO (también el de Postgres), `fallas: 0`. Mi ejemplo distinto (`descontar` resta `n − 1`)
+cae en 7 casos. Acta: `REPRODUCCION-ABUSO-2-2026-11-07.md`.
 
-**Causa:** las pruebas de `descontar` miran sólo que la cuenta que entra
-recupere su lugar, no que el perdón sea exactamente lo propio, una vez y en
-la misma ventana. Reproducido por mí, con `83 passed` cada uno:
+Riesgo, no devolución: un `delete` de lo propio por prefijo pasa en verde
+(hoy no hay camino; una clave ajena que empiece igual lo cerraría si algún
+día tocás ese caso). Siguen los riesgos de D105 y de Opus.
 
-1. Sacar el `where clave == clave` del `update`: el login correcto resta de
-   todas las filas (otras IPs, `recuperar:*`, `registro:*`).
-2. Leer la fila propia con `select` en vez de borrarla: cada login correcto
-   repetido vuelve a restar.
-
-La familia (Sonnet alto, también en verde): la cuenta que olvida a las 48 h,
-lo vencido sin purgar antes de restar, la IP con otra ventana que la cuenta.
-Pedido: un caso por causa donde la familia va como datos. Un login correcto
-no cambia ninguna otra clave; dos logins correctos seguidos perdonan una sola
-vez; lo propio vencido no se resta; la cuenta y la IP olvidan juntas. Commits
-sólo de pruebas y sabotajes; el informe muestra cada mutación en rojo.
-
-- **D105: (a), decidido por la PM.** Queda como riesgo: un mail menos por
-  hora para quien pidió, y (b) reabre el salto por muchas IPs.
-- Riesgos que quedan (Opus alto): con cuentas duplicadas por mayúsculas del
-  email, recuperar manda 3 mails por cuenta; el tope de recuperar es de
-  ventana fija (de antes).
-
-Tu orden: **esta devolución** → ENTORNO-2 → D100 →
-ENTRADAS-2 → el resto.
 
 ## ENTRADAS-1: aceptada sobre `c839197`, sin integrar (2026-11-07 PM)
 
