@@ -7372,9 +7372,10 @@ _TEXTOS_DEL_CLIENTE = ("nombre", "email", "telefono", "cuit", "direccion", "nota
 
 def _textos_de_arriba_guardables(cuerpo):
     # Un null queda vacío: el alta y la edición lo pasan por str(), que lo volvería «None».
+    # El nombre no puede quedar vacío, así que un null ahí es un dato que no es texto.
     limpio = {}
     for clave, valor in cuerpo.items():
-        if clave in _TEXTOS_DEL_CLIENTE and valor is None:
+        if clave in _TEXTOS_DEL_CLIENTE and clave != "nombre" and valor is None:
             valor = ""
         elif clave in _TEXTOS_DEL_CLIENTE and not isinstance(valor, str):
             raise HTTPException(status_code=400, detail=f"{clave} tiene que ser texto.")
