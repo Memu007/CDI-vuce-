@@ -339,36 +339,52 @@ SUFIJO_MAXIMO = 120  # el mismo tope que valida /generate_maria
 # cantidades (peso, %, capacidad, cantidad…) y los que empiezan con A son
 # texto (marca, modelo, código); el archivo aceptado de 2026 los trae enteros.
 PIDE_NUMERO = ("Z",)
-# Un número al que sacarle un signo, una barra o un separador lo cambia de
-# valor (revisión de SUFIJOS-2): «-5» saldría «5», «1/2» saldría «1 2»,
-# «1.500» saldría «1,500». No se adivina: se dice dónde y no se genera.
-_SIGNO_JUNTO_A_NUMERO = re.compile(r"[0-9][.,/+\-]|[.,/+\-][0-9]")
-_SIGNO_DE_UN_NUMERO = re.compile(r"(?<![A-Za-z0-9])[-+.,]+[0-9]")
-_UN_NUMERO = re.compile(r"(?<![A-Za-z0-9])[0-9]+(?:[.,/\-][0-9]+)+")
+# Una palabra con números cuyo separador el MARIA no acepta (sale espacio) se
+# lee igual sólo si es una fecha, números con guion o un código con letras
+# en el que, después de un dígito, sólo hay guion, punto o «°».
+_PALABRA = re.compile(r"[A-Za-z0-9]+(?:[^A-Za-z0-9\s][A-Za-z0-9]+)*")
+_SE_LEE_IGUAL = re.compile(
+    r"[0-9]{1,2}([./-])[0-9]{1,2}\1[0-9]{2,4}"
+    r"|[0-9]+(?:-[0-9]+)+"
+    r"|(?=.*[A-Za-z])(?!.*[0-9][Ee][^A-Za-z0-9][0-9])(?!.*[0-9][^A-Za-z0-9.°-]).+")
 
 
-def _junto_a_un_digito_que_no_es_ascii(valor: str) -> bool:
-    """«1½» o «1.5²»: un dígito que no es ASCII pegado a un número."""
-    return any(not ("0" <= c <= "9") and c.isnumeric() and any(
-        v in "0123456789" for v in valor[max(i - 1, 0):i] + valor[i + 1:i + 2])
-        for i, c in enumerate(valor))
+def _alrededor(texto: str, i: int) -> str:
+    return texto[max(i - 8, 0):i + 9].strip()
 
 
-def _numero_que_cambiaria(valor: str, pide_numero: bool) -> str:
-    """El pedazo de `valor` que, limpio, sería otro número; '' si no hay."""
-    if _junto_a_un_digito_que_no_es_ascii(valor):
-        return valor
-    if pide_numero:
-        signo = _SIGNO_JUNTO_A_NUMERO.search(valor)
-        return signo[0] if signo else ""
-    signo = _SIGNO_DE_UN_NUMERO.search(valor)
-    if signo:
-        return signo[0]
-    for numero in _UN_NUMERO.finditer(valor):
-        separadores = re.findall(r"[.,/]", numero[0])
-        if "/" in separadores or len(separadores) > 1 or (
-                separadores == ["."] and sufijos_arca.miles_o_decimales(numero[0])):
-            return numero[0]
+def _signo_de_un_numero(t: str, i: int) -> bool:
+    """`t[i]`, fuera de una palabra, sale espacio: ¿era parte de un número?"""
+    antes, despues = t[:i].rstrip(), t[i + 1:].lstrip()
+    digito_antes, digito_despues = antes[-1:].isdigit(), despues[:1].isdigit()
+    if digito_antes and digito_despues:                 # «1 / 2»
+        return True
+    if t[i + 1:i + 2].isdigit():                        # «-5», «.5»
+        return True
+    if digito_antes:                                    # «10%», pero no «5, AZUL»
+        return not (t[i] in ",.;:-" and t[i + 1:i + 2] in ("", " "))
+    signo = t[i] in "+-" or unicodedata.category(t[i]) in ("Pd", "Sm")
+    return signo and digito_despues and not antes[-1:].isalnum()   # «- 5»
+
+
+def _numero_que_cambiaria(valor: str) -> str:
+    """El pedazo de `valor` que, limpio para el MARIA, se leería como otro
+    número; '' si no hay."""
+    for i, c in enumerate(valor):
+        if c.isnumeric() and not "0" <= c <= "9":
+            # Sólo el ² o el ³ de una unidad (M²) es otra forma del mismo valor.
+            de_unidad = i > 0 and valor[i - 1].isascii() and valor[i - 1].isalpha()
+            if c.isdecimal() or not de_unidad or valor[i + 1:i + 2].isnumeric():
+                return _alrededor(valor, i)
+    t, limpio = sufijos_arca.sin_tildes(valor), sufijos_arca.caracteres_del_maria(valor)
+    palabra = {i: p for p in _PALABRA.finditer(t) for i in range(p.start(), p.end())}
+    for i, (antes, despues) in enumerate(zip(t, limpio)):
+        if antes == despues or despues != " ":
+            continue
+        p = palabra.get(i)
+        if antes.isnumeric() or (p is None and _signo_de_un_numero(t, i)) or (
+                p and not _SE_LEE_IGUAL.fullmatch(p[0])):
+            return p[0] if p else _alrededor(t, i)
     return ""
 
 
@@ -396,28 +412,27 @@ def limpiar_sufijo(sufijo: str, donde: str = "") -> tuple[str, bool]:
         if numero is not None:
             partes.append(codigo + numero)
         else:
-            pide_numero = codigo.upper().startswith(PIDE_NUMERO)
-            cambiaria = _numero_que_cambiaria(valor, pide_numero)
-            valor = sufijos_arca.caracteres_del_maria(valor)
-            if not valor.strip():
+            limpio = sufijos_arca.caracteres_del_maria(valor)
+            if not limpio.strip():
                 raise ValueError(
                     f"Sufijo de valor{donde}: «{uno[0][:40]}» está vacío. Escribí el valor o "
                     f"sacá el código. Así no se genera el TXT."
                 )
-            if pide_numero and ("," in valor or cambiaria):
+            if codigo.upper().startswith(PIDE_NUMERO) and not re.fullmatch(r"[0-9]+", valor):
                 raise ValueError(
                     f"Sufijo de valor{donde}: «{uno[0][:40]}» pide un número sin decimales y no "
-                    f"se redondea solo. Escribilo entero, sin punto, coma, signo ni barra. Así "
-                    f"no se genera el TXT."
+                    f"se redondea solo. Escribilo sólo con dígitos, sin punto, coma, signo, "
+                    f"espacio ni barra. Así no se genera el TXT."
                 )
+            cambiaria = _numero_que_cambiaria(valor)
             if cambiaria:
                 raise ValueError(
                     f"Sufijo de valor{donde}: en «{uno[0][:40]}», «{cambiaria[:20]}» cambiaría de "
                     f"valor sin el signo, la barra o el punto, que el MARIA no acepta. Escribí "
-                    f"los decimales con coma y los miles sin separador (1500, no 1.500). Así "
-                    f"no se genera el TXT."
+                    f"los decimales con coma, los miles sin separador (1500, no 1.500) y las "
+                    f"fechas como 31/12/2026. Así no se genera el TXT."
                 )
-            partes.append(f"{codigo}({valor})")
+            partes.append(f"{codigo}({limpio})")
         pos = _ENTRE_SUFIJOS.match(sufijo, uno.end()).end()
     final = "-" if partes and _ENTRE_SUFIJOS.fullmatch(sufijo[-1]) else ""
     limpio = "-".join(partes) + final

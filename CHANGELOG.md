@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: un sufijo frena cuando el número que va al TXT no es el que se escribió (SUFIJOS-2, segunda revisión)
+
+- Se compara lo escrito con lo que sale al TXT: un menos o una raya, una fracción, un exponente, dígitos de ancho completo o de otra escritura, un `%` o un apóstrofo de miles que el MARIA cambiaría frenan con el aviso de siempre. Las fechas `31/12/2026`, `31.12.2026` y `31-12-2026` salen `31 12 2026` sin frenar.
+- Un sufijo que pide número (Z) acepta sólo dígitos: `ZA(10%)`, `ZA(1 500)` o dígitos de ancho completo frenan.
+
 ## 2026-11-08 · fix: un NUL en el cliente elegido al subir un Excel no da 500 (ENTRADAS-4)
 
 - El campo `cliente_id` de `/upload_excel_v2/` recibe el mismo trato que los demás textos que van a la base: un NUL o un carácter inválido se cambia por «�», no se encuentra el cliente y el Excel se lee sin su mapeo, en vez de dar 500 en Postgres.

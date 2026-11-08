@@ -195,11 +195,16 @@ def caracteres_del_maria(texto) -> str:
     decimales; lo demás, espacio. El MARIA rechazó guiones y puntos el 24/10
     y el despachante confirmó el 28/10 que un número puede llevar coma
     (SUFIJOS-2): «2.5» sale «2,5», no «2 5», que es otro número."""
-    sin_tildes = "".join(c for c in unicodedata.normalize("NFKD", str(texto or ""))
-                         if not unicodedata.combining(c))
     return _DECIMAL_O_SIGNO.sub(lambda m: (" " if not m[1] else f"{m[1]} {m[2]}"
                                           if miles_o_decimales(m[0]) else f"{m[1]},{m[2]}"),
-                                sin_tildes)
+                                sin_tildes(texto))
+
+
+def sin_tildes(texto) -> str:
+    """NFKD sin las marcas que se combinan: la base de caracteres_del_maria,
+    carácter por carácter del mismo largo que su salida."""
+    return "".join(c for c in unicodedata.normalize("NFKD", str(texto or ""))
+                   if not unicodedata.combining(c))
 
 
 def miles_o_decimales(numero: str) -> bool:
