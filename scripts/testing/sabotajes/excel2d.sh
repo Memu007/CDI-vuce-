@@ -104,7 +104,7 @@ sabotaje $F "las celdas combinadas vuelven a no contar como rangos" \
 sabotaje $F "los vínculos vuelven a no contar como rangos" \
   '            rangos += etiqueta in ("mergeCell", "hyperlink")' \
   '            rangos += etiqueta in ("mergeCell",)' \
-  "FAILED $T::test_un_formato_que_excel_no_guarda_se_rechaza[vínculos]"
+  "FAILED $T::test_un_formato_que_excel_no_guarda_se_rechaza[v\\xednculos]"  # pytest escapa la í del id
 
 # .xls
 sabotaje $F "los formatos de un .xls vuelven a no mirarse antes de abrir" \
