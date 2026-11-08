@@ -171,8 +171,11 @@ _SIN_FIRMA = {
     "firmado con clave vacía": {"url": "/api/payments/webhook", "clave": ""},
     "sólo los primeros caracteres": {"url": "/api/payments/webhook", "clave": SECRETO,
                                      "v1": lambda v: v[:8] + "".join("1" if c == "0" else "0" for c in v[8:])},
-    "el último carácter cambiado": {"url": "/api/payments/webhook", "clave": SECRETO,
-                                    "v1": lambda v: v[:-1] + ("1" if v[-1] == "0" else "0")},
+    **{f"el carácter {i} cambiado": {"url": "/api/payments/webhook", "clave": SECRETO,
+                                     "v1": lambda v, i=i: v[:i] + ("1" if v[i] == "0" else "0") + v[i + 1:]}
+       for i in range(64)},
+    "dos v1, la buena primero": {"url": "/api/payments/webhook", "clave": SECRETO, "v1": lambda v: f"{v},v1={v[::-1]}"},
+    "dos v1, la buena al final": {"url": "/api/payments/webhook", "clave": SECRETO, "v1": lambda v: f"{v[::-1]},v1={v}"},
     "firma más corta": {"url": "/api/payments/webhook", "clave": SECRETO, "v1": lambda v: v[:-1]},
     "firma más larga": {"url": "/api/payments/webhook", "clave": SECRETO, "v1": lambda v: v + "0"},
     "cuerpo que no es un objeto": {"url": "/api/payments/webhook", "content": '["{pid}"]', "firma": b"ts=1,v1=00"},

@@ -605,6 +605,12 @@ def _cancelada_con_la_suya_anotada(nombres, sid, org_id):
     _leer_org(org_id, billing_status="canceled", payment_provider=None)
 
 
+def _cancelada_con_una_propia_que_no_paga(nombres, sid, org_id):
+    from tests.test_cobro_mp1 import _leer_org
+    SUS[sid] = "pending"
+    _leer_org(org_id, billing_status="canceled", payment_provider=None)
+
+
 def _cancelada_por_la_duena(nombres, sid, org_id):
     from tests.test_cobro_mp1 import _leer_org
     SUS[sid] = "cancelled"
@@ -668,6 +674,8 @@ _QUIEN_TOCA = {
                   {"duena": 200, "abrio": 403, "miembro": 403}),
     "reactivar_con_la_suya": (_cancelada_con_la_suya_anotada, ("post", "/api/billing/reactivate"),
                               _volvio_a_la_prueba, {"duena": 200, "abrio": 200, "miembro": 403}),
+    "reactivar_con_una_propia_que_no_paga": (_cancelada_con_una_propia_que_no_paga, ("post", "/api/billing/reactivate"),
+                                             _volvio_a_la_prueba, {"abrio": 403}),
     "checkout_con_pausada": (_pausada_y_vencida, ("post", "/api/billing/checkout"), _abrio_otra,
                              {"duena": 409, "abrio": 200, "miembro": 409}),
     "sacar_con_pendiente": (_del_miembro("pending"), _SACAR_MIEMBRO, _salio_sin_suscripcion(1), _SACA),
@@ -748,7 +756,7 @@ def test_si_una_no_se_cancela_la_ya_cancelada_en_mp_no_queda_anotada(client):
     assert _leer(nombres["miembro"])["mp_preapproval_id"] is None
 
 
-@pytest.mark.parametrize("lectura, codigo", [("pending", 403), ("cancelled", 403), (_contesta_500, 503)])
+@pytest.mark.parametrize("lectura, codigo", [("pending", 403), (_contesta_500, 503)])
 def test_un_miembro_cuya_suscripcion_no_paga_no_cancela_el_plan_del_estudio(client, lectura, codigo):
     from tests.test_cobro_mp1 import _leer_org
     nombres, sid, org_id, _ = _org_con_suscripcion(client, "miembro")
@@ -765,6 +773,41 @@ def test_un_miembro_cuya_suscripcion_no_paga_no_cancela_el_plan_del_estudio(clie
     assert codigo != 403 or "que lo paga" in r.json()["detail"], r.text
     assert _leer_org(org_id)["billing_status"] == "active" and SUS["nueva-1"] == queda
     assert _leer(nombres["miembro"])["mp_preapproval_id"] == "nueva-1"
+
+
+# Quién reintenta y si otra suscripción del estudio paga.
+@pytest.mark.parametrize("quien, otra_paga, codigo", [("abrio", False, 200), ("duena", False, 200),
+                                                      ("abrio", True, 403)])
+def test_si_mp_cancelo_sin_confirmar_el_reintento_concilia(client, quien, otra_paga, codigo):
+    from tests.test_cobro_mp1 import _leer_org
+    nombres, sid, org_id, _ = _org_con_suscripcion(client, quien)
+
+    def _cancela_y_contesta_500(request):
+        s = _RUTA_SUS.fullmatch(str(request.url)).group(1)
+        if request.method == "PUT":
+            SUS[s] = "cancelled"
+            return httpx.Response(500, json={})
+        if FALLA.get("lecturas", 0) >= 1:
+            return httpx.Response(500, json={})
+        FALLA["lecturas"] = FALLA.get("lecturas", 0) + 1
+        return httpx.Response(200, json={"id": s, "status": SUS[s]})
+    FALLA["PUT"] = FALLA["GET"] = _cancela_y_contesta_500
+    r1 = client.post("/api/billing/cancel")
+    FALLA.clear()
+    assert r1.status_code == 503 and r1.json()["detail"] == _NO_SE_CONFIRMO_CANCELAR, r1.text
+    assert SUS[sid] == "cancelled" and _leer(nombres["abrio"])["mp_preapproval_id"] == sid
+    if otra_paga:
+        SUS["sus-otra"] = "authorized"
+        _set_user(nombres["miembro"], mp_preapproval_id="sus-otra")
+    r2 = client.post("/api/billing/cancel")
+    assert r2.status_code == codigo, r2.text
+    if codigo == 200:
+        assert _leer_org(org_id)["billing_status"] == "canceled"
+        assert _leer(nombres["abrio"])["mp_preapproval_id"] is None
+        assert client.get("/api/billing/me").json()["renueva"] is False
+    else:
+        assert _leer_org(org_id)["billing_status"] == "active" and SUS["sus-otra"] == "authorized"
+        assert _leer(nombres["abrio"])["mp_preapproval_id"] == sid
 
 
 class _NoContesta:
@@ -823,7 +866,13 @@ def test_con_mp_sin_contestar_se_contesta_503_dentro_del_tope(client, monkeypatc
     assert demora < 3, demora
     assert (_leer_org(org_id), {k: _leer(u) for k, u in nombres.items()}) == antes
     # Mercado Pago pudo haber cancelado igual: el aviso no afirma cómo quedó el plan.
-    assert pedido != _CANCELAR or r.json()["detail"] == _NO_SE_CONFIRMO_CANCELAR, r.text
+    from proyecto_maria.main import _NO_SE_CONFIRMA_SUSCRIPCION
+    esperado = {_CANCELAR: _NO_SE_CONFIRMO_CANCELAR,
+                _CHECKOUT: _NO_SE_CONFIRMA_SUSCRIPCION if traba in ("GET", "PUT")
+                else "Mercado Pago no contestó. Probá de nuevo en unos minutos.",
+                _SACAR_ABRIO: f"No se pudo confirmar en Mercado Pago la suscripción de {nombres['abrio']}; "
+                              "sigue en el estudio. Probá de nuevo en unos minutos."}[pedido]
+    assert r.json()["detail"] == esperado, r.text
 
 
 class _Lenta:
@@ -851,9 +900,10 @@ class _Lenta:
 # plazo propio en esa fase la deja terminar (cambia algo, contesta otra cosa o tarda).
 @pytest.mark.parametrize("pedido, quien, fase", [
     (_CANCELAR, "duena", 2), (_CANCELAR, "duena", 3), (_REACTIVAR, "duena", 2),
-    (_CHECKOUT, "abrio", 2), (_CHECKOUT, "abrio", 3), (_CHECKOUT, "abrio", 4), (_SACAR_ABRIO, "duena", 2),
+    (_CHECKOUT, "abrio", 2), (_CHECKOUT, "abrio", 3), (_CHECKOUT, "abrio", 4), (_CHECKOUT, "duena", 2),
+    (_SACAR_ABRIO, "duena", 2),
 ], ids=["cancelar_lee", "cancelar_cancela", "reactivar_lee", "checkout_relee", "checkout_cancela",
-        "checkout_crea", "sacar_cancela"])
+        "checkout_crea", "checkout_lee_dos", "sacar_cancela"])
 def test_el_tope_es_uno_para_todos_los_pedidos_a_mp(client, monkeypatch, pedido, quien, fase):
     import proyecto_maria.main as main_mod
     from tests.test_cobro_mp1 import _leer_org
