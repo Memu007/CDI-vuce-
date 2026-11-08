@@ -479,3 +479,7 @@ ENTORNO-3 aceptada sobre `fd545c1`, sin integrar. Decididas por la PM: D111 (a),
 ### 2026-11-08 05:35 UTC (PM principal)
 
 COBRO-MP-2+3 vuelta 2 (`71e15df`): devolución. Camino real: quien abrió la suscripción queda trabada tras un 503 de cancelar en el que MP sí canceló (el permiso se decide con el estado de MP posterior). D112 de la Dev técnica registrada como D114: el reintento concilia para quien recibió el 503, dentro de esta pieza (no hace falta COBRO-MP-4). Más casos de firma (cada posición, dos `v1=`), textos de 503, plazo único con varias suscripciones y reactivar con sid que no paga. Numeración única de D: MARIA D115, técnica D116.
+
+### 2026-11-08 05:45 UTC (PM principal)
+
+AISLAMIENTO-2 y LIMPIEZA-1 aceptadas sobre `c86f3ff`, sin integrar. D116 (b), decidido por la PM dentro de «arreglos chicos de seguridad» de Emi: pieza PERMISOS-1 de la Dev técnica (el arranque da admin por email de `ADMIN_USERNAMES` y el email se cambia sin verificar). El registro con invitación sin comparar email ya es ORG-1. Próxima D libre: D117 (MARIA ya tiene D115 reservada).

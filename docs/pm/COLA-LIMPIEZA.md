@@ -109,3 +109,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   sacarlo.
 - La guarda «No podés removerte a vos mismo» al sacar un miembro no tiene caso
   que la frene si se borra.
+- Roles: normalizarlos al leerlos de la base (`/auth/me` los devuelve crudos;
+  el arranque parte un texto en letras).
+- `ci.yml`: el comentario de «Suite completa» cuenta historia; y `CLAUDE.md` §5
+  (la CI deselecciona) cambia cuando LIMPIEZA-1 llegue a `main`.

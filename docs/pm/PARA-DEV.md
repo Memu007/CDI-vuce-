@@ -42,8 +42,34 @@ Cada punto, con su rojo con el arreglo revertido o con la mutación.
 **A la cola de limpieza** (decidido por la PM): la guarda «No podés removerte
 a vos mismo» no tiene caso (R1).
 
-Esta devolución va primero. Después: AISLAMIENTO-2 / LIMPIEZA-1. **Próxima
-D libre: D116** (MARIA usa D115).
+Esta devolución va primero. Después: PERMISOS-1 (abajo).
+
+## AISLAMIENTO-2 y LIMPIEZA-1: aceptadas sobre `c86f3ff`, sin integrar (2026-11-08 PM)
+
+Evidencia: `docs/pm/REPRODUCCION-AISLAMIENTO-2-LIMPIEZA-1-2026-11-08.md`.
+Igual al informe: chequeo-6 (`+2/−3`, avisos 0), `50 passed`,
+`limpieza1.sh` 37, `aislamiento2.sh` 10 + 18 ROJO, todos con «sabotajes con
+falla: 0», y el ataque `Bloqueado: 47 · Fugas: 0 · Sin probar: 0`.
+
+- **D114:** contestada en la devolución de arriba (el reintento concilia,
+  dentro de COBRO-MP-2+3).
+- **D116: (b), decidido por la PM** (Emi: arreglos chicos de seguridad, sí).
+  Pieza **PERMISOS-1**, después de la devolución de COBRO: ningún usuario
+  llega a admin por un email que él mismo puso. Caso: cambia su email a uno
+  de `ADMIN_USERNAMES` sin cuenta, reinicio, sigue sin admin; la familia
+  como datos (mayúsculas, espacios, el email de una cuenta que se borró).
+  Revisión más fuerte (§3): sabotaje propio.
+- **El registro con invitación sin comparar el email:** ya es parte de ORG-1
+  (MARIA, «atadas al email»); no lo tocás.
+- **`.claude/skills/entregar/SKILL.md`:** saco «(cubre sólo clientes y
+  descargas)» (hecho en este commit).
+- **A la cola de limpieza:** normalizar `roles` al leerlos de la base
+  (`/auth/me` devuelve crudos); el arranque que parte un texto en letras; el
+  comentario nuevo de `ci.yml` cuenta historia; `CLAUDE.md` §5 dirá que la
+  CI ya no deselecciona cuando esto llegue a `main`.
+
+Tu orden: **la devolución de COBRO-MP-2+3** → PERMISOS-1 → BACKUP-1a →
+EXCEL-2c. Próxima D libre: D117.
 
 ## Veredicto de COBRO-CORTE-1, vuelta 4 (2026-11-06 PM): aceptada, sin integrar
 
