@@ -8,7 +8,7 @@ import uuid
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 
 from proyecto_maria import main
 from proyecto_maria.core.rate_limit import limiter
@@ -36,6 +36,18 @@ async def _fila(username):
         return (await s.execute(select(User).where(User.username == username))).scalars().first()
 
 
+def _ip(n):
+    # IP propia del rango de documentación: sus fallos de login no suman al bloqueo
+    # de la IP que comparten las demás pruebas.
+    return f"2001:db8::{n[3:7]}:{n[7:11]}"
+
+
+async def _borrar_intentos(ip):
+    async with AsyncSessionLocal() as s:
+        await s.execute(text("delete from limites_auth where clave like :fin"), {"fin": f"%:{ip}"})
+        await s.commit()
+
+
 async def _borrar(username):
     async with AsyncSessionLocal() as s:
         await s.execute(delete(Organization).where(Organization.owner_username == username))
@@ -56,6 +68,7 @@ def nombre(monkeypatch):
     yield n
     for variante in set(_formas(n).values()):
         _run(_borrar(variante))
+    _run(_borrar_intentos(_ip(n)))
 
 
 # (la que existe, la que se pide, si la que existe está en ADMIN_USERNAMES)
@@ -87,9 +100,10 @@ def test_un_nombre_que_existe_con_otras_mayusculas_no_se_registra(monkeypatch, n
         assert _run(_fila(pedido)) is None
 
 
-def _entrar(c, username, clave):
+def _entrar(c, username, clave, ip):
     c.cookies.clear()
-    return c.post("/auth/login", json={"username": username, "password": clave})
+    return c.post("/auth/login", headers={"X-Forwarded-For": ip},
+                  json={"username": username, "password": clave})
 
 
 # Las cuentas sembradas y la de la lista van como datos: el arranque y el login tienen que
@@ -107,7 +121,7 @@ def test_dos_cuentas_viejas_que_difieren_en_mayusculas_siguen_entrando(monkeypat
     c = TestClient(main.app)
     for username in claves:
         for clave in existen.values():
-            r = _entrar(c, username, clave)
+            r = _entrar(c, username, clave, _ip(nombre))
             if existen.get(username) != clave:
                 assert r.status_code == 401, (username, r.status_code)
                 continue
