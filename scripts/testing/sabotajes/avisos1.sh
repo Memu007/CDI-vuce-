@@ -77,10 +77,10 @@ sabotaje $G "sólo saltea lo que no es palabra" \
   "FAILED $T"'[\u3164EC01-True-/generate_maria]' \
   "FAILED tests/test_doc1_documentos.py::test_generador_directo_rechaza_ec[\u3164EC01]"
 sabotaje $G "no lleva el ancho completo a EC" \
-  'unicodedata.normalize("NFKC", str(tipo_destinacion or "")[:64])' 'str(tipo_destinacion or "")[:64]' \
+  'unicodedata.normalize("NFKC", str(tipo_destinacion or "").strip()[:64])' 'str(tipo_destinacion or "").strip()[:64]' \
   "FAILED $T"'[\uff25\uff2301-True-/generate_maria/avisos]'
 sabotaje $G "distingue mayúsculas" \
-  'str(tipo_destinacion or "")[:64]).upper()' 'str(tipo_destinacion or "")[:64])' \
+  'str(tipo_destinacion or "").strip()[:64]).upper()' 'str(tipo_destinacion or "").strip()[:64])' \
   "FAILED $T"'[ ec01 -True-/generate_maria]'
 sabotaje $G "exige algo delante" \
   "$P" 'return re.match(r"[^A-Z0-9]+EC", texto) is not None' \

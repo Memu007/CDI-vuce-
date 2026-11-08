@@ -60,12 +60,20 @@ def test_lo_que_no_es_un_codigo_da_400_y_no_genera(client, ruta, destinacion):
     assert r.json()["detail"].startswith(FORMA) and "IC04" in r.json()["detail"], r.text
 
 
+@pytest.mark.parametrize("destinacion", ["IC041", "IC0", "IC-4", "ＩＣ０４"])
+def test_el_generador_tampoco_escribe_lo_que_no_es_un_codigo(destinacion):
+    from tests.test_generar_maria_txt import _gen
+    with pytest.raises(ValueError, match=FORMA):
+        _gen("SINT-FORMA", [], tipo_destinacion=destinacion)
+
+
 # ------------------------------------------------- 2. la exportación
 
 
 @pytest.mark.parametrize("destinacion, status", [
     ("EC01", 200), (" ec01 ", 200), ("EC05", 200),
     ("IC04", 400), ("TRAN", 400), ("ZFI1", 400), ("", 400), ("0EC01", 400), ("EC011", 400), ("​EC01", 400),
+    pytest.param(" " * 70 + "EC01", 200, id="70blancos-EC01-200"),
 ])
 def test_la_exportacion_sólo_genera_con_una_ec(destinacion, status):
     r = TestClient(main.app).post("/generate_maria_export", json={**EXPORT, "tipo_destinacion": destinacion})
@@ -115,6 +123,8 @@ def test_el_seguro_borrado_de_vuelta_a_fob_dice_lo_que_paso(client):
 @pytest.mark.parametrize("copia", COPIAS)
 @pytest.mark.parametrize("lugar, valor", [
     ("documento", "​EC01"), ("documento", "ㅤec02"), ("operacion", "​EC01"), ("raiz", "﻿EC03"),
+    pytest.param("documento", " " * 70 + "EC01", id="documento-70blancos"),
+    pytest.param("operacion", "\xa0" * 70 + "EC01", id="operacion-70nbsp"),
 ])
 def test_el_lector_rechaza_la_exportacion_con_lo_invisible_adelante(monkeypatch, copia, lugar, valor):
     respuesta = _respuesta(dict(FACTURA, destinacion=valor) if lugar == "documento" else FACTURA)

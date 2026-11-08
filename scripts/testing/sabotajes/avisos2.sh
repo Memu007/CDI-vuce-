@@ -85,13 +85,20 @@ sabotaje $G "la exportación acepta una de importación" \
   'if es_exportacion(tipo_destinacion) != exportacion:' 'if es_exportacion(tipo_destinacion) and not exportacion:' \
   "FAILED $EXP[IC04-400]" "FAILED $EXP[TRAN-400]"
 sabotaje $G "normaliza el texto entero" \
-  'str(tipo_destinacion or "")[:64]' 'str(tipo_destinacion or "")' \
+  'str(tipo_destinacion or "").strip()[:64]' 'str(tipo_destinacion or "").strip()' \
   "FAILED $A::test_un_texto_enorme_no_se_normaliza_entero"
+sabotaje $G "corta antes de sacar los blancos" \
+  'str(tipo_destinacion or "").strip()[:64]' 'str(tipo_destinacion or "")[:64]' \
+  "FAILED $EXP[70blancos-EC01-200]" \
+  "FAILED tests/test_doc1_documentos.py::test_ec_directa_nunca_entra_a_importacion[70blancos-EC01-/generate_maria]" \
+  "FAILED $A::test_el_lector_rechaza_la_exportacion_con_lo_invisible_adelante[documento-70blancos-"
 sabotaje $G "el generador corta en vez de rechazar" \
   '    tipo_destinacion = destinacion_del_txt(tipo_destinacion)
-' '    tipo_destinacion = (str(tipo_destinacion or "").strip().upper() or "IC04")[:4]
+' '    if es_exportacion(tipo_destinacion):
+        raise ValueError(EXPORTACION_EN_IMPORTACION)
+    tipo_destinacion = (str(tipo_destinacion or "").strip().upper() or "IC04")[:4]
 ' \
-  "FAILED tests/test_doc1_documentos.py::test_generador_directo_rechaza_ec[EC02]"
+  "FAILED $A::test_el_generador_tampoco_escribe_lo_que_no_es_un_codigo[IC041]"
 sabotaje $M "la exportación no mira la destinación" \
   '    request.tipo_destinacion = _destinacion_o_400(request.tipo_destinacion, exportacion=True)
 ' '' \
