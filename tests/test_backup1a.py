@@ -321,8 +321,7 @@ def _envoltorio(tmp_path: Path) -> Path:
             "fi\n"
             f'if [ "{nombre}" = pg_restore ] && [ -n "${{B1A_RESTORE:-}}" ]; then\n'
             '  [ "$B1A_RESTORE" = falla ] && exit 1\n'
-            f'  "{PG_BIN}/pg_restore" "$@" || exit 1\n'
-            f'  echo $$ > "{tmp_path}/pid_pg_restore"\n'
+            f'  echo $$ > "{tmp_path}/pid.tmp" && mv "{tmp_path}/pid.tmp" "{tmp_path}/pid_pg_restore"\n'
             "  exec sleep 30\n"
             "fi\n"
             f'exec "{PG_BIN}/{nombre}" "$@"\n')
@@ -353,40 +352,51 @@ def test_copiar_sale_con_error_si_la_verificacion_falla(origen, tmp_path):
 def _vivo(pid: int) -> bool:
     try:
         os.kill(pid, 0)
-    except ProcessLookupError:
+        return Path(f"/proc/{pid}/stat").read_text().split(")")[-1].split()[0] != "Z"
+    except (ProcessLookupError, FileNotFoundError):
         return False
-    return Path(f"/proc/{pid}/stat").read_text().split(")")[-1].split()[0] != "Z"
+
+
+def _sin_restos(pid_restore: Path) -> None:
+    assert not _vivo(int(pid_restore.read_text())), "pg_restore quedó corriendo"
+    assert descartables() == []
 
 
 def test_un_corte_no_deja_la_base_ni_el_pg_restore(origen, tmp_path):
-    """Con la restauración ya hecha y pg_restore todavía corriendo: el plazo
-    vencido y un SIGTERM borran la base descartable y matan a pg_restore."""
+    """Con la base descartable creada y pg_restore colgado: el plazo vencido y un
+    SIGTERM la borran y matan a pg_restore; un SIGHUP ignorado (nohup) no corta."""
     archivo = tmp_path / "copia.dump"
     _copiar_ok(origen, archivo)
     pid_restore = tmp_path / "pid_pg_restore"
-    env = {"COPIA_PG_BIN": str(_envoltorio(tmp_path)), "B1A_RESTORE": "espera"}
+    env = {"COPIA_PG_BIN": str(_envoltorio(tmp_path)), "B1A_RESTORE": "colgado"}
 
     r = correr("verificar", str(archivo), COPIA_PLAZO_S="3", **env)
     assert r.returncode == 1 and "no terminó en 3 s" in r.stderr, r.stdout + r.stderr
-    assert not _vivo(int(pid_restore.read_text())), "pg_restore quedó corriendo"
-    assert descartables() == []
+    assert pid_restore.exists(), "el plazo venció antes de llegar a pg_restore"
+    _sin_restos(pid_restore)
 
     pid_restore.unlink()
     proc = subprocess.Popen([sys.executable, str(SCRIPT), "verificar", str(archivo)],
-                            env=_entorno(None, env), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    limite = time.monotonic() + 60
-    while not pid_restore.exists() and proc.poll() is None and time.monotonic() < limite:
-        time.sleep(0.1)
-    assert pid_restore.exists(), "pg_restore no llegó a restaurar"
-    proc.send_signal(signal.SIGTERM)
-    _, err = proc.communicate(timeout=30)
-    assert proc.returncode == 1 and "se cortó por una señal" in err, err
-    assert not _vivo(int(pid_restore.read_text())), "pg_restore quedó corriendo"
-    assert descartables() == []
+                            env=_entorno(None, env), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            preexec_fn=lambda: signal.signal(signal.SIGHUP, signal.SIG_IGN))
+    try:
+        limite = time.monotonic() + 60
+        while not pid_restore.exists() and proc.poll() is None and time.monotonic() < limite:
+            time.sleep(0.1)
+        assert pid_restore.exists(), "no llegó a pg_restore"
+        proc.send_signal(signal.SIGHUP)
+        proc.send_signal(signal.SIGTERM)
+        _, err = proc.communicate(timeout=30)
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+    assert proc.returncode == 1 and "se cortó por SIGTERM" in err, err
+    _sin_restos(pid_restore)
     assert not marca(archivo).exists()
 
 
-@pytest.mark.parametrize("plazo", ["0", "-5", "una hora"])
+@pytest.mark.parametrize("plazo", ["0", "-5", "una hora", "²"])
 def test_un_plazo_que_no_se_entiende_no_copia(origen, tmp_path, plazo):
     archivo = tmp_path / "copia.dump"
     r = correr("copiar", str(archivo), origen=origen, COPIA_PLAZO_S=plazo)

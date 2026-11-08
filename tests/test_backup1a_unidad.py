@@ -66,7 +66,8 @@ def test_fijar_no_pisa_un_archivo_que_aparecio(tmp_path):
 def _copia_verificada(carpeta):
     archivo = carpeta / "copia.dump"
     archivo.write_bytes(b"PGDMP" + secrets.token_bytes(64))
-    huella = {"formato": copia_base.FORMATO, "codificacion": "UTF8", "tablas": {}}
+    huella = {"formato": copia_base.FORMATO, "codificacion": "UTF8",
+              "tablas": {"public.x": {"filas": 3, "sha256": "0"}}}
     (carpeta / "copia.dump.huella.json").write_text(json.dumps(huella))
     suma = hashlib.sha256(archivo.read_bytes()).hexdigest()
     (carpeta / "copia.dump.sha256").write_text(f"{suma}  copia.dump\n")

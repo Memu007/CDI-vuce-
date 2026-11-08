@@ -119,9 +119,13 @@ echo "== un corte"
 sabotaje "sin plazo" "un_corte" "copia verificada" \
   reemplazar $C 'loop.call_later(int(plazo), cortar, f"no terminó en {plazo} s")' 'pass'
 sabotaje "un plazo que no se entiende corre igual" "plazo_que_no_se_entiende" "no terminó en 0 s|no terminó en -5 s" \
-  reemplazar $C 'if not plazo.isdigit() or int(plazo) == 0:' 'if not plazo.lstrip("-").isdigit():'
+  reemplazar $C 'if not re.fullmatch(r"[0-9]+", plazo) or int(plazo) == 0:' 'if not plazo.lstrip("-").isdigit():'
+sabotaje "un plazo con «²» rompe" "plazo_que_no_se_entiende" "ValueError: invalid literal for int()" \
+  reemplazar $C 'if not re.fullmatch(r"[0-9]+", plazo) or int(plazo) == 0:' 'if not plazo.isdigit() or int(plazo) == 0:'
 sabotaje "la señal mata sin limpiar" "un_corte" "(-15 == 1" \
-  reemplazar $C 'loop.add_signal_handler(senal, cortar, "se cortó por una señal antes de terminar")' 'pass'
+  reemplazar $C 'loop.add_signal_handler(senal, cortar, f"se cortó por {senal.name} antes de terminar")' 'pass'
+sabotaje "una señal ignorada corta igual" "un_corte" "se cortó por SIGHUP" \
+  reemplazar $C 'if signal.getsignal(senal) is not signal.SIG_IGN:' 'if True:'
 sabotaje "cortar no mata al hijo" "un_corte" "pg_restore quedó corriendo" \
   reemplazar $C '        if proc.returncode is None:
             proc.kill()
@@ -153,7 +157,7 @@ sabotaje "tapar no mira ?password=" "tapar_no_deja" "en_la_consulta|queda la cla
 echo "== enviar"
 sabotaje "los archivos los lee cualquiera" "lleva_la_copia_verificada" "copia.dump: 0o100644" \
   reemplazar $C 'os.umask(0o077)' 'pass'
-sabotaje "enviar sin huella" "sin_su_huella" "DID NOT RAISE" \
+sabotaje "enviar sin huella" "sin_su_huella" "copia.dump.huella.json" \
   reemplazar $C '    leer_huella(archivo)
     # La marca va última' '    # La marca va última'
 sabotaje "enviar sin marca la da por verificada" "cortada" "destino/copia.dump" \
