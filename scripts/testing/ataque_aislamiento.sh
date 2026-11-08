@@ -148,6 +148,7 @@ registrar() {
 paso "Registrando a ${JEFE} y reiniciando la app con él en ADMIN_USERNAMES"
 CK_J="$TMP/jefe.txt"
 registrar "$JEFE" "$CK_J" >/dev/null
+grep -q access_token "$CK_J" || { echo -e "${RED}❌ No se pudo crear a ${JEFE}.${NC}"; tail -20 "$TMP/app.log"; exit 1; }
 kill "$APP_PID"; wait "$APP_PID" 2>/dev/null
 levantar "$JEFE"
 echo -e "${GREEN}✅ App reiniciada${NC}"
