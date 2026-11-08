@@ -80,6 +80,15 @@
             err.motivo = lead;
             throw err;
         }
+        if (!res.ok) {
+            let cuerpo = null;
+            try { cuerpo = await res.clone().json(); } catch (_) {}
+            if (cuerpo && Array.isArray(cuerpo.detail)) {
+                cuerpo.detail = textoDeError(cuerpo.detail, 'Revisá los datos ingresados.');
+                return new Response(JSON.stringify(cuerpo), { status: res.status, statusText: res.statusText,
+                    headers: { 'Content-Type': 'application/json' } });
+            }
+        }
         return res;
     }
 

@@ -997,7 +997,7 @@
             });
             const out = await res.json().catch(() => ({}));
             if (!res.ok || !out.success || !out.cliente) {
-                const det = humanizeApiError(out.detail, 'No se pudo crear el cliente');
+                const det = textoDeError(out.detail, 'No se pudo crear el cliente');
                 CDI.toast && CDI.toast('No se pudo crear', det, 'error');
                 return;
             }
@@ -1062,7 +1062,7 @@
             });
             const out = await res.json().catch(() => ({}));
             if (!res.ok || !out.success || !out.cliente) {
-                const det = humanizeApiError(out.detail, 'No se pudo crear el cliente');
+                const det = textoDeError(out.detail, 'No se pudo crear el cliente');
                 CDI.toast && CDI.toast('No se pudo crear', det, 'error');
                 return;
             }
@@ -1143,17 +1143,6 @@
                 }
             },
         });
-    }
-
-    function humanizeApiError(detail, fallback) {
-        if (!detail) return fallback;
-        if (typeof detail === 'string') return detail;
-        if (Array.isArray(detail)) {
-            const msg = detail.map(d => (d && d.msg) || '').filter(Boolean).join('; ');
-            return msg || fallback;
-        }
-        if (detail.msg) return String(detail.msg);
-        try { return JSON.stringify(detail); } catch (_) { return fallback; }
     }
 
     CDI.registerScreen('review', {

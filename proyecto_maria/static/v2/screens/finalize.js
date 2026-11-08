@@ -1067,17 +1067,6 @@
         } catch (_) { return null; }
     }
 
-    function humanizeApiError(detail, fallback) {
-        if (!detail) return fallback;
-        if (typeof detail === 'string') return detail;
-        if (Array.isArray(detail)) {
-            const msg = detail.map(d => (d && d.msg) || '').filter(Boolean).join('; ');
-            return msg || fallback;
-        }
-        if (detail.msg) return String(detail.msg);
-        try { return JSON.stringify(detail); } catch (_) { return fallback; }
-    }
-
     async function orphanCreateSubmit() {
         const btn = document.getElementById('orphanCreateSaveBtn');
         const inpNom = document.getElementById('orphanCreateNombre');
@@ -1137,7 +1126,7 @@
             });
             const out = await res.json().catch(() => ({}));
             if (!res.ok || !out.success || !out.cliente) {
-                showOrphanCreateError(humanizeApiError(out.detail, 'No se pudo crear el cliente.'));
+                showOrphanCreateError(textoDeError(out.detail, 'No se pudo crear el cliente.'));
                 return;
             }
             CDI.clientesCache = [];

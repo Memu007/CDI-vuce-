@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: un dato mal cargado se explica en castellano en login, registro, reset y el panel (FRONT-422)
+
+- Cuando la API rechaza un dato (falta un campo, no es texto, es demasiado largo, la clave pasa de 72 bytes), la pantalla dice cuál y por qué, en vez de «[object Object]», un mensaje genérico o el texto en inglés.
+
 ## 2026-11-07 · fix: sin ENVIRONMENT o con un valor desconocido los controles de producción quedan puestos (ENTORNO-2)
 
 - Fuera de `development`, `test` o `testing`: el CSRF bloquea, las cookies van `Secure`, `/docs`, `/redoc` y `/openapi.json` dan 404, sin `DATABASE_URL` la app no arranca y el VUCE simulado no responde.
