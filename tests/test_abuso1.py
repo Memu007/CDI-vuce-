@@ -499,6 +499,23 @@ def test_reset_tres_por_hora_por_cuenta_aunque_cambie_la_ip(monkeypatch, reloj):
     assert (enviados, _links_de_reset(u)) == ([email] * 4, 4), "pasada la hora no volvió a mandar"
 
 
+def test_reset_una_ip_inventada_no_gasta_el_tope_de_la_cuenta(monkeypatch):
+    """Sin proxy que agregue su entrada, la IP la escribe el cliente: una IP
+    con forma de clave de cuenta no puede caer en el contador de esa cuenta."""
+    enviados = []
+    monkeypatch.setattr(main_mod, "send_email", lambda to, *a, **k: enviados.append(to) or True)
+    c = TestClient(app)
+    u = "ab3c_" + uuid.uuid4().hex[:8]
+    email = f"{u}@ejemplo.test"
+    assert c.post("/auth/register", headers=_xff(_ip()), json={
+        "username": u, "password": CLAVE, "email": email, "name": "Ab"}).status_code == 200
+    for prefijo in ("cuenta:", "-cuenta:", "", ":cuenta:"):
+        for _ in range(4):
+            c.post(RESET, json={"email": "nadie@ejemplo.test"}, headers=_xff(f"{prefijo}{u}"))
+    assert c.post(RESET, json={"email": email}, headers=_xff(_ip())).status_code == 200
+    assert enviados == [email], "una IP inventada gastó el tope de la cuenta"
+
+
 def test_c9_registros_simultaneos_no_pasan_el_tope():
     """Veinte registros a la vez desde una IP: pasan cinco, como en fila."""
     import httpx
