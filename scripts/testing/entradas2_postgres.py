@@ -148,11 +148,11 @@ try:
         libres = '{"descripcion": "A", "cantidad": 1}, {"descripcion": "B", "cantidad": 1}'
         r = pedir("POST", "/api/operations/manual", sesion,
                   f'{{"client_id": "{cliente(sesion)}", "items": [{tope}, {libres}]}}')
-        op_id = r.json()["operation_id"]
+        op_id = r.json().get("operation_id", "")
         ids = [fila[0] for fila in admin(
             f"select id from operation_items where operation_id = '{op_id}' and grupo_id is null", URL_BASE)]
         r = c.post(f"/api/operacion/{op_id}/agrupar", headers=sesion, json={"item_ids": ids})
-        chequear(r.status_code < 500 and len(ids) == 2,
+        chequear(r.status_code == 409 and len(ids) == 2,
                  f"agrupar con el grupo 2147483647 ocupado: {r.status_code} {r.text[:80]}")
 
         # 6. clave del alta de estudio
