@@ -866,7 +866,9 @@ def test_estilos_de_un_libro_real_con_muchos_formatos_siguen_pasando():
     """Revisión Opus: 40.000 formatos con su alineación y 10.000 fuentes
     (220.000 etiquetas, dentro de lo que deja Excel) se rechazaban."""
     from proyecto_maria.security.file_security import _contar_hojas_xlsx
-    assert _contar_hojas_xlsx(_con_estilos(_libro([ENCABEZADO]), "xf", 230_000))[0] == 1
+    # Las mismas 230 000 etiquetas, con no más formatos de celda de los que guarda Excel.
+    libro = _con_estilos(_con_estilos(_libro([ENCABEZADO]), "xf", 40_000), "font", 190_000)
+    assert _contar_hojas_xlsx(libro)[0] == 1
 
 
 def _con_hoja_de_grafico(contenido: bytes, tam: int) -> bytes:
