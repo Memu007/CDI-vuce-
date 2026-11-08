@@ -1384,14 +1384,10 @@ async def lifespan(app: FastAPI):
             await session.commit()
             print("✅ Usuarios demo verificados/creados")
 
-            # Bootstrap admin via ADMIN_USERNAMES (funciona en cualquier entorno)
-            admin_identifiers = _admin_usernames()
-            for identifier in admin_identifiers:
-                result = await session.execute(
-                    select(User).where(
-                        (User.username == identifier) | (User.email == identifier)
-                    )
-                )
+            # Bootstrap admin via ADMIN_USERNAMES (funciona en cualquier entorno).
+            # Sólo por username: el email lo cambia el usuario sin verificarlo.
+            for identifier in _admin_usernames():
+                result = await session.execute(select(User).where(User.username == identifier))
                 user = result.scalars().first()
                 if user and "admin" not in (user.roles or []):
                     new_roles = list(user.roles) if user.roles else []

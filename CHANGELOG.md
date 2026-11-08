@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-08 · fix: un email que puso el usuario ya no da admin (PERMISOS-1)
+
+- **fix(permisos):** al arrancar, `ADMIN_USERNAMES` da el rol de admin sólo por username. Antes también lo daba al usuario cuyo email coincidía, y el email cada uno lo cambia sin verificarlo.
+
 ## 2026-11-08 · fix: cancelar se puede reintentar si Mercado Pago canceló sin confirmarlo, y el aviso con la firma repetida da 401 (COBRO-MP-2, COBRO-MP-3)
 
 - **fix(cobro):** si Mercado Pago canceló la suscripción pero CDI no lo supo (503), quien la abrió puede volver a cancelar y CDI queda igual que Mercado Pago, mientras ninguna otra suscripción del estudio pague.
