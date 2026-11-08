@@ -3,10 +3,18 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Mientras reviso `ca84c5f`: empezá COBRO-MP-4 (2026-11-08 PM)
+## COBRO-MP-2+3 vuelta 3, PERMISOS-1 y BACKUP-1a: aceptadas sobre `ca84c5f`, sin integrar (2026-11-08 PM)
 
-`ca84c5f` está en reproducción; el veredicto llega arriba de este
-bloque. Si trae una devolución, esa va primero.
+Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-2-3-PERMISOS-1-BACKUP-1a-2026-11-08.md`.
+Igual al informe: chequeo-6 `+19/−15` sin avisos; `permisos1` 4, `cobro_mp3`
+22, `backup1a` 48 y `cobro_mp2` 87 ROJO, todos con falla 0. Corrí
+`cobro_mp2.sh` entero sobre `ca84c5f`, sin tu copia que salteaba 43.
+Adversarios Opus y Sonnet alto: nada grave nuevo. El 404 como cancelado ya
+está en COBRO-MP-4. Riesgos anotados: el backup no compara índices, FK,
+objetos grandes ni secuencias; `\n` en el username y los argumentos de
+`pg_dump` van a la cola.
+
+## Seguí con COBRO-MP-4 (2026-11-08 PM)
 
 - **D119 → (b), decidido por la PM** (seguridad de MP, Emi): pieza
   **COBRO-MP-4**. Cancelar anota la cuenta que recibió el 503; sólo esa
@@ -45,47 +53,6 @@ saltean sin rojo.
 
 **Orden:** sin cambios. COBRO-MP-4 (con D124) → PERMISOS-2. El veredicto de
 `ca84c5f` llega cuando terminen mis sabotajes. Próxima D libre: D125.
-
-## Veredicto de COBRO-MP-2+3, vuelta 2 (2026-11-08 PM): devolución
-
-Sobre `71e15df` (informe `335d287b`). Evidencia y el caso para copiar:
-`docs/pm/REPRODUCCION-COBRO-MP-2-3-v2-2026-11-08.md`. Se reproduce lo tuyo
-(`211 passed`, `cobro_mp3.sh` 18 ROJO). Lo de la vuelta anterior quedó
-arreglado. Vuelve por una cosa de producto y por pruebas que todavía no
-distinguen.
-
-**Producto, con camino de hoy.** Quien abrió la suscripción cancela; MP
-cancela pero la respuesta se pierde y la relectura falla → 503 «Probá de
-nuevo». Al reintentar, 403: ya no es «quien abrió la que paga», porque MP ya
-no la cobra. La org queda `active` con el sid anotado y `/billing/me` dice
-`renueva: True`. Sólo la dueña lo destraba. **Causa:** el permiso se decide
-con el estado de MP *después* del cambio que se quiere confirmar. Pido:
-quien tiene anotada la suscripción puede reintentar cancelar y CDI concilia
-(sin sid, el plan como en una cancelación confirmada). Lo mismo con
-cualquier dato de la familia: el reintento lo hace quien recibió el 503.
-Esto responde tu **D112**, que registro como **D114**: el reintento concilia
-para todos los que pudieron pedirla; no hace falta pieza aparte.
-
-**Pruebas, la misma causa que la vez pasada** (un cambio que rompe lo que la
-pieza protege deja verde). Cada fila es una mutación del adversario que hoy
-pasa:
-
-1. **Firma** (W1, W2, W7, W4): una firma con **un solo carácter cambiado en
-   cada posición** (las 64, como datos), y un encabezado con **dos `v1=`**.
-   Todas 401 sin consultar MP.
-2. **Textos de los 503** (X1, X2): fijar el texto de sacar miembro y el del
-   checkout cuando MP no contesta. Ninguno afirma un estado que no se
-   confirmó.
-3. **Plazo único** (T1): checkout con dos o más suscripciones anotadas, cada
-   lectura por debajo del tope y la suma por encima: 503 dentro del tope.
-4. **Quién toca** (A3): un miembro con sid propio que no paga no reactiva el
-   plan del estudio.
-
-Cada punto, con su rojo con el arreglo revertido o con la mutación.
-**A la cola de limpieza** (decidido por la PM): la guarda «No podés removerte
-a vos mismo» no tiene caso (R1).
-
-Esta devolución va primero. Después: PERMISOS-1 (abajo).
 
 ## AISLAMIENTO-2 y LIMPIEZA-1: aceptadas sobre `c86f3ff`, sin integrar (2026-11-08 PM)
 

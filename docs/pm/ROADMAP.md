@@ -132,9 +132,9 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 |---|---|---|
 | ✅ COBRO-MP-1 | Dev técnica | Aviso de pago verificado, aplicado una vez, con el monto controlado; las renovaciones extienden el período (C3, D8) |
 | ✅ COBRO-CORTE-1 | Dev técnica | Quien no paga no genera ni gasta Gemini; contar una vez por operación sin pasarse del tope (también con guardados a la vez); el aviso dice la razón real (C1, C5, C6; D4 b N = 10, D5 a, D6 a) |
-| 🔵 COBRO-MP-2 | Dev técnica | Cancelar también en Mercado Pago sin perder días pagados, una sola suscripción, reactivar pagando (C2, C4, C8, D9) |
+| ✅ COBRO-MP-2 | Dev técnica | Cancelar también en Mercado Pago sin perder días pagados, una sola suscripción, reactivar pagando (C2, C4, C8, D9) |
 | ✅ VALIDACION-1 | Dev técnica | Sí de Emi el 06/11: la validación de una carga nunca muestra ni guarda los totales, errores o avisos de otra (hoy se reusa 60 s sin mirar de qué carga es, `finalize.js:103-108`); «Generar» se habilita por los errores de la carga que se ve |
-| ⚪ COBRO-MP-3 | Dev técnica | Sumada por Emi el 04/11: las consultas a Mercado Pago no frenan el servidor (D8 a); el aviso de pago tiene límite de pedidos; un aviso sin firma verificable no cambia nada |
+| ✅ COBRO-MP-3 | Dev técnica | Sumada por Emi el 04/11: las consultas a Mercado Pago no frenan el servidor (D8 a); el aviso de pago tiene límite de pedidos; un aviso sin firma verificable no cambia nada |
 | ⏳ PRORRATEO-1 | Dev MARIA | El reparto ítem por ítem de ajustes, seguro y flete hasta el FOB casillero, con las sumas exactas al centavo (segunda etapa acordada el 24/10) |
 | ✅ ORG-1 | Dev MARIA | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
 | ⏳ LEGAL-1 | Dev MARIA | Términos y privacidad con el texto de Emi; aviso de que CDI es un asistente y el despachante revisa; cómo pedir el borrado de datos (X5) |
@@ -166,7 +166,7 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | 🔵 CONEXIONES-1 | Dev MARIA | Sumada por Emi el 28/10 (D37 de MARIA): medir si el cierre de la sesión de base cancelado deja conexiones tomadas, con Postgres 16; arreglar sólo si las deja |
 | ✅ AISLAMIENTO-2 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ LIMPIEZA-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
-| ⏳ PERMISOS-1 | Dev técnica | Sumada por la PM el 08/11 («arreglos chicos de seguridad», Emi; D116): ningún usuario llega a admin por un email que él puso |
+| ✅ PERMISOS-1 | Dev técnica | Sumada por la PM el 08/11 («arreglos chicos de seguridad», Emi; D116): ningún usuario llega a admin por un email que él puso |
 | ⏳ COBRO-MP-4 | Dev técnica | Sumada por la PM el 08/11 (D119 b, seguridad de MP, Emi): sólo quien recibió el 503 de cancelar, o la dueña, concilia el reintento |
 | ⏳ PERMISOS-2 | Dev técnica | Sumada por la PM el 08/11 (D120 b, «arreglos chicos de seguridad», Emi): sólo los roles guardados dan admin; el registro rechaza un nombre de `ADMIN_USERNAMES` |
 | 🔵 OBSERVABILIDAD-1 | Dev MARIA | La columna `api_logs.owner_username` que falta en producción, con migración probada en Postgres descartable |
@@ -176,7 +176,7 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | ✅ CSRF-2 | Dev técnica | Con el control CSRF prendido, la landing, la pantalla vieja y la recuperación de cuenta siguen andando, y `webhook` en la ruta no saltea el control (D56 b de CSRF-1; decidido por la PM el 05/11 con el sí de Emi del 04/11 a los arreglos chicos de seguridad) |
 | ✅ CSRF-3 | Dev técnica | Una sesión abierta sin la cookie `csrf_token` la recibe sola y puede seguir escribiendo sin volver a entrar (D59 a de CSRF-2; decidido por la PM el 05/11 con el sí de Emi del 04/11 a los arreglos chicos de seguridad) |
 | ✅ DATOS-1 | Dev MARIA | Borrar un cliente con presupuesto; `/health` honesto; sin detalles de error al público (D5, D2, D6 de `AUDITORIA-2026-10-06.md`) |
-| 🔵 BACKUP-1 | Dev técnica (pasada por la PM el 28/10) | Ver `AUDITORIA-2026-10-06.md`. BACKUP-1a: copia y restauración probada; el destino fuera de Railway y dónde se programa esperan a Emi |
+| 🔵 BACKUP-1 | Dev técnica (pasada por la PM el 28/10) | Ver `AUDITORIA-2026-10-06.md`. BACKUP-1a ✅ (08/11, `ca84c5f`): copia y restauración probada; el destino fuera de Railway y dónde se programa esperan a Emi |
 | ✅ DISCO-1 | Dev MARIA | El historial de NCM de cada estudio pasa del disco de Railway a la base (D4 de `AUDITORIA-2026-10-06.md`) |
 | ⚪ AUDITORIA-FINAL | PM | Ver `AUDITORIA-2026-10-06.md` |
 

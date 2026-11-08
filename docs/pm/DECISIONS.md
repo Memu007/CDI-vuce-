@@ -511,3 +511,7 @@ Decididas por la PM sobre el informe de `ca84c5f` (técnica): D119 (b) → pieza
 ### 2026-11-08 12:05 UTC (PM principal)
 
 EXCEL-2d aceptada sobre `84fd9f2`, sin integrar. D124 (a), decidida por la PM: la CI instala `xlwt` para las pruebas (sin `xlwt` los casos `.xls` se saltean sin rojo), en un commit aparte de la entrega de COBRO-MP-4. Próxima D libre: D125.
+
+### 2026-11-08 12:30 UTC (PM principal)
+
+COBRO-MP-2+3 (vuelta 3), PERMISOS-1 y BACKUP-1a aceptadas sobre `ca84c5f`, sin integrar. Cuatro guiones de sabotaje con falla 0; `cobro_mp2.sh` entero sobre `ca84c5f`. Riesgo para confiar la copia de producción: la verificación del backup no compara índices, FK, objetos grandes ni secuencias.
