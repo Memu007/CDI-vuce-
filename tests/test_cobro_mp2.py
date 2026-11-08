@@ -832,6 +832,26 @@ _REACTIVAR = ("post", "/api/billing/reactivate")
 _NO_SE_CONFIRMO_CANCELAR = "No se pudo confirmar la cancelación en Mercado Pago. Probá de nuevo en unos minutos."
 
 
+# La del miembro, la de quien abrió (None: no tiene) y qué pide el miembro.
+@pytest.mark.parametrize("suya, de_abrio, pedido", [
+    ("cancelled", "pending", _CANCELAR), ("cancelled", None, _REACTIVAR), ("pending", "cancelled", _CANCELAR),
+], ids=["cancela_la_pendiente_de_otro", "reactiva_con_la_suya_cancelada", "cancela_con_la_suya_pendiente"])
+def test_un_miembro_con_una_cancelada_no_toca_el_plan_del_estudio(client, suya, de_abrio, pedido):
+    from tests.test_cobro_mp1 import _leer_org
+    nombres, sid, org_id, _ = _org_con_suscripcion(client, "miembro")
+    estado_org = "canceled" if pedido is _REACTIVAR else "active"
+    _leer_org(org_id, billing_status=estado_org)
+    _set_user(nombres["abrio"], mp_preapproval_id=de_abrio and sid)
+    SUS[sid], SUS["vieja-m"] = de_abrio, suya
+    _set_user(nombres["miembro"], mp_preapproval_id="vieja-m")
+    r = getattr(client, pedido[0])(pedido[1])
+    assert r.status_code == 403, r.text
+    assert SUS[sid] == de_abrio and SUS["vieja-m"] == suya, dict(SUS)
+    assert _leer_org(org_id)["billing_status"] == estado_org
+    assert _leer(nombres["abrio"])["mp_preapproval_id"] == (de_abrio and sid)
+    assert _leer(nombres["miembro"])["mp_preapproval_id"] == "vieja-m"
+
+
 # Quién pide, qué, dónde se traba Mercado Pago (al leer, al cancelar o al crear) y
 # cómo está la suscripción de quien abrió.
 @pytest.mark.parametrize("quien, pedido, traba, estado", [

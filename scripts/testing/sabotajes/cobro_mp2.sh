@@ -310,11 +310,16 @@ sabotaje $M "el reintento no concilia" "$R[abrio-False-200]" \
   "    if miembro and not (paga[db_user] or reintento):" "    if miembro and not paga[db_user]:"
 sabotaje $M "cancelar no avisa que es un reintento" "$R[abrio-False-200]" \
   "no_se_pudo, plazo, cancelar=True)" "no_se_pudo, plazo)"
+TODAS='all(estado == "cancelled" for estado in estados.values())'
+C="FAILED $T::test_un_miembro_con_una_cancelada_no_toca_el_plan_del_estudio"
 sabotaje $M "el reintento concilia aunque otra suscripción pague" "$R[abrio-True-403]" \
-  "estados.get(db_user) == \"cancelled\" and not any(paga.values())" "estados.get(db_user) == \"cancelled\""
-sabotaje $M "reactivar acepta una suscripción propia ya cancelada" \
-  "FAILED $T::test_solo_la_duena_o_quien_abrio_la_que_paga_la_tocan[reactivar-abrio]" \
-  "    reintento = cancelar and estados" "    reintento = estados"
+  "$TODAS" 'any(estado == "cancelled" for estado in estados.values())'
+sabotaje $M "con la suya cancelada, un miembro cancela la pendiente de otro" "$C[cancela_la_pendiente_de_otro]" \
+  "$TODAS" 'estados.get(db_user) == "cancelled" and not any(paga.values())'
+sabotaje $M "con otra cancelada, un miembro cancela la suya pendiente" "$C[cancela_con_la_suya_pendiente]" \
+  "$TODAS" '"cancelled" in estados.values()'
+sabotaje $M "reactivar acepta una suscripción propia ya cancelada" "$C[reactiva_con_la_suya_cancelada]" \
+  "    reintento = cancelar and " "    reintento = "
 
 # --- Lo que dicen los 503: nada que Mercado Pago no confirmó
 sabotaje $M "si Mercado Pago no contesta, sacar dice que el miembro ya salió" \
