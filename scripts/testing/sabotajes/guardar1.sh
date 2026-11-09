@@ -94,8 +94,8 @@ sabotaje $M "el historial vuelve a ir sin savepoint por producto" \
   $'        if True:\n            entrada = await upsert(db, **campos)\n            await db.flush()' \
   "FAILED $T::test_un_producto_malo_no_se_lleva_el_historial_de_los_demas"
 sabotaje $M "el NUL vuelve a llegar a la base" \
-  '        data = _sin_nul(await request.json())' \
-  '        data = await request.json()' \
+  '        data = _sin_nul(data)' \
+  '        data = data' \
   "FAILED $T::test_un_grupo_fuera_de_rango_y_el_nul_en_otros_textos_no_impiden_guardar"
 sabotaje $M "un grupo fuera de rango vuelve a llegar a la base" \
   '    return numero if numero is not None and -2**31 <= numero < 2**31 else None' \
