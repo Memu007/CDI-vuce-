@@ -3378,8 +3378,6 @@ async def register(request: RegisterRequest, req: Request, background_tasks: Bac
     Si EMAIL_VERIFICATION_REQUIRED=false (default dev/beta):
     - is_verified=True de una, sin mandar email.
     """
-    import re
-
     # Límites por IP (ABUSO-1, C9): 5 registros por hora y 20 por día. Cuentan
     # también los rechazados, para que probar datos inválidos no salga gratis.
     if limiter.enabled:
