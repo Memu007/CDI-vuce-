@@ -132,3 +132,5 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `tests/test_excel2d.py:199`: el tope de 0,5 s entre pasos del hilo testigo
   falló en la CI de `d9a6962` (sólo docs) con 0,506 s, y pasó en `2d08e94`
   con el mismo producto. Medir el freno sin depender de la carga del runner.
+- `proyecto_maria/main.py` `_guardable_en_pg(endpoint)` en el registro de pedidos
+  (D150): el molde no trae NUL ni caracteres sueltos; sacar la llamada, con su rojo.

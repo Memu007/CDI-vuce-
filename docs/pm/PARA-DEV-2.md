@@ -3,51 +3,32 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## OBSERVABILIDAD-1: devolución sobre `694f183` (2026-11-08 23:20 PM)
+## OBSERVABILIDAD-1: aceptada sobre `279ef26`, sin integrar (2026-11-09 00:20 PM)
 
-Evidencia: `docs/pm/REPRODUCCION-OBSERVABILIDAD-1-2026-11-08.md`. Igual al
-informe: chequeo-6 +35/−15 sin avisos, casos 10 passed, arranque SQLite y PG
-`fallas 0`, sabotajes 24 ROJO, sin rojo 0. Mi negativo (volver al camino
-crudo sólo cuando no hay ruta) da rojo. Las cuatro cosas de la devolución
-anterior están bien.
+Evidencia: `docs/pm/REPRODUCCION-OBSERVABILIDAD-1-2026-11-08.md`, «Vuelta 2».
+Igual al informe: `entradas3_postgres.py` con PG `fallas: 0` (NUL y 300
+caracteres como `<sin ruta>`, molde recortado a 200, `error_message` con
+`�`); el arnés de `694f183` sobre el mismo producto da `fallas: 2`;
+`sabotajes/entradas3.sh 279ef265` con PG: BASE verde, 12 ROJO, `sabotajes con
+falla: 0`, salida 0. Mi negativo con otros ejemplos (`/api/clients%00`, dos
+NUL, ruta de 201 caracteres) da los tres como `<sin ruta>`, `fallas: 0`. La
+devolución está resuelta por la causa: el `grep` de `api_logs.endpoint` cubre
+pruebas, scripts y producto.
 
-**Devolución, por la causa: la pieza cambió qué se guarda en
-`api_logs.endpoint` y no actualizó el arnés que lo lee.**
-`scripts/testing/entradas3_postgres.py:60` busca la métrica por el camino
-crudo (`/api/nul-a…` y el de 300 caracteres). Con `694f183` da
-`FALLA | NUL en la ruta: 404; en api_logs: 0`, `FALLA | ruta de 300
-caracteres: 404; en api_logs: 0`, `fallas: 2`; con el `main.py` de `0231eee`,
-`fallas: 0`. Por eso `sabotajes/entradas3.sh` corta en «BASE | postgres_ ya
-está en rojo» y no mide nada: ENTRADAS-3 aceptada deja de reproducirse.
+- **D150: (b), decidida por la PM**, pero no como pieza del roadmap: sacar
+  `_guardable_en_pg` del `endpoint` (`main.py:1983`) va a `COLA-LIMPIEZA.md`,
+  con su rojo cuando se haga.
+- **D142** sigue con Emi; hasta entonces (c). **D131** y **D136** siguen.
+- **D139: (a)**: escapar el panel va después de ORG-1+D40.
+- Numeración: tus próximas D desde la D151.
 
-Pido:
-1. Todo lo que lee `api_logs.endpoint` (pruebas, scripts, sabotajes,
-   herramientas de PM y consultas del producto) revisado; el informe trae el
-   `grep` y qué hiciste con cada uno.
-2. `entradas3_postgres.py` sigue probando lo mismo: el pedido con NUL y el de
-   300 caracteres no rompen el registro en Postgres y quedan como
-   `<sin ruta>`. `sabotajes/entradas3.sh` con PG: base verde y sus ROJO.
-3. `_guardable_en_pg` sigue con un caso que lo distinga, si hoy no queda
-   ninguno (un molde de más de 200 caracteres, por ejemplo; sugerencia).
+**RESET-3** (`8fda3d2`), **SMOKE-1** (`00df4de`) y **OBSERVABILIDAD-1**
+(`279ef26`): aceptadas, sin integrar; las integra INTEGRAR-1 de la técnica.
 
-Del adversario, bajos, quedan como riesgo y no van en esta vuelta: un índice
-con ese nombre sobre otra columna se anuncia como creado; `error_message`
-puede traer los parámetros de una excepción de SQLAlchemy.
-
-- **Numeración:** tu D140 choca con la D140 de la técnica. **Tu D140 pasa a
-  ser D142.** Tus próximas D: desde la D150; la técnica usa hasta la D149.
-- **D139: (a), decidida por la PM.** Escapar el panel va como pieza chica
-  aparte, después de ORG-1+D40.
-- **D142 (filas viejas con camino crudo): va a Emi** (datos de producción). Hasta que decida,
-  (c): no se tocan.
-- **Supuestos:** los dos aceptados.
-- **D136** sigue.
-
-**RESET-3** (21:40, sobre `8fda3d2`) y **SMOKE-1** (21:55, sobre `00df4de`):
-aceptadas, sin integrar.
-
-**Tarea activa: la devolución de OBSERVABILIDAD-1.** Cola: OBSERVABILIDAD-1 →
-ORG-1+D40 → escapar el panel (D139) → D102. Corte: 2026-11-09 05:00 UTC.
+**Tarea activa: ORG-1+D40** (la devolución sobre `b358827`, más abajo en este
+archivo; traé mi rama con `merge` antes). Cola: ORG-1+D40 → escapar el panel
+(D139) → D102. Corte: 2026-11-09 05:00 UTC o cuando Emi avise el 95 % de uso:
+ahí terminás el paso en curso, commit, push, anotás dónde quedaste y frenás.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 

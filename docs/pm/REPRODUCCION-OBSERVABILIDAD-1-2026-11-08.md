@@ -34,3 +34,16 @@ Veredicto: **devolución** (el arnés de ENTRADAS-3 queda en rojo).
 - D139 (a), decidida por la PM: escapar el panel, pieza chica después de ORG-1+D40.
 - D140 de MARIA renumerada D142 (choca con la de la técnica): va a Emi; hasta
   entonces (c).
+
+## Vuelta 2: sobre `279ef26` (2026-11-09 00:20 UTC, PM)
+
+Worktree en `279ef265`, Postgres 16 local en el puerto 55462.
+
+| Qué | Informe | PM |
+|---|---|---|
+| `entradas3_postgres.py` con PG | 18 OK, `fallas: 0` | `OK \| NUL en la ruta: 404; como <sin ruta>: 1`, `OK \| ruta de 300 caracteres: 404; como <sin ruta>: 1`, molde y `error_message` OK, `fallas: 0` |
+| arnés de `694f183` sobre el producto de `279ef26` | — | `FALLA \| NUL en la ruta: 404; en api_logs: 0`, `FALLA \| ruta de 300 caracteres…`, `fallas: 2` (reproduce el rojo) |
+| `sabotajes/entradas3.sh 279ef265` con PG | BASE verde, 12 ROJO, falla 0 | `BASE \| en verde`, 12 `ROJO`, `sabotajes con falla: 0`, `salida 0` |
+| negativo PM: `/api/clients%00`, `/api/a%00%00b`, `/api/` + 196 `z` | — | los tres `404; como <sin ruta>: 1`, `fallas: 0` |
+
+Veredicto: aceptada. D150 (b) a `COLA-LIMPIEZA.md`.
