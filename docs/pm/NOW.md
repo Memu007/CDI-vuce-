@@ -212,6 +212,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-09 23:57 UTC: vuelta sin entregas ni D abiertas; contextos ~118k, allowed_warning. Técnica corre cobro_mp2 y despacho1b (~72 min). MARIA en CATALOGO-3: D156 verde con el arreglo y rojo en la base; sigue D84.
 2026-11-09 23:48 UTC: Emi: «Dps lo pregunto, seguí»: NL queda 434 hasta que Emi confirme (sigue en la lista de antes de publicar). Sin entregas: técnica ajusta sabotajes de INTEGRAR-1 (1c36ef2), MARIA en CATALOGO-3.
 2026-11-09 21:57 UTC: vuelta sin entregas. Técnica en INTEGRAR-1 vuelta 2: validacion1 rojo por 429 al registrar, lo verifica sobre los padres. MARIA en CATALOGO-3 (D156/D157 en f625159), escribe la prueba roja; próxima D158.
 2026-11-09 20:53 UTC: D157 (a) y D156 (a) a MARIA: varchar(3)→text no reescribe (PG 16.15, mismo filenode), sólo el lock. D102 ya estaba aceptada.
@@ -221,7 +222,6 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 2026-11-09 05:01 UTC: **CORTE de las 12 h.** Las tres rutinas, apagadas; las dos Devs avisadas (terminan el paso, push, anotan y frenan). Técnica en `28c4dd5`, MARIA en `cddf7de`. Para retomar: revisar INTEGRAR-1 y prender las rutinas.
 2026-11-09 04:28 UTC: **INTEGRAR-1 entregada** (`19036a2`, técnica): suite 1 rojo (D140), 56 sabotajes sin correr. Recibida, sin aceptar: la reviso después del corte. D140 (a) lo hace ella; D141 (a) y D143 (a), piezas para Emi.
 2026-11-09 02:45 UTC: **D102 aceptada** (`af924ea`, sin integrar): 5 passed con bcrypt 5 y rojo con 4.3.0. D153 (a) a la cola, D154 (a). MARIA sin pieza disponible: anota y frena hasta el corte.
-2026-11-09 02:20 UTC: **D139 aceptada** (`3fde8bb`, sin integrar): prueba en Chromium 0 fallas y 4 en la base, 6 ROJO. D152 (a) no. MARIA → D102 (bcrypt).
 2026-11-09 00:20 UTC: **OBSERVABILIDAD-1 aceptada** (`279ef26`, sin integrar): entradas3 con PG falla 0 y 12 ROJO, mi negativo verde, el arnés viejo rojo. D150 (b) a la cola de limpieza. MARIA → ORG-1+D40. Técnica en INTEGRAR-1 (`99855b4`).
 
 
