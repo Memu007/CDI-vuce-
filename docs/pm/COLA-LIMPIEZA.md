@@ -134,3 +134,5 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   con el mismo producto. Medir el freno sin depender de la carga del runner.
 - `proyecto_maria/main.py` `_guardable_en_pg(endpoint)` en el registro de pedidos
   (D150): el molde no trae NUL ni caracteres sueltos; sacar la llamada, con su rojo.
+- `proyecto_maria/main.py` `register` (219 líneas): partirla en validar la
+  invitación, crear la cuenta y usar las otras pendientes, sin partir la transacción.

@@ -213,6 +213,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-09 02:10 UTC: **ORG-1+D40 aceptada** (`bf9583b`, sin integrar): 35 ROJO falla 0 con PG, mi negativo rojo en la base. D151 (a). Sonnet: invitación de Y trabada si X cambia el email del perfil (a Emi, con R3). MARIA → D139.
 2026-11-09 00:20 UTC: **OBSERVABILIDAD-1 aceptada** (`279ef26`, sin integrar): entradas3 con PG falla 0 y 12 ROJO, mi negativo verde, el arnés viejo rojo. D150 (b) a la cola de limpieza. MARIA → ORG-1+D40. Técnica en INTEGRAR-1 (`99855b4`).
 2026-11-08 23:55 UTC: sin entregas. Técnica subió INTEGRAR-1 sin entregar (`99855b4`): 1 rojo (D140), sabotajes 35/96. MARIA cerrando la devolución de OBSERVABILIDAD-1 (`7fd0f5f`, suite corriendo). Contexto 120k y 131k de 200k.
 2026-11-08 23:35 UTC: **Emi: uso al 87 %, se puede llegar al 95 % y frenar.** La PM no ve el medidor: frena cuando Emi avise 95 % o a las 05:00, lo que llegue primero, con el procedimiento de corte. Mientras, sin adversarios Opus nuevos. OBSERVABILIDAD-1 con devolución (`3d7f296`); D142 a Emi.
@@ -225,7 +226,6 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 2026-11-08 17:40 UTC: EMAIL-1 (D45) de MARIA aceptada sobre `40423be`; D131 a Emi, D132 → RESET-3. MARIA → AVISOS-2.
 2026-11-08 15:50 UTC: **CORTE de las 24 h.** Las tres rutinas, apagadas. Técnica frenada en `65af1d3` (SEPARADORES-1b-ARNÉS aceptada, sin pieza nueva). MARIA frenada en `cf68314`: entregó EMAIL-1 sin cambio de producto, **sin revisar**; abiertas D131 y D132. Para retomar: revisar EMAIL-1 y prender las rutinas.
 2026-11-08 13:58 UTC: vuelta. Contexto OK (técnica 134k, MARIA 138k, PM 143k, todas 200k; límite `allowed_warning`). Sin entregas nuevas: técnica en PERMISOS-2 (suite corriendo, `a1db966`), MARIA en AVISOS-1. Corte 15:50 UTC.
-2026-11-08 13:40 UTC: **SEGURO-2 aceptada** (`d160738`, MARIA, sin integrar): 242 passed, 19+12 sabotajes en rojo, Sonnet en pantalla real sin TXT malo. D125 a, D126 a; dos textos a AVISOS-1. MARIA sigue AVISOS-1.
 
 2026-11-06 11:20 UTC: **COBRO-CORTE-1 aceptada** (`ca50916`, técnica, sin integrar por `e0b8626`): 98 passed, 88 sabotajes en rojo sin falla, suite `4284 passed` rc=0, chequeo-6 con sus 3 avisos explicados; Opus y Sonnet alto sin doble cobro. Cuatro bajas a la cola. Para Emi: la validación de 60 s cruza cargas (de antes), pieza nueva. Técnica entregó COBRO-MP-2 (`4f1822f`, D62): reviso con Opus y Sonnet alto.
 
