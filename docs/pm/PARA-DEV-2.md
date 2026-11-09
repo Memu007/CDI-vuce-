@@ -3,34 +3,29 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## ORG-1 + D40: aceptada sobre `bf9583b`, sin integrar (2026-11-09 02:10 PM)
+## D139 (a), escapar el panel: aceptada sobre `3fde8bb`, sin integrar (2026-11-09 02:20 PM)
 
-Evidencia: `docs/pm/REPRODUCCION-ORG-1-D40-2026-11-09.md`. Igual al informe:
-chequeo-6 +8/−3 con el aviso de `register` (explicado: queda, y partirla va a
-`COLA-LIMPIEZA.md`); `sabotajes/org1.sh bf9583b6` con PG: BASE verde en SQLite
-y Postgres, 35 ROJO, `sabotajes sin rojo: 0`, salida 0. Mi negativo, con otros
-ejemplos (pendiente invitada en mayúsculas cuya cuenta se crea en minúsculas;
-invitar al dueño de otro estudio en mayúsculas): verde sobre `bf9583b`, y el
-primero rojo con el `main.py` de `db9f11f`. Los seis puntos de la devolución,
-resueltos por la causa.
+Evidencia: `docs/pm/REPRODUCCION-D139-2026-11-09.md`. Igual al informe:
+chequeo-6 +22/−27 sin avisos; `pantalla_panel_dev.js` 7 OK y `fallas: 0`
+sobre `3fde8bb`, y `fallas: 4` (las mismas cuatro) con la plantilla de
+`827df3e`; `sabotajes/panel_dev.sh 3fde8bb`: BASE verde, 6 ROJO, `sabotajes
+sin rojo: 0`. Mío: la plantilla ya no tiene ningún `innerHTML`,
+`insertAdjacentHTML`, `outerHTML` ni `document.write`, y el arreglo resta
+(reusa `fila` de pagos rechazados). Bien.
 
-- **D151: (a)**, como dice D136: mi rama no la traés hasta que INTEGRAR-1
-  esté aceptada.
-- **Supuestos 1 y 2:** aceptados.
-- **R1 a R4:** quedan como riesgo. El adversario (Sonnet, alto) suma uno a R3
-  y R4, reproducido en SQLite: X tiene pendiente, se registra sin link (deja
-  de ocupar lugar), el dueño invita a Y, X cambia el email del perfil y entra
-  con el link viejo; Y queda con su invitación y el registro le dice «estudio
-  lleno», sin forma de revocarla. El tope no se supera. Va a Emi junto con
-  R3 (verificar el email del perfil) y revocar invitaciones; no lo arreglás acá.
-- Tus próximas D, desde la D152. D131 y D142 siguen con Emi.
+- El hallazgo del adversario sobre `title` y `href`: queda como riesgo,
+  como propusiste.
+- **D152** (traer mi rama antes de D102): **(a) no**, sigue D151. D102 es un
+  chore que no depende de mi rama.
+- ORG-1+D40 (`bf9583b`) aceptada; su evidencia y R1 a R4 están en
+  `REPRODUCCION-ORG-1-D40-2026-11-09.md` y van a Emi.
 
-RESET-3, SMOKE-1, OBSERVABILIDAD-1 (`279ef26`) y ORG-1+D40 (`bf9583b`):
-aceptadas, sin integrar; las integra INTEGRAR-1.
+RESET-3, SMOKE-1, OBSERVABILIDAD-1, ORG-1+D40 y D139 (`3fde8bb`): aceptadas,
+sin integrar; las integra INTEGRAR-1. Próxima D libre: D153.
 
-**Tarea activa: escapar el panel (D139 a)**, después D102. Corte: 2026-11-09
-05:00 UTC o cuando Emi avise el 95 %: terminás el paso en curso, commit, push,
-anotás dónde quedaste y frenás.
+**Tarea activa: D102 (a), fijar la versión de `bcrypt`** (chore, DECISIONS
+del 07/11, ENTRADAS-1). Corte: 2026-11-09 05:00 UTC o cuando Emi avise el
+95 %: terminás el paso en curso, commit, push, anotás dónde quedaste y frenás.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
