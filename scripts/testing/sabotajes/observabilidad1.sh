@@ -157,7 +157,8 @@ sabotaje pytest_o1 "la falla va al log sin el motivo" 1 \
   $'        logging.exception(\n            "[OBSERVABILIDAD-1]' $'        logging.error(\n            "[OBSERVABILIDAD-1]' \
   "FAILED $T::test_si_falla_no_levanta_y_deja_el_motivo_en_el_log" "el log tiene que traer el motivo"
 sabotaje arranque_pg "en Postgres espera el lock sin límite" 1 \
-  $'                await conn.exec_driver_sql("SET LOCAL lock_timeout = \'5s\'")' $'                pass' \
+  $'                # (y reintentar en el próximo arranque) que colgar el arranque.\n                await conn.exec_driver_sql("SET LOCAL lock_timeout = \'5s\'")' \
+  $'                # (y reintentar en el próximo arranque) que colgar el arranque.\n                pass' \
   "FALLA | la app arranca igual"
 
 git checkout -q -- proyecto_maria/
