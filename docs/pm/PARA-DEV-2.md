@@ -3,32 +3,32 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## AVISOS-2: aceptada sobre `4db641b`, sin integrar (2026-11-08 PM)
+## OBSERVABILIDAD-1: aceptada sobre `279ef26`, sin integrar (2026-11-09 00:20 PM)
 
-Evidencia: `docs/pm/REPRODUCCION-AVISOS-2-2026-11-08.md`. Igual al informe:
-chequeo-6 +29/−16 sin avisos, `avisos2.sh` 131 passed y 12 ROJO, falla 0;
-`avisos1.sh` falla 0. Bien encontrada y bien contada la regresión de los
-blancos. Sonnet alto no encontró otro camino. CONEXIONES-1 ya no es tuya.
+Evidencia: `docs/pm/REPRODUCCION-OBSERVABILIDAD-1-2026-11-08.md`, «Vuelta 2».
+Igual al informe: `entradas3_postgres.py` con PG `fallas: 0` (NUL y 300
+caracteres como `<sin ruta>`, molde recortado a 200, `error_message` con
+`�`); el arnés de `694f183` sobre el mismo producto da `fallas: 2`;
+`sabotajes/entradas3.sh 279ef265` con PG: BASE verde, 12 ROJO, `sabotajes con
+falla: 0`, salida 0. Mi negativo con otros ejemplos (`/api/clients%00`, dos
+NUL, ruta de 201 caracteres) da los tres como `<sin ruta>`, `fallas: 0`. La
+devolución está resuelta por la causa: el `grep` de `api_logs.endpoint` cubre
+pruebas, scripts y producto.
 
-- **D133: (a), decidido por la PM.** El lector pasa la destinación por la
-  misma regla y, si no es código, la deja vacía.
-- **D135: (a), decidido por la PM.** Al guardar el perfil, la misma regla:
-  400 si el default no es un código de importación.
-- **D136: ni (a) ni (b), decidido por la PM.** Yo no toco producto. La
-  integración la hace la técnica como pieza INTEGRAR-1: mi rama más la tuya
-  en `4db641b`, con las dos suites y los arneses, y cada choque de fondo
-  como D para mí. Vos no traés mi rama hasta que te avise que INTEGRAR-1
-  está aceptada; ahí la traés y resolvés sólo lo tuyo posterior.
+- **D150: (b), decidida por la PM**, pero no como pieza del roadmap: sacar
+  `_guardable_en_pg` del `endpoint` (`main.py:1983`) va a `COLA-LIMPIEZA.md`,
+  con su rojo cuando se haga.
+- **D142** sigue con Emi; hasta entonces (c). **D131** y **D136** siguen.
+- **D139: (a)**: escapar el panel va después de ORG-1+D40.
+- Numeración: tus próximas D desde la D151.
 
-**Tarea activa: AVISOS-2b** (arreglo de AVISOS-2, no cuenta aparte), antes de
-RESET-3:
+**RESET-3** (`8fda3d2`), **SMOKE-1** (`00df4de`) y **OBSERVABILIDAD-1**
+(`279ef26`): aceptadas, sin integrar; las integra INTEGRAR-1 de la técnica.
 
-1. D133 (a), con el caso `"\u200b"*65 + "EC01"` y la familia como datos.
-2. D135 (a), con `IC041`, `IC0` y `EC01` como datos.
-3. `IC_4` a los datos del caso de forma (mi negativo de arriba lo deja pasar).
-
-Cola: AVISOS-2b → RESET-3 → OBSERVABILIDAD-1 → ORG-1+D40 → D102. Próxima D
-tuya: D137. Corte: 2026-11-09 05:00 UTC.
+**Tarea activa: ORG-1+D40** (la devolución sobre `b358827`, más abajo en este
+archivo; traé mi rama con `merge` antes). Cola: ORG-1+D40 → escapar el panel
+(D139) → D102. Corte: 2026-11-09 05:00 UTC o cuando Emi avise el 95 % de uso:
+ahí terminás el paso en curso, commit, push, anotás dónde quedaste y frenás.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
@@ -491,37 +491,6 @@ sabotaje:
    no pide verificarlo (lo llevo a Emi como seguridad, no lo arreglás acá).
 
 SQLite y Postgres 16, CHANGELOG, commits separados y `/entregar`.
-
-## OBSERVABILIDAD-1: devolución, sobre `39be45e` (2026-10-28 18:40 UTC)
-
-Evidencia en `REPRODUCCION-OBSERVABILIDAD-1-2026-10-28.md`. La migración
-cumple lo pedido: sólo agrega, dos arranques no cambian nada y si falla la
-app arranca. **Causa de la devolución:** la pieza vuelve a grabar la
-métrica sin mirar qué graba, y eso no se puede publicar así.
-
-1. **Lo que graba la métrica, decidido por la PM (dentro de esta pieza).**
-   Reproducido por la PM: `MetricsMiddleware` guarda el camino crudo y
-   `/api/dev/stats` lo muestra; ahí quedan el token de invitación entero,
-   el hash de un presupuesto público, la preferencia de pago, el nombre de
-   archivo y el CUIT. Que guarde el molde de la ruta
-   (`/api/invitations/{token}`), y un pedido que no coincide con ninguna
-   ruta guarde `<sin ruta>`. Rojo antes del arreglo: cada ruta de la app
-   con parámetro en el camino guarda su molde, sacada de la lista de rutas
-   de la app y no de una lista a mano, más un camino que no existe. Un
-   sabotaje que vuelva al camino crudo y dé rojo.
-2. **El lock exclusivo dura sólo el `ALTER`.** Hoy el `ALTER` y el índice
-   van en la misma transacción, y el adversario midió unos 0,6 s por millón
-   de filas con la tabla trabada para leer y escribir. Separalos: columna en
-   una transacción y el índice en otra, cada una con su `lock_timeout`.
-3. **El log dice la verdad:** «agregada columna» y «agregado índice» se
-   imprimen después del commit de cada uno.
-4. **A riesgos, sin cambiar:** la espera de 5 s detrás de otra transacción
-   (frena a los que llegan detrás y reintenta en el próximo arranque); un
-   índice inválido o parcial que se da por bueno; un camino de más de 200
-   caracteres que pierde su métrica en Postgres.
-
-Postgres 16 y SQLite. Línea en `CHANGELOG.md`. Commits aparte y su propio
-`/entregar`.
 
 ## D41 y el orden de lo que queda (2026-10-28 17:20 UTC)
 

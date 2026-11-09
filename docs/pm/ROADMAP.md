@@ -111,7 +111,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | 8 | ✅ SEGURO-2 | Sumada por Emi el 04/11 (D30 b): lo que SEGURO-1 sólo avisa frena la generación hasta que se corrija, también el 1 % mandado sin calcular | respuesta del despachante del 28/10 |
 | 9 | ✅ AVISOS-1 | D123: los avisos rechazan una exportación igual que generar, aunque el código traiga un invisible o un espacio adelante | caso de la familia, sin dato externo |
 | 10 | ✅ AVISOS-2 | D130 (decidida por la PM): sólo destinaciones con forma de código entran al TXT (homoglifos y basura adelante frenan); un texto enorme no traba; el 400 del seguro borrado dice lo que pasó también en FOB; la exportación no acepta una destinación de importación | caso de la familia, sin dato externo |
-| 11 | ⏳ RESET-3 | D132 (decidida por la PM, «arreglos chicos de seguridad»): pedir el reset de contraseña tiene tope por cuenta, como recuperar usuario; cambiar de IP no llena el correo de una cuenta | rojo con IPs distintas, sabotaje propio |
+| 11 | ✅ RESET-3 | D132 (decidida por la PM, «arreglos chicos de seguridad»): pedir el reset de contraseña tiene tope por cuenta, como recuperar usuario; cambiar de IP no llena el correo de una cuenta | rojo con IPs distintas, sabotaje propio |
 
 **Dev técnica:**
 
@@ -173,7 +173,7 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | ✅ PERMISOS-2 | Dev técnica | Sumada por la PM el 08/11 (D120 b, «arreglos chicos de seguridad», Emi): sólo los roles guardados dan admin; el registro rechaza un nombre de `ADMIN_USERNAMES` |
 | ✅ PERMISOS-3 | Dev técnica | Sumada por la PM el 08/11 («arreglos chicos de seguridad», Emi): un nombre de usuario con `\n` final o con otras mayúsculas que uno de `ADMIN_USERNAMES` no se registra |
 | ✅ NOMBRES-1 | Dev técnica | Sí de Emi el 08/11 (D127 b): un nombre de usuario que ya existe con otras mayúsculas no se registra, para todas las cuentas; las cuentas que ya existen quedan como están |
-| 🔵 OBSERVABILIDAD-1 | Dev MARIA | La columna `api_logs.owner_username` que falta en producción, con migración probada en Postgres descartable |
+| ✅ OBSERVABILIDAD-1 | Dev MARIA | La columna `api_logs.owner_username` que falta en producción, con migración probada en Postgres descartable |
 | ✅ CATALOGO-LARGO-1 | Dev MARIA | Sumada por Emi el 04/11: una descripción larga (301 a 2000 caracteres) no se pierde en silencio en la memoria del cliente ni en el catálogo (`product_key` de 300); con migración probada en Postgres descartable si hace falta |
 | ✅ CATALOGO-LARGO-2 | Dev MARIA | Sí de Emi el 05/11 21:41: un origen de más de 5 caracteres o un proveedor de más de 200 no se pierden en silencio (hoy dan 200 sin guardar o 500), y una descripción que normaliza a vacío no contesta «guardado» |
 | ✅ CSRF-1 | Dev técnica | Sumada por Emi el 04/11: con el control CSRF prendido, la telemetría de la página llega y cerrar sesión pide el token (D16 b) |
