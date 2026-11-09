@@ -596,3 +596,11 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - **D155 (a)** en CATALOGO-3: origen válido = lo que reconoce
   `pais_reconocido` (nombre o código), guardado tal cual, en despacho,
   catálogo y extractor. Con (b) quedaban sin origen 143, 402, 403, 408 y 423.
+
+### 2026-11-09 20:55 UTC (Emi: «fijate online»; la PM busca)
+
+- En CATALOGO-3, Países Bajos lleva el código María **423**: así lo dicen
+  las tablas de AFIP (Códigos María, la guía de factura de exportación). El
+  434 viene del formulario F. 2672, que usa cuatro dígitos. Los sitios de
+  AFIP e infoleg no se abren desde la sesión: el dato sale del resumen del
+  buscador, sin haber abierto el documento.
