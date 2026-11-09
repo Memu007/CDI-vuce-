@@ -2,39 +2,40 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CATALOGO-3: en curso, falta decidir D155 (2026-11-09)
+## CATALOGO-3: en curso; D155 (a) recibida, con la corrección de las 20:45 (2026-11-09)
 
-Sigo con los puntos 1, 2, 3 y 5 mientras tanto. El punto 4 (D80) no se puede
-hacer sin romper una prueba ya aceptada, cualquiera sea el criterio:
+Busqué quién compara el origen por igualdad o supone tres letras, como pediste.
+Esto es lo que encontré:
 
-- `tests/test_catalogo_largo2.py:54-70` y `:118-119` piden que el catálogo y
-  la memoria guarden «TAIWAN», «JAPON» y «ALEMANIA» enteros (y que «TAIWAN»
-  dé 313, no el 310 de «TAI»).
-- `tests/test_despacho1b.py:460` y `:2171-2177` piden que el despacho rechace
-  «CHINA», «XYZ», «123», «ZZ», «ＢＲ» y «ÉS» con «usá el código de dos letras».
+| Lugar | Qué hace | Qué hago |
+|---|---|---|
+| `models.py:283`, `operation_items.origen` | `String(3)`: «TAIWAN» no entra en Postgres | D156 |
+| `main.py:3773` (operación manual) y `:8177` (ítems de la factura) | recortan a 3 (`[:3]`) | sacar el recorte (depende de D156) |
+| `pdf_extractor.py:573-575` | recorta a 3 letras | el criterio único (depende de D156 para llegar a la operación) |
+| `maria_generator.py:1418` y `main.py:8290` (agrupar) | comparan el texto: «CHINA» y «CN» darían «orígenes distintos» | comparar el código MARIA |
+| `main.py:9706` (`/api/ncm/calcular`) | recorta a 3 y pone «CN» si no viene | sólo lo anoto: no llega al TXT ni al catálogo |
+| `maria_generator.py:129` y `:134` | «NL» dos veces (423 y 434); es el único conflicto de la tabla, medido con `ast` sobre las 446 claves | la prueba de la familia lo marca pendiente, como pediste |
 
-Hoy hay tres criterios: el despacho (`despacho_lector.py:841`) sólo acepta dos
-letras reconocidas; el catálogo acepta nombres; el extractor
-(`pdf_extractor.py:573-575`) recorta a 3 letras («TAIWAN» → «TAI» → 310). El
-extractor ya tiene `_origen_desde_factura` (`pdf_extractor.py:2070`), que
-convierte nombre, ISO3 o dos letras a ISO2, y la usa en otros cinco lugares.
+Sigo con D76, D77, D78 y D84, que no dependen de esto.
 
 ### Decisiones
 
-- **D155 — qué es un origen válido (D80).** Opciones:
-  (a) todo lo que `pais_reconocido` reconoce, nombre o código, y se guarda tal
-  cual. Cambia `test_despacho1b`: el despacho pasa a aceptar «CHINA» y el
-  mensaje deja de decir «usá el código de dos letras»; siguen rechazados
-  «XYZ», «ZZ», «123», «ＢＲ» y «ÉS».
-  (b) sólo el ISO2: un nombre se convierte con `_origen_desde_factura` antes
-  de guardar. Cambia `test_catalogo_largo2`: guarda «TW» y no «TAIWAN». Los
-  cinco códigos MARIA sin ISO2 (143, 402, 403, 408, 423) no tienen dos letras
-  que los representen y quedan sin origen.
-  **Recomiendo (a):** no pierde información y no deja afuera esos cinco
-  países. En los dos casos: el extractor deja de recortar a 3 y usa el mismo
-  criterio, «XX» y vacío cuentan como «no vino», y el cambio en lo que sale en
-  el TXT lleva su prueba y la corrida del golden. Anoto sin arreglar: la tabla
-  da 434 para «NL» y «HOLANDA» pero 423 para «PAISES BAJOS».
+- **D156 — ancho de `operation_items.origen` (D155 a).** La columna es
+  `String(3)`. Con «se guarda tal cual», un ítem con origen «TAIWAN» no entra
+  en Postgres; por eso hoy se recorta y queda «TAI» → 310. Opciones:
+  (a) ensanchar la columna a `Text`, con su migración en el arranque (Postgres
+  descartable), y sacar los dos `[:3]`; (b) dejar la columna y, al entrar a la
+  operación, guardar el código MARIA de tres dígitos («TAIWAN» → «313»), que
+  `pais_reconocido` ya acepta. **Recomiendo (a):** es lo que dice D155 (a), y
+  (b) cambia lo que ve el usuario en la pantalla de la operación. El
+  `ALTER ... TYPE TEXT` en Postgres reescribe la tabla y la bloquea mientras
+  dura; con el tamaño de hoy son segundos.
+- **D157 — proveedor mixto, CJK y latín (D76).** «深圳某某有限公司 Co., Ltd»
+  da el slug `co_ltd`, igual que casi cualquier proveedor chino con el sufijo
+  en inglés: comparten catálogo. Opciones: (a) sumar al `vendor_id` el hash de
+  las letras no latinas que se sacaron, como en D77; (b) dejarlo. **Recomiendo
+  (a)**, y que se decida antes de que entregue: si entra después, los
+  `vendor_id` se migran dos veces.
 
 ## D102 (a), fijar la versión de `bcrypt`: **entregada** en `af924ea` (2026-11-09; el informe va en el commit siguiente), base `d39c1f6`
 
@@ -156,8 +157,11 @@ Nada asignado después de D102: espero tu próxima tarea.
 /compact conservar: Dev 2 (MARIA), sesión session_01C8gCBjvn36wnYC6qG2Sixi,
 rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (rama
 claude/practical-shannon-szpwkn), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP
-(/respondio). Pieza activa CATALOGO-3 (D76, D77, D78/D86, D80, D84); D155
-(criterio de origen) pendiente de la PM; sigo con 1, 2, 3 y 5. Después,
-PRESUPUESTO-CLIENTE-1. Próxima D libre: D156. D151 sigue: no traer la rama de
-la PM con merge hasta que INTEGRAR-1 esté aceptada. Nada se publica sin el
-«dale» de Emi para el SHA; nunca main; sin secretos.
+(/respondio). Pieza activa CATALOGO-3 (D76, D77, D78/D86, D80, D84). D155 (a)
+recibida, con la corrección de las 20:45 (prueba sobre la familia de la tabla,
+NL pendiente de Emi, buscar comparaciones por igualdad). D156 (ancho de
+operation_items.origen) y D157 (proveedor mixto) pendientes de la PM; sigo con
+D76, D77, D78 y D84. Después, PRESUPUESTO-CLIENTE-1. Próxima D libre: D158.
+D151 sigue: no traer la rama de la PM con merge hasta que INTEGRAR-1 esté
+aceptada. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin
+secretos.
