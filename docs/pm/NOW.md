@@ -223,7 +223,6 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 2026-11-09 02:20 UTC: **D139 aceptada** (`3fde8bb`, sin integrar): prueba en Chromium 0 fallas y 4 en la base, 6 ROJO. D152 (a) no. MARIA → D102 (bcrypt).
 2026-11-09 02:10 UTC: **ORG-1+D40 aceptada** (`bf9583b`, sin integrar): 35 ROJO falla 0 con PG, mi negativo rojo en la base. D151 (a). Sonnet: invitación de Y trabada si X cambia el email del perfil (a Emi, con R3). MARIA → D139.
 2026-11-09 00:20 UTC: **OBSERVABILIDAD-1 aceptada** (`279ef26`, sin integrar): entradas3 con PG falla 0 y 12 ROJO, mi negativo verde, el arnés viejo rojo. D150 (b) a la cola de limpieza. MARIA → ORG-1+D40. Técnica en INTEGRAR-1 (`99855b4`).
-2026-11-08 23:35 UTC: **Emi: uso al 87 %, se puede llegar al 95 % y frenar.** La PM no ve el medidor: frena cuando Emi avise 95 % o a las 05:00, lo que llegue primero, con el procedimiento de corte. Mientras, sin adversarios Opus nuevos. OBSERVABILIDAD-1 con devolución (`3d7f296`); D142 a Emi.
 
 
 
