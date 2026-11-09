@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Negativos del panel de dev: cada sabotaje vuelve a interpretar como HTML una
-# parte de la tabla de api_logs, o le saca el color o la insignia, y
+# parte de la tabla de api_logs, o le saca el color, el gris o la insignia, y
 # scripts/testing/pantalla_panel_dev.js tiene que fallar por ese motivo.
 #
 # uso: scripts/testing/sabotajes/panel_dev.sh [SHA]
@@ -10,8 +10,8 @@ set -uo pipefail
 REPO="$(git rev-parse --show-toplevel)"
 SHA="$(git -C "$REPO" rev-parse "${1:-HEAD}")"
 TMPD="$(mktemp -d)"; WT="$TMPD/wt"
-git -C "$REPO" worktree add --detach "$WT" "$SHA" >/dev/null || exit 2
 trap 'git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMPD"' EXIT
+git -C "$REPO" worktree add --detach "$WT" "$SHA" >/dev/null || exit 2
 cd "$WT" || exit 2
 FALLAS=0
 H=proyecto_maria/templates/dev_dashboard.html
@@ -50,12 +50,19 @@ sabotaje "las celdas interpretan el texto como HTML" \
   "td.textContent = texto == null ? '—' : String(texto);" \
   "td.innerHTML = texto == null ? '—' : String(texto);" \
   "elementos creados por el texto de api_logs"
+sabotaje "el texto se interpreta como HTML fuera de la tabla" \
+  "td.textContent = texto == null ? '—' : String(texto);" \
+  "document.createElement('div').innerHTML = String(texto); td.textContent = texto == null ? '—' : String(texto);" \
+  "imágenes pedidas por el texto de api_logs"
 sabotaje "la insignia interpreta el método como HTML" \
   "metodo.textContent = log.method;" "metodo.innerHTML = log.method;" \
   "elementos creados por el texto de api_logs"
 sabotaje "el estado pierde su color" \
   "tr.cells[3].className = log.status" "void tr.cells[3].className, log.status" \
   "color del estado"
+sabotaje "la hora y la IP pierden el gris" \
+  "tr.cells[0].className = tr.cells[5].className = 'text-muted';" "void 0;" \
+  "hora e IP en gris"
 sabotaje "el método pierde su insignia" \
   "tr.cells[1].replaceChildren(metodo);" "void metodo;" \
   "método en su insignia"
