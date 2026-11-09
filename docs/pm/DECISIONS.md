@@ -581,3 +581,12 @@ D143 (a) se proponen a Emi como piezas nuevas. D102 aceptada sobre `af924ea`
 vuelven los adversarios Opus; un rechazo real por límite sigue cortando.
 Publicar, roadmap y esfuerzo de las Devs, sin cambios. Rutina de MARIA
 apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
+
+### 2026-11-09 20:10 UTC (Emi)
+
+- Sí a **CATALOGO-3** (MARIA, ya; D76, D77, D78, D80 con D84-D86).
+- **D141 (a)**: sí, como pieza PRESUPUESTO-CLIENTE-1 (MARIA, tras CATALOGO-3).
+- **D143 (a)**: sí, como pieza BORRADOR-1 (técnica, tras INTEGRAR-1).
+- «Fusioná» quería decir **publicar**. Nada se publica sin «dale <SHA>»: la
+  PM le pasa el SHA cuando INTEGRAR-1 esté aceptada y lo previo a publicar
+  esté hecho (D64, FRONTEND_URL y ALLOWED_ORIGINS en Railway, riesgo de D102).

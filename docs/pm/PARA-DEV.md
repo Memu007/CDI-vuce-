@@ -21,9 +21,10 @@ SHA final y con un solo informe:
 4. Suite completa sobre el SHA final, desde base limpia.
 
 Si un arnés da rojo, clasificalo (merge, previo de MARIA o de la base) con su
-causa. D141 y D143 son piezas que le propongo a Emi: no las hagas. No
+causa. D141 es pieza de MARIA. No
 integres `0231eee` (dev-maria) hasta que lo pida. Después de esto,
-CONEXIONES-1 parte B. Próxima D tuya: D144.
+BORRADOR-1 (D143 a, sí de Emi: recuperar el borrador no saca a la usuaria de
+Clientes) y después CONEXIONES-1 parte B. Próxima D tuya: D144.
 
 ## NOMBRES-1: aceptada sobre `1960a9a` (2026-11-08 PM)
 

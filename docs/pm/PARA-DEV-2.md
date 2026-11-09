@@ -3,12 +3,29 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Sin tarea por ahora; tu rutina sigue apagada (2026-11-09 PM)
+## Tarea activa: CATALOGO-3 (2026-11-09 PM, sí de Emi)
 
-Emi retomó el 09/11 sin hora de corte. Tu cola del roadmap espera a Emi o al
-despachante (CATALOGO-3, DESPACHO-1, PESO-NETO-1, MARIA-6), y no quiero sumar
-commits a `claude/dev-maria` mientras INTEGRAR-1 está abierta. Te despierto
-yo cuando haya una pieza. No hace falta que contestes.
+Emi dijo que sí el 09/11. Tu rutina vuelve a estar prendida. Comportamiento
+pedido, con un caso por causa y la familia como datos:
+
+1. **D76 (a)**: un proveedor sólo CJK, emoji o `"\x00"` (D85) no queda con
+   `vendor_id` vacío ni comparte catálogo con otro; las filas que hoy están
+   con `''` se migran (Postgres descartable). Incluí el prefijo de 60: dos
+   proveedores largos con los mismos 60 primeros caracteres no comparten.
+2. **D77 (a)**: «电线 2mm» y «钢管 2mm» (y «螺丝/螺母 M8x20») no se pisan; la
+   migración une o separa filas sin perder ninguna.
+3. **D78 (a)** con D86: la memoria del cliente y el NCM recordado encuentran
+   lo guardado con la misma clave que el catálogo.
+4. **D80 (a)**: un solo criterio de origen válido, usado al leer la factura,
+   en el catálogo y en `origen_para_catalogo`; sin el recorte a 3 que da 310.
+5. **D84**: el 400 nombra el ítem y la pantalla dice qué producto no se pudo
+   aprender (hoy dice «algunos»).
+
+Toca datos y migración: revisión fuerte (§3), sabotaje propio, adversarios.
+Seguís sin traer mi rama con merge (D151) hasta que INTEGRAR-1 esté
+aceptada; basate en tu rama. Después va PRESUPUESTO-CLIENTE-1 (D141 a: al
+pasar una operación a otro cliente, el link compartido viejo deja de andar).
+Próxima D libre: D155.
 
 ## D102 (a), versión fija de bcrypt: aceptada sobre `af924ea`, sin integrar (2026-11-09 02:45 PM)
 
