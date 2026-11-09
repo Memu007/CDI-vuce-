@@ -12,7 +12,11 @@ Comprueba:
    invitación, dos registros con invitaciones distintas por el último lugar
    del estudio, y dos invitaciones enviadas a la vez por ese último lugar;
 5. un email, una cuenta (D40): no se invita un email que ya tiene cuenta, y
-   al registrarse se usan las otras invitaciones de ese email en el estudio.
+   al registrarse se usan las otras invitaciones de ese email en el estudio;
+6. las guardas: un miembro no invita, no se saca a alguien de otro estudio,
+   una vencida sigue vencida, con el estudio lleno un email con cuenta dice
+   que ya tiene cuenta, y una pendiente cuyo email ya tiene cuenta no ocupa
+   lugar.
 
 uso (con un Postgres local y descartable, nunca el de producción):
   python scripts/testing/org1_postgres.py postgresql://cdi@127.0.0.1:55432/<base>
@@ -368,6 +372,60 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
         r1, r2 = est.invitar(email()), est.invitar(email())
         chequear(ok_perfil and r1.status_code == 200 and r2.status_code == 400,
                  f"una pendiente al email de un miembro no ocupa lugar ({ok_perfil}, {r1.status_code}, {r2.status_code})")
+
+        # --- 6. guardas
+        def con_sesion(sesion):
+            c.cookies.clear()
+            for k, v in sesion.items():
+                c.cookies.set(k, v)
+
+        PREMIUM["users"] = TOPE_REAL
+        est, otro = Estudio(), Estudio()
+        a, b, ajeno = email(), email(), azar("o1u_")
+        registrar(a, est.token(a))
+        r = c.post("/api/organizations/invite", json={"email": b})
+        pend = sql("select count(*) from invitations where email=%s", b)[0][0]
+        chequear(r.status_code == 403 and pend == 0, f"un miembro no invita ({r.status_code} {detalle(r)}, {pend})")
+        c.cookies.clear()
+        c.post("/auth/register", json={"username": ajeno, "password": CLAVE, "email": b,
+                                       "invite_token": otro.token(b)})
+        con_sesion(est.sesion)
+        r = c.delete(f"/api/organizations/members/{ajeno}")
+        chequear(r.status_code == 404 and usuarios(b) == [(ajeno, otro.org_id)],
+                 f"no se saca a alguien de otro estudio ({r.status_code} {detalle(r)}, {usuarios(b)})")
+
+        a = email()
+        vencida, vigente = est.token(a), est.token(a)
+        sql("update invitations set status='expired' where token=%s", vencida)
+        r = registrar(a, vigente)
+        chequear(r.status_code == 200 and estado(vencida) == "expired",
+                 f"una vencida sigue vencida al entrar con otra ({r.status_code} {estado(vencida)})")
+
+        PREMIUM["users"] = 2
+        est = Estudio()
+        est.token(email())
+        a = email()
+        c.cookies.clear()
+        c.post("/auth/register", json={"username": azar("o1u_"), "password": CLAVE, "email": a})
+        r = est.invitar(a)
+        chequear(r.status_code == 400 and detalle(r) == YA_TIENE_CUENTA,
+                 f"con el estudio lleno, un email con cuenta dice que ya tiene cuenta ({r.status_code} {detalle(r)})")
+
+        PREMIUM["users"] = 3
+        for como in ("sin link", "con la invitación de otro estudio"):
+            est = Estudio()
+            a = email()
+            est.token(a)
+            est.token(email())
+            if como == "sin link":
+                c.cookies.clear()
+                c.post("/auth/register", json={"username": azar("o1u_"), "password": CLAVE, "email": a})
+            else:
+                registrar(a, Estudio().token(a))
+            r1, r2 = est.invitar(email()), est.invitar(email())
+            chequear(len(usuarios(a)) == 1 and r1.status_code == 200 and r2.status_code == 400,
+                     f"una pendiente cuyo email ya tiene cuenta {como} no ocupa lugar "
+                     f"({len(usuarios(a))}, {r1.status_code}, {r2.status_code})")
     finally:
         PREMIUM["users"] = TOPE_REAL
 

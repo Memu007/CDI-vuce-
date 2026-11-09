@@ -621,3 +621,155 @@ def test_una_pendiente_al_email_de_un_miembro_no_ocupa_lugar(monkeypatch):
     assert _pendientes(est.org_id, nuevo)  # sigue pendiente
     est.invitar_ok(_email())  # el lugar que la pendiente no ocupa
     assert est.invitar(_email()).status_code == 400
+
+
+# ================================================================ 6. guardas de invitar, validar y sacar
+
+def _sin_estudio(email=None):
+    """Una cuenta registrada sin invitación, con su sesión en el cliente que devuelve."""
+    cliente, usuario = TestClient(app), _azar("o1u_")
+    r = cliente.post("/auth/register", json={"username": usuario, "password": CLAVE,
+                                             "email": email or _email()})
+    assert r.status_code == 200, r.text
+    return cliente, usuario
+
+
+def _miembro(est, usuario=None):
+    """Un miembro nuevo del estudio, con su sesión en el cliente que devuelve."""
+    cliente, email = TestClient(app), _email()
+    r = _registrar(email, est.invitar_ok(email), username=usuario, cliente=cliente)
+    assert r.status_code == 200, r.text
+    return cliente, email
+
+
+def test_invitar_o_sacar_sin_estudio_400():
+    cliente, _ = _sin_estudio()
+    for r in (cliente.post("/api/organizations/invite", json={"email": _email()}),
+              cliente.delete(f"/api/organizations/members/{_azar('o1u_')}")):
+        assert r.status_code == 400, r.text
+        assert r.json()["detail"] == "No pertenecés a un estudio"
+
+
+def test_un_miembro_no_puede_invitar_403():
+    est = Estudio()
+    cliente, _ = _miembro(est)
+    email = _email()
+    r = cliente.post("/api/organizations/invite", json={"email": email})
+    assert r.status_code == 403, r.text
+    assert _pendientes(est.org_id, email) == []
+
+
+def test_la_invitacion_vence_a_los_7_dias():
+    r = Estudio().invitar(_email())
+    assert r.status_code == 200, r.text
+    vence = datetime.fromisoformat(r.json()["expires_at"])
+    vence = vence if vence.tzinfo else vence.replace(tzinfo=timezone.utc)
+    assert abs(vence - (datetime.now(timezone.utc) + timedelta(days=7))) < timedelta(minutes=1)
+
+
+def test_validar_con_el_estudio_borrado_404():
+    """Sólo en SQLite: en Postgres la clave foránea no deja borrar el estudio con invitaciones."""
+    tok = Estudio().invitar_ok(_email())
+    _cambiar_invitacion(tok, org_id=str(uuid.uuid4()))
+    r = TestClient(app, raise_server_exceptions=False).get(f"/api/invitations/{tok}")
+    assert r.status_code == 404, r.text
+    assert r.json()["detail"] == "El estudio ya no existe"
+
+
+def test_sacar_a_alguien_de_otro_estudio_404_y_sigue_en_el_suyo():
+    est, otro = Estudio(), Estudio()
+    usuario = _azar("o1u_")
+    _, email = _miembro(otro, usuario)
+    r = est.quitar(usuario)
+    assert r.status_code == 404, r.text
+    assert _usuarios(email) == [(usuario, otro.org_id)]
+
+
+def test_sacar_no_borra_al_usuario():
+    est = Estudio()
+    usuario = _azar("o1u_")
+    _, email = _miembro(est, usuario)
+    assert est.quitar(usuario).status_code == 200
+    assert _usuarios(email) == [(usuario, None)]
+    r = TestClient(app).post("/auth/login", json={"username": usuario, "password": CLAVE})
+    assert r.status_code == 200, r.text
+
+
+def test_mine_lista_sólo_los_miembros_del_estudio_y_quién_es_dueño():
+    est, otro = Estudio(), Estudio()
+    usuario = _azar("o1u_")
+    cliente, _ = _miembro(est, usuario)
+    _miembro(otro)
+    for sesion, es_dueno in ((est.c, True), (cliente, False)):
+        r = sesion.get("/api/organizations/mine")
+        assert r.status_code == 200, r.text
+        org = r.json()["organization"]
+        assert org["is_owner"] is es_dueno
+        assert sorted((m["username"], m["is_owner"]) for m in org["members"]) == sorted(
+            [(est.dueno, True), (usuario, False)])
+
+
+@pytest.mark.parametrize("como", ["sin link", "con la invitacion de otro estudio", "perfil",
+                                  "vieja en mayusculas"])
+def test_una_pendiente_cuyo_email_ya_tiene_cuenta_no_ocupa_lugar(monkeypatch, como):
+    _tope(monkeypatch, 3)
+    est = Estudio()
+    email = _email()
+    est.invitar_ok(email)
+    est.invitar_ok(_email())  # dueño + 2 pendientes: lleno
+    if como == "con la invitacion de otro estudio":
+        assert _registrar(email, Estudio().invitar_ok(email)).status_code == 200
+    elif como == "perfil":
+        cliente, _ = _sin_estudio()
+        r = cliente.put("/api/user/profile", json={"email": email, "current_password": CLAVE})
+        assert r.status_code == 200, r.text
+    else:
+        _sin_estudio(email)
+    if como == "vieja en mayusculas":
+        async def q(s):
+            await s.execute(update(User).where(User.email == email).values(email=email.upper()))
+        _db(q)
+    assert _pendientes(est.org_id, email)  # sigue pendiente, pero nadie la puede usar
+    est.invitar_ok(_email())  # el lugar que la pendiente no ocupa
+    assert est.invitar(_email()).status_code == 400
+
+
+def test_una_invitacion_vencida_sigue_vencida_cuando_entra_con_otra(zona):
+    est = Estudio()
+    email = _email()
+    vencida, vigente = est.invitar_ok(email), est.invitar_ok(email)
+    _cambiar_invitacion(vencida, status="expired")
+    assert _registrar(email, vigente).status_code == 200
+    assert _invitacion(vencida)["status"] == "expired"
+
+
+def test_con_el_estudio_lleno_un_email_con_cuenta_dice_que_ya_tiene_cuenta(monkeypatch):
+    _tope(monkeypatch, 2)
+    est = Estudio()
+    est.invitar_ok(_email())  # lleno
+    email = _email()
+    _sin_estudio(email)
+    r = est.invitar(email)
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == YA_TIENE_CUENTA
+
+
+def test_si_falla_usar_las_otras_invitaciones_no_se_crea_la_cuenta():
+    """Usar las otras pendientes del email va en la misma transacción que el alta."""
+    est = Estudio()
+    email = _email()
+    otra, tok = est.invitar_ok(email), est.invitar_ok(email)
+
+    def _falla(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("UPDATE INVITATIONS") and "lower(trim(" in statement:
+            raise RuntimeError("falla al usar las otras invitaciones")
+
+    motor = _conn.engine.sync_engine
+    event.listen(motor, "before_cursor_execute", _falla)
+    try:
+        r = _registrar(email, tok, cliente=TestClient(app, raise_server_exceptions=False))
+    finally:
+        event.remove(motor, "before_cursor_execute", _falla)
+    assert r.status_code != 200, r.text
+    assert _usuarios(email) == []
+    assert sorted(_pendientes(est.org_id, email)) == sorted([otra, tok])
