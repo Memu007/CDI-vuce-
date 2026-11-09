@@ -22,11 +22,11 @@ export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
        DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=.
 FALLAS=0
 
-# sqlite <archivo de pruebas>
+# sqlite <archivo de pruebas>...
 sqlite() {
   rm -f test.db
   DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=test \
-    "$PY" -m pytest -q --no-cov --timeout=120 -p no:randomly -p no:cacheprovider "$1" 2>&1
+    "$PY" -m pytest -q --no-cov --timeout=120 -p no:randomly -p no:cacheprovider "$@" 2>&1
 }
 
 postgres() {
@@ -69,21 +69,24 @@ juzgar() {
 
 # sabotaje <nombre> <rojo en SQLite> <rojo en Postgres> <viejo> <nuevo> [<viejo> <nuevo> ...]
 # Los rojos van separados por «|». Uno de SQLite sin «::» es un caso de
-# tests/test_org1.py; con «::», de ese archivo. Sin rojo en Postgres, no corre ahí.
+# tests/test_org1.py; con «::», de ese archivo. Sin rojo en un motor, no corre ahí.
 sabotaje() {
-  local nombre="$1" en_sqlite="$2" en_pg="$3" archivo salida codigo r; shift 3
-  local -a esperados=()
+  local nombre="$1" en_sqlite="$2" en_pg="$3" salida codigo r; shift 3
+  local -a esperados=() archivos=()
   git checkout -q -- proyecto_maria/
   if ! aplicar proyecto_maria/main.py "$@"; then
     echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return
   fi
-  IFS='|' read -ra rojos <<<"$en_sqlite"
-  for r in "${rojos[@]}"; do
-    [[ "$r" == *::* ]] || r="tests/test_org1.py::$r"
-    archivo="${r%%::*}"; esperados+=("FAILED $r")
-  done
-  salida="$(sqlite "$archivo")"; codigo=$?
-  juzgar "$nombre (SQLite)" "$salida" "$codigo" "${esperados[@]}"
+  if [ -n "$en_sqlite" ]; then
+    IFS='|' read -ra rojos <<<"$en_sqlite"
+    for r in "${rojos[@]}"; do
+      [[ "$r" == *::* ]] || r="tests/test_org1.py::$r"
+      esperados+=("FAILED $r")
+      [[ " ${archivos[*]} " == *" ${r%%::*} "* ]] || archivos+=("${r%%::*}")
+    done
+    salida="$(sqlite "${archivos[@]}")"; codigo=$?
+    juzgar "$nombre (SQLite)" "$salida" "$codigo" "${esperados[@]}"
+  fi
   if [ -n "$PG" ] && [ -n "$en_pg" ]; then
     esperados=()
     IFS='|' read -ra rojos <<<"$en_pg"
@@ -136,6 +139,7 @@ sabotaje "con el estudio lleno, el tope habla antes que la cuenta" \
 OTRAS='        await db.execute(
             sa_update(Invitation)
             .where(Invitation.org_id == invite_org.id, Invitation.status == "pending",
+                   Invitation.expires_at > datetime.now(timezone.utc),
                    func.lower(func.trim(Invitation.email)) == request.email)
             .values(status="accepted")
             .execution_options(synchronize_session=False)
@@ -151,11 +155,18 @@ sabotaje "la regla 2 sin mayúsculas ni espacios" "test_registrarse_usa_tambien_
 sabotaje "la regla 2 en todos los estudios" "test_registrarse_con_una_invitacion_usa_las_otras_del_mismo_email" \
   "registrarse usa las otras del mismo email en ese estudio" \
   ".where(Invitation.org_id == invite_org.id, Invitation.status == \"pending\"," ".where(Invitation.status == \"pending\","
-sabotaje "la regla 2 despierta a las vencidas" "test_una_invitacion_vencida_sigue_vencida_cuando_entra_con_otra" \
-  "una vencida sigue vencida al entrar con otra" \
+# Una marcada vencida con fecha futura sólo la arma org1_postgres.py: en SQLite
+# la marcada ya venció por fecha, y eso lo cuida la línea de expires_at.
+sabotaje "la regla 2 despierta a las marcadas vencidas" "" "una vencida sigue vencida al entrar con otra" \
   ".where(Invitation.org_id == invite_org.id, Invitation.status == \"pending\",
-                   func.lower" ".where(Invitation.org_id == invite_org.id,
-                   func.lower"
+                   Invitation.expires_at" ".where(Invitation.org_id == invite_org.id,
+                   Invitation.expires_at"
+VEN="test_una_invitacion_vencida_sigue_vencida_cuando_entra_con_otra"
+sabotaje "la regla 2 usa las vencidas por fecha" "$VEN[sqlite_sin_zona-pending]|$VEN[postgres_con_zona-pending]" "" \
+  "                   Invitation.expires_at > datetime.now(timezone.utc),
+                   func.lower(func.trim(Invitation.email)) == request.email)
+            .values" "                   func.lower(func.trim(Invitation.email)) == request.email)
+            .values"
 sabotaje "la regla 2 en otra transacción" "test_si_falla_usar_las_otras_invitaciones_no_se_crea_la_cuenta" "" \
   "$OTRAS" "" \
   "    db.add(new_user)
@@ -167,6 +178,7 @@ sabotaje "la regla 2 en otra transacción" "test_si_falla_usar_las_otras_invitac
         await db.execute(
             sa_update(Invitation)
             .where(Invitation.org_id == new_user.organization_id, Invitation.status == \"pending\",
+                   Invitation.expires_at > datetime.now(timezone.utc),
                    func.lower(func.trim(Invitation.email)) == request.email)
             .values(status=\"accepted\")
             .execution_options(synchronize_session=False)
@@ -181,6 +193,13 @@ sabotaje "el tope cuenta las pendientes de emails con cuenta" \
   "una pendiente cuyo email ya tiene cuenta sin link no ocupa lugar|una pendiente al email de un miembro no ocupa lugar" \
   "    emails_pendientes -= {email for (email,) in con_cuenta.all()}
 " ""
+sabotaje "el tope compara la cuenta sin mayúsculas" \
+  "test_una_pendiente_cuyo_email_ya_tiene_cuenta_no_ocupa_lugar[vieja en mayusculas]" "" \
+  "select(func.lower(User.email)).where(func.lower(User.email).in_(emails_pendientes))" \
+  "select(User.email).where(User.email.in_(emails_pendientes))"
+sabotaje "el tope compara la cuenta sin espacios" "test_una_pendiente_a_una_cuenta_con_espacios_ocupa_lugar" "" \
+  "select(func.lower(User.email)).where(func.lower(User.email).in_(emails_pendientes))" \
+  "select(func.lower(func.trim(User.email))).where(func.lower(func.trim(User.email)).in_(emails_pendientes))"
 sabotaje "invitar sin validar el email" "test_invitar_un_email_que_el_registro_rechaza_400_sin_ocupar_lugar" "" \
   "    # registro rechace no la puede usar nadie y ocupa un lugar hasta que vence.
     clean_email = _email_valido(req.email)" \

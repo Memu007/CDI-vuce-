@@ -734,13 +734,34 @@ def test_una_pendiente_cuyo_email_ya_tiene_cuenta_no_ocupa_lugar(monkeypatch, co
     assert est.invitar(_email()).status_code == 400
 
 
-def test_una_invitacion_vencida_sigue_vencida_cuando_entra_con_otra(zona):
+@pytest.mark.parametrize("estado", ["expired", "pending"])
+def test_una_invitacion_vencida_sigue_vencida_cuando_entra_con_otra(zona, estado):
+    """Ya marcada, o vencida por fecha sin que nadie la haya validado."""
     est = Estudio()
     email = _email()
     vencida, vigente = est.invitar_ok(email), est.invitar_ok(email)
-    _cambiar_invitacion(vencida, status="expired")
+    _cambiar_invitacion(vencida, status=estado, expires_at=datetime.now(timezone.utc) - timedelta(minutes=1))
     assert _registrar(email, vigente).status_code == 200
-    assert _invitacion(vencida)["status"] == "expired"
+    assert _invitacion(vencida)["status"] == estado
+    r = _validar(vencida)
+    assert r.status_code == 400 and "expiró" in r.json()["detail"], r.text
+
+
+def test_una_pendiente_a_una_cuenta_con_espacios_ocupa_lugar(monkeypatch):
+    """El registro no ve como suya una cuenta guardada con espacios: la
+    invitación se puede usar y ocupa su lugar."""
+    _tope(monkeypatch, 3)
+    est = Estudio()
+    email = _email()
+    tok = est.invitar_ok(email)
+    est.invitar_ok(_email())  # dueño + 2 pendientes: lleno
+    _sin_estudio(email)
+
+    async def q(s):
+        await s.execute(update(User).where(User.email == email).values(email=f" {email} "))
+    _db(q)
+    assert est.invitar(_email()).status_code == 400
+    assert _registrar(email, tok).status_code == 200
 
 
 def test_con_el_estudio_lleno_un_email_con_cuenta_dice_que_ya_tiene_cuenta(monkeypatch):
