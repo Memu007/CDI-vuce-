@@ -3,6 +3,19 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## INTEGRAR-1: recibida en `19036a2`, revisión después del corte (2026-11-09 PM)
+
+Corte de la sesión a las 05:00 UTC: terminá el paso en curso, commit, push,
+anotá al final de `PARA-PM.md` dónde quedaste y frená. No integres `0231eee`
+(dev-maria) hasta que lo pida. La revisión y reproducción de INTEGRAR-1 la
+hago en la próxima sesión; no es aceptada todavía.
+
+- **D140: (a).** El webhook sin `MP_WEBHOOK_SECRET` se rechaza en cualquier
+  entorno. Hacé el cambio de `tests/test_entorno1.py` y `sabotajes/entorno1.sh`
+  en tu próxima vuelta (después del corte), en commits separados.
+- **D141: (a)**, pero como pieza nueva: se la propongo a Emi. No la hagas.
+- **D143: (a)**, también pieza nueva para Emi. No la hagas.
+
 ## NOMBRES-1: aceptada sobre `1960a9a` (2026-11-08 PM)
 
 Evidencia: `docs/pm/REPRODUCCION-NOMBRES-1-2026-11-08.md`, vuelta 2. Igual a

@@ -3,32 +3,30 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## OBSERVABILIDAD-1: aceptada sobre `279ef26`, sin integrar (2026-11-09 00:20 PM)
+## D102 (a), versión fija de bcrypt: aceptada sobre `af924ea`, sin integrar (2026-11-09 02:45 PM)
 
-Evidencia: `docs/pm/REPRODUCCION-OBSERVABILIDAD-1-2026-11-08.md`, «Vuelta 2».
-Igual al informe: `entradas3_postgres.py` con PG `fallas: 0` (NUL y 300
-caracteres como `<sin ruta>`, molde recortado a 200, `error_message` con
-`�`); el arnés de `694f183` sobre el mismo producto da `fallas: 2`;
-`sabotajes/entradas3.sh 279ef265` con PG: BASE verde, 12 ROJO, `sabotajes con
-falla: 0`, salida 0. Mi negativo con otros ejemplos (`/api/clients%00`, dos
-NUL, ruta de 201 caracteres) da los tres como `<sin ruta>`, `fallas: 0`. La
-devolución está resuelta por la causa: el `grep` de `api_logs.endpoint` cubre
-pruebas, scripts y producto.
+Evidencia: `docs/pm/REPRODUCCION-D102-2026-11-09.md`. Igual al informe:
+`-k 72` da 5 passed con bcrypt 5.0.0 y `assert 200 == 401` con 4.3.0;
+producto +0/−0. Mío: el `Dockerfile` y la CI leen el `requirements.txt` de
+la raíz, donde quedó el pin; passlib con bcrypt 5 arranca en Python 3.12.
 
-- **D150: (b), decidida por la PM**, pero no como pieza del roadmap: sacar
-  `_guardable_en_pg` del `endpoint` (`main.py:1983`) va a `COLA-LIMPIEZA.md`,
-  con su rojo cuando se haga.
-- **D142** sigue con Emi; hasta entonces (c). **D131** y **D136** siguen.
-- **D139: (a)**: escapar el panel va después de ORG-1+D40.
-- Numeración: tus próximas D desde la D151.
+- **D153**: **(a)**, a `COLA-LIMPIEZA.md` (ya anotada).
+- **D154**: **(a)**, no se agrega el tope en `verify_password`.
+- Riesgo que va con la publicación: quien se haya registrado en producción
+  con más de 72 bytes antes del tope del alta deja de entrar.
 
-**RESET-3** (`8fda3d2`), **SMOKE-1** (`00df4de`) y **OBSERVABILIDAD-1**
-(`279ef26`): aceptadas, sin integrar; las integra INTEGRAR-1 de la técnica.
+D139 (`3fde8bb`) y ORG-1+D40 (`bf9583b`) aceptadas antes; sus evidencias
+están en sus `REPRODUCCION-*`. RESET-3, SMOKE-1, OBSERVABILIDAD-1,
+ORG-1+D40, D139 y D102 (`af924ea`): aceptadas, sin integrar; las integra
+INTEGRAR-1. Próxima D libre: D155.
 
-**Tarea activa: ORG-1+D40** (la devolución sobre `b358827`, más abajo en este
-archivo; traé mi rama con `merge` antes). Cola: ORG-1+D40 → escapar el panel
-(D139) → D102. Corte: 2026-11-09 05:00 UTC o cuando Emi avise el 95 % de uso:
-ahí terminás el paso en curso, commit, push, anotás dónde quedaste y frenás.
+**Sin tarea nueva hasta el corte.** Tu cola del roadmap está cerrada: lo que
+queda (DESPACHO-1, CATALOGO-3, PESO-NETO-1, MARIA-6) espera al despachante
+o a Emi, y la cola de limpieza es para después del lanzamiento. Anotá al
+final de `PARA-PM-2.md` dónde quedaste (rama, SHA y tu `/compact
+conservar: …`), commit, push, y frená. Si tu rutina te despierta antes del
+corte y este encabezado no cambió, no hay nada que hacer: terminá el turno.
+Corte: 2026-11-09 05:00 UTC o cuando Emi avise el 95 %.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
@@ -457,40 +455,6 @@ una, sin esperar a juntar.
   Esperás a que `api_logs` tenga todos los pedidos, un control que cancele
   el `close` y tenga que dar rojo, y cortes en vuelo de verdad. Hasta
   entonces la D37 sigue abierta.
-
-## ORG-1 + D40: devolución, sobre `b358827` (2026-10-28 18:50 UTC)
-
-Evidencia en `REPRODUCCION-ORG-1-D40-2026-10-28.md`. Lo que la D40 cierra
-está bien: normalización, carrera en Postgres, tope en el registro y el
-sacado que no vuelve. **Causa de la devolución:** las reglas de la D40
-tienen filtros que ninguna prueba distingue, y el «Sumá» 4 de la
-aceptación de ORG-1 no llegó. Cada punto, rojo antes del arreglo y con su
-sabotaje:
-
-1. **El «Sumá» 4 entero**, un caso por guarda (la lista está en la
-   aceptación de ORG-1, abajo). Reproducido por la PM: con el control de
-   dueño al invitar en `if False`, o sin el filtro por estudio al sacar,
-   las pruebas de ORG-1 siguen en `81 passed`.
-2. **Una invitación vencida queda vencida.** Sin `status == "pending"` en
-   el `UPDATE` del registro, `92 passed` (corrida de la PM): falta el caso
-   del mismo email con una vencida y una pendiente.
-3. **El orden de los mensajes.** Con el estudio lleno, invitar un email que
-   ya tiene cuenta da «Ese email ya tiene una cuenta…», no el del tope.
-4. **El `UPDATE` va en la misma transacción que la cuenta,** con una prueba
-   secuencial (hoy sólo la de carrera lo distingue).
-5. **Lugar muerto, decidido por la PM.** Una invitación pendiente cuyo
-   email ya tiene cuenta en CDI (en cualquier estudio o en ninguno) no
-   ocupa lugar: no se puede usar nunca. Generaliza la regla de la D40.
-   Reproducido por la PM: (A) el invitado se registra sin el link y su
-   pendiente ocupa lugar hasta que el dueño la borra; (C) X tiene
-   pendientes en A y en B, entra con la de A, y la de B queda ocupando
-   lugar en B. Los dos, rojos, y la familia: cualquier camino por el que
-   un email pendiente llegue a tener cuenta.
-6. **A riesgos:** el modo `REGISTER_TEST_EMAIL_REPLACE`; invitar dice si un
-   email tiene cuenta, sin límite de pedidos; cambiar el email del perfil
-   no pide verificarlo (lo llevo a Emi como seguridad, no lo arreglás acá).
-
-SQLite y Postgres 16, CHANGELOG, commits separados y `/entregar`.
 
 ## D41 y el orden de lo que queda (2026-10-28 17:20 UTC)
 
