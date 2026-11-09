@@ -3547,6 +3547,7 @@ async def register(request: RegisterRequest, req: Request, background_tasks: Bac
         await db.execute(
             sa_update(Invitation)
             .where(Invitation.org_id == invite_org.id, Invitation.status == "pending",
+                   Invitation.expires_at > datetime.now(timezone.utc),
                    func.lower(func.trim(Invitation.email)) == request.email)
             .values(status="accepted")
             .execution_options(synchronize_session=False)
@@ -10854,7 +10855,7 @@ async def invite_to_organization(
         if not inv.expires_at or _utc(inv.expires_at) > ahora
     }
     con_cuenta = await db.execute(
-        select(func.lower(func.trim(User.email))).where(func.lower(func.trim(User.email)).in_(emails_pendientes))
+        select(func.lower(User.email)).where(func.lower(User.email).in_(emails_pendientes))
     )
     emails_pendientes -= {email for (email,) in con_cuenta.all()}
     if clean_email not in emails_pendientes and len(emails_miembros) + len(emails_pendientes) >= tope:

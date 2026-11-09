@@ -8,7 +8,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-09 · fix: una invitación a un email que ya tiene cuenta no ocupa lugar en el estudio (ORG-1)
 
-- Si la persona invitada se registró sin el link, entró a otro estudio o se puso ese email en el perfil, la invitación ya no se puede usar: deja de contar para el tope del plan y el dueño puede invitar a otra persona.
+- Si la persona invitada se registró sin el link, entró a otro estudio o se puso ese email en el perfil, la invitación no se puede usar mientras esa cuenta tenga el email: deja de contar para el tope del plan y el dueño puede invitar a otra persona.
+- Al registrarse con una invitación, una vencida del mismo email sigue vencida aunque nadie la haya abierto.
 
 ## 2026-11-08 · fix: las métricas guardan la ruta y no el camino pedido (OBSERVABILIDAD-1)
 
