@@ -136,3 +136,5 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   (D150): el molde no trae NUL ni caracteres sueltos; sacar la llamada, con su rojo.
 - `proyecto_maria/main.py` `register` (219 líneas): partirla en validar la
   invitación, crear la cuenta y usar las otras pendientes, sin partir la transacción.
+- `proyecto_maria/main.py:166` `pwd_context` de passlib no lo usa nadie (el
+  hash va directo con `bcrypt`): sacarlo, y `passlib[bcrypt]` de `requirements.txt` (D153).

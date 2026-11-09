@@ -3,29 +3,30 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D139 (a), escapar el panel: aceptada sobre `3fde8bb`, sin integrar (2026-11-09 02:20 PM)
+## D102 (a), versión fija de bcrypt: aceptada sobre `af924ea`, sin integrar (2026-11-09 02:45 PM)
 
-Evidencia: `docs/pm/REPRODUCCION-D139-2026-11-09.md`. Igual al informe:
-chequeo-6 +22/−27 sin avisos; `pantalla_panel_dev.js` 7 OK y `fallas: 0`
-sobre `3fde8bb`, y `fallas: 4` (las mismas cuatro) con la plantilla de
-`827df3e`; `sabotajes/panel_dev.sh 3fde8bb`: BASE verde, 6 ROJO, `sabotajes
-sin rojo: 0`. Mío: la plantilla ya no tiene ningún `innerHTML`,
-`insertAdjacentHTML`, `outerHTML` ni `document.write`, y el arreglo resta
-(reusa `fila` de pagos rechazados). Bien.
+Evidencia: `docs/pm/REPRODUCCION-D102-2026-11-09.md`. Igual al informe:
+`-k 72` da 5 passed con bcrypt 5.0.0 y `assert 200 == 401` con 4.3.0;
+producto +0/−0. Mío: el `Dockerfile` y la CI leen el `requirements.txt` de
+la raíz, donde quedó el pin; passlib con bcrypt 5 arranca en Python 3.12.
 
-- El hallazgo del adversario sobre `title` y `href`: queda como riesgo,
-  como propusiste.
-- **D152** (traer mi rama antes de D102): **(a) no**, sigue D151. D102 es un
-  chore que no depende de mi rama.
-- ORG-1+D40 (`bf9583b`) aceptada; su evidencia y R1 a R4 están en
-  `REPRODUCCION-ORG-1-D40-2026-11-09.md` y van a Emi.
+- **D153**: **(a)**, a `COLA-LIMPIEZA.md` (ya anotada).
+- **D154**: **(a)**, no se agrega el tope en `verify_password`.
+- Riesgo que va con la publicación: quien se haya registrado en producción
+  con más de 72 bytes antes del tope del alta deja de entrar.
 
-RESET-3, SMOKE-1, OBSERVABILIDAD-1, ORG-1+D40 y D139 (`3fde8bb`): aceptadas,
-sin integrar; las integra INTEGRAR-1. Próxima D libre: D153.
+D139 (`3fde8bb`) y ORG-1+D40 (`bf9583b`) aceptadas antes; sus evidencias
+están en sus `REPRODUCCION-*`. RESET-3, SMOKE-1, OBSERVABILIDAD-1,
+ORG-1+D40, D139 y D102 (`af924ea`): aceptadas, sin integrar; las integra
+INTEGRAR-1. Próxima D libre: D155.
 
-**Tarea activa: D102 (a), fijar la versión de `bcrypt`** (chore, DECISIONS
-del 07/11, ENTRADAS-1). Corte: 2026-11-09 05:00 UTC o cuando Emi avise el
-95 %: terminás el paso en curso, commit, push, anotás dónde quedaste y frenás.
+**Sin tarea nueva hasta el corte.** Tu cola del roadmap está cerrada: lo que
+queda (DESPACHO-1, CATALOGO-3, PESO-NETO-1, MARIA-6) espera al despachante
+o a Emi, y la cola de limpieza es para después del lanzamiento. Anotá al
+final de `PARA-PM-2.md` dónde quedaste (rama, SHA y tu `/compact
+conservar: …`), commit, push, y frená. Si tu rutina te despierta antes del
+corte y este encabezado no cambió, no hay nada que hacer: terminá el turno.
+Corte: 2026-11-09 05:00 UTC o cuando Emi avise el 95 %.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
