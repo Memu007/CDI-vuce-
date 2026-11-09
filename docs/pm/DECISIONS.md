@@ -567,3 +567,10 @@ RESET-3 aceptada sobre `8fda3d2`, sin integrar (D136). D138 (a), decidida por la
 ### 2026-11-08 21:55 UTC (PM principal)
 
 SMOKE-1 aceptada sobre `00df4de`, sin integrar (D136): el smoke espera el rechazo sin sesión; sabotajes en rojo. MARIA sigue OBSERVABILIDAD-1. Numeración: MARIA D139, técnica D140 en adelante.
+
+### 2026-11-09 05:00 UTC (PM principal)
+
+Corte de las 12 h extra que dio Emi el 08/11. Rutinas apagadas. INTEGRAR-1
+recibida en `19036a2`, sin aceptar: D140 (a) la cambia la técnica; D141 (a) y
+D143 (a) se proponen a Emi como piezas nuevas. D102 aceptada sobre `af924ea`
+(D153 a la cola, D154 a). Para retomar: revisar INTEGRAR-1 y prender rutinas.
