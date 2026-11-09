@@ -618,3 +618,12 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   y 434 HOLANDA. Ningún código de país cambia de valor. «NL» sigue en 434
   hasta que Emi confirme cuál lleva un despacho real; va a la lista de antes
   de publicar.
+
+## 2026-11-09 20:53 UTC (PM, con el consejero)
+
+- D157 (a): el `vendor_id` de un proveedor mixto suma el hash de sus letras no
+  latinas, con la función de D77.
+- D156 (a): `operation_items.origen` pasa a `Text` y sale el recorte a 3. Medido
+  en Postgres 16.15: `varchar(3)` → `text` no reescribe la tabla (mismo
+  filenode); sólo toma un lock exclusivo. (b), guardar el código de 3 dígitos,
+  no tenía respuesta para un texto que no se reconoce.

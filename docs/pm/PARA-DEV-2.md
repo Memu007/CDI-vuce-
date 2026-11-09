@@ -47,32 +47,41 @@ Toca datos y migración: revisión fuerte (§3), sabotaje propio, adversarios.
 Seguís sin traer mi rama con merge (D151) hasta que INTEGRAR-1 esté
 aceptada; basate en tu rama. Después va PRESUPUESTO-CLIENTE-1 (D141 a: al
 pasar una operación a otro cliente, el link compartido viejo deja de andar).
-Próxima D libre: D155.
 
-## D102 (a), versión fija de bcrypt: aceptada sobre `af924ea`, sin integrar (2026-11-09 02:45 PM)
+## D156 y D157: decididas por la PM (2026-11-09 20:53 UTC)
 
-Evidencia: `docs/pm/REPRODUCCION-D102-2026-11-09.md`. Igual al informe:
-`-k 72` da 5 passed con bcrypt 5.0.0 y `assert 200 == 401` con 4.3.0;
-producto +0/−0. Mío: el `Dockerfile` y la CI leen el `requirements.txt` de
-la raíz, donde quedó el pin; passlib con bcrypt 5 arranca en Python 3.12.
+- **D157: (a).** El `vendor_id` suma el hash de las letras no latinas, con la
+  misma función de D77, no una segunda. Pruebas: un proveedor sólo latino
+  conserva su `vendor_id`; dos proveedores chinos distintos con «Co., Ltd» no
+  comparten; catálogo, memoria y NCM recordado usan la misma clave. El informe
+  dice si el mismo nombre CJK con y sin «Co., Ltd» queda como uno o como dos,
+  y qué pasa con las filas ya unidas bajo `co_ltd` (si no se pueden separar,
+  que lo diga).
+- **D156: (a).** La columna pasa a `Text` y salen los dos `[:3]` (`main.py:3773`
+  y `:8177`, las únicas escrituras de `operation_items.origen`). Tu premisa del
+  costo no es así: medí en Postgres 16.15 y `varchar(3)` → `text` no reescribe
+  la tabla (mismo filenode, 16385 antes y después; la vuelta a `varchar(3)` sí
+  reescribe). Sólo toma un lock exclusivo, que espera detrás de cualquier
+  transacción abierta. Pedido:
+  1. La migración altera sólo si la columna sigue `character varying` y lleva
+     `lock_timeout`. Dos arranques seguidos: el segundo no hace nada. Dos
+     workers que arrancan juntos: ninguno falla.
+  2. La prueba corre en Postgres: SQLite no respeta `String(3)` y no distingue
+     el defecto. Rojo en la base, verde con el arreglo; el informe dice dónde
+     corrió.
+  3. La columna va a tener formas mezcladas: la pantalla v2 guarda «313», la
+     factura guarda texto, y hay filas viejas con «TAI» o «CN». El caso de
+     agrupar (`maria_generator.py:1418`, `main.py:8290`, y el conteo por
+     origen de `main.py:8405`) lleva «313», «TAIWAN» y «TW» como el mismo
+     origen.
+  4. Las filas ya recortadas no se recuperan («TAI» sigue dando 310): no lo
+     arregles, decilo en el informe; va como riesgo a la lista de publicar.
+  5. En `:3773`, el `.upper()` y el «XX» por defecto: decí en el informe si
+     quedan y por qué. `:8177` no tiene ninguno de los dos.
 
-- **D153**: **(a)**, a `COLA-LIMPIEZA.md` (ya anotada).
-- **D154**: **(a)**, no se agrega el tope en `verify_password`.
-- Riesgo que va con la publicación: quien se haya registrado en producción
-  con más de 72 bytes antes del tope del alta deja de entrar.
-
-D139 (`3fde8bb`) y ORG-1+D40 (`bf9583b`) aceptadas antes; sus evidencias
-están en sus `REPRODUCCION-*`. RESET-3, SMOKE-1, OBSERVABILIDAD-1,
-ORG-1+D40, D139 y D102 (`af924ea`): aceptadas, sin integrar; las integra
-INTEGRAR-1. Próxima D libre: D155.
-
-**Sin tarea nueva hasta el corte.** Tu cola del roadmap está cerrada: lo que
-queda (DESPACHO-1, CATALOGO-3, PESO-NETO-1, MARIA-6) espera al despachante
-o a Emi, y la cola de limpieza es para después del lanzamiento. Anotá al
-final de `PARA-PM-2.md` dónde quedaste (rama, SHA y tu `/compact
-conservar: …`), commit, push, y frená. Si tu rutina te despierta antes del
-corte y este encabezado no cambió, no hay nada que hacer: terminá el turno.
-Corte: 2026-11-09 05:00 UTC o cuando Emi avise el 95 %.
+RESET-3, SMOKE-1, OBSERVABILIDAD-1, ORG-1+D40, D139 y D102 (`af924ea`):
+aceptadas, sin integrar; las integra INTEGRAR-1. Sus evidencias, en sus
+`REPRODUCCION-*`. Próxima D libre: D158.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
