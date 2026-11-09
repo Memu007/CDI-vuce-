@@ -212,6 +212,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-09 20:45 UTC: merge b9db0ad revisado a mano. Los trozos de main.py, finalize.js, clientes.js y file_security.py están bien. El 409 que se sacó de finalize.js lo había sacado antes efaef2b6. D155 corregida: la prueba va sobre la familia; NL 423 o 434 lo decide Emi.
 2026-11-09 20:12 UTC: Emi: sí a CATALOGO-3 (MARIA, rutina prendida), D141 (a) = PRESUPUESTO-CLIENTE-1, D143 (a) = BORRADOR-1; «fusioná» = publicar (tras INTEGRAR-1).
 2026-11-09 20:05 UTC: **Emi retoma sin límite.** Técnica → INTEGRAR-1 vuelta 2 (D140, lo no corrido, suite). MARIA sin pieza, rutina apagada. A Emi: CATALOGO-3, D141, D143, «fusioná», clave de Anthropic.
 2026-11-09 05:01 UTC: **CORTE de las 12 h.** Las tres rutinas, apagadas; las dos Devs avisadas (terminan el paso, push, anotan y frenan). Técnica en `28c4dd5`, MARIA en `cddf7de`. Para retomar: revisar INTEGRAR-1 y prender las rutinas.
@@ -224,7 +225,6 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 2026-11-08 23:35 UTC: **Emi: uso al 87 %, se puede llegar al 95 % y frenar.** La PM no ve el medidor: frena cuando Emi avise 95 % o a las 05:00, lo que llegue primero, con el procedimiento de corte. Mientras, sin adversarios Opus nuevos. OBSERVABILIDAD-1 con devolución (`3d7f296`); D142 a Emi.
 2026-11-08 15:50 UTC: **CORTE de las 24 h.** Las tres rutinas, apagadas. Técnica frenada en `65af1d3` (SEPARADORES-1b-ARNÉS aceptada, sin pieza nueva). MARIA frenada en `cf68314`: entregó EMAIL-1 sin cambio de producto, **sin revisar**; abiertas D131 y D132. Para retomar: revisar EMAIL-1 y prender las rutinas.
 
-2026-11-06 11:20 UTC: **COBRO-CORTE-1 aceptada** (`ca50916`, técnica, sin integrar por `e0b8626`): 98 passed, 88 sabotajes en rojo sin falla, suite `4284 passed` rc=0, chequeo-6 con sus 3 avisos explicados; Opus y Sonnet alto sin doble cobro. Cuatro bajas a la cola. Para Emi: la validación de 60 s cruza cargas (de antes), pieza nueva. Técnica entregó COBRO-MP-2 (`4f1822f`, D62): reviso con Opus y Sonnet alto.
 
 
 

@@ -10,9 +10,15 @@ reconoce `pais_reconocido`, nombre o código, y se guarda tal cual; el
 extractor deja de recortar a 3 y usa ese mismo criterio. Cambiá
 `test_despacho1b` para la nueva conducta. Que siga rechazando «XYZ», «ZZ»,
 «123», «ＢＲ» y «ÉS», y que nombre en el informe qué casos de esa prueba
-cambiaron. Una prueba tiene que mostrar que «CHINA» y «CN» dan el mismo
-código MARIA en el TXT, y va la corrida del golden. «PAISES BAJOS» → 423 queda
-anotado: no es de esta pieza.
+cambiaron. **Corrección de la PM (20:45 UTC):** la prueba va sobre la familia y no sobre el
+ejemplo. Para cada país de la tabla, su nombre y su código tienen que dar el
+mismo código MARIA en el TXT. Va además la corrida del golden. «PAISES BAJOS» sí entra en esta pieza: con (a), ese camino llega al
+TXT. En `maria_generator.py:129` y `:134` la clave «NL» está dos veces, y gana
+la segunda. Cuál es el valor correcto, 423 o 434, se lo pregunté a Emi. Hasta
+que conteste, la prueba de la familia lo marca como pendiente, sin elegir uno.
+Antes de cerrar, buscá quién compara el origen por igualdad o supone que tiene
+dos letras: ancho de columna, listas ISO2, claves. Con (a), un mismo país puede
+aparecer escrito de dos formas.
 
 Emi dijo que sí el 09/11. Tu rutina vuelve a estar prendida. Comportamiento
 pedido, con un caso por causa y la familia como datos:
