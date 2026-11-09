@@ -581,3 +581,49 @@ D143 (a) se proponen a Emi como piezas nuevas. D102 aceptada sobre `af924ea`
 vuelven los adversarios Opus; un rechazo real por límite sigue cortando.
 Publicar, roadmap y esfuerzo de las Devs, sin cambios. Rutina de MARIA
 apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
+
+### 2026-11-09 20:10 UTC (Emi)
+
+- Sí a **CATALOGO-3** (MARIA, ya; D76, D77, D78, D80 con D84-D86).
+- **D141 (a)**: sí, como pieza PRESUPUESTO-CLIENTE-1 (MARIA, tras CATALOGO-3).
+- **D143 (a)**: sí, como pieza BORRADOR-1 (técnica, tras INTEGRAR-1).
+- «Fusioná» quería decir **publicar**. Nada se publica sin «dale <SHA>»: la
+  PM le pasa el SHA cuando INTEGRAR-1 esté aceptada y lo previo a publicar
+  esté hecho (D64, FRONTEND_URL y ALLOWED_ORIGINS en Railway, riesgo de D102).
+
+### 2026-11-09 20:20 UTC (PM, modo automático)
+
+- **D155 (a)** en CATALOGO-3: origen válido = lo que reconoce
+  `pais_reconocido` (nombre o código), guardado tal cual, en despacho,
+  catálogo y extractor. Con (b) quedaban sin origen 143, 402, 403, 408 y 423.
+
+### 2026-11-09 20:55 UTC (Emi: «fijate online»; la PM busca)
+
+- En CATALOGO-3, Países Bajos lleva el código María **423**: así lo dicen
+  las tablas de AFIP (Códigos María, la guía de factura de exportación). El
+  434 viene del formulario F. 2672, que usa cuatro dígitos. Los sitios de
+  AFIP e infoleg no se abren desde la sesión: el dato sale del resumen del
+  buscador, sin haber abierto el documento.
+
+### 2026-11-09 20:43 UTC (Emi)
+
+- «Usalo más seguido al advisor por favor sos la pm usalo, esto es rule para
+  vos». Los momentos en que se lo consulta quedan escritos en
+  `ONBOARDING-PM.md`, «Subagentes».
+
+### 2026-11-09 21:00 UTC (PM; corrige la entrada de las 20:55)
+
+- Retiro «Países Bajos = 423». El consejero lo objetó y volví a buscar: las
+  tablas oficiales y `paises_maria.js` traen dos entradas, 423 PAISES BAJOS
+  y 434 HOLANDA. Ningún código de país cambia de valor. «NL» sigue en 434
+  hasta que Emi confirme cuál lleva un despacho real; va a la lista de antes
+  de publicar.
+
+## 2026-11-09 20:53 UTC (PM, con el consejero)
+
+- D157 (a): el `vendor_id` de un proveedor mixto suma el hash de sus letras no
+  latinas, con la función de D77.
+- D156 (a): `operation_items.origen` pasa a `Text` y sale el recorte a 3. Medido
+  en Postgres 16.15: `varchar(3)` → `text` no reescribe la tabla (mismo
+  filenode); sólo toma un lock exclusivo. (b), guardar el código de 3 dígitos,
+  no tenía respuesta para un texto que no se reconoce.

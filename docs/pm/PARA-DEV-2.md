@@ -3,37 +3,85 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Sin tarea por ahora; tu rutina sigue apagada (2026-11-09 PM)
+## Tarea activa: CATALOGO-3 (2026-11-09 PM, sí de Emi)
 
-Emi retomó el 09/11 sin hora de corte. Tu cola del roadmap espera a Emi o al
-despachante (CATALOGO-3, DESPACHO-1, PESO-NETO-1, MARIA-6), y no quiero sumar
-commits a `claude/dev-maria` mientras INTEGRAR-1 está abierta. Te despierto
-yo cuando haya una pieza. No hace falta que contestes.
+**D155: (a), decidido por la PM (20:20 UTC).** Origen válido es lo que
+reconoce `pais_reconocido`, nombre o código, y se guarda tal cual; el
+extractor deja de recortar a 3 y usa ese mismo criterio. Cambiá
+`test_despacho1b` para la nueva conducta. Que siga rechazando «XYZ», «ZZ»,
+«123», «ＢＲ» y «ÉS», y que nombre en el informe qué casos de esa prueba
+cambiaron. **Corrección de la PM (20:45 UTC):** la prueba va sobre la familia y no sobre el
+ejemplo. Para cada país de la tabla, su nombre y su código tienen que dar el
+mismo código MARIA en el TXT. Va además la corrida del golden. «PAISES BAJOS» sí entra en esta pieza: con (a), ese camino llega al
+TXT. En `maria_generator.py:129` y `:134` la clave «NL» está dos veces, y gana
+la segunda. **NL queda pendiente (corrección de las 21:00 UTC; retiro lo de
+las 20:55).** Las tablas oficiales traen dos entradas, 423 PAISES BAJOS y 434
+HOLANDA, y `paises_maria.js` también. Ningún país cambia de valor: «PAISES
+BAJOS» da 423, «HOLANDA» da 434, y «NL» sigue como hoy (434, en el back y en
+el front) hasta que decida Emi. El chequeo de claves repetidas lee el código
+fuente del literal (`ast` o F601 de pyflakes): en el dict ya cargado no se ve
+la clave perdida. En la prueba de la familia, cada código ISO dice con qué
+nombre va. Las entradas dobles (NL, CHIPRE 311/435, TURQUIA 336/436, ALEMANIA
+402/438) van como D, sin arreglarlas.
+Antes de cerrar, buscá quién compara el origen por igualdad o supone que tiene
+dos letras: ancho de columna, listas ISO2, claves. Con (a), un mismo país puede
+aparecer escrito de dos formas.
 
-## D102 (a), versión fija de bcrypt: aceptada sobre `af924ea`, sin integrar (2026-11-09 02:45 PM)
+Emi dijo que sí el 09/11. Tu rutina vuelve a estar prendida. Comportamiento
+pedido, con un caso por causa y la familia como datos:
 
-Evidencia: `docs/pm/REPRODUCCION-D102-2026-11-09.md`. Igual al informe:
-`-k 72` da 5 passed con bcrypt 5.0.0 y `assert 200 == 401` con 4.3.0;
-producto +0/−0. Mío: el `Dockerfile` y la CI leen el `requirements.txt` de
-la raíz, donde quedó el pin; passlib con bcrypt 5 arranca en Python 3.12.
+1. **D76 (a)**: un proveedor sólo CJK, emoji o `"\x00"` (D85) no queda con
+   `vendor_id` vacío ni comparte catálogo con otro; las filas que hoy están
+   con `''` se migran (Postgres descartable). Incluí el prefijo de 60: dos
+   proveedores largos con los mismos 60 primeros caracteres no comparten.
+2. **D77 (a)**: «电线 2mm» y «钢管 2mm» (y «螺丝/螺母 M8x20») no se pisan; la
+   migración une o separa filas sin perder ninguna.
+3. **D78 (a)** con D86: la memoria del cliente y el NCM recordado encuentran
+   lo guardado con la misma clave que el catálogo.
+4. **D80 (a)**: un solo criterio de origen válido, usado al leer la factura,
+   en el catálogo y en `origen_para_catalogo`; sin el recorte a 3 que da 310.
+5. **D84**: el 400 nombra el ítem y la pantalla dice qué producto no se pudo
+   aprender (hoy dice «algunos»).
 
-- **D153**: **(a)**, a `COLA-LIMPIEZA.md` (ya anotada).
-- **D154**: **(a)**, no se agrega el tope en `verify_password`.
-- Riesgo que va con la publicación: quien se haya registrado en producción
-  con más de 72 bytes antes del tope del alta deja de entrar.
+Toca datos y migración: revisión fuerte (§3), sabotaje propio, adversarios.
+Seguís sin traer mi rama con merge (D151) hasta que INTEGRAR-1 esté
+aceptada; basate en tu rama. Después va PRESUPUESTO-CLIENTE-1 (D141 a: al
+pasar una operación a otro cliente, el link compartido viejo deja de andar).
 
-D139 (`3fde8bb`) y ORG-1+D40 (`bf9583b`) aceptadas antes; sus evidencias
-están en sus `REPRODUCCION-*`. RESET-3, SMOKE-1, OBSERVABILIDAD-1,
-ORG-1+D40, D139 y D102 (`af924ea`): aceptadas, sin integrar; las integra
-INTEGRAR-1. Próxima D libre: D155.
+## D156 y D157: decididas por la PM (2026-11-09 20:53 UTC)
 
-**Sin tarea nueva hasta el corte.** Tu cola del roadmap está cerrada: lo que
-queda (DESPACHO-1, CATALOGO-3, PESO-NETO-1, MARIA-6) espera al despachante
-o a Emi, y la cola de limpieza es para después del lanzamiento. Anotá al
-final de `PARA-PM-2.md` dónde quedaste (rama, SHA y tu `/compact
-conservar: …`), commit, push, y frená. Si tu rutina te despierta antes del
-corte y este encabezado no cambió, no hay nada que hacer: terminá el turno.
-Corte: 2026-11-09 05:00 UTC o cuando Emi avise el 95 %.
+- **D157: (a).** El `vendor_id` suma el hash de las letras no latinas, con la
+  misma función de D77, no una segunda. Pruebas: un proveedor sólo latino
+  conserva su `vendor_id`; dos proveedores chinos distintos con «Co., Ltd» no
+  comparten; catálogo, memoria y NCM recordado usan la misma clave. El informe
+  dice si el mismo nombre CJK con y sin «Co., Ltd» queda como uno o como dos,
+  y qué pasa con las filas ya unidas bajo `co_ltd` (si no se pueden separar,
+  que lo diga).
+- **D156: (a).** La columna pasa a `Text` y salen los dos `[:3]` (`main.py:3773`
+  y `:8177`, las únicas escrituras de `operation_items.origen`). Tu premisa del
+  costo no es así: medí en Postgres 16.15 y `varchar(3)` → `text` no reescribe
+  la tabla (mismo filenode, 16385 antes y después; la vuelta a `varchar(3)` sí
+  reescribe). Sólo toma un lock exclusivo, que espera detrás de cualquier
+  transacción abierta. Pedido:
+  1. La migración altera sólo si la columna sigue `character varying` y lleva
+     `lock_timeout`. Dos arranques seguidos: el segundo no hace nada. Dos
+     workers que arrancan juntos: ninguno falla.
+  2. La prueba corre en Postgres: SQLite no respeta `String(3)` y no distingue
+     el defecto. Rojo en la base, verde con el arreglo; el informe dice dónde
+     corrió.
+  3. La columna va a tener formas mezcladas: la pantalla v2 guarda «313», la
+     factura guarda texto, y hay filas viejas con «TAI» o «CN». El caso de
+     agrupar (`maria_generator.py:1418`, `main.py:8290`, y el conteo por
+     origen de `main.py:8405`) lleva «313», «TAIWAN» y «TW» como el mismo
+     origen.
+  4. Las filas ya recortadas no se recuperan («TAI» sigue dando 310): no lo
+     arregles, decilo en el informe; va como riesgo a la lista de publicar.
+  5. En `:3773`, el `.upper()` y el «XX» por defecto: decí en el informe si
+     quedan y por qué. `:8177` no tiene ninguno de los dos.
+
+RESET-3, SMOKE-1, OBSERVABILIDAD-1, ORG-1+D40, D139 y D102 (`af924ea`):
+aceptadas, sin integrar; las integra INTEGRAR-1. Sus evidencias, en sus
+`REPRODUCCION-*`. Próxima D libre: D158.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
