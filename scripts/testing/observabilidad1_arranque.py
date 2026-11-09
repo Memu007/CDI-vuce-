@@ -167,14 +167,14 @@ class Postgres:
 class App:
     """Un arranque de uvicorn sobre la base; cada uno con su log."""
 
-    def __init__(self, base, etiqueta):
+    def __init__(self, base, etiqueta, admins=ADMIN):
         self.puerto = puerto_libre()
         self.log = os.path.join(TMP, f"{base.nombre}_{etiqueta}.log")
         env = {**os.environ, "DATABASE_URL": base.url, "ENVIRONMENT": "testing",
                "EMAIL_VERIFICATION_REQUIRED": "false",
                "JWT_SECRET_KEY": "clave-solo-para-esta-prueba-con-mas-de-32-caracteres",
                "GEMINI_API_KEY": "test-key", "VUCE_MODE": "fake", "TARIFAR_MODE": "fake", "AFIP_MODE": "fake",
-               "DOLARAPI_BASE": "http://127.0.0.1:9/v1/dolares", "ADMIN_USERNAMES": ADMIN,
+               "DOLARAPI_BASE": "http://127.0.0.1:9/v1/dolares", "ADMIN_USERNAMES": admins,
                "CDI_DATA_DIR": os.path.join(TMP, "data"), "PYTHONPATH": REPO}
         env.pop("PYTEST_CURRENT_TEST", None)  # con ella el middleware no graba métricas
         self.p = subprocess.Popen([sys.executable, "-m", "uvicorn", "proyecto_maria.main:app",
@@ -229,7 +229,9 @@ def base_vieja(b):
     antes = b.sql("select * from api_logs order by id")
     chequear(b.columna() is None, "la base de partida no tiene api_logs.owner_username")
 
-    app = App(b, "1")
+    # Un nombre de ADMIN_USERNAMES no se registra: la cuenta se crea con la lista
+    # vacía y el arranque que la tiene en la lista le da el rol.
+    app = App(b, "1", admins="")
     try:
         if not app.arranco:
             chequear(False, f"la app arranca: {app.texto()[-1500:]}")
@@ -256,9 +258,6 @@ def base_vieja(b):
         r = app.pedir("/auth/register", {"username": ADMIN, "password": CLAVE,
                                          "email": f"{ADMIN.replace('_', '-')}@example.com", "name": "adm"})
         chequear(r[0] == 200, f"registro del admin: {r[0]} {r[1][:120]!r}")
-        r = app.pedir("/api/dev/stats")
-        chequear(r[0] == 200 and '"endpoint":"/robots.txt"' in r[1].decode(),
-                 f"el panel de admin responde y muestra la métrica: {r[0]} {r[1][:160]!r}")
     finally:
         app.parar()
 
@@ -282,6 +281,16 @@ def base_vieja(b):
     chequear("api_logs.owner_username" not in app.texto(), "ni dice que agregó algo")
     chequear("[OBSERVABILIDAD-1]" not in app.texto(),
              "ni falla" + (" con una lectura abierta sobre la tabla" if lectura is not None else ""))
+
+    app = App(b, "admin")
+    try:
+        r = app.pedir("/auth/login", {"username": ADMIN, "password": CLAVE})
+        chequear(r[0] == 200, f"entra el admin: {r[0]} {r[1][:120]!r}")
+        r = app.pedir("/api/dev/stats")
+        chequear(r[0] == 200 and '"endpoint":"/robots.txt"' in r[1].decode(),
+                 f"el panel de admin responde y muestra la métrica: {r[0]} {r[1][:160]!r}")
+    finally:
+        app.parar()
 
 
 def base_con_falla(b):
