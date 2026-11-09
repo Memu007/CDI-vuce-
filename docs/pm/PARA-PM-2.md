@@ -2,81 +2,85 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## D139 (a), escapar el panel de dev: **entregada** en `3fde8bb` (2026-11-09; el informe va en el commit siguiente), base `827df3e`
+## D102 (a), fijar la versión de `bcrypt`: **entregada** en `af924ea` (2026-11-09; el informe va en el commit siguiente), base `d39c1f6`
 
 | SHA | Qué |
 |---|---|
-| `43ac587` | fix: `dev_dashboard.html` arma la tabla de pedidos con `textContent`, sin `innerHTML`; CHANGELOG |
-| `55f282c` | test: `scripts/testing/pantalla_panel_dev.js` (Chromium) y `scripts/testing/sabotajes/panel_dev.sh` |
-| `3fde8bb` | test: la prueba cuenta las imágenes pedidas por el ataque y mira el gris de hora e IP |
+| `a7bc85a` | chore: `requirements.txt` fija `bcrypt==5.0.0`; CHANGELOG |
+| `2a68280` | test: el login con una clave de 72 bytes y algo más da 401 |
+| `af924ea` | test: esas mismas claves tampoco valen como clave actual en el cambio de clave (400) |
 
-**Resultado:** la tabla «pedidos recientes» del panel muestra como texto la
-hora, el método, el endpoint, el estado, la latencia y la IP. Un valor con
-`<img src=/inyectado onerror=…>` no crea elementos, no pide la imagen y se lee
-tal cual; `<sin ruta>` también. Se conservan la insignia del método, el color
-del estado y el gris de hora e IP.
+**Resultado:** `requirements.txt` sólo fijaba `passlib[bcrypt]`, que acepta
+cualquier `bcrypt>=3.1`. Con una 4.x, `checkpw` compara sólo los primeros 72
+bytes: una clave más larga que empieza igual que la verdadera entraba al login
+y servía como «clave actual» para cambiarla. Con la 5.0.0 fijada, `checkpw`
+lanza `ValueError`, `verify_password` (`main.py:3203-3213`) la atrapa y
+devuelve `False`: falla cerrado, 401 en el login y 400 en el cambio. La clave
+exacta de 72 bytes sigue entrando.
 
-**Nada para decidir.** Leí tu D151 (a): tu rama no la traigo hasta que
-INTEGRAR-1 esté aceptada, así que esta pieza va sobre `827df3e` sin merge.
-Supuesto reversible: ninguno; no agregué nada fuera de la tabla.
+### Decisiones
 
-**Archivo de producto tocado:** `proyecto_maria/templates/dev_dashboard.html`.
-`producto +22/−27`.
+- **D153 — `pwd_context` de passlib (`main.py:166`).** Es código muerto: no
+  hay ningún `.verify` ni `.hash` en el repositorio. Con bcrypt 5, si alguien
+  lo usara, passlib lanza `ValueError` al detectar el backend. Opciones:
+  (a) pieza chica de limpieza que saca `pwd_context` y `passlib` de
+  `requirements.txt`; (b) dejarlo. **Recomiendo (a)**, a la cola de limpieza:
+  es una trampa para quien lo use creyendo que funciona.
+- **D154 — tope propio de 72 bytes en `verify_password`.** Opciones:
+  (a) dejarlo como está: el pin y la prueba nueva lo cubren; (b) agregar el
+  tope en `verify_password`. **Recomiendo (a)**: con (b) la prueba deja de
+  distinguir que alguien saque el pin (daría verde con bcrypt 4.x), y el
+  `except` ya falla cerrado.
+
+Supuesto reversible: ninguno; no agregué nada fuera del pin y su prueba.
+
+**Archivos de producto tocados:** `requirements.txt` (+1) y `CHANGELOG.md`
+(+4). `chequeo-6` dice `producto +0/−0` porque cuenta sólo `proyecto_maria/`;
+`main.py` no cambió.
 
 ### Comandos copiables
 
 ```bash
-node scripts/testing/pantalla_panel_dev.js          # 7 «OK», última línea «fallas: 0», salida 0
-scripts/testing/sabotajes/panel_dev.sh 3fde8bb      # «BASE | en verde», 6 «ROJO», «sabotajes sin rojo: 0», salida 0
-git show 827df3e:proyecto_maria/templates/dev_dashboard.html > proyecto_maria/templates/dev_dashboard.html; \
-  node scripts/testing/pantalla_panel_dev.js; git checkout -- proyecto_maria/templates/dev_dashboard.html   # «fallas: 4», las de abajo
+pip show bcrypt | grep Version                                    # «Version: 5.0.0»
+python -m pytest -q --no-cov tests/test_entradas1.py -k "72"      # 5 passed, salida 0
+# rojo con una 4.3.0 instalada aparte (pip install --target <dir> bcrypt==4.3.0):
+PYTHONPATH=<dir>:. python -m pytest -q --no-cov tests/test_entradas1.py -k "72"   # «assert 200 == 401», «1 failed, 4 passed, 75 deselected»
 ```
 
-Ninguno necesita servidor ni base: la prueba sirve la plantilla real y
-responde la API ella misma.
+### Rojos con bcrypt 4.3.0, copiados de la salida
 
-### Rojo con el producto anterior (`827df3e`), copiado de la salida
-
-```
-FALLA | elementos creados por el texto de api_logs: 10
-FALLA | imágenes pedidas por el texto de api_logs: 1
-FALLA | fila 1 como texto: ["1","2","3","500","4 ms","5"]
-FALLA | fila 2 como texto: ["10:00:00","GET","","404","7 ms","203.0.113.9"]
-```
-
-### Sabotajes, sobre `3fde8bb` (salida exacta)
+Login (`af924ea`; en `2a68280`, con su `-k`, daba el mismo `assert 200 == 401` con `1 failed, 79 deselected`):
 
 ```
-BASE  | en verde
-ROJO  | las celdas interpretan el texto como HTML: dice «elementos creados por el texto de api_logs»
-ROJO  | el texto se interpreta como HTML fuera de la tabla: dice «imágenes pedidas por el texto de api_logs»
-ROJO  | la insignia interpreta el método como HTML: dice «elementos creados por el texto de api_logs»
-ROJO  | el estado pierde su color: dice «color del estado»
-ROJO  | la hora y la IP pierden el gris: dice «hora e IP en gris»
-ROJO  | el método pierde su insignia: dice «método en su insignia»
-sabotajes sin rojo: 0
+E   AssertionError: ('login', 73, '{"message":"Login exitoso","access_token":"eyJ…",...}')
+E   assert 200 == 401
+1 failed, 4 passed, 75 deselected
 ```
 
-Cada sabotaje exige que su patrón aparezca una sola vez (si no, «ROTO») y que
-el rojo diga su motivo (si no, «ROJO?»).
+Cambio de clave, con el tramo del login salteado (`af924ea`):
 
-### Puertas, sobre `3fde8bb`
+```
+E   AssertionError: ('cambio', 73, '{"success":true,"message":"Contraseña actualizada","access_token":"eyJ…"}')
+E   assert 200 == 400
+1 failed, 4 passed, 75 deselected
+```
+
+### Puertas, sobre `af924ea`
 
 | Puerta | Salida |
 |---|---|
-| pytest (entorno de `/entregar`) | `=== 5452 passed, 335 skipped, 3 xfailed, 108 warnings in 1053.49s (0:17:33) ====`, salida 0. Al final, avisos «Task was destroyed but it is pending!» de asyncio, como en las vueltas anteriores. |
+| pytest (entorno de `/entregar`) | `=== 5453 passed, 335 skipped, 3 xfailed, 107 warnings in 1065.78s (0:17:45) ====`, salida 0 (uno más que en D139: la prueba nueva) |
 | `compileall -q proyecto_maria` | salida 0 |
 | `smoke_friccion.sh` (uvicorn en 8097, SQLite propia) | `==> OK · telemetría y alias session/state rechazan sin sesión + by-cuit protegido`, salida 0 |
-| `ataque_aislamiento.sh` | **no corrido**: la pieza sólo cambia una plantilla del panel admin; no toca datos, sesión ni permisos. `/api/dev/stats` sigue con `Depends(require_admin)`. |
-| `pantalla_panel_dev.js` | 7 OK, `fallas: 0`. **No corre en pytest ni en la CI** (no hay navegador ahí). |
+| `ataque_aislamiento.sh` | **no corrido**: la pieza sólo fija la dependencia del hashing; no cambia datos, sesión ni permisos de clientes o descargas, que es lo que cubre el script. Login y cambio de clave los cubre la prueba nueva. |
 | grep de historia de §6 | vacío |
 
-`chequeo-6.py 827df3e 3fde8bb`, salida entera:
+`chequeo-6.py d39c1f6 af924ea`, salida entera:
 
 ```
-chequeo-6 827df3e..3fde8bb: avisos para mirar, no un veredicto
-producto +22/−27
-arnés +136/−0
+chequeo-6 d39c1f6..af924ea: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +16/−0
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
@@ -86,27 +90,31 @@ avisos: 0
 
 | Quién | Hallazgo | Qué hice |
 |---|---|---|
-| adversario Sonnet, alto | Media: la prueba no veía la ejecución, sólo elementos dentro de la tabla; un `innerHTML` en un nodo suelto corría el `onerror` en verde | Arreglado en `3fde8bb`: cuenta los pedidos de `/inyectado` hasta una imagen centinela y busca elementos en toda la página. Sabotaje «fuera de la tabla». |
-| adversario Sonnet, alto | `setAttribute('title', …)` y `href` con `javascript:` | No existen en el código: quedan como riesgo para quien los agregue |
-| adversario Sonnet, alto | Baja: un método nulo deja la insignia vacía | Queda: `method` es `nullable=False` (`models.py:368`) |
-| adversario Sonnet, alto | Info: latencia nula muestra «null ms» | Queda, igual que antes |
-| `/code-review high` | `/inyectado` y `text-muted` no se chequeaban; `trim` escondía diferencias; `trap` armado después del worktree | Arreglados en `3fde8bb` |
-| `/code-review high` | índices de celda escritos a mano | Queda: la tabla tiene seis columnas fijas en la plantilla |
-| `/code-review high` | `fetchStats` no mira `response.ok` | Previo, fuera de alcance: riesgo |
-| `/security-review` (Sonnet) | sin hallazgos de confianza ≥ 8 | — |
+| adversario Sonnet, alto | Baja: una cuenta cuyo hash se hizo con 4.x sobre una clave de más de 72 bytes ya no entra con la clave completa | Queda como riesgo (abajo) |
+| adversario Sonnet, alto | Baja: `pwd_context` lanza `ValueError` con bcrypt 5 | Código muerto: D153 |
+| adversario Sonnet, alto | Sin problema: registro, estudio, reset y cambio pasan por `ClaveNueva` (tope de 72 bytes); `pip check` limpio; los hashes 4.x verifican con 5; la prueba distingue el defecto | — |
+| `/code-review high` | Faltaba el cambio de clave, que verifica la actual con la misma función | Arreglado en `af924ea`, con su rojo |
+| `/code-review high` | Sacar passlib | D153 |
+| `/code-review high` | `verify_password` sin chequeo de largo propio | D154 |
+| `/code-review high` | Aserción unitaria del contrato de `verify_password` | Queda: el rojo con 4.x y el login exacto final ya lo muestran |
+| `/code-review high` | Registro duplicado en la prueba | Queda: `_por_registro` no devuelve el usuario |
+| `/code-review high` | `proyecto_maria/requirements.txt` sin el pin | No aplica: archivo viejo que no usa nada (Dockerfile y CI leen el de la raíz) |
+| `/security-review` (Sonnet) | sin hallazgos de confianza ≥ 8. Planteó un 500 por `ValueError` en `hash_password` | No se alcanza: las cuatro entradas externas usan `ClaveNueva` (`main.py:353`, `1799`, `2498`, `10640`); la llamada de `1717` hashea claves de semilla fijas y cortas |
 
 ### Riesgos y lo que no se corrió
 
-- `pantalla_panel_dev.js` y sus sabotajes no corren en la CI ni en pytest.
+- Cuentas viejas: si en producción corrió alguna vez una 4.x y alguien
+  registró una clave de más de 72 bytes antes de que existiera el tope de
+  `ClaveNueva`, ya no entra con la clave completa; sí con sus primeros 72
+  bytes o con un reset. No lo puedo medir sin mirar producción.
+- La CI instala `requirements.txt` y corre `pytest --no-cov` entero
+  (`ci.yml:31,45`), así que corre la prueba nueva con la 5.0.0; Railway no
+  espera la CI. (`CLAUDE.md` §5 dice que la CI deselecciona tests de
+  presupuestos: en el `ci.yml` actual no veo ningún `--deselect`.)
 - `ataque_aislamiento.sh`: no corrido, por la razón de la tabla.
-- Previos, fuera de alcance: `fetchStats` sin `response.ok`; el CDN de
-  `dev_dashboard.html:7-8` sin SRI; «null ms».
-- Ajenos que vi y no toqué: `main.py:2905` devuelve `HTMLResponse(f"<pre>{e}</pre>")`
-  sin escapar; `innerHTML` en `static/v2` sin auditar. Si querés, van a una D.
-- Por un error mío (variable de shell vacía) quedaron dos archivos de salida
-  en la raíz del contenedor, `/panel-sab-55f282c.txt` y `/suite-55f282c.txt`.
-  No están en el repositorio; no los pude borrar desde la sesión.
+- Siguen en la raíz del contenedor de D139 los dos archivos sueltos
+  (`/panel-sab-55f282c.txt`, `/suite-55f282c.txt`); no están en el repositorio.
 
 ### Sigue
 
-D102 (fijar `bcrypt`).
+Nada asignado después de D102: espero tu próxima tarea.
