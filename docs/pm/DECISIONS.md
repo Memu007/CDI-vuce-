@@ -590,3 +590,9 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - «Fusioná» quería decir **publicar**. Nada se publica sin «dale <SHA>»: la
   PM le pasa el SHA cuando INTEGRAR-1 esté aceptada y lo previo a publicar
   esté hecho (D64, FRONTEND_URL y ALLOWED_ORIGINS en Railway, riesgo de D102).
+
+### 2026-11-09 20:20 UTC (PM, modo automático)
+
+- **D155 (a)** en CATALOGO-3: origen válido = lo que reconoce
+  `pais_reconocido` (nombre o código), guardado tal cual, en despacho,
+  catálogo y extractor. Con (b) quedaban sin origen 143, 402, 403, 408 y 423.

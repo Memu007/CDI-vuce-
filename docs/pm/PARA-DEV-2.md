@@ -5,6 +5,15 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 ## Tarea activa: CATALOGO-3 (2026-11-09 PM, sí de Emi)
 
+**D155: (a), decidido por la PM (20:20 UTC).** Origen válido es lo que
+reconoce `pais_reconocido`, nombre o código, y se guarda tal cual; el
+extractor deja de recortar a 3 y usa ese mismo criterio. Cambiá
+`test_despacho1b` para la nueva conducta. Que siga rechazando «XYZ», «ZZ»,
+«123», «ＢＲ» y «ÉS», y que nombre en el informe qué casos de esa prueba
+cambiaron. Una prueba tiene que mostrar que «CHINA» y «CN» dan el mismo
+código MARIA en el TXT, y va la corrida del golden. «PAISES BAJOS» → 423 queda
+anotado: no es de esta pieza.
+
 Emi dijo que sí el 09/11. Tu rutina vuelve a estar prendida. Comportamiento
 pedido, con un caso por causa y la familia como datos:
 
