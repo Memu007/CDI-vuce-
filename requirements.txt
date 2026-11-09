@@ -100,6 +100,7 @@ aiosqlite>=0.19.0          # Async SQLite driver (fallback dev)
 # Additional tools:
 # python-jose[cryptography]  # Enhanced JWT
 passlib[bcrypt]==1.7.4    # Password hashing
+bcrypt==5.0.0             # la 4.x compara sólo los primeros 72 bytes: una clave más larga que empieza igual entraría
 pytest>=9.1.0
 pytest-asyncio>=1.4.0
 pytest-timeout==2.4.0    # mata tests colgados (red de seguridad anti-hang)

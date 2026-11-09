@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-09 · chore: bcrypt queda fijado en 5.0.0 (D102)
+
+- Una instalación nueva no puede traer una bcrypt 4.x, que compara sólo los primeros 72 bytes de la clave: con ella, en el login entraría una clave más larga que empieza igual que la verdadera.
+
 ## 2026-11-09 · fix: el panel de dev muestra como texto lo que llega de los pedidos (D139)
 
 - La tabla de pedidos recientes ya no interpreta como HTML el endpoint, el método, la IP ni la hora: un camino con `<img onerror=…>` guardado antes de que las métricas guardaran el molde ya no corre en el navegador del admin, y `<sin ruta>` se lee tal cual.
