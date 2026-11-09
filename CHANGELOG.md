@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-09 · fix: el panel de dev muestra como texto lo que llega de los pedidos (D139)
+
+- La tabla de pedidos recientes ya no interpreta como HTML el endpoint, el método, la IP ni la hora: un camino con `<img onerror=…>` guardado antes de que las métricas guardaran el molde ya no corre en el navegador del admin, y `<sin ruta>` se lee tal cual.
+
 ## 2026-11-09 · fix: una invitación a un email que ya tiene cuenta no ocupa lugar en el estudio (ORG-1)
 
 - Si la persona invitada se registró sin el link, entró a otro estudio o se puso ese email en el perfil, la invitación no se puede usar mientras esa cuenta tenga el email: deja de contar para el tope del plan y el dueño puede invitar a otra persona.
