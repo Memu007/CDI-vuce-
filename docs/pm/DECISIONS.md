@@ -604,3 +604,17 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   434 viene del formulario F. 2672, que usa cuatro dígitos. Los sitios de
   AFIP e infoleg no se abren desde la sesión: el dato sale del resumen del
   buscador, sin haber abierto el documento.
+
+### 2026-11-09 20:43 UTC (Emi)
+
+- «Usalo más seguido al advisor por favor sos la pm usalo, esto es rule para
+  vos». Los momentos en que se lo consulta quedan escritos en
+  `ONBOARDING-PM.md`, «Subagentes».
+
+### 2026-11-09 21:00 UTC (PM; corrige la entrada de las 20:55)
+
+- Retiro «Países Bajos = 423». El consejero lo objetó y volví a buscar: las
+  tablas oficiales y `paises_maria.js` traen dos entradas, 423 PAISES BAJOS
+  y 434 HOLANDA. Ningún código de país cambia de valor. «NL» sigue en 434
+  hasta que Emi confirme cuál lleva un despacho real; va a la lista de antes
+  de publicar.

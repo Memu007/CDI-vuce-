@@ -14,11 +14,15 @@ cambiaron. **Corrección de la PM (20:45 UTC):** la prueba va sobre la familia y
 ejemplo. Para cada país de la tabla, su nombre y su código tienen que dar el
 mismo código MARIA en el TXT. Va además la corrida del golden. «PAISES BAJOS» sí entra en esta pieza: con (a), ese camino llega al
 TXT. En `maria_generator.py:129` y `:134` la clave «NL» está dos veces, y gana
-la segunda. **El valor es 423** (Emi: «fijate online», 20:55 UTC). Las tablas de
-códigos María de AFIP ponen 423 PAISES BAJOS, entre 422 NORUEGA y 426 REINO
-UNIDO. El 0434 es de otro formulario, el F. 2672, que usa cuatro dígitos. «NL»
-y «HOLANDA» dan 423. Si al cruzar la tabla con esa misma fuente aparece otro
-choque de este tipo, va como D: no lo arregles sin preguntar.
+la segunda. **NL queda pendiente (corrección de las 21:00 UTC; retiro lo de
+las 20:55).** Las tablas oficiales traen dos entradas, 423 PAISES BAJOS y 434
+HOLANDA, y `paises_maria.js` también. Ningún país cambia de valor: «PAISES
+BAJOS» da 423, «HOLANDA» da 434, y «NL» sigue como hoy (434, en el back y en
+el front) hasta que decida Emi. El chequeo de claves repetidas lee el código
+fuente del literal (`ast` o F601 de pyflakes): en el dict ya cargado no se ve
+la clave perdida. En la prueba de la familia, cada código ISO dice con qué
+nombre va. Las entradas dobles (NL, CHIPRE 311/435, TURQUIA 336/436, ALEMANIA
+402/438) van como D, sin arreglarlas.
 Antes de cerrar, buscá quién compara el origen por igualdad o supone que tiene
 dos letras: ancho de columna, listas ISO2, claves. Con (a), un mismo país puede
 aparecer escrito de dos formas.
