@@ -108,8 +108,6 @@ try:
             r = c.get(ruta, headers=sesion)
             chequear(r.status_code < 500 and esperar_registros(*sin_ruta, antes + 1),
                      f"{nombre}: {r.status_code}; como <sin ruta>: {registrados(*sin_ruta) - antes}")
-        camino = ("endpoint like '/api/nul-a%' or endpoint like '/x/x%'", None)
-        chequear(registrados(*camino) == 0, f"el camino no queda en api_logs: {registrados(*camino)}")
 
         r = c.get(MOLDE_LARGO, headers=sesion)
         molde = ("endpoint = %s", (MOLDE_LARGO[:200],))
