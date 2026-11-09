@@ -3,18 +3,27 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## INTEGRAR-1: recibida en `19036a2`, revisión después del corte (2026-11-09 PM)
+## Tarea activa: INTEGRAR-1 vuelta 2, terminar lo no corrido (2026-11-09 PM)
 
-Corte de la sesión a las 05:00 UTC: terminá el paso en curso, commit, push,
-anotá al final de `PARA-PM.md` dónde quedaste y frená. No integres `0231eee`
-(dev-maria) hasta que lo pida. La revisión y reproducción de INTEGRAR-1 la
-hago en la próxima sesión; no es aceptada todavía.
+Emi retomó el 09/11 19:59 UTC sin hora de corte. INTEGRAR-1 sigue recibida en
+`19036a2`, sin aceptar. Antes de que yo la revise, cerrala vos, sobre un solo
+SHA final y con un solo informe:
 
-- **D140: (a).** El webhook sin `MP_WEBHOOK_SECRET` se rechaza en cualquier
-  entorno. Hacé el cambio de `tests/test_entorno1.py` y `sabotajes/entorno1.sh`
-  en tu próxima vuelta (después del corte), en commits separados.
-- **D141: (a)**, pero como pieza nueva: se la propongo a Emi. No la hagas.
-- **D143: (a)**, también pieza nueva para Emi. No la hagas.
+1. **D140 (a)**: el webhook sin `MP_WEBHOOK_SECRET` se rechaza en cualquier
+   entorno. Cambiá `tests/test_entorno1.py` y `sabotajes/entorno1.sh` en
+   commits separados (producto, pruebas).
+2. Todo lo de «No corrido»: los 56 arneses, `cobro_mp1` y `cobro_corte1.sh`
+   enteros, `aislamiento2.sh ataque` y `ataque_aislamiento.sh`,
+   `smoke_friccion.sh`, `/code-review` y `/security-review` sobre el merge.
+3. **Causa del corte de 30 minutos**: es el tiempo por defecto de las tareas
+   en segundo plano de Bash. Pasá `timeout` hasta 7200000 ms y agrupá los
+   arneses en tandas que entren; esperá la condición, sin esperas fijas.
+4. Suite completa sobre el SHA final, desde base limpia.
+
+Si un arnés da rojo, clasificalo (merge, previo de MARIA o de la base) con su
+causa. D141 y D143 son piezas que le propongo a Emi: no las hagas. No
+integres `0231eee` (dev-maria) hasta que lo pida. Después de esto,
+CONEXIONES-1 parte B. Próxima D tuya: D144.
 
 ## NOMBRES-1: aceptada sobre `1960a9a` (2026-11-08 PM)
 

@@ -3,6 +3,13 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
+## Sin tarea por ahora; tu rutina sigue apagada (2026-11-09 PM)
+
+Emi retomó el 09/11 sin hora de corte. Tu cola del roadmap espera a Emi o al
+despachante (CATALOGO-3, DESPACHO-1, PESO-NETO-1, MARIA-6), y no quiero sumar
+commits a `claude/dev-maria` mientras INTEGRAR-1 está abierta. Te despierto
+yo cuando haya una pieza. No hace falta que contestes.
+
 ## D102 (a), versión fija de bcrypt: aceptada sobre `af924ea`, sin integrar (2026-11-09 02:45 PM)
 
 Evidencia: `docs/pm/REPRODUCCION-D102-2026-11-09.md`. Igual al informe:
