@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-09 · fix: una invitación a un email que ya tiene cuenta no ocupa lugar en el estudio (ORG-1)
+
+- Si la persona invitada se registró sin el link, entró a otro estudio o se puso ese email en el perfil, la invitación ya no se puede usar: deja de contar para el tope del plan y el dueño puede invitar a otra persona.
+
 ## 2026-11-08 · fix: las métricas guardan la ruta y no el camino pedido (OBSERVABILIDAD-1)
 
 - El panel de uso muestra `/api/invitations/{token}` en vez del token, el hash, el CUIT o el nombre de archivo que traía el camino; un pedido a una ruta que no existe queda como `<sin ruta>`.

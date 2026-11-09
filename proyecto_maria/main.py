@@ -10840,8 +10840,8 @@ async def invite_to_organization(
         )
 
     # Tope del plan: miembros (el dueño también) más los emails con una
-    # invitación pendiente sin vencer. Volver a invitar a un email que ya
-    # tiene una pendiente no ocupa otro lugar.
+    # invitación pendiente sin vencer y sin cuenta en CDI, la única que se
+    # puede usar. Volver a invitar a un email pendiente no ocupa otro lugar.
     tope = billing_service.get_plan(org.plan or "premium")["users"]
     emails_miembros = await _emails_de_miembros(db, org.id)
     ahora = datetime.now(timezone.utc)
@@ -10852,7 +10852,11 @@ async def invite_to_organization(
         (inv.email or "").strip().lower()
         for inv in pendientes.scalars().all()
         if not inv.expires_at or _utc(inv.expires_at) > ahora
-    } - set(emails_miembros)
+    }
+    con_cuenta = await db.execute(
+        select(func.lower(func.trim(User.email))).where(func.lower(func.trim(User.email)).in_(emails_pendientes))
+    )
+    emails_pendientes -= {email for (email,) in con_cuenta.all()}
     if clean_email not in emails_pendientes and len(emails_miembros) + len(emails_pendientes) >= tope:
         raise HTTPException(
             status_code=400,
