@@ -21,9 +21,14 @@ sabotaje $M "login con la contraseña guardada salvo en producción" \
   'if not is_valid and not IS_PRODUCTION and stored_password == password:' \
   "$C[login_con_lo_guardado]" "login_con_lo_guardado $VIEJO"
 sabotaje $M "webhook sin secreto acepta salvo en producción" \
-  $'    if not MP_WEBHOOK_SECRET:\n        return _es_desarrollo()' \
+  $'    if not MP_WEBHOOK_SECRET:\n        return False' \
   $'    if not MP_WEBHOOK_SECRET:\n        return not IS_PRODUCTION' \
   "$C[webhook_sin_secreto]" "webhook_sin_secreto $VIEJO"
+sabotaje $M "webhook sin secreto acepta en desarrollo" \
+  $'    if not MP_WEBHOOK_SECRET:\n        return False' \
+  $'    if not MP_WEBHOOK_SECRET:\n        return _es_desarrollo()' \
+  "FAILED $T::test_puerta_cerrada_tambien_en_desarrollo[webhook_sin_secreto]" \
+  "webhook_sin_secreto no queda cerrada: {'development': 'abierta', 'test': 'abierta', 'testing': 'abierta'}"
 sabotaje $M "link de reset por consola salvo en producción" \
   $'        if not _es_desarrollo():\n            logging.warning("SMTP no configurado' \
   $'        if IS_PRODUCTION:\n            logging.warning("SMTP no configurado' \
@@ -43,7 +48,7 @@ sabotaje $CF "desarrollo sin mirar mayúsculas ni espacios" \
   "$C[demo]" "$C[cobro_simulado]" "cobro_simulado no queda cerrada: {'Development': 'abierta', ' development': 'abierta', 'TESTING': 'abierta'}"
 sabotaje $CF "staging cuenta como desarrollo" \
   'in ("development", "test", "testing")' 'in ("development", "test", "testing", "staging")' \
-  "$C[webhook_sin_secreto]" "webhook_sin_secreto no queda cerrada: {'staging': 'abierta'}"
+  "$C[demo]" "demo no queda cerrada: {'staging': 'abierta'}"
 sabotaje $CF "variable ausente cuenta como desarrollo" \
   'return os.getenv("ENVIRONMENT") in' 'return os.getenv("ENVIRONMENT", "development") in' \
   "$C[login_con_lo_guardado]" "login_con_lo_guardado no queda cerrada: {None: 'abierta'}"
