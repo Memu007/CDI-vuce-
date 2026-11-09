@@ -2,214 +2,169 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## OBSERVABILIDAD-1, devolución sobre `694f183`: **entregada** en `279ef26` (2026-11-09), base `0231eee`
+## ORG-1 + D40, devolución sobre `b358827`: **entregada** en `bf9583b` (2026-11-09; el informe va en el commit siguiente), base `db9f11f`
 
-La devolución tenía razón. La pieza cambió qué se guarda en `api_logs.endpoint`,
-y el arnés de Postgres de ENTRADAS-3 seguía contando por el camino pedido. Lo
-arreglé en el arnés. **El producto no cambió desde `694f183`.** Nada para
-decidir dentro de la pieza; D150 es para después.
+Los seis puntos de la devolución están atendidos. El producto cambió en dos
+lugares de `main.py` (+8/−3): el tope ya no cuenta las pendientes de emails
+con cuenta, y al registrarse una vencida por fecha no queda usada. Decidís
+D151 (cuándo traigo tu rama). Lo demás de las decisiones sigue como estaba.
 
 | SHA | qué |
 |---|---|
-| `df59756`, `42dd9a6` | fix (vuelta anterior, sin cambios) |
-| `7fe33c5`, `d7a57ac`, `2c52c83`, `694f183` | test (vuelta anterior, sin cambios) |
-| `328458d`, `e2dd1e2` | docs (vuelta anterior) |
-| `d3a64f9` | test: el arnés de Postgres de ENTRADAS-3 lee el molde |
-| `7fd0f5f` | test: cada pedido sin ruta cuenta su propia fila |
-| `279ef26` | test: los sabotajes de ENTRADAS-3 leen la salida de Postgres como texto |
+| `1095f5c` | fix: una pendiente a un email con cuenta no ocupa lugar en el tope |
+| `ef022b3` | test: un caso por guarda de invitar, sacar, validar y listar, con su sabotaje |
+| `e9e6153` | fix: una vencida por fecha no queda usada; el tope compara la cuenta como el registro (lower, sin trim). Suma CHANGELOG |
+| `bf9583b` | test: los rojos de `e9e6153` y tres sabotajes |
 | este commit | docs: el informe |
 
-**Producto +35/−15**, igual que en `694f183`. Las 20 netas ya las expliqué en
-la vuelta anterior: son el segundo `try` del índice. **Arnés +252/−39.**
+**Producto +8/−3. Arnés +406/−58** (`test_org1.py` +173, `sabotajes/org1.sh`
++174/−57, `org1_postgres.py` +59/−1).
 
-Los tres puntos de la devolución:
+### Los seis puntos
 
-1. **Revisé todo lo que lee `api_logs.endpoint`.** El `grep` y lo que hice con
-   cada resultado están en la tabla de abajo. Sólo el arnés de ENTRADAS-3 y
-   sus sabotajes leían el camino. Los demás ya esperaban el molde o no miran
-   la columna.
-2. **`entradas3_postgres.py` sigue probando lo mismo.** Hay dos pedidos: el que
-   lleva NUL (`/api/nul-a%00b`) y el de 300 caracteres que no existe. Cada uno
-   suma una fila nueva con `endpoint = '<sin ruta>' and status_code = 404`, y
-   ninguno da 500. `sabotajes/entradas3.sh` con Postgres da base verde y 12
-   ROJO (tabla de puertas). El arnés de `694f183` sobre el mismo producto
-   reproduce tu rojo: `FALLA | NUL en la ruta: 404; en api_logs: 0` y
-   `FALLA | ruta de 300 caracteres: 404; en api_logs: 0`.
-3. **`_guardable_en_pg`** tiene casos para dos de sus usos:
-   - la guarda sobre `error_message`: `RuntimeError("e3\x00falla")` queda como
-     `e3�falla`;
-   - el `[:200]`: un molde de prueba de 313 caracteres queda recortado a 200.
-
-   La llamada sobre `endpoint` no puede tener caso: es D150.
-
-### Grep de lo que lee `api_logs.endpoint`
-
-```bash
-grep -rn --include='*.py' --include='*.sh' --include='*.sql' --include='*.html' --include='*.js' \
-  -E "api_logs|\.endpoint\b|ApiLog" proyecto_maria scripts tests docs/pm/herramientas
-```
-
-| dónde | qué hace con `endpoint` | qué hice |
-|---|---|---|
-| `scripts/testing/entradas3_postgres.py` | contaba filas por el camino pedido | arreglado en `d3a64f9` y `7fd0f5f`: cuenta `<sin ruta>` y el molde |
-| `scripts/testing/sabotajes/entradas3.sh:94-101` | sabotajes del registro en Postgres | adaptados en `d3a64f9`; en `279ef26` saqué el NUL de la salida |
-| `scripts/testing/sabotajes/observabilidad1.sh` | sabotajes de la pieza | ya esperaban el molde: 24 ROJO |
-| `scripts/testing/observabilidad1_arranque.py:256-265` | lee las filas nuevas de `/robots.txt` | queda: `/robots.txt` es su propio molde |
-| `tests/test_observabilidad1.py:138` y `:258` | casos de la pieza | ya esperan el molde |
-| `proyecto_maria/main.py:2697-2714` → `templates/dev_dashboard.html:260` | panel de dev, con `innerHTML` sin escapar | D139 (a): va en una pieza aparte |
-| `scripts/testing/conexiones1_medir.py:302` | `count(*)`, no mira la columna | nada |
-| `add_indexes.sql:33` | índice sobre la columna | nada |
-| `proyecto_maria/core/error_notes_tracker.py` | su `endpoint` sale de `context`, no de `api_logs` | nada |
-| `monitoring_service.py` | métricas en memoria | nada |
-| `docs/pm/herramientas` | sin resultados | nada |
+1. **El «Sumá» 4, un caso por guarda.** Casos nuevos en `tests/test_org1.py`,
+   cada uno con su sabotaje en `org1.sh`:
+   - `test_invitar_o_sacar_sin_estudio_400` ← «invitar sin estudio», «sacar sin estudio»;
+   - `test_un_miembro_no_puede_invitar_403` ← «invita quien no es dueño» (tu `if False`);
+   - `test_la_invitacion_vence_a_los_7_dias` ← «la invitación vence a los 8 días»;
+   - `test_validar_con_el_estudio_borrado_404` ← «validar con el estudio borrado»;
+   - `test_sacar_a_alguien_de_otro_estudio_404_y_sigue_en_el_suyo` ← «sacar busca en todos los estudios» (tu filtro por estudio);
+   - `test_sacar_no_borra_al_usuario` ← «sacar borra al usuario»;
+   - `test_mine_lista_sólo_los_miembros_del_estudio_y_quién_es_dueño` ← los tres de `/mine`.
+   El de validar con el estudio borrado corre sólo en SQLite: en Postgres la
+   FK de `models.py:571` no deja borrar el estudio con la invitación adentro.
+2. **Una vencida queda vencida.** `test_una_invitacion_vencida_sigue_vencida_cuando_entra_con_otra`,
+   por zona (SQLite sin zona, Postgres con zona) × estado (`expired`, y
+   `pending` con la fecha pasada). El `pending` vencido por fecha estaba **en
+   rojo** (`'accepted' == 'pending'`): el `UPDATE` del registro lo marcaba
+   usado. Lo arregla `e9e6153`. El filtro `status == "pending"` sólo lo
+   distingue Postgres: en SQLite la marcada `expired` no vuelve a `pending`
+   por otro lado. Sabotajes: «la regla 2 despierta a las marcadas vencidas
+   (sólo en PG)» y «la regla 2 usa las vencidas por fecha».
+3. **El orden de los mensajes.** `test_con_el_estudio_lleno_un_email_con_cuenta_dice_que_ya_tiene_cuenta`,
+   también en `org1_postgres.py`. Ya estaba verde; lo distingue «con el
+   estudio lleno, el tope habla antes que la cuenta».
+4. **El `UPDATE` en la misma transacción.** `test_si_falla_usar_las_otras_invitaciones_no_se_crea_la_cuenta`:
+   secuencial, hace fallar el `UPDATE` y comprueba que no queda la cuenta ni
+   cambia la invitación. Ya estaba verde; lo distingue «la regla 2 en otra
+   transacción».
+5. **Lugar muerto.** `test_una_pendiente_cuyo_email_ya_tiene_cuenta_no_ocupa_lugar`,
+   con la familia como datos: `sin link` (tu A), `con la invitacion de otro
+   estudio` (tu C), `perfil` (se pone ese email en el perfil) y `vieja en
+   mayusculas` (cuenta guardada con mayúsculas). Los cuatro **en rojo** sobre
+   `db9f11f` (`4 failed, 79 passed`); los arregla `1095f5c`. El caso de la
+   cuenta guardada con espacios (`test_una_pendiente_a_una_cuenta_con_espacios_ocupa_lugar`)
+   va al revés: esa cuenta no frena el registro, así que la invitación sí se
+   puede usar y sigue ocupando lugar. Estaba **en rojo** con `1095f5c`
+   (`200 == 400`); lo arregla `e9e6153`. Sabotajes: «el tope cuenta las
+   pendientes de emails con cuenta», «el tope compara la cuenta sin
+   mayúsculas», «el tope compara la cuenta sin espacios».
+6. **A riesgos**, abajo: R1 a R3.
 
 ## Decisiones
 
-- **D150. `_guardable_en_pg(endpoint)` es inalcanzable.** Lo que se guarda en
-  `endpoint` es una de dos cosas: el `path_format` de la ruta, que sale del
-  código, o la constante `<sin ruta>`. Además, `_RutaSinNul` frena antes un
-  NUL en el camino (404) o en la consulta (400). Ningún pedido puede meter un
-  NUL ahí.
-  - (a) Dejar la llamada sin caso, como defensa por si cambia de dónde sale el
-    endpoint.
-  - (b) Sacar la llamada del producto y dejar el endpoint sólo con `[:200]`.
+- **D151. Cuándo traigo tu rama.** `DECISIONS.md:557` (D136) dice que no la
+  traigo hasta que INTEGRAR-1 esté aceptada, y tu rama trae producto de la
+  técnica (`main.py`, `models.py`, billing).
+  - (a) Espero a INTEGRAR-1.
+  - (b) La traigo ahora y resuelvo los choques en `main.py`.
 
-  **Recomiendo (b):** un chequeo que nada puede activar tampoco se puede
-  probar, y §6 pide restar antes de sumar. Va en otra pieza, con su rojo,
-  porque esta devolución no cambia producto.
-- **D142** (en la vuelta anterior la llamé D140): las filas viejas de
-  `api_logs` tienen el camino crudo. Va a Emi. Mientras decide, (c): no toco
-  ninguna fila.
+  **Recomiendo (a):** es lo decidido en D136, y traerla ahora mezcla en esta
+  entrega producto que no es de la pieza.
 
-Siguen abiertas:
-- **D131**, de EMAIL-1, va a Emi.
-- **D136**: no traigo tu rama hasta que INTEGRAR-1 esté aceptada.
-
-D139 ya la decidiste: (a), escapar el panel en una pieza aparte. La próxima D
-libre es la D151.
+Siguen abiertas D131 (a Emi) y D142 (a Emi; mientras, c). D150 la decidiste
+(b), D139 (a). La próxima D libre es la D152.
 
 Supuestos reversibles:
 
-1. **`<sin ruta>` cubre también pedidos que nunca llegan a una ruta.** Son el
-   preflight de CORS, el 404 (NUL en la ruta) y el 400 (NUL en la consulta)
-   de `_RutaSinNul`, el 307 de la barra final y el 429 del límite. Ninguno
-   deja el camino crudo. Esto corrige la vuelta anterior, que nombraba sólo
-   «el 400 de `_RutaSinNul`».
-2. **Los moldes del caso salen de `app.openapi()["paths"]`.** Sin cambios
-   desde la vuelta anterior.
+1. **«Tiene cuenta» compara `lower(email)` sin `trim`, igual que el registro.**
+   Si la cuenta quedó guardada con espacios, el registro no la ve, así que la
+   invitación se puede usar y ocupa lugar.
+2. **El tope descuenta con una consulta más bajo el lock del estudio.** Son
+   tres consultas bajo `with_for_update`; no medí el costo, es un estudio con
+   pocas pendientes.
 
 ## Comandos
 
 ```bash
-export GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=.
-# arnés de Postgres de ENTRADAS-3, solo: 18 «OK», termina en «fallas: 0»
-python scripts/testing/entradas3_postgres.py postgresql://cdi@127.0.0.1:55432/postgres
-# sabotajes de ENTRADAS-3: «BASE  | en verde», 12 «ROJO», «sabotajes con falla: 0», salida 0
-PY=python PG_URL=postgresql://cdi@127.0.0.1:55432/postgres ./scripts/testing/sabotajes/entradas3.sh 279ef26
-# sabotajes de la pieza: 24 «ROJO», «sabotajes sin rojo: 0; no corridos: 0», salida 0
-PY=python PG_URL=postgresql://cdi@127.0.0.1:55432/postgres ./scripts/testing/sabotajes/observabilidad1.sh
-# rojo de la devolución: el arnés de 694f183 sobre este producto da «fallas: 2»
-mkdir -p /tmp/e3v/scripts/testing && git show 694f183:scripts/testing/entradas3_postgres.py > /tmp/e3v/scripts/testing/e3.py
-PYTHONPATH=$PWD python /tmp/e3v/scripts/testing/e3.py postgresql://cdi@127.0.0.1:55432/postgres
+export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=.
+# casos de la pieza: «86 passed»
+python -m pytest -q --no-cov tests/test_org1.py
+# arnés de Postgres, en una base nueva: termina en «fallas: 0»
+psql postgresql://cdi@127.0.0.1:55432/postgres -qc "create database org1pm" && python scripts/testing/org1_postgres.py postgresql://cdi@127.0.0.1:55432/org1pm; psql postgresql://cdi@127.0.0.1:55432/postgres -qc "drop database org1pm"
+# sabotajes: 35 «ROJO», «sabotajes sin rojo: 0», salida 0
+PY=python PG=postgresql://cdi@127.0.0.1:55432 ./scripts/testing/sabotajes/org1.sh bf9583b
+# rojo del lugar muerto: los cuatro de la familia, «4 failed»
+git checkout db9f11f -- proyecto_maria/main.py && python -m pytest -q --no-cov tests/test_org1.py -k no_ocupa_lugar; git checkout HEAD -- proyecto_maria/main.py
 ```
 
 ## Puertas
 
 | corrida | SHA | salida exacta |
 |---|---|---|
-| sabotajes de ENTRADAS-3, con Postgres | `279ef26` | `BASE  \| en verde`, 12 `ROJO`, `sabotajes con falla: 0`, salida 0; ningún `ignored null byte` |
-| arnés de Postgres de ENTRADAS-3, solo | `279ef26` | 18 `OK`, `fallas: 0`, salida 0 |
-| arnés de `694f183` sobre el producto de `279ef26` | `279ef26` | `FALLA \| NUL en la ruta: 404; en api_logs: 0`, `FALLA \| ruta de 300 caracteres: 404; en api_logs: 0`, `fallas: 2`, salida 1 |
-| suite completa | `7fd0f5f` | `5434 passed, 335 skipped, 3 xfailed, 112 warnings in 1009.39s (0:16:49)`, salida 0 |
-| `compileall -q proyecto_maria` | `7fd0f5f` | sin salida, salida 0 |
-| smoke_friccion | `7fd0f5f` | `==> OK · telemetría y alias session/state rechazan sin sesión + by-cuit protegido`, salida 0 |
-| arranque SQLite | `7fd0f5f` | `fallas 0`, salida 0 |
-| arranque Postgres 16 | `7fd0f5f` | `fallas 0`, salida 0 |
-| sabotajes de la pieza | `d3a64f9` (después cambió sólo el arnés de ENTRADAS-3) | 24 `ROJO`, `sabotajes sin rojo: 0; no corridos: 0`, salida 0 |
-| sabotajes de ENTRADAS-3, con Postgres | `7fd0f5f` | 12 `ROJO`, `sabotajes con falla: 0`, salida 0, con 4 avisos `ignored null byte` (los saca `279ef26`) |
+| `sabotajes/org1.sh bf9583b` con `PG=` | `bf9583b` | `BASE  | verde sin sabotaje en bf9583b… (SQLite y Postgres)`, 35 líneas `ROJO` (25 sabotajes; los que el arnés de Postgres no distingue corren sólo en SQLite, y «despierta a las marcadas vencidas» sólo en Postgres), `sabotajes sin rojo: 0`, `salida 0` |
+| suite completa (`pytest -q --no-cov --timeout=120`) | `bf9583b` | `5452 passed, 335 skipped, 3 xfailed, 106 warnings in 1045.19s (0:17:25)`, `salida 0` |
+| `compileall -q proyecto_maria` | `bf9583b` | sin salida, `salida 0` |
+| smoke_friccion, servidor local en el 8097 | `bf9583b` | `OK · telemetría y alias session/state rechazan sin sesión + by-cuit protegido`, `salida 0` |
+| `ataque_aislamiento.sh` (`PUERTO=8098`) | `bf9583b` | `Bloqueado: 47 · Fugas: 0 · Sin probar: 0`, `✅ PUERTA G3 PASADA. Ningún despachante ve datos de otro.`, `salida 0` |
+| rojo de `test_org1.py` con el producto de `ef022b3` | `bf9583b` | `3 failed, 83 passed, 5 warnings in 55.39s`: `[sqlite_sin_zona-pending]`, `[postgres_con_zona-pending]`, `test_una_pendiente_a_una_cuenta_con_espacios_ocupa_lugar` |
+| rojo de `test_org1.py` sobre `db9f11f` | `ef022b3` | `4 failed, 79 passed`, los cuatro de `test_una_pendiente_cuyo_email_ya_tiene_cuenta_no_ocupa_lugar` |
 
-Los 12 ROJO de ENTRADAS-3 son los de siempre. 8 son de pytest:
-- 3 de la pila;
-- NUL en la consulta;
-- campo no texto `[alta`;
-- null que se guarda como «None» `[alta`;
-- nombre null `[edicion`;
-- número enorme `[1e16`.
-
-Los otros 4 son de Postgres:
-
-- «un pedido sin molde guarda el camino: dice «FALLA | NUL en la ruta»»;
-- «un molde largo no queda en api_logs: dice «FALLA | molde de 300 caracteres»»;
-- «una excepción con NUL no queda en api_logs: dice «FALLA | excepción con NUL en el mensaje»»;
-- «un número enorme revienta el listado en Postgres: dice «FALLA | después de 1e308»».
-
-**Corrido y no corrido:**
-- No repetí la suite sobre `279ef26`: desde `7fd0f5f` sólo cambiaron dos
-  scripts que pytest no corre.
-- El `/security-review` lo hice a mano sobre el diff. El producto no cambió
-  desde `694f183` y el arnés no agrega superficie: no encontré nada nuevo.
-- No corrí `ataque_aislamiento.sh`: no se tocan sesión, permisos ni datos de
-  clientes.
+**Corrido y no corrido:** todo lo de la tabla, una corrida a la vez, sobre `bf9583b`. La suite completa corre sólo en SQLite; en Postgres 16 corrieron `org1_postgres.py` (dentro de los sabotajes, que arrancan con la base en verde) y los sabotajes marcados PG. No corrí los sabotajes de otras piezas: son tuyos al publicar.
 
 ## Hallazgos de la autorrevisión
 
 | quién | hallazgo | qué hice |
 |---|---|---|
-| `adversario-sonnet-alto` (Sonnet, alto) | Baja: si fallaba el primer conteo, el segundo daba un falso rojo en cascada | Arreglado en `7fd0f5f`: cada pedido cuenta su propia fila |
-| `adversario-sonnet-alto` (Sonnet, alto) | La razón principal de D150 es `path_format`, no `_RutaSinNul` | Corregido en D150 |
-| `adversario-sonnet-alto` (Sonnet, alto) | `COLA-LIMPIEZA.md:57-58` quedó desactualizado | No lo toco porque es tuyo; ver Riesgos |
-| `adversario-sonnet-alto` (Sonnet, alto) | No hay lectores nuevos de `api_logs.endpoint` | Confirmado con el grep |
-| `adversario-sonnet-alto` (Sonnet, alto) | No pudo comprobar `scope["route"]` porque su entorno no tiene FastAPI | Lo cubren los casos de la pieza, que sí corren |
-| `/code-review high` | `_guardable_en_pg(endpoint)` no tiene negativo | D150 |
-| `/code-review high` | El NUL del log de la excepción llegaba a la salida: bash avisaba y `grep` la tomaba por binaria | Lo reproduje (4 avisos y «binary file matches»); arreglado en `279ef26` con `tr -d '\000'` |
-| `/code-review high` | Se compara un estado < 500 contra un conteo de 404; otro 404 en la ventana también contaría | Queda así: hay un solo cliente secuencial, y el mensaje muestra el estado |
-| `/code-review high` | Un sabotaje repite uno de `observabilidad1.sh:202` | Queda: mide que el arnés de Postgres distingue |
-| `/code-review high` | El chequeo del camino repetía el de `<sin ruta>` | Sacado en `279ef26` |
-| `/code-review high` | Los `%` de la consulta cuando los parámetros vienen vacíos | Es especulativo: queda |
-| `/code-review high` | El molde sin parámetros no distingue el molde del camino | Queda: lo distingue el caso de pytest |
-| `/code-review high` | Abre una conexión por cada conteo | Es menor: queda |
+| `/code-review high` | Una pendiente vuelve a ocupar lugar si la cuenta suelta el email (lo cambia en el perfil) | Es correcto: la invitación vuelve a poder usarse. A riesgos (R4) |
+| `/code-review high` | El tope comparaba la cuenta con `trim` y el registro sin | Arreglado en `e9e6153`, con su rojo |
+| `/code-review high` | El `UPDATE` del registro marcaba usada una pendiente vencida por fecha | Arreglado en `e9e6153`, con su rojo |
+| `/code-review high` | Marcar las pendientes al momento en que alguien toma el email | Propuesta, no la hice: suma escrituras en el perfil. A riesgos (R4) |
+| `/code-review high` | `archivo` se pisaba entre sabotajes en `org1.sh` | Arreglado en `bf9583b` |
+| `/code-review high` | Tres consultas bajo el lock del estudio | Queda: supuesto 2 |
+| `/code-review high` | Dos hallazgos más | Descartados al verificarlos; no guardé su texto, así que no te los puedo citar |
+| `/code-review high` | Dos opcionales de estilo | No los hice |
+| `adversario-sonnet-alto` (Sonnet, alto) | La vencida por fecha queda usada | El mismo de arriba: arreglado en `e9e6153` |
+| `adversario-sonnet-alto` (Sonnet, alto) | Una pendiente revive si la cuenta suelta el email | Lo reprodujo; R4 |
+| `adversario-sonnet-alto` (Sonnet, alto) | Variantes del tope que ningún caso distinguía | Cerrado con los tres sabotajes del tope |
+| `adversario-sonnet-alto` (Sonnet, alto) | El bloque de Postgres no se había corrido | Corrido: puertas |
+| `/security-review` | Sin hallazgos con confianza ≥ 8: consultas parametrizadas, el tope no se saltea porque el registro vuelve a contar bajo lock | Nada |
 
 ## Riesgos
 
-Los seis de la vuelta anterior siguen igual:
-1. la espera de 5 s detrás de otra transacción;
-2. un índice inválido o parcial se da por bueno;
-3. un camino de más de 200 caracteres pierde su métrica;
-4. `lock_timeout` no limita la construcción del índice;
-5. dos workers pueden chocar en `CREATE INDEX`;
-6. el caso SQLite de la falla del índice no distingue si se juntan las
-   transacciones.
-
-Los dos que pediste anotar:
-
-7. **Un índice con ese nombre sobre otra columna se anuncia como creado.**
-   Si ya hay un índice llamado `ix_api_logs_owner_username`,
-   `CREATE INDEX IF NOT EXISTS` no hace nada, sea sobre la columna que sea.
-8. **`error_message` puede traer los parámetros de una excepción de
-   SQLAlchemy**, con datos del pedido.
-
-Además, `COLA-LIMPIEZA.md:57-58` describe el estado de antes de esta pieza.
-Lo dejo para que lo actualices vos.
+1. **`REGISTER_TEST_EMAIL_REPLACE`** (`main.py:235`): con esa variable en
+   `true`, el registro reemplaza el email. Es un modo de prueba que vive en
+   el producto.
+2. **Invitar dice si un email tiene cuenta, sin límite de pedidos.** Un dueño
+   puede preguntar por cualquier email. Es anterior a la pieza.
+3. **Cambiar el email del perfil no pide verificarlo.** Con eso se puede
+   tomar un email ajeno y liberar el lugar de su invitación pendiente.
+4. **Una pendiente vuelve a ocupar lugar si la cuenta suelta el email.** Es
+   correcto (la invitación vuelve a poder usarse), pero el dueño puede ver
+   que el estudio pasa a estar lleno sin haber invitado a nadie.
 
 ## chequeo-6
 
 ```
-chequeo-6 0231eee..279ef26: avisos para mirar, no un veredicto
-producto +35/−15
-arnés +252/−39
+chequeo-6 db9f11f..bf9583b: avisos para mirar, no un veredicto
+producto +8/−3
+arnés +406/−58
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/main.py: 12086 → 12106
-avisos: 0
+  proyecto_maria/main.py: 12106 → 12111
+  AVISO creció una función de más de 150: proyecto_maria/main.py:3391 register 218 → 219, 1 en su propio cuerpo (§6: lo nuevo va aparte)
+avisos: 1
 ```
+
+El `AVISO` queda: es un filtro más (`expires_at > ahora`) en el `UPDATE` que `register` ya tenía; sacarlo aparte partiría esa transacción. Partir `register` no está en `COLA-LIMPIEZA.md`: te lo propongo para ahí.
 
 ## Archivos de producto
 
-`proyecto_maria/main.py`: `_migrate_add_api_logs_owner_column` y
-`MetricsMiddleware`. Sin cambios desde `694f183`.
+`proyecto_maria/main.py`: `register` (el `UPDATE` de las otras invitaciones)
+e `invite_to_organization` (el tope). `CHANGELOG.md`.
 
 ## Lo que sigue
 
-ORG-1+D40; después escapar el panel (D139) y D102.
+D139 (escapar el panel), después D102.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797WNM (send_message next, «Dev MARIA: …»), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. Devolución de OBSERVABILIDAD-1 entregada en 279ef26 (informe en este archivo, base 0231eee). RESET-3, SMOKE-1 y AVISOS-2b aceptadas. Abiertas: D131 (a Emi), D136 (no traigo tu rama hasta INTEGRAR-1), D142 (filas viejas, a Emi; mientras, c), D150 (recomiendo b). D139 decidida (a), pieza aparte. La próxima D libre es la D151. Sigue ORG-1+D40, después D139, después D102. Corte 2026-11-09 05:00 UTC o 95 % de uso. Nunca main, nada se publica sin el «dale» de Emi para el SHA, sin secretos, sólo datos inventados.
+/compact conservar: Dev MARIA (Dev 2), rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP (/respondio), aviso a la PM principal session_01B7FVQspcEHF7PqNv797WNM. ORG-1+D40 entregada en bf9583b (informe en el commit siguiente), base db9f11f; espera veredicto y D151. Sigue D139 (escapar el panel), después D102. Próxima D libre: D152. Nada se publica sin el «dale» de Emi; nunca main; sin secretos; sin datos reales.
