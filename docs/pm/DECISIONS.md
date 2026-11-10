@@ -627,3 +627,21 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   en Postgres 16.15: `varchar(3)` → `text` no reescribe la tabla (mismo
   filenode); sólo toma un lock exclusivo. (b), guardar el código de 3 dígitos,
   no tenía respuesta para un texto que no se reconoce.
+
+## 2026-11-10 02:34 UTC — CATALOGO-3: devolución, D158 (a), D159 (a) (PM, con el consejero)
+
+- Devolución sobre `f4ade80` por tres causas (acta
+  `REPRODUCCION-CATALOGO-3-2026-11-10.md`): un origen no reconocido hace
+  perder la confirmación entera en guardar-uso; textos iguales bajo NFKC
+  dan claves distintas y «Screw M8» deja de encontrar a «Screw M8 螺丝»;
+  el lookup es ~10 veces más lento.
+- D158 (a): «123» es LIBIA en `PAISES_INDEC` y se acepta. Pedir rechazarlo
+  fue un error de la PM.
+- D159 (a): el origen en clientes (`clientes.js`, `clients.default_origin`
+  VARCHAR(3), los `[:3]` de `main.py`) va como pieza aparte, ORIGEN-2, a
+  proponer a Emi. Extractor, guardar-uso, PUT del catálogo y
+  `catalogo.js` entran en la devolución.
+- A la lista de antes de publicar, junto a D156: el primer arranque puede
+  frenarse si otra sesión tiene una transacción abierta sobre
+  `operation_items`.
+
