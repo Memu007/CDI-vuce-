@@ -157,6 +157,22 @@ sabotaje $J "la pantalla vuelve a reconocer una provincia como país" \
   "const ALIASES = {" \
   'const ALIASES = {"CORDOBA":"256",' \
   "FAILED $PS"
+sabotaje $J "la pantalla vuelve a recortar con trim()" \
+  "return value.replace(new RegExp('^' + ESPACIO + '+|' + ESPACIO + '+\$', 'g'), '');" \
+  "return value.trim();" \
+  "first extra item: ('\ufeffCHINA', '310', '')"
+sabotaje $J "la pantalla vuelve a contar el largo en UTF-16" \
+  "[...raw].length <= 2" \
+  "raw.length <= 2" \
+  "one more item: ('𝐁𝐑', '203', '')"
+sabotaje $J "el nombre después del código vuelve a cortarse en \u2028" \
+  "([^\\\\n]+))?\$');" \
+  "(.+))?\$');" \
+  "one more item: ('302\u2028·\u2028ARABIA\u2028SAUDITA', '', '302')"
+sabotaje $J "la pantalla vuelve a colapsar los espacios con \s" \
+  ".replace(ESPACIOS, ' ')" \
+  ".replace(/\\s+/g, ' ')" \
+  "Left contains 3 more items"
 sabotaje $G "un espacio raro en el medio vuelve a quedar" \
   'escrito = " ".join(unicodedata.normalize("NFC", str(texto)).split())' \
   'escrito = unicodedata.normalize("NFC", str(texto)).strip()' \
