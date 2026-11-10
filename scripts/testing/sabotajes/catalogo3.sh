@@ -24,7 +24,10 @@ T=tests/test_catalogo3.py
 B=tests/test_despacho1b.py::test_cambiar_el_origen_valida_igual_que_guardar
 A=tests/test_despacho1b.py::test_cambiar_el_origen_guarda_el_codigo_en_mayusculas
 D=tests/test_despacho1c.py::test_el_aviso_del_catalogo_nombra_el_producto_que_no_se_aprendio
-PRUEBA=("$PY" -m pytest -q --no-cov -p no:cacheprovider "$T" "$B" "$A" "$D")
+D2=tests/test_despacho1c.py::test_los_productos_sin_origen_se_avisan
+CF="$T::test_cada_forma_del_pais_da_el_mismo_codigo_al_importar_y_exportar"
+PS="$T::test_la_pantalla_y_el_servidor_reconocen_los_mismos_paises"
+PRUEBA=("$PY" -m pytest -q --no-cov -p no:cacheprovider "$T" "$B" "$A" "$D" "$D2")
 
 # sabotaje <archivo> <nombre> <texto original> <texto saboteado> <lo que el rojo tiene que decir>
 sabotaje() {
@@ -55,6 +58,9 @@ C=proyecto_maria/core/catalog_service.py
 M=proyecto_maria/main.py
 G=proyecto_maria/core/maria_generator.py
 F=proyecto_maria/static/v2/screens/finalize.js
+E=proyecto_maria/core/maria_generator_export.py
+J=proyecto_maria/static/v2/paises_maria.js
+X=proyecto_maria/pdf_extractor.py
 
 if ! "${PRUEBA[@]}" >/dev/null 2>&1; then
   echo "BASE  | la prueba ya está en rojo sin sabotaje: no se puede medir nada"; exit 1
@@ -131,10 +137,34 @@ sabotaje $G "el criterio vuelve a recortar a 3" \
   'return escrito.upper() if len(escrito) == 2 else escrito' \
   'return escrito.upper()[:3]' \
   "FAILED $T::test_el_extractor_conserva_el_nombre_del_pais"
-sabotaje $G "el ancho completo vuelve a pasar" \
-  'if not escrito or unicodedata.normalize("NFKC", escrito) != escrito:' \
-  'if not escrito:' \
-  "FAILED $B[nombre ancho completo]"
+sabotaje $G "el servidor vuelve a no leer el ancho completo" \
+  's = unicodedata.normalize("NFKD", str(pais))' \
+  's = unicodedata.normalize("NFD", str(pais))' \
+  'FAILED '"$CF"'[\uff23\uff28\uff29\uff2e\uff21]'
+sabotaje $J "la pantalla vuelve a no leer el ancho completo" \
+  ".normalize('NFKD')" \
+  ".normalize('NFD')" \
+  "FAILED $PS"
+sabotaje $G "el servidor vuelve a aceptar un nombre que contradice el código" \
+  '(nombre is None or ' \
+  '(True or ' \
+  "FAILED $CF[310 - Vietnam]"
+sabotaje $J "la pantalla vuelve a aceptar un nombre que contradice el código" \
+  "return nombre === null || nombre === normalize(country.name) || ALIASES[nombre] === code[1] ? code[1] : '';" \
+  "return code[1];" \
+  "FAILED $PS"
+sabotaje $J "la pantalla vuelve a reconocer una provincia como país" \
+  "const ALIASES = {" \
+  'const ALIASES = {"CORDOBA":"256",' \
+  "FAILED $PS"
+sabotaje $G "un espacio raro en el medio vuelve a quedar" \
+  'escrito = " ".join(unicodedata.normalize("NFC", str(texto)).split())' \
+  'escrito = unicodedata.normalize("NFC", str(texto)).strip()' \
+  "FAILED $CF[HONG\\u2009KONG]"
+sabotaje $E "la exportación vuelve a tener su propio criterio" \
+  '    return get_pais_codigo_import(pais, PAIS_DEFAULT_EXPORT)' \
+  '    return PAISES_INDEC.get(str(pais).strip().upper(), PAIS_DEFAULT_EXPORT)' \
+  'FAILED '"$CF"'[CHINA\xa0]'
 sabotaje $G "«ÉS» vuelve a pasar como «ES»" \
   'if len(escrito) <= 2 and not (escrito.isascii() and escrito.isalpha()):' \
   'if False:' \
@@ -146,7 +176,7 @@ sabotaje $G "«Ñ» con la tilde aparte vuelve a pasar" \
 sabotaje $G "un código de miles de cifras vuelve a dar 500" \
   'm = re.fullmatch(r"0?([0-9]{3})(?:' \
   'm = re.fullmatch(r"0?([0-9]+)(?:' \
-  "FAILED $B[cifras de mas]"
+  "FAILED $CF[1111"
 sabotaje $G "get_pais_codigo vuelve a hacer int() de cualquier tira de cifras" \
   're.fullmatch(r"[0-9]{1,4}", str(pais).strip())' \
   're.fullmatch(r"[0-9]+", str(pais).strip())' \
@@ -186,13 +216,28 @@ sabotaje proyecto_maria/core/tarifar_connector.py "el estimador vuelve a pedir d
   "FAILED $T::test_el_estimador_de_tarifar_reconoce_el_pais_igual_que_el_catalogo[TAIWAN-False]"
 # D84: el error nombra el producto
 sabotaje $C "el 400 vuelve a no nombrar el producto" \
-  'raise ValueError(f"Producto {n}{cual}: {e}") from None' \
+  'raise ValueError(f"{cual}: {e}") from None' \
   'raise' \
   "FAILED $T::test_el_error_del_catalogo_nombra_el_producto"
 sabotaje $F "la pantalla vuelve a decir «algunos»" \
   "detail: res.ok ? '' : textoDeError(data && data.detail, '')" \
   "detail: ''" \
   "FAILED $D"
+
+sabotaje $C "un origen no reconocido vuelve a rechazar el lote" \
+  'origen, aviso = origen_para_guardar(prod.get("origen"))' \
+  'origen, aviso = origen_para_guardar(prod.get("origen"))
+    if aviso:
+        raise ValueError(aviso)' \
+  "FAILED $T::test_un_origen_que_no_reconoce_no_hace_perder_el_lote"
+sabotaje $F "la pantalla vuelve a no avisar los productos sin origen" \
+  "r.avisos && r.avisos.length && " \
+  "false && " \
+  "FAILED $D2"
+sabotaje $X "el extractor vuelve a tirar el origen hecho de cifras" \
+  "if not texto or texto.upper() in ('NA', 'N/A'):" \
+  "if not texto or texto.isdigit() or texto.upper() in ('NA', 'N/A'):" \
+  "FAILED $T::test_el_extractor_conserva_el_nombre_del_pais"
 
 git checkout -q -- proyecto_maria/
 echo "fallas: $FALLAS"

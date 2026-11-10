@@ -191,17 +191,6 @@ def test_la_migracion_separa_los_proveedores_y_los_productos_mezclados(client):
     assert [k for _, k, _ in primera if k == "2mm"] == ["2mm"], primera
 
 
-@pytest.mark.parametrize("producto, empieza", [
-    ({"descripcion": "TUERCA", "ncm": NCM, "origen": "XYZ"}, "Producto 2 («TUERCA»): "),
-    ({"descripcion": 5, "ncm": NCM}, "Producto 2: "),
-])
-def test_el_error_del_catalogo_nombra_el_producto(client, producto, empieza):
-    _cliente(client)
-    r = client.post("/api/catalog/proveedor/productos", json={
-        "vendor_name": VENDOR, "productos": [{"descripcion": "ARANDELA", "ncm": NCM}, producto]})
-    assert r.status_code == 400 and r.json()["detail"].startswith(empieza), r.text
-
-
 def test_la_tabla_de_paises_no_tiene_claves_repetidas_salvo_nl():
     fuente = inspect.getsource(maria_generator)
     arbol = ast.parse(fuente)
@@ -225,13 +214,18 @@ def test_nombre_y_codigo_de_cada_pais_dan_el_mismo_codigo():
 def test_el_extractor_conserva_el_nombre_del_pais():
     from proyecto_maria import pdf_extractor
     respuesta = Mock(text='{"items": [{"descripcion": "Tornillo", "cantidad": 1, "valor_unitario": 1, '
-                          '"origen": "TAIWAN"}, {"descripcion": "Tuerca", "cantidad": 1, "origen": "XYZ"}]}')
+                          '"origen": "TAIWAN"}, {"descripcion": "Tuerca", "cantidad": 1, "origen": "XYZ"}, '
+                          '{"descripcion": "Perno", "cantidad": 1, "origen": "123"}, '
+                          '{"descripcion": "Clavo", "cantidad": 1, "origen": "Alemania Federal"}]}')
     gemini = Mock()
     gemini.GenerativeModel.return_value.generate_content.return_value = respuesta
     with patch.object(pdf_extractor, "_load_gemini_client", return_value=gemini), \
             patch.dict(os.environ, {"GEMINI_API_KEY": "test-key", "ENABLE_FALLBACK_CASCADE": "false"}):
         items = pdf_extractor._llm_extract_pdf_items("Factura sintetica CATALOGO tres " + os.urandom(8).hex())
-    assert [it["origen"] for it in items] == ["TAIWAN", "XX"]
+    assert [it["origen"] for it in items] == ["TAIWAN", "XX", "123", "Alemania Federal"]
+    # El lector de la factura con cabecera pasa a dos letras lo que tiene ISO; «123» es LIBIA.
+    assert [pdf_extractor._origen_desde_factura(o) for o in ("123", "Alemania Federal", "XYZ")] == [
+        "LY", "Alemania Federal", ""]
 
 
 # Reconocidos con su código MARIA; los demás se guardan sin origen y avisan.
@@ -257,6 +251,49 @@ def test_guardar_uso_no_pierde_el_ncm_por_un_origen_que_no_reconoce(client, orig
         assert "aviso" not in r.json() and get_pais_codigo(cat[0]) == codigo == get_pais_codigo(hist[0]), (hist, cat)
 
 
+def test_el_error_del_catalogo_nombra_el_producto(client):
+    _cliente(client)
+    r = client.post("/api/catalog/proveedor/productos", json={
+        "vendor_name": VENDOR, "productos": [{"descripcion": "ARANDELA", "ncm": NCM}, {"descripcion": 5, "ncm": NCM}]})
+    assert r.status_code == 400 and r.json()["detail"].startswith("Producto 2: "), r.text
+
+
+@pytest.mark.parametrize("origen", FAMILIA_ORIGEN)
+def test_un_origen_que_no_reconoce_no_hace_perder_el_lote(client, origen):
+    owner = _dueno(_cliente(client))
+    r = client.post("/api/catalog/proveedor/productos", json={"vendor_name": VENDOR, "productos": [
+        {"descripcion": "ARANDELA", "ncm": NCM}, {"descripcion": "TUERCA", "ncm": NCM, "origen": origen}]})
+    assert r.status_code == 200, r.text
+    filas = _sql("select descripcion, ncm, origen from vendor_catalog_products where owner_username=:o "
+                 "order by descripcion", o=owner)
+    if FAMILIA_ORIGEN[origen] is None:
+        assert r.json()["avisos"] == [f"Producto 2 («TUERCA»): No reconozco el origen «{origen}»: "
+                                      "usá el nombre o el código del país."], r.text
+        assert filas == [("ARANDELA", NCM, None), ("TUERCA", NCM, None)]
+    else:
+        assert r.json()["avisos"] == [] and get_pais_codigo(filas[1][2]) == FAMILIA_ORIGEN[origen], (r.text, filas)
+
+
+# Forma escrita → código MARIA, o None si no se reconoce (el TXT cae en el default de cada régimen).
+LECTURA_PAIS = {"CHINA\xa0": 310, "HONG\u2009KONG": 341, "\u3000CHINA": 310, "ＣＨＩＮＡ": 310, "CHINA\n": 310,
+                "310 - CHINA": 310, "203 - BRASIL": 203, "435 · CHIPRE": 435, "436 · TURQUIA": 436,
+                "123": 123, "Alemania Federal": 402, "310 - Vietnam": None, "203-ARG": None,
+                "435 · TURQUIA": None, "\n": None, "XYZ": None, "1" * 5000: None}
+
+
+@pytest.mark.parametrize("escrito", LECTURA_PAIS, ids=lambda e: e[:20])
+def test_cada_forma_del_pais_da_el_mismo_codigo_al_importar_y_exportar(escrito):
+    from proyecto_maria.core import maria_generator_export
+    codigo = LECTURA_PAIS[escrito]
+    assert maria_generator.codigo_de_pais(escrito) == codigo
+    assert (maria_generator.origen_valido(escrito) is None) == (codigo is None)
+    importa, exporta = get_pais_codigo(escrito), maria_generator_export.get_pais_codigo(escrito)
+    if codigo is None:
+        assert (importa, exporta) == (maria_generator.PAIS_DEFAULT_IMPORT, maria_generator_export.PAIS_DEFAULT_EXPORT)
+    else:
+        assert importa == exporta == codigo
+
+
 @pytest.mark.parametrize("origen", ["TAI", "PRC"])
 def test_cambiar_el_ncm_de_una_fila_con_origen_viejo_guarda_el_ncm(client, origen):
     owner = _dueno(_cliente(client))
@@ -267,6 +304,10 @@ def test_cambiar_el_ncm_de_una_fila_con_origen_viejo_guarda_el_ncm(client, orige
     assert r.status_code == 200 and origen in r.json()["aviso"], r.text
     assert _sql("select ncm, origen from vendor_catalog_products where owner_username=:o", o=owner) == [
         ("84714900", origen)]
+
+
+# Pedazos de nombres de zonas francas y territorios («ZF CORDOBA»): no son un país.
+NO_SON_PAISES = ("AFRICA", "AMERICA", "OCEANIA", "ISLAS", "(AAE)", "ESTADO ASOCIADO", "BUENOS AIRES", "CORDOBA")
 
 
 def _resolve_de_la_pantalla(valores):
@@ -282,10 +323,12 @@ def test_la_pantalla_y_el_servidor_reconocen_los_mismos_paises():
     from proyecto_maria.core.paises_iso3 import ISO3_A_ISO2
     codigos = sorted(maria_generator.codigos_tabla_oficial())
     valores = [*FAMILIA_ORIGEN, *PAISES_INDEC, *ISO3_A_ISO2, *(f"0{c}" for c in codigos),
-               *(f"{c} · X" for c in codigos), "0313", "123", "ÉS", "ＢＲ", "XYZ", "99999", "Türkiye", ""]
+               *(f"{c} · X" for c in codigos), "0313", "123", "ÉS", "ＢＲ", "XYZ", "99999", "Türkiye", "",
+               *LECTURA_PAIS, *NO_SON_PAISES]
     servidor = [str(maria_generator.codigo_de_pais(v) or "") for v in valores]
     distintos = [(v, p, s) for v, p, s in zip(valores, _resolve_de_la_pantalla(valores), servidor) if p != s]
     assert distintos == []
+    assert [s for v, s in zip(valores, servidor) if v in NO_SON_PAISES] == [""] * len(NO_SON_PAISES)
 
 
 def test_el_txt_usa_el_codigo_de_cada_forma_reconocida():
