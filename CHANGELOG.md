@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-10 · fix: en la memoria del cliente el texto idéntico no distingue mayúsculas y la misma hora no la decide la base (CATALOGO-3)
+
+- «CABLE 2,5MM2» cuenta como el mismo texto que «Cable 2,5mm2»; con el mismo texto y dos NCM gana el último confirmado.
+- Dos confirmaciones a la misma hora dan siempre el mismo NCM, en SQLite y en Postgres.
+
 ## 2026-11-10 · fix: el NCM recordado de un cliente no depende del orden de las filas (CATALOGO-3)
 
 - Si dos productos guardados se parecen igual a lo que se busca, gana el que tiene el texto idéntico y, si no hay, el último confirmado; antes ganaba el que la base devolvía primero, el mismo para los dos textos.

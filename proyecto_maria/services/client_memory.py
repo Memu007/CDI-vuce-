@@ -140,10 +140,14 @@ def descripcion_del_producto(descripcion) -> str:
     return texto
 
 
+def _misma_descripcion(descripcion: str) -> str:
+    """Dos descripciones que dan lo mismo son el mismo texto para la clave."""
+    return unicodedata.normalize("NFC", descripcion.casefold())
+
+
 def clave_del_producto(ncm8: str, descripcion: str) -> str:
     """Lo que identifica al producto en la base: el índice único la usa."""
-    misma = unicodedata.normalize("NFC", descripcion.casefold())
-    return hashlib.sha256(f"{ncm8}\x1f{misma}".encode()).hexdigest()
+    return hashlib.sha256(f"{ncm8}\x1f{_misma_descripcion(descripcion)}".encode()).hexdigest()
 
 
 def identidad_del_producto(ncm, descripcion) -> Optional[tuple[str, str, str]]:
@@ -274,7 +278,7 @@ async def lookup_client_memory(
 
     clave = clave_de_producto(descripcion)
     try:
-        tal_cual = descripcion_del_producto(descripcion)
+        tal_cual = _misma_descripcion(descripcion_del_producto(descripcion))
     except ValueError:
         tal_cual = None
     q = sa_select(ClientProductHistory).where(
@@ -284,11 +288,12 @@ async def lookup_client_memory(
     result = await db.execute(q)
     candidates = result.scalars().all()
 
-    # Ante un empate gana el texto idéntico y después la última confirmada,
-    # sin depender del orden en que la base devuelve las filas.
+    # Ante un empate gana el texto idéntico y después la última confirmada; a la
+    # misma hora decide el contenido de la fila, no su id al azar ni su orden.
     def orden(row):
-        return (parecido(clave, clave_de_producto(row.descripcion or "")), row.descripcion == tal_cual,
-                row.ultima_vez is not None, row.ultima_vez, row.id)
+        texto = row.descripcion or ""
+        return (parecido(clave, clave_de_producto(texto)), _misma_descripcion(texto) == tal_cual,
+                row.ultima_vez is not None, row.ultima_vez, row.ncm, texto, row.id)
 
     best_row = max(candidates, key=orden, default=None)
     best_score = orden(best_row)[0] if best_row is not None else 0.0
