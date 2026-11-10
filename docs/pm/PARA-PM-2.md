@@ -2,191 +2,187 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CATALOGO-3 (devolución 973c489) entregada en e81b961 (base b7c4c85)
+## PRESUPUESTO-CLIENTE-1 (D141 a) entregada en eeba405 (base de176b1~1 = 2fbfea9)
 
-Para ver sólo esta vuelta: `git diff b7c4c85..e81b961`. El producto cambia
-sólo en `proyecto_maria/services/client_memory.py` (y `CHANGELOG.md`).
+Los commits de la pieza están intercalados con los de CATALOGO-3. Para verla
+sola, cherry-pick de los ocho sobre `de176b1~1` (comando abajo). El producto
+cambia sólo en `proyecto_maria/main.py` (y `CHANGELOG.md`).
 
 | SHA | Qué |
 |---|---|
-| 53ac893 | fix: ante un empate gana el texto idéntico y después el último confirmado |
-| a2f77ee | test: empates en SQLite, Postgres y sabotajes |
-| 3f68668 | fix: el texto idéntico no distingue mayúsculas y la misma hora no la decide el id |
-| 1e81a30 | test: mayúsculas, el mismo texto con dos NCM y la misma hora |
-| 1dca33e | fix: el texto idéntico se compara contra la clave guardada |
-| e81b961 | test: la fila vieja con otro espaciado, los dos órdenes y cada guardado comprobado |
+| de176b1 | fix: pasar una operación compartida a otro cliente da de baja su link |
+| f9d4c76 | test: el link compartido se va al pasar la operación a otro cliente |
+| db0f25a | refactor: el borrado del link al cambiar de cliente va en su función |
+| 1345ca7 | test: los sabotajes del link siguen al borrado en su función |
+| 4d30e9c | refactor: el cliente de `_soltar_link_de_otro_cliente` es texto (hallazgo 8) |
+| c3cca11 | test: en Postgres, la operación pasada a otro cliente pierde su link |
+| a9fb87f | docs: el docstring dice qué hay en el link que se suelta |
+| eeba405 | test: al pasar la operación de cliente no se van los links de otras operaciones |
 | (siguiente) | docs: este informe |
 
-**Resultado.** Las tres reglas quedan cumplidas, en SQLite y en PG; con el
-arreglo revertido falla alguna siempre, en los dos motores (rojos abajo).
-Nada para decidir: no hay D nuevas. Próxima D libre: **D163**.
+**Resultado.** Cuando `save_client_operation` guarda en otro cliente una
+operación que ya tenía cliente, borra sus PublicQuote en la misma
+transacción. Desde ese momento el link da 404. Hay tres casos en que el link
+sigue:
+- la operación se guarda en el mismo cliente;
+- la operación no tenía cliente y recibe uno;
+- el guardado falla: el rollback deja el link como estaba.
 
-- **Regla 1, texto idéntico.** Ante un empate de parecido gana la fila cuya
-  clave guardada (`row.clave`) es la clave del texto buscado con el NCM de esa
-  fila (`identidad_del_producto`, la misma función que la escribe). Es lo que
-  pediste: NFC y sin distinguir mayúsculas. Se compara contra la clave
-  guardada y no contra la descripción, porque una fila escrita por una
-  versión anterior con otro espaciado («Cable  2,5mm2») tiene la misma clave
-  y otra descripción: comparando descripciones perdía (es el rojo de 1e81a30).
-- **Regla 1 con varias filas idénticas y regla 2.** Gana la de `ultima_vez`
-  mayor; una fila sin fecha pierde contra una con fecha.
-- **Regla 3, determinismo.** Si además coinciden en la hora, decide el
-  contenido de la fila (NCM, descripción) y recién después el id. El
-  resultado ya no depende del orden en que la base devuelve las filas.
-- `client_memory.py:283-295`. Se sacó el bucle de «la primera de mayor
-  puntaje»; producto +12/−9 (chequeo-6 abajo).
+Los links de las demás operaciones, del mismo dueño o de otro, no se tocan.
+Funciona igual en SQLite y en PG 16. Con el arreglo revertido falla en los
+dos motores (rojos abajo).
 
-## Lo demás de la devolución
+`main.py:6341`, función aparte de 8 líneas. `save_client_operation` sólo suma
+la llamada. Producto +10/−0 (chequeo-6 abajo).
 
-- **D160, D161, D162:** (a) aplicadas; no requieren código nuevo, el
-  comportamiento entregado en ec0092a ya era (a).
-- **Corrijo:** SUR→SR es **Surinam (232)**, no Sudáfrica. El supuesto
-  reversible de la entrega anterior estaba mal escrito; el código no cambia.
-- **Choque de la migración:** a la lista de publicar. Si el primer arranque
-  dice que N filas quedan por un choque y N > 0, se frena antes de que
-  alguien confirme: con el choque, el texto exacto lee la otra fila y al
-  confirmarlo pisa su NCM, origen y descripción.
-- **Salteados, 335 contra 101.** De mis 335, **234 son de
-  `tests/test_excel3*`**, que se saltean porque en mi venv no está `xlwt`
-  (`pytest.importorskip`); 335 − 234 = 101, que es lo tuyo. Otros 19 son de
-  backup1a (sin binarios de PG 16 en el PATH de la suite) y el resto son
-  saltos fijos del código. El total coincide porque los tests salteados
-  igual se cuentan.
-- **Riesgos que no pedís arreglar**, quedan anotados tal cual: «1½» contra
-  «1 1/2» (0,67); orígenes de cifras («212» da US, D158); dos versiones
-  escribiendo claves a la vez; recorte de espacios cuadrático en JS y avisos
-  sin tope; `main.py:8244` y `8844` guardan el origen crudo (ORIGEN-2);
-  descripciones largas que difieren en potencia y modelo sugieren el mismo NCM.
+## Decisiones
+
+**D163. Un link que se comparte mientras la operación pasa a otro cliente.**
+`share_quote` lee la operación, después calcula los aranceles (llama a
+Tarifar) y recién ahí inserta el link. Puede pasar que, mientras tanto, el
+mismo usuario guarde la operación en otro cliente desde otra pestaña. En ese
+caso el link nuevo se inserta después del borrado y queda andando con el
+presupuesto armado para el cliente anterior (CR1 de /code-review).
+`get_public_quote` no compara el cliente del link (CR2).
+- (a) Queda como riesgo bajo, sin código.
+- (b) En `share_quote`, bloquear la operación y volver a leer
+  `op.client_id` antes del insert.
+- (c) Guardar `client_id` en el snapshot y que `get_public_quote` dé 404 si
+  ya no coincide con el de la operación.
+
+**Recomiendo (a).** Para que pase, el mismo dueño tiene que compartir y
+cambiar de cliente a la vez, en dos pestañas. No cruza ninguna frontera de
+permisos: el link lo arma y lo reparte ese mismo usuario, y puede volver a
+compartirlo cuando quiera. (b) agrega un bloqueo en un endpoint que espera a
+un servicio externo. (c) cambia el formato del snapshot y deja sin cubrir los
+links ya emitidos, que no tienen el campo. Si preferís cerrarlo, (c) es la
+más barata y no bloquea nada.
+
+## Hallazgo 8
+
+- **`client_id: int`:** corregido en 4d30e9c. La columna y el valor de la
+  ruta son texto; la anotación decía `int` e invitaba a convertirlo, y eso
+  rompería la comparación. No tiene prueba porque no cambia el
+  comportamiento: la comparación ya era entre textos.
+- **La función de 161 líneas:** es el AVISO de chequeo-6. La rama nueva va en
+  la función aparte, como pide §6. La función larga sólo suma la llamada
+  (160 → 161). Partirla va a la cola de limpieza; no la toqué.
 
 ## Comandos copiables
 
-Desde un worktree en e81b961, con su venv y las variables de las pruebas
+Desde un worktree con su venv y las variables de las pruebas
 (`DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares`):
 
 ```bash
-python -m pytest -q --no-cov tests/test_catalogo3.py -k empate        # 14 passed
-git worktree add /tmp/rev b7c4c85 && cp tests/test_catalogo3.py /tmp/rev/tests/ && (cd /tmp/rev && python -m pytest -q --no-cov tests/test_catalogo3.py -k empate)   # 13 failed, 1 passed
-(unset DATABASE_URL; python scripts/testing/catalogo3_postgres.py postgresql://<usuario>@127.0.0.1:<puerto>/postgres)            # «todo OK»
-(unset DATABASE_URL; python scripts/testing/catalogo3_postgres.py postgresql://<usuario>@127.0.0.1:<puerto>/postgres b7c4c85)    # FALLA en los tres empates
-PY=$(which python) scripts/testing/sabotajes/catalogo3.sh e81b961     # 50 de 50 ROJO, «fallas: 0»
+python -m pytest -q --no-cov tests/test_datos1.py          # 10 passed
+PY=$(which python) scripts/testing/sabotajes/datos1.sh eeba405   # 18 ROJO, «sabotajes sin rojo: 0»
+(unset DATABASE_URL; python scripts/testing/datos1_postgres.py postgresql://<usuario>@127.0.0.1:<puerto>/<base vacía>)   # «fallas: 0»
+# la pieza sola, para chequeo-6:
+git worktree add /tmp/pc1 de176b1~1 && cd /tmp/pc1 && git cherry-pick de176b1 f9d4c76 db0f25a 1345ca7 4d30e9c c3cca11 a9fb87f eeba405 && python docs/pm/herramientas/chequeo-6.py de176b1~1 HEAD
 ```
 
-## Rojos copiados (con el arreglo revertido)
+## Rojos copiados
 
-Pruebas de e81b961 sobre el producto de b7c4c85 (sin ningún arreglo) y de
-1e81a30 (sin el último).
+- **Arreglo revertido, SQLite** (sabotaje «pasada a otro cliente, el link
+  sigue andando»): «FAILED tests/test_datos1.py::test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto»
+  «AssertionError: (True, 200)» «assert 200 == 404».
+- **Arreglo revertido, PG 16** (`pg_pc1_antes.log`): «FALLA | guardada en
+  otro cliente, la operación pierde su link (200)», «fallas: 1». El chequeo
+  anterior, «si el guardado en otro cliente falla, el link sigue (400)», da
+  OK también sin el arreglo, como corresponde.
+- **PG 16 sobre eeba405** (`pg_pc1_v2.log`): «OK | si el guardado en otro
+  cliente falla, el link sigue (400)», «OK | guardada en otro cliente, la
+  operación pierde su link (200)», «fallas: 0», salida=0.
 
-- **SQLite, b7c4c85:** «13 failed, 1 passed, 90 deselected in 7.55s».
-  Los 8 de texto idéntico dicen «assert ['84714900', '84714900'] ==
-  ['73181500', '84714900']»; los 5 de última confirmada «At index 2 diff:
-  '84714900' != '73181500'». El que pasa es el de la misma hora: con la base
-  vieja depende del orden en que SQLite devuelve las filas, y en 3 corridas
-  pasó 1. Por eso el rojo «siempre» lo dan los otros 13, que no dependen del
-  orden.
-- **SQLite, 1e81a30:** «1 failed, 13 passed, 90 deselected in 7.36s»:
-  «FAILED tests/test_catalogo3.py::test_ante_un_empate_gana_el_texto_identico[Cable 2,5mm2-Cable 2,5mm\xb2-None-Cable  2,5mm2-False]»,
-  «assert ['84714900', '84714900'] == ['73181500', '84714900']».
-- **PG 16, b7c4c85:** salida=1, FALLA en los tres chequeos de empate:
-  identico alterna `['73181500','73181500']` y `['84714900','84714900']`;
-  ultima da 5 × `['73181500','73181500','73181500','73181500']`;
-  misma_hora `['73181500','73181500','84714900','84714900']`.
-- **PG 16, 1e81a30:** salida=1, «FALLA | ante un empate gana el texto
-  idéntico, en los dos órdenes de guardado»: el 7.º par da
-  `['84714900', '84714900']` (la fila vieja con otro espaciado). Los otros
-  dos chequeos de empate dan OK.
-- **PG 16, e81b961:** «todo OK», salida=0. identico 8 × `['73181500','84714900']`;
-  ultima 5 × `['73181500','84714900','73181500','84714900']`; misma_hora 4 ×
-  `'84714900'`. Cada confirmación devuelve `historial_guardado: true` y va en
-  su propio pedido.
+## Sabotajes (`scripts/testing/sabotajes/datos1.sh`)
 
-## Sabotajes nuevos (`scripts/testing/sabotajes/catalogo3.sh`)
-
-50 sabotajes en el script; corrí los 50 sobre e81b961: **50 de 50 ROJO**,
-«fallas: 0», salida=0 (`sab_c3_v3.log`). Los de esta vuelta, con el texto del
-log:
+El script tiene 18 sabotajes y corrí los 18 sobre eeba405: **18 de 18 ROJO**,
+«sabotajes sin rojo: 0», salida=0. Estos son los de esta pieza, con el texto
+del log (todos en `test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto`):
 
 | Sabotaje | Dice |
 |---|---|
-| ante un empate vuelve a no preferir el texto idéntico | «FAILED tests/test_catalogo3.py::test_ante_un_empate_gana_el_texto_identico» |
-| el texto idéntico vuelve a distinguir mayúsculas y espacios | «FAILED tests/test_catalogo3.py::test_ante_un_empate_gana_el_texto_identico[Cable 2,5mm\xb2-Cable 2,5mm2-buscados2-» |
-| ante un empate vuelve a ganar una fila fija | «FAILED tests/test_catalogo3.py::test_ante_un_empate_gana_la_ultima_confirmada» |
-| a la misma hora vuelve a decidir el id de la fila | «FAILED tests/test_catalogo3.py::test_un_empate_a_la_misma_hora_no_depende_del_orden» |
-| ante un empate vuelve a quedarse la primera fila que trae la base | «FAILED tests/test_catalogo3.py::test_ante_un_empate_gana» |
-| la memoria del cliente compara sin las letras no latinas (existente, ahora apunta a `client_memory.py`) | «FAILED tests/test_catalogo3.py::test_la_memoria_del_cliente_usa_la_misma_clave» |
+| pasada a otro cliente, el link sigue andando | «AssertionError: (True, 200)» «assert 200 == 404» |
+| se borra aunque siga en el mismo cliente | «AssertionError: (False, 200)» «assert 404 == 200» |
+| se borra al recibir cliente por primera vez | «AssertionError: sin cliente antes» «assert 404 == 200» |
+| el borrado queda aunque el guardado falle | «AssertionError: (True, 400)» «assert 404 == 200» |
+| se borran también los links de otras operaciones | «AssertionError: otra operación del mismo cliente» «assert 404 == 200» |
+| el guardado encuentra la operación de otro dueño | «AssertionError: otro dueño» «assert 404 == 200» |
 
 ## Puertas
 
-Todo sobre e81b961, desde base limpia (`rm -f test.db`), una puerta por vez.
+Todo sobre eeba405, desde base limpia (`rm -f test.db`), una puerta por vez.
 
 | Puerta | Salida |
 |---|---|
-| suite completa (`--timeout=120`) | «5562 passed, 335 skipped, 3 xfailed, 107 warnings in 1138.69s (0:18:58)», salida=0 |
-| salteados por archivo | 234 `test_excel3.py` (sin `xlwt`), 31 `security/test_security.py`, 19 `test_backup1a.py`, 15 `integration/test_workflows.py`, 12 `test_user_registration.py`, 10 `test_recent_changes_validation.py`, 7 `test_pdf_avg_functional.py`, 6 `unit/test_validations.py`, 1 `test_regression_phase0.py` |
-| `compileall -q proyecto_maria` | salida=0 |
-| golden (5 archivos) | «115 passed, 2 xfailed, 15 warnings in 16.83s» |
-| `tests/test_catalogo3.py` | «104 passed, 3 warnings in 30.61s» |
-| arnés PG 16 (`catalogo3_postgres.py`) | «todo OK», salida=0 |
-| sabotajes `catalogo3.sh` | 50 de 50 ROJO, «fallas: 0» |
+| suite completa (`--timeout=120`) | «5562 passed, 335 skipped, 3 xfailed, 110 warnings in 1123.64s (0:18:43)»; sin FAILED ni ERROR. Los 335 salteados son la misma cuenta que en CATALOGO-3 (234 de `test_excel3` sin xlwt, 19 de `test_backup1a` «sin Postgres 16 local» y 82 viejos con motivo escrito) |
+| `compileall -q proyecto_maria` | rc=0, sin salida |
+| golden (5 archivos) | «115 passed, 2 xfailed in 17.33s» |
+| `tests/test_datos1.py` | «10 passed» |
+| arnés PG 16 (`datos1_postgres.py`) | «fallas: 0», salida=0 |
+| sabotajes `datos1.sh` | 18 de 18 ROJO, «sabotajes sin rojo: 0» |
+| `smoke_friccion.sh` (app en ENVIRONMENT=test, SQLite) | «OK · telemetría y alias session/state rechazan sin sesión + by-cuit protegido», salida=0 |
+| `ataque_aislamiento.sh` | sobre Postgres descartable: «Bloqueado: 47 · Fugas: 0 · Sin probar: 0», «PUERTA G3 PASADA», salida=0 |
 
-Al cerrar el proceso, la suite y test_catalogo3 imprimen «Task was destroyed but
-it is pending!». Es el cierre del loop de asyncio, después del resumen (775 veces en el log de la suite), y no
-cambia la salida.
-
-### chequeo-6
+### chequeo-6 (la pieza sola: los 8 commits sobre `de176b1~1`)
 
 ```
-chequeo-6 b7c4c85..e81b961: avisos para mirar, no un veredicto
-producto +12/−9
-arnés +166/−4
+chequeo-6 de176b1~1..HEAD: avisos para mirar, no un veredicto
+producto +10/−0
+arnés +141/−6
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/services/client_memory.py: 305 → 308
-avisos: 0
+  proyecto_maria/main.py: 12124 → 12134
+  AVISO creció una función de más de 150: proyecto_maria/main.py:8098 save_client_operation 160 → 161, 1 en su propio cuerpo (§6: lo nuevo va aparte)
+avisos: 1
 ```
+
+AVISO de `save_client_operation`: la rama nueva va en la función aparte, como
+pide §6. La función larga sólo suma la llamada. Partirla va a la cola de
+limpieza.
 
 ## Hallazgos
 
 | Quién | # | Sev. | Hallazgo | Qué hice |
 |---|---|---|---|---|
-| adversario-sonnet-alto (Sonnet, alto), sobre a2f77ee | A1 | Baja | Una fila escrita antes de que se normalizara la descripción («Cable  2,5mm2») nunca era «idéntica» | Arreglado en 1dca33e (compara contra la clave guardada); caso en e81b961, rojo con 1e81a30 arriba |
-| ídem | A2 | Baja | Dentro de una misma operación o archivo, la «última» la decide el orden de escritura (hash de la clave), no el de la factura | Queda como riesgo: es determinista y la regla pedida se cumple |
-| ídem | A3 | Baja | El PATCH manual pone `ultima_vez` con `func.now()` (segundos en SQLite, reloj de la base en PG) y cuenta como confirmación | Queda como riesgo; no lo reproduje |
-| ídem | A4 | Baja | Sin prueba: `ultima_vez` nula, desempate por id, consulta que no normaliza | El desempate por id se reemplazó (3f68668) y lo cubre el caso de la misma hora; `ultima_vez` nula y la consulta que no normaliza siguen sin caso (abajo) |
-| /code-review high (Opus, alto), sobre 1e81a30 | C1 | Media | El caso de la misma hora guardaba siempre en el mismo orden: no distinguía el defecto | Arreglado en e81b961: los dos órdenes, en SQLite y PG |
-| ídem | C2 | Media | El texto idéntico se rearmaba con una función propia, no con la clave guardada | Arreglado en 1dca33e; de paso, el desempate se calcula sólo entre las filas empatadas (resuelve los dos hallazgos de rendimiento) |
-| ídem | C3 | Baja | El arnés PG no comprobaba que cada confirmación se guardara | Arreglado en e81b961 (`historial_guardado: true` en cada pedido) |
-| ídem | C4 | Baja | Fechas con y sin zona horaria mezcladas | Descartado: dentro de un motor no se mezclan; lookup y upsert van en pedidos distintos |
-| ídem | C5 | Baja | Dos definiciones de «la más reciente» (lookup y migración) | Descartado: la migración desempata dentro de la misma clave, no entre filas que empatan en parecido |
-| ídem | C6 | Baja | Relojes desparejos entre réplicas | Riesgo, abajo |
-| ídem | C7 | Baja | Filas sin clave nunca son «idénticas» | Riesgo, abajo (era así antes) |
+| PM | 8 | Baja | `client_id: int` y función de 161 líneas | Anotación arreglada en 4d30e9c; la función, AVISO justificado arriba |
+| adversario-sonnet-alto (Sonnet, alto) | A1 | Baja | El docstring exageraba qué datos guarda el link | Arreglado en a9fb87f |
+| /code-review high (Opus, alto) | CR1 | Baja | Carrera: un `share_quote` en vuelo inserta el link después del borrado | D163 |
+| ídem | CR2 | Baja | `get_public_quote` no compara el cliente | D163 (c) |
+| ídem | CR3 | Media | Ninguna prueba distinguía un borrado de los links de otras operaciones | Arreglado en eeba405 (caso + sabotaje) |
+| ídem | CR4 | Baja | El arnés PG no comprobaba el status del guardado ni del share del caso 6 | Arreglado en eeba405 |
+| ídem | CR5 | Baja | El historial de productos (ClientProductHistory) del cliente anterior conserva lo aprendido de esa operación | Riesgo, abajo |
+| ídem | CR6 | Baja | `ITEM` y `_cliente` del caso duplican a `_cliente_con_presupuesto` | Riesgo, abajo (va a limpieza) |
+| ídem | CR7 | Baja | f9d4c76 arrastró una línea de `catalogo3.sh` (la etiqueta Ñ) | Riesgo, abajo: ya está subido, sin amend |
+| revisión de seguridad (Sonnet, alto, sólo lectura) | — | — | Sin hallazgos (confianza 9/10) | — |
 
-La severidad de C1 a C7 es mi lectura: no conservé la que dio /code-review.
+La severidad de CR1 a CR7 es mi lectura.
 
 ## Riesgos y lo no corrido
 
-- `catalog_service.py:381-402` (catálogo del proveedor) tiene el mismo patrón
-  de «la primera de mayor puntaje»; la devolución pide la memoria del cliente,
-  así que no lo toqué. Va como pieza aparte si lo querés.
-- Con relojes de réplicas distintas, o con la misma hora, «la última
-  confirmada» puede no ser la última real: a la misma hora gana el NCM mayor.
-  Es determinista, no cronológico.
-- µ/μ dan la misma clave (NFKC), así que para la memoria son el mismo texto:
-  van en el caso de última confirmada, no en el de texto idéntico.
-- Una fila con `clave` NULL (sin migrar) nunca cuenta como texto idéntico y
-  cae a la última confirmada. Era así antes.
-- Fechas con y sin zona horaria mezcladas romperían la comparación; lookup y
-  upsert escriben con el mismo criterio, por eso lo descarté (C4).
-- **No corrido:** `smoke_friccion.sh` y `ataque_aislamiento.sh`. El cambio
-  es sólo cuál fila gana un empate dentro de `lookup_client_memory`: no cambia
-  rutas, sesión, permisos ni la forma de la respuesta. El camino HTTP lo
-  recorren el arnés PG y los casos de SQLite.
-- **Sin caso:** una fila con `ultima_vez` nula en un empate, y una búsqueda que
-  no normaliza (más de 2000 caracteres o un medio par). Las dos ramas se leen
-  correctas (A4), pero ninguna prueba las distingue.
+- **CR5.** Si la operación pasa al cliente B, la memoria de NCM del
+  cliente A conserva lo que aprendió de ella. No borra nada ni expone nada
+  a otro usuario; queda así.
+- **CR6.** El caso nuevo de `test_datos1.py` repite el armado de cliente e
+  ítem del helper. Va a la cola de limpieza.
+- **CR7.** El cambio de `catalogo3.sh` en f9d4c76 es de CATALOGO-3 y quedó
+  en el commit equivocado. Ya está subido, así que no lo corrijo con amend.
+- En `datos1_postgres.py`, los POST que crean los clientes x e y encadenan
+  `.json()["cliente"]["id"]` sin mirar el status. Si fallaran, el arnés
+  cortaría con KeyError en vez de con un FALLA legible. No da un falso
+  verde.
+- **No corrí `/security-review` sobre la rama entera:** el diff contra
+  `main` mide unos 600 KB y casi todo es de otras piezas. En su lugar hice
+  una revisión de seguridad acotada a los ocho commits, con un subagente
+  Sonnet alto de sólo lectura. Revisó `_get_owned_client`, el filtro por
+  dueño de `_operacion_maria`, que el borrado va por `operation.id`, el
+  dueño en `share_quote`, los parámetros ligados y el commit y rollback.
+  Sin hallazgos.
+- **No corrido:** nada de las puertas de `/entregar`.
 
 ## Sigue
 
-PRESUPUESTO-CLIENTE-1 (D141 a): faltan sus puertas, sabotajes, informe y el
-hallazgo 8.
+CATALOGO-3 quedó aceptada sobre e81b961, sin integrar (f2b099a). Nada marcado
+en mi canal para después de esta pieza: espero su veredicto.
 
-/compact conservar: Dev 2 (MARIA), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797WNM (rama claude/practical-shannon-szpwkn), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. CATALOGO-3 (devolución 973c489) entregada en e81b961 (informe en el commit siguiente), esperando veredicto. Sigue PRESUPUESTO-CLIENTE-1. Próxima D libre: D163. D151 sigue. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos.
+/compact conservar: Dev 2 (MARIA), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (rama claude/practical-shannon-szpwkn), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. CATALOGO-3 aceptada sobre e81b961 (f2b099a); PRESUPUESTO-CLIENTE-1 entregada en eeba405 (informe en el commit siguiente), esperando veredicto. Próxima D libre: D164. D151 sigue. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos.
