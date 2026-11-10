@@ -120,7 +120,7 @@ def _normalize(text: str) -> str:
 
 def _sufijo(texto: str) -> str:
     """Resumen de las letras y cifras no latinas que _normalize descarta (CJK,
-    kana); «º», «ª» y «µ» son de Latin-1 y no cuentan."""
+    kana, griego): «º» y «ª» no cuentan; «µ» llega como «μ» y sí."""
     fuera = "".join(
         c for c in unicodedata.normalize("NFC", texto)
         if c > "\u024f" and (unicodedata.category(c)[0] == "L" or unicodedata.category(c) == "Nd")
@@ -132,12 +132,12 @@ def _sufijo(texto: str) -> str:
 
 
 def _compatible(texto: str) -> str:
-    """NFKC salvo en «º», «ª» y los símbolos, para que «Nº» siga igual a «N°» y
-    «Bolt™» a «Bolt»."""
+    """NFKC salvo en «ºª№™℠», para que «Nº» siga igual a «N°» y «Bolt™» a «Bolt»;
+    las unidades como «㎜» sí pasan a «mm»."""
     if texto.isascii() or unicodedata.is_normalized("NFKC", texto):
         return texto
     return unicodedata.normalize("NFC", "".join(
-        c if c in "ºª" or unicodedata.category(c)[0] == "S" else unicodedata.normalize("NFKC", c)
+        c if c in "ºª№™℠" else unicodedata.normalize("NFKC", c)
         for c in texto
     ))
 
