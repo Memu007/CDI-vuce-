@@ -5,7 +5,8 @@
 #
 # QUÉ HACE (no hay que saber programar para usarlo):
 #
-#   1. Levanta la app con configuración de producción y una base descartable.
+#   1. Levanta la app con configuración de producción y un Postgres 16
+#      descartable (sin Postgres 16 instalado, falla).
 #   2. Crea dos despachantes distintos: Ana y Beto.
 #   3. Ana carga un cliente con CUIT y genera su archivo MARIA.TXT.
 #   4. Beto intenta ver, modificar, borrar y descargar todo lo de Ana:
@@ -108,7 +109,8 @@ if command -v pg_ctl >/dev/null 2>&1; then
         PGDIR=""
     fi
 fi
-[ -z "$DB_URL" ] && { DB_URL="sqlite+aiosqlite:///${TMP}/aisl.db"; echo -e "${YELLOW}⚠️  Sin Postgres: se usa SQLite temporal.${NC}"; }
+# Producción corre en Postgres: medir sobre SQLite daría una puerta pasada que no vale.
+[ -n "$DB_URL" ] || { echo -e "${RED}❌ No levantó Postgres 16: sin él no se mide.${NC}"; [ -f "$TMP/pg.log" ] && tail -20 "$TMP/pg.log"; exit 1; }
 
 PY="./venv/bin/python"; [ -x "$PY" ] || PY="python3"
 
@@ -325,15 +327,7 @@ sigue() {
 # Los ids de los ítems de una operación no salen por ninguna API: se leen de
 # la base. Se mide autorización suponiendo que Beto los conoce.
 sql() {
-    if [ -n "$PGDIR" ]; then
-        psql -h 127.0.0.1 -p 5434 -U cdi -d cdi -tAc "$1"
-    else
-        "$PY" -c 'import sqlite3, sys
-con = sqlite3.connect(sys.argv[1])
-for r in con.execute(sys.argv[2]).fetchall():
-    print("|".join("" if v is None else str(v) for v in r))
-con.commit()' "$TMP/aisl.db" "$1"
-    fi
+    psql -h 127.0.0.1 -p 5434 -U cdi -d cdi -tAc "$1"
 }
 
 json() { "$PY" -c 'import json, sys

@@ -778,8 +778,8 @@ if ! correr >/dev/null; then
 else
   echo "BASE  | la pantalla Listo, en verde"
   sabotaje $F2 "g: Listo guarda la operación sin el archivo del MARIA" \
-    "            saveOperationToHistory(items, data, carga, foto).catch(err => {" \
-    "            saveOperationToHistory(items, {}, carga, foto).catch(err => {" \
+    "            saveOperationToHistory(items, data, carga, foto).then(r => {" \
+    "            saveOperationToHistory(items, {}, carga, foto).then(r => {" \
     "FALLA: import: la pantalla hizo"
 fi
 
