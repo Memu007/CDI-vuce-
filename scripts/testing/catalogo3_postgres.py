@@ -17,7 +17,9 @@ Comprueba:
 - que la migración le da al proveedor CJK un id no vacío, separa a los dos
   proveedores largos y no pierde ninguna fila;
 - que «电线 2mm» y «钢管 2mm» quedan en dos filas;
-- que un tercer arranque no cambia nada.
+- que un tercer arranque no cambia nada;
+- que un worker arranca aunque otro tenga tomada más de 5 s la migración
+  de las claves.
 
 uso (con un Postgres local y descartable, nunca el de producción; el usuario
 tiene que poder crear bases):
@@ -214,6 +216,15 @@ try:
     chequear("ARRANCO" in s and not cambios
              and antes == (tipo_origen(), catalogo(), sql("select origen from operation_items order by origen")),
              f"un tercer arranque no cambia nada: {cambios}")
+
+    # --- 5. un worker arranca aunque otro siga más de 5 s con las claves del catálogo
+    tomado = psycopg2.connect(URL_BASE)
+    tomado.autocommit = True
+    tomado.cursor().execute("select pg_advisory_lock(%s)", (CANDADO,))
+    s, e = correr(NUEVA, ARRANCAR).communicate(timeout=600)
+    tomado.close()
+    chequear("ARRANCO" in s, "un worker arranca mientras otro tiene tomada la migración de claves: "
+             + (e.strip().splitlines() or [""])[-1][:200])
 finally:
     with contextlib.suppress(Exception):
         con = psycopg2.connect(URL)
