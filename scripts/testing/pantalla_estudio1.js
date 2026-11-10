@@ -6,6 +6,8 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_estudio1.js [captura-telefono.png]
 const { chromium } = require('playwright');
+// Cada registro entra con otra IP inventada: el registro tiene límite por IP, por hora y por día.
+const ipNueva = () => '10.' + [0, 0, 0].map(() => Math.floor(Math.random() * 256)).join('.');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const CUIT_PERFIL = '20111111112';
 const CUIT_UNO = '30222222229';
@@ -19,7 +21,7 @@ const NOMBRE_HTML = '<img src=x onerror="window.__xss=1">Estudio Inventado Uno';
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
   const usuario = 'e1_' + id;
-  let r = await page.request.post(base + '/auth/register', { data: { username: usuario, password: 'Clave-Inventada-123', email: 'e1' + id + '@ejemplo.test' } });
+  let r = await page.request.post(base + '/auth/register', { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: usuario, password: 'Clave-Inventada-123', email: 'e1' + id + '@ejemplo.test' } });
   if (!r.ok()) falla('registro: ' + r.status() + ' ' + await r.text());
   r = await page.request.put(base + '/api/user/profile', { data: { cuit: CUIT_PERFIL } });
   if (!r.ok()) falla('CUIT del perfil: ' + r.status() + ' ' + await r.text());
@@ -182,7 +184,7 @@ const NOMBRE_HTML = '<img src=x onerror="window.__xss=1">Estudio Inventado Uno';
   const ctx2 = await b.newContext({ viewport: { width: 390, height: 844 } });
   const p2 = await ctx2.newPage();
   const usuario2 = 'e1b_' + id;
-  r = await p2.request.post(base + '/auth/register', { data: { username: usuario2, password: 'Clave-Inventada-123', email: 'e1b' + id + '@ejemplo.test' } });
+  r = await p2.request.post(base + '/auth/register', { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: usuario2, password: 'Clave-Inventada-123', email: 'e1b' + id + '@ejemplo.test' } });
   if (!r.ok()) falla('registro sin perfil: ' + r.status());
   await p2.route('**/api/estudios', route => route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"x"}' }));
   await p2.goto(base + '/dashboard');

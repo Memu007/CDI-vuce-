@@ -82,8 +82,8 @@ sabotaje $M "el uso del perfil se anota antes de generar" \
   $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    if estudio is None:\n        await db.merge(UsoCuitPerfil(owner_username=user["username"], last_used_at=datetime.now(timezone.utc)))\n        await db.commit()\n    if not request.items:' \
   "FAILED $T::test_los_avisos_y_un_txt_que_no_sale_con_el_perfil_no_cuentan"
 sabotaje $M "los avisos cuentan como uso del perfil" \
-  $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    items = _items_con_procedencia(request)' \
-  $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    if estudio is None:\n        await db.merge(UsoCuitPerfil(owner_username=user["username"], last_used_at=datetime.now(timezone.utc)))\n        await db.commit()\n    items = _items_con_procedencia(request)' \
+  $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    _textos_como_van_al_txt(request)\n' \
+  $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    if estudio is None:\n        await db.merge(UsoCuitPerfil(owner_username=user["username"], last_used_at=datetime.now(timezone.utc)))\n        await db.commit()\n    _textos_como_van_al_txt(request)\n' \
   "FAILED $T::test_los_avisos_y_un_txt_que_no_sale_con_el_perfil_no_cuentan"
 sabotaje $M "el uso del perfil se lee de otra cuenta" \
   '    uso_perfil = await db.get(UsoCuitPerfil, user["username"])' \

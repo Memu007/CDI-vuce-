@@ -6,6 +6,8 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_destino1.js [captura.png]
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
+// Cada registro entra con otra IP inventada: el registro tiene límite por IP, por hora y por día.
+const ipNueva = () => '10.' + [0, 0, 0].map(() => Math.floor(Math.random() * 256)).join('.');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const TRES = [
   ['NO_VALIDA', 'Comercialización o reventa'],
@@ -17,7 +19,7 @@ const TRES = [
   const page = await (await b.newContext({ viewport: { width: 1280, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  await page.request.post(base + '/auth/register', { data: { username: 'd1_' + id, password: 'Clave-Inventada-123', email: 'd1' + id + '@ejemplo.test' } });
+  await page.request.post(base + '/auth/register', { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: 'd1_' + id, password: 'Clave-Inventada-123', email: 'd1' + id + '@ejemplo.test' } });
   const rc = await page.request.post(base + '/api/clientes', { data: { nombre: 'Cliente D1', cuit: '30712345678' } });
   const cj = await rc.json(); const cliente = cj.cliente || cj;
 
