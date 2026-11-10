@@ -114,12 +114,12 @@ reemplazar $R '        return r.error ? String(raw).trim() : r.valor;' '        
 caso "ambiguo_guardado_como_numero" "FAILED $T::test_la_revision_guarda_el_monto_entero"
 
 # 11. el pedido lleva el monto con Number()
-reemplazar $J '        const n = CDI.montos.leer(v).valor;
-        return n === null ? 0 : n;' '        return Number(v) || 0;'
+reemplazar $J '        if (r.error) return String(v).trim();
+        return r.valor === null ? 0 : r.valor;' '        return Number(v) || 0;'
 caso "pedido_con_number" "FAILED $T::test_el_pedido_lleva_los_montos_enteros"
 
 # 12. el ajuste del valor vuelve a Number() (VALOR-1)
-reemplazar $J '        return CDI.montos.leer(v).valor;' '        return v === "" ? null : Number(v);'
+reemplazar $J '        return r.error ? String(v).trim() : r.valor;' '        return v === "" ? null : Number(v);'
 caso "ajuste_con_number" "FAILED $T::test_un_ajuste_con_punto_de_miles"
 
 # 13. el flete vuelve a ser un campo numérico del navegador

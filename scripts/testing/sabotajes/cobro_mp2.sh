@@ -341,7 +341,7 @@ sabotaje $M "el pago suma desde el fin sólo si está activa" \
 # --- Sin token no hay demo ni «activada» (D7.4, D9)
 sabotaje $M "el checkout sin token da demo fuera de pruebas" \
   "FAILED $T::test_sin_token_fuera_de_desarrollo_no_hay_demo" \
-  "        if not _demo_permitida():
+  "        if not _es_desarrollo():
             raise HTTPException(status_code=503, detail=\"Los pagos" "        if False:
             raise HTTPException(status_code=503, detail=\"Los pagos"
 sabotaje $M "sin la variable de entorno hay demo" \
@@ -351,12 +351,12 @@ sabotaje $M "sin la variable de entorno hay demo" \
 sabotaje $M "la página de la demo abre fuera de pruebas" \
   "FAILED $T::test_sin_token_fuera_de_desarrollo_no_hay_demo" \
   "    \"\"\"Página de checkout demo cuando no hay credenciales MP\"\"\"
-    if not _demo_permitida() or" "    \"\"\"Página de checkout demo cuando no hay credenciales MP\"\"\"
+    if not _es_desarrollo() or" "    \"\"\"Página de checkout demo cuando no hay credenciales MP\"\"\"
     if"
 sabotaje $M "confirmar la demo funciona fuera de pruebas" \
   "FAILED $T::test_sin_token_fuera_de_desarrollo_no_hay_demo" \
   "    \"\"\"Confirma un pago demo: no cobra ni cambia la cuenta.\"\"\"
-    if not _demo_permitida() or" "    \"\"\"Confirma un pago demo: no cobra ni cambia la cuenta.\"\"\"
+    if not _es_desarrollo() or" "    \"\"\"Confirma un pago demo: no cobra ni cambia la cuenta.\"\"\"
     if"
 sabotaje $M "la vuelta del pago dice «activada»" \
   "FAILED $T::test_la_pagina_de_exito_sin_token_no_dice_activada" \

@@ -1757,24 +1757,14 @@
             source: sugg.source || 'manual',
             data_source: it.ncm_source || 'unknown'
         });
-        if (it.descripcion) saveNcmUsage(it.descripcion, ncmFmt, it.origen);
-
-        // Hint contextual: la primera vez que el user asigna un NCM,
-        // le contamos que se va a guardar para [cliente] + [proveedor].
-        try {
-            if (CDI.hint) {
-                const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
-                const op = (CDI.state && CDI.state.operacion) || {};
-                const cliNombre = (cliente && cliente.nombre) ? cliente.nombre : 'el cliente activo';
-                const provNombre = String(op.vendedor_nombre || '').trim() || 'el proveedor';
-                CDI.hint('autocatalogo', {
-                    title: '🧠 Memoria activada',
-                    text: 'Guardamos este NCM para ' + cliNombre + ' · ' + provNombre +
-                          '. En la próxima factura del mismo proveedor ya te lo sugerimos.',
-                    cta: 'Entendido',
-                });
-            }
-        } catch (_) {}
+        if (it.descripcion) {
+            // los nombres de ahora: el guardado contesta después y la persona pudo cambiar de cliente
+            const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
+            const op = (CDI.state && CDI.state.operacion) || {};
+            saveNcmUsage(it.descripcion, ncmFmt, it.origen).then(guardado => {
+                if (guardado) avisarMemoriaActivada(cliente, op);
+            });
+        }
 
         const activeIdx = spotActiveIdx;
         closeSpotlight();
@@ -1824,11 +1814,28 @@
         }
     }
 
+    // La primera vez que se guarda un NCM, contamos para qué cliente y proveedor quedó.
+    function avisarMemoriaActivada(cliente, op) {
+        try {
+            if (CDI.hint) {
+                const cliNombre = (cliente && cliente.nombre) ? cliente.nombre : 'el cliente activo';
+                const provNombre = String(op.vendedor_nombre || '').trim() || 'el proveedor';
+                CDI.hint('autocatalogo', {
+                    title: '🧠 Memoria activada',
+                    text: 'Guardamos este NCM para ' + cliNombre + ' · ' + provNombre +
+                          '. En la próxima factura del mismo proveedor ya te lo sugerimos.',
+                    cta: 'Entendido',
+                });
+            }
+        } catch (_) {}
+    }
+
     async function saveNcmUsage(descripcion, ncm, origen) {
+        let guardado = false;
         try {
             const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
             const operacion = (CDI.state && CDI.state.operacion) || {};
-            await CDI.api('/api/ncm/guardar-uso', {
+            const res = await CDI.api('/api/ncm/guardar-uso', {
                 method: 'POST',
                 body: JSON.stringify({
                     descripcion: descripcion,
@@ -1838,7 +1845,14 @@
                     vendor_name: String(operacion.vendedor_nombre || '').trim() || null
                 })
             });
-        } catch (_) { /* best effort */ }
+            const data = await res.json().catch(() => ({}));
+            guardado = data.success === true && data.historial_guardado !== false;
+        } catch (_) { /* red caída o plan vencido: el mismo aviso */ }
+        if (!guardado && CDI.toast) {
+            CDI.toast('No se guardó en la memoria de productos',
+                'La posición quedó en esta operación, pero la próxima vez no se va a sugerir sola.', 'warning');
+        }
+        return guardado;
     }
 
     function renderSpotLoading() {

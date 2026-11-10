@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 from typing import Optional
 
@@ -5,22 +6,37 @@ from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-# Mismo default débil que _DEFAULT_DEV_SECRET en main.py.
 # En producción DEBE sobreescribirse con JWT_SECRET_KEY (o SECRET_KEY).
 _DEFAULT_DEV_SECRET = "tu-clave-secreta-super-segura-cambiar-en-produccion"
 
 
+def es_desarrollo() -> bool:
+    # Sin la variable o con un valor desconocido, la app se porta como en producción.
+    return os.getenv("ENVIRONMENT") in ("development", "test", "testing")
+
+
+def get_frontend_url() -> str:
+    """Base pública de la UI para los links de los emails y la vuelta del cobro."""
+    url = (os.getenv("FRONTEND_URL") or "").strip().rstrip("/")
+    if url:
+        return url
+    if not es_desarrollo():
+        raise RuntimeError(
+            "FRONTEND_URL no esta seteada y ENVIRONMENT no es development, test ni testing. "
+            "Definir p.ej. FRONTEND_URL=https://cdi.tu-dominio.com"
+        )
+    return "http://127.0.0.1:8010"
+
+
 class Settings(BaseSettings):
     # JWT Configuration
-    # Lee JWT_SECRET_KEY → SECRET_KEY → JWT_SECRET (mismo orden que main.py).
-    # Esto garantiza que jwt_utils.py y main.py siempre firman/verifican
-    # con la misma clave, sin importar cuál variable setea el operador.
+    # Lee JWT_SECRET_KEY → SECRET_KEY → JWT_SECRET. Firma y verificación la
+    # toman sólo de acá (auth/dependencies.py).
     jwt_secret: str = Field(
         default=_DEFAULT_DEV_SECRET,
         validation_alias=AliasChoices("JWT_SECRET_KEY", "SECRET_KEY", "JWT_SECRET"),
     )
     jwt_algorithm: str = Field("HS256", alias="JWT_ALGORITHM")
-    jwt_exp_minutes: int = Field(60, alias="JWT_EXP_MINUTES")
 
     # Rate Limiting (diferenciado por plan)
     # Ajustado para soportar 2000 usuarios (200 concurrentes)

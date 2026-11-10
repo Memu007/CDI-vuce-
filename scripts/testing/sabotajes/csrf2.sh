@@ -15,7 +15,7 @@ CONTROL='        if method in _CSRF_SAFE_METHODS or path in _CSRF_EXEMPT_PATHS:'
 EXENTAS=tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas
 sabotaje pytest_csrf $M "el alias responde sin cerrar la sesión" \
   "FAILED tests/test_csrf.py::test_logout_con_token_borra_las_dos_cookies[/logout]" \
-  '    return await logout(request, response)' '    return {}'
+  '    return await logout(request, response, db)' '    return {}'
 sabotaje pytest_csrf $M "«webhook» en cualquier parte de la ruta saltea el control" \
   "FAILED $EXENTAS[DELETE /api/catalog/x/productos/abc-webhook]" \
   "$CONTROL" "${CONTROL%:} or \"webhook\" in path:"

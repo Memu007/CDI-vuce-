@@ -10,7 +10,9 @@ Comprueba:
 3. el tope de usuarios del plan, al invitar y al registrarse;
 4. un solo uso y el tope bajo carrera: dos registros a la vez con la misma
    invitación, dos registros con invitaciones distintas por el último lugar
-   del estudio, y dos invitaciones enviadas a la vez por ese último lugar.
+   del estudio, y dos invitaciones enviadas a la vez por ese último lugar;
+5. un email, una cuenta (D40): no se invita un email que ya tiene cuenta, y
+   al registrarse se usan las otras invitaciones de ese email en el estudio.
 
 uso (con un Postgres local y descartable, nunca el de producción):
   python scripts/testing/org1_postgres.py postgresql://cdi@127.0.0.1:55432/<base>
@@ -273,6 +275,99 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
         pendientes = sql("select count(*) from invitations where org_id=%s and status='pending'", est.org_id)[0][0]
         chequear([s for s, _ in res] == [200, 400] and "ocupa los 2" in res[1][1] and pendientes == 1,
                  f"dos invitaciones a la vez por el último lugar: sale una ({res}, pendientes {pendientes})")
+
+        # --- 5. un email, una cuenta (D40)
+        YA_TIENE_CUENTA = "Ese email ya tiene una cuenta en CDI y no se puede invitar como miembro nuevo."
+        PREMIUM["users"] = 3
+        for donde in ("este estudio", "otro estudio", "sin estudio", "guardada con mayúsculas"):
+            est = Estudio()
+            a = email()
+            if donde == "este estudio":
+                registrar(a, est.token(a))
+            elif donde == "otro estudio":
+                registrar(a, Estudio().token(a))
+            else:
+                c.cookies.clear()
+                c.post("/auth/register", json={"username": azar("o1u_"), "password": CLAVE, "email": a})
+            chequear(len(usuarios(a)) == 1, f"cuenta {donde}: creada")
+            if donde == "guardada con mayúsculas":
+                # Una cuenta de antes de EMAIL-1 puede tener el email con mayúsculas.
+                sql("update users set email=%s where email=%s", a.upper(), a)
+                chequear(len(usuarios(a.upper())) == 1, "  la cuenta queda con el email en mayúsculas")
+            r = est.invitar(f" {a.upper()} ")
+            pend = sql("select count(*) from invitations where org_id=%s and email=%s and status='pending'", est.org_id, a)[0][0]
+            chequear(r.status_code == 400 and detalle(r) == YA_TIENE_CUENTA and pend == 0,
+                     f"invitar un email con cuenta {donde}: 400 sin invitación ({r.status_code} {detalle(r)})")
+            libres = 3 - miembros(est.org_id)
+            oks = [est.invitar(email()).status_code for _ in range(libres)]
+            r = est.invitar(email())
+            chequear(oks == [200] * libres and r.status_code == 400,
+                     f"  y no ocupa lugar: {libres} libres, {oks}, la siguiente {r.status_code}")
+
+        PREMIUM["users"] = TOPE_REAL
+        est, otro = Estudio(), Estudio()
+        a = email()
+        tok1, tok2 = est.token(a), est.token(a.upper())
+        ajena, de_otro = est.token(email()), otro.token(a)
+        # Una de antes de EMAIL-1, con mayúsculas y espacios: el registro la acepta.
+        vieja = est.token(a)
+        sql("update invitations set email=%s where token=%s", f"  {a.upper()} ", vieja)
+        r = registrar(a, tok2)
+        chequear(r.status_code == 200 and estado(tok1) == "accepted" and "ya fue usada" in detalle(validar(tok1))
+                 and estado(vieja) == "accepted"
+                 and estado(ajena) == "pending" and estado(de_otro) == "pending",
+                 f"registrarse usa las otras del mismo email en ese estudio, y sólo esas ({r.status_code} "
+                 f"{estado(tok1)} {estado(vieja)} {estado(ajena)} {estado(de_otro)})")
+
+        est = Estudio()
+        a, sacado = email(), azar("o1u_")
+        tok1, tok2 = est.token(a), est.token(a)
+        c.cookies.clear()
+        r = c.post("/auth/register", json={"username": sacado, "password": CLAVE, "email": a, "invite_token": tok1})
+        suya = dict(c.cookies)
+        chequear(r.status_code == 200, f"el sacado: entra con la primera ({r.status_code} {detalle(r)})")
+        c.cookies.clear()
+        for k, v in est.sesion.items():
+            c.cookies.set(k, v)
+        r = c.delete(f"/api/organizations/members/{sacado}")
+        chequear(r.status_code == 200, f"el sacado: el dueño lo saca ({r.status_code} {detalle(r)})")
+        c.cookies.clear()
+        for k, v in suya.items():
+            c.cookies.set(k, v)
+        r = c.put("/api/user/profile", json={"email": email(), "current_password": CLAVE})
+        chequear(r.status_code == 200 and not usuarios(a), f"el sacado: cambia su email ({r.status_code} {detalle(r)})")
+        r = registrar(a, tok2)
+        chequear(r.status_code == 400 and "ya fue usada" in detalle(r) and not usuarios(a)
+                 and miembros(est.org_id) == 1,
+                 f"el sacado no vuelve a entrar con la segunda ({r.status_code} {detalle(r)}, miembros {miembros(est.org_id)})")
+
+        est = Estudio()
+        a = email()
+        tok1, tok2 = est.token(a), est.token(a)
+        c.cookies.clear()
+        res = carrera([(a, tok1), (a, tok2)])
+        chequear([s for s, _ in res] == [200, 400] and "ya fue usada" in res[1][1] and len(usuarios(a)) == 1
+                 and {estado(tok1), estado(tok2)} == {"accepted"},
+                 f"dos invitaciones del mismo email a la vez: entra uno y el otro recibe 400 ({res})")
+
+        PREMIUM["users"] = 3
+        est = Estudio()
+        a, nuevo = email(), email()
+        tok = est.token(a)
+        c.cookies.clear()
+        r = c.post("/auth/register", json={"username": azar("o1u_"), "password": CLAVE, "email": a,
+                                           "invite_token": tok})
+        chequear(r.status_code == 200, f"el miembro entra con su invitación ({r.status_code} {detalle(r)})")
+        suya = dict(c.cookies)
+        tok_nuevo = est.token(nuevo)
+        c.cookies.clear()
+        for k, v in suya.items():
+            c.cookies.set(k, v)
+        r = c.put("/api/user/profile", json={"email": nuevo, "current_password": CLAVE})
+        ok_perfil = r.status_code == 200 and estado(tok_nuevo) == "pending"
+        r1, r2 = est.invitar(email()), est.invitar(email())
+        chequear(ok_perfil and r1.status_code == 200 and r2.status_code == 400,
+                 f"una pendiente al email de un miembro no ocupa lugar ({ok_perfil}, {r1.status_code}, {r2.status_code})")
     finally:
         PREMIUM["users"] = TOPE_REAL
 

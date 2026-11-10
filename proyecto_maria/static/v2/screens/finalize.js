@@ -354,9 +354,11 @@
     }
 
     // El seguro que calculó el sistema con otros importes queda como está:
-    // pasa a ser de la persona y el servidor deja de frenarlo (VALOR-1c).
+    // pasa a ser de la persona. El servidor lo frena sólo si el incoterm ya
+    // lleva el seguro en el precio.
     function dejarSeguro() {
         const op = CDI.state.operacion = CDI.state.operacion || {};
+        op.seguro_dejado = true;
         delete op.seguro_calculado;
         cuentasViejas();
         refrescarAvisos();
@@ -383,7 +385,7 @@
     // algo cambió desde entonces (un ajuste, el descuento, el seguro, otra
     // operación), no se usa: se piden las cuentas de nuevo.
     function calcularSeguro() {
-        if (!ultimoValor || ultimoValor.error) return;
+        if (!ultimoValor || ultimoValor.error || ultimoValor.seguro_en_el_precio) return;
         let ahora = null;
         try { ahora = firmaDelPedido(buildMariaRequest()); } catch (err) { ahora = null; }
         if (!cuentasCon || cuentasCon !== ahora) {
@@ -394,6 +396,8 @@
         const op = CDI.state.operacion = CDI.state.operacion || {};
         op.seguro = ultimoValor.seguro_sugerido;
         op.seguro_calculado = true;
+        delete op.seguro_dejado;
+        delete op.seguro_borrado;
         // Ya está completo: deja de avisarse que no se leyó (MARIA-1c).
         if (Array.isArray(op.campos_sin_leer) && op.campos_sin_leer.includes('seguro')) {
             const completados = new Set(op.campos_completados || []);
@@ -410,9 +414,35 @@
             !(Array.isArray(op.campos_completados) && op.campos_completados.includes('seguro'));
     }
 
+    // Con un incoterm que ya lleva el seguro en el precio, el 1 % que puso el
+    // sistema no va: se borra, queda para completar y marcado como borrado para
+    // que los avisos no digan que no se leyó. Sólo con las cuentas del pedido de
+    // ahora; el seguro leído o escrito por la persona no se toca.
+    function borrarSeguroCalculado(valor, firma) {
+        const op = CDI.state && CDI.state.operacion;
+        if (!op || !valor || !valor.seguro_en_el_precio || !(op.seguro_calculado || op.seguro_dejado)) return false;
+        let ahora = null;
+        try { ahora = firmaDelPedido(buildMariaRequest()); } catch (err) { ahora = null; }
+        if (!firma || firma !== ahora) return false;
+        op.seguro_borrado = true;
+        op.seguro = '';
+        delete op.seguro_calculado;
+        delete op.seguro_dejado;
+        const sinLeer = Array.isArray(op.campos_sin_leer) ? op.campos_sin_leer : [];
+        if (!sinLeer.includes('seguro')) op.campos_sin_leer = sinLeer.concat(['seguro']);
+        if (Array.isArray(op.campos_completados)) {
+            op.campos_completados = op.campos_completados.filter(c => c !== 'seguro');
+        }
+        cuentasViejas();
+        refrescarAvisos();
+        if (CDI.semaforo && CDI.semaforo.refresh) CDI.semaforo.refresh();
+        return true;
+    }
+
     function pintarValor(valor, firma) {
         ultimoValor = valor;
         cuentasCon = firma || null;
+        if (borrarSeguroCalculado(valor, firma)) return;
         const op = (CDI.state && CDI.state.operacion) || {};
         const incluir = document.getElementById('valorIncluir');
         const deducir = document.getElementById('valorDeducir');
@@ -473,24 +503,37 @@
         const calculado = ok && op.seguro_calculado;
         // Sobre qué FOB va el 1 % lo dice el servidor (BASE_SEGURO_SUGERIDO, D13).
         const base = (ok && valor.base_seguro) || 'FOB';
-        const mostrar = ok && (!(valor.seguro > 0) || calculado) && valor.seguro !== valor.seguro_sugerido;
+        // Con CIF, CIP, DPU, DAP o DDP no hay 1 %: lo dice el servidor (SEGURO-1).
+        const enElPrecio = !!(valor && valor.seguro_en_el_precio);
+        const mostrar = ok && !enElPrecio && (!(valor.seguro > 0) || calculado) &&
+            valor.seguro !== valor.seguro_sugerido;
         if (boton) {
             boton.hidden = !mostrar;
             boton.textContent = (calculado ? 'Recalcular seguro' : 'Calcular seguro') +
-                ' (1 % de ' + base + ' + flete): ' + (ok ? importeEscrito(valor.seguro_sugerido) : '');
+                ' (1 % de ' + base + ' + flete): ' + (mostrar ? importeEscrito(valor.seguro_sugerido) : '');
         }
         // Lo calculó con otros importes, o ya no se puede comprobar: el
         // servidor no genera hasta que se recalcule o se deje (VALOR-1c).
+        // Sin respuesta de los avisos no se sabe si el incoterm lleva el
+        // seguro en el precio: dejarlo mandaría el 1 % con CIF (SEGURO-1).
         const dejar = document.getElementById('valorDejarSeguro');
-        if (dejar) dejar.hidden = !(valor && op.seguro_calculado &&
+        if (dejar) dejar.hidden = !(valor && !enElPrecio && op.seguro_calculado &&
+            valor.error !== SIN_CUENTAS &&
             (valor.error || valor.seguro !== valor.seguro_sugerido));
+        const incoterm = String(op.incoterm || '').trim().toUpperCase() || 'este incoterm';
         if (nota) {
             nota.textContent = !ok ? '' :
+                enElPrecio ? 'Con ' + incoterm + ' el seguro ya está en el precio: el sistema no lo calcula.' +
+                    (seguroSinLeer(op) ? (op.seguro_borrado ?
+                        ' El que calculó el sistema se borró: cargá el de la factura en la revisión; si la factura no trae seguro, escribí 0.' :
+                        ' No pudimos leerlo de la factura: completalo en la revisión; si no trae seguro, escribí 0.') :
+                        valor.seguro > 0 ? '' : ' Si la factura lo trae, cargalo en la revisión.') :
                 (calculado && valor.seguro !== valor.seguro_sugerido) ? 'El seguro se calculó con otros importes.' :
                 calculado ? 'Seguro calculado: 1 % de (' + base + ' + flete).' :
                 valor.seguro > 0 ? 'La operación ya trae seguro.' :
-                mostrar && seguroSinLeer(op) ? 'La factura puede traer un seguro que no pudimos leer: ' +
-                    'revisala antes de calcularlo.' : '';
+                mostrar && seguroSinLeer(op) ? (op.seguro_borrado ?
+                    'El seguro que calculó el sistema se borró al cambiar el incoterm: calculalo de nuevo o cargá el de la factura.' :
+                    'La factura puede traer un seguro que no pudimos leer: revisala antes de calcularlo.') : '';
         }
     }
 
@@ -713,6 +756,12 @@
                     CDI.goTo('validating');
                     throw new Error(detail);
                 }
+                // Lo que falta del seguro se completa en la revisión, junto al campo.
+                if (typeof detail === 'string' && /^Seguro: (no pudimos leerlo|el que calculó el sistema se borró)/.test(detail)) {
+                    CDI.goTo('review');
+                    if (CDI.marcarEnLaRevision) CDI.marcarEnLaRevision('seguro', detail);
+                    throw new Error(detail);
+                }
                 // Los controles de antes de generar llegan como {errors: [...]}.
                 const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ') : detail;
                 throw new Error(texto || 'No se pudo generar el archivo');
@@ -724,13 +773,22 @@
                 duration_ms: dur
             });
             if (carga === CDI.state) mostrarListo(data);
-            // Best-effort: guardar en historial del cliente activo (si hay)
-            saveOperationToHistory(items, data, carga, foto).catch(err => {
-                console.warn('[history] no se pudo guardar operacion', err);
+            // A la vez y best-effort. Toast reemplaza al anterior: si la operación ya
+            // avisó algo (que puede ser un error), el aviso del catálogo no lo tapa.
+            let avisoDeLaOperacion = false;
+            saveOperationToHistory(items, data, carga, foto).then(r => {
+                avisoDeLaOperacion = (!r.ok && r.reason !== 'sin_cliente') || r.historial_guardado === false;
+            }).catch(err => {
+                console.warn('[history] no se pudo armar la operacion', err);
+                avisoDeLaOperacion = true;
+                CDI.toast && CDI.toast('No se guardó al cliente',
+                    'La operación no quedó en el historial. Volvé a Listo y reintentá.', 'error');
             });
-            // Best-effort: aprender productos en catalogo del proveedor
-            saveCatalogLearn(items, carga).catch(err => {
-                console.warn('[catalog] no se pudo aprender', err);
+            saveCatalogLearn(items, carga).then(aprendido => {
+                if (!aprendido && !avisoDeLaOperacion && CDI.toast) {
+                    CDI.toast('Algunos productos no quedaron en la memoria',
+                        'La operación está lista, pero la próxima vez esos productos no se van a sugerir solos.', 'warning');
+                }
             });
         } catch (err) {
             console.error('[ready] generate error', err);
@@ -839,6 +897,9 @@
             flete: montoDelPedido(op.flete),
             seguro: montoDelPedido(op.seguro),
             seguro_calculado: !!op.seguro_calculado,
+            seguro_dejado: !!op.seguro_dejado,
+            seguro_borrado: !!op.seguro_borrado,
+            seguro_para_completar: seguroSinLeer(op),
             // MARIA-3: el servidor decide si van al TXT (sólo EXW, FCA o FAS).
             gastos_anteriores_fob: montoDelPedido(op.gastos_anteriores_fob),
             // VALOR-1: sólo para las cuentas; no van al TXT (D12).
@@ -865,6 +926,7 @@
     }
 
     function renderReady() {
+        hide($('readyClientSuccess'));
         hide(rGenerating);
         hide(rError);
         show(rDone);
@@ -923,6 +985,7 @@
         if (wasDismissed) { panel.hidden = true; return; }
 
         panel.hidden = false;
+        clienteCreadoAca = null;
         // Reset del form interno por si quedó abierto antes
         const form = document.getElementById('readyOrphanCreateForm');
         if (form) form.hidden = true;
@@ -933,6 +996,7 @@
         try { CDI.track && CDI.track('op_orphan_panel_shown'); } catch (_) {}
     }
 
+    let clienteCreadoAca = null;
     let _orphanListenersWired = false;
     function setupOrphanPanelListeners() {
         if (_orphanListenersWired) return;
@@ -1043,17 +1107,6 @@
         } catch (_) { return null; }
     }
 
-    function humanizeApiError(detail, fallback) {
-        if (!detail) return fallback;
-        if (typeof detail === 'string') return detail;
-        if (Array.isArray(detail)) {
-            const msg = detail.map(d => (d && d.msg) || '').filter(Boolean).join('; ');
-            return msg || fallback;
-        }
-        if (detail.msg) return String(detail.msg);
-        try { return JSON.stringify(detail); } catch (_) { return fallback; }
-    }
-
     async function orphanCreateSubmit() {
         const btn = document.getElementById('orphanCreateSaveBtn');
         const inpNom = document.getElementById('orphanCreateNombre');
@@ -1076,6 +1129,13 @@
         }
         if (btn) btn.disabled = true;
         try {
+            // Ya se creó en este panel y falló el guardado (aunque después se haya
+            // probado asignar otro): se reintenta con ese, sin crear otro.
+            if (clienteCreadoAca) {
+                CDI.setClienteActivo(clienteCreadoAca);
+                await reSaveOperationAndClosePanel('create');
+                return;
+            }
             // Pre-check: si ya existe un cliente con este CUIT, ofrecer usar ese.
             if (cuit) {
                 const existente = await lookupClienteByCuit(cuit);
@@ -1106,10 +1166,11 @@
             });
             const out = await res.json().catch(() => ({}));
             if (!res.ok || !out.success || !out.cliente) {
-                showOrphanCreateError(humanizeApiError(out.detail, 'No se pudo crear el cliente.'));
+                showOrphanCreateError(textoDeError(out.detail, 'No se pudo crear el cliente.'));
                 return;
             }
             CDI.clientesCache = [];
+            clienteCreadoAca = out.cliente;
             CDI.setClienteActivo(out.cliente);
             await reSaveOperationAndClosePanel('create');
         } catch (err) {
@@ -1146,20 +1207,28 @@
 
     async function reSaveOperationAndClosePanel(via) {
         const items = (CDI.state && CDI.state.items) || [];
-        await saveOperationToHistory(items, lastMaria || {});
+        const guardado = await saveOperationToHistory(items, lastMaria || {});
+        // El error ya está a la vista y el panel queda abierto para reintentar.
+        if (!guardado.ok) return;
         const panel = document.getElementById('readyOrphanPanel');
         if (panel) panel.hidden = true;
         const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
         const nombre = (cliente && cliente.nombre) || 'cliente';
+        const sinMemoria = guardado.historial_guardado === false;
         showReadyClientSuccess(
             via === 'assign' ? 'Cliente asignado a esta operación' : 'Cliente creado con éxito',
-            'Operación asociada a ' + nombre + '. La próxima factura con este CUIT se detecta sola.'
+            'Operación asociada a ' + nombre + (sinMemoria
+                ? '. Algunos productos no quedaron en la memoria: la próxima vez no se van a sugerir solos.'
+                : '. La próxima factura con este CUIT se detecta sola.')
         );
-        CDI.toast && CDI.toast(
-            'Cliente guardado',
-            'La próxima factura con este CUIT se detecta sola. Operación asociada a ' + nombre + '.',
-            'success'
-        );
+        // toast reemplaza al anterior: no tapar el aviso de lo que no quedó en la memoria.
+        if (!sinMemoria && CDI.toast) {
+            CDI.toast(
+                'Cliente guardado',
+                'La próxima factura con este CUIT se detecta sola. Operación asociada a ' + nombre + '.',
+                'success'
+            );
+        }
         CDI.track && CDI.track('op_orphan_resolved', { via: via });
     }
 
@@ -1170,21 +1239,10 @@
                  maria: CDI.despachante ? CDI.despachante.valores() : {} };
     }
 
-    async function saveOperationToHistory(items, mariaData, carga, foto = fotoDeLaPantalla()) {
-        carga = carga || (CDI.state = CDI.state || {});
+    function armarOperacion(items, mariaData, carga, foto) {
         // Sin cliente al pedir, el que se le eligió a esa carga mientras esperaba.
         const cliente = foto.cliente || carga.clienteActivo || null;
-        if (!cliente || !cliente.id) {
-            console.warn('[history] no hay cliente activo, no se guarda al historial');
-            return { ok: false, reason: 'sin_cliente' };
-        }
         const opCode = (mariaData && mariaData.filename) || null;
-        // Idempotencia: si ya guardamos esta misma operación para este mismo
-        // cliente, no la re-posteamos (cubre re-entry a Listo, F5 suave, etc.).
-        const savedFor = carga.operationSavedFor || null;
-        if (savedFor && savedFor.cliente_id === cliente.id && savedFor.op_code === opCode) {
-            return { ok: true, reason: 'ya_guardada' };
-        }
         const stats = foto.stats;
         const op = carga.operacion || {};
         const total_valor = Number(stats.total_valor_usd || 0);
@@ -1222,6 +1280,22 @@
                 unidad: it.unidad || null
             }))
         };
+        return { cliente, opCode, body };
+    }
+
+    async function saveOperationToHistory(items, mariaData, carga, foto = fotoDeLaPantalla()) {
+        carga = carga || (CDI.state = CDI.state || {});
+        const { cliente, opCode, body } = armarOperacion(items, mariaData, carga, foto);
+        if (!cliente || !cliente.id) {
+            console.warn('[history] no hay cliente activo, no se guarda al historial');
+            return { ok: false, reason: 'sin_cliente' };
+        }
+        // Idempotencia: si ya guardamos esta misma operación para este mismo
+        // cliente, no la re-posteamos (cubre re-entry a Listo, F5 suave, etc.).
+        const savedFor = carga.operationSavedFor || null;
+        if (savedFor && savedFor.cliente_id === cliente.id && savedFor.op_code === opCode) {
+            return { ok: true, reason: 'ya_guardada' };
+        }
         try {
             const res = await CDI.api(
                 '/api/clientes/' + encodeURIComponent(cliente.id) + '/operaciones',
@@ -1236,12 +1310,18 @@
                     cliente_id: cliente.id,
                     items: items.length
                 });
-                return { ok: true, cliente_id: cliente.id };
+                if (data.historial_guardado === false) {
+                    CDI.toast && CDI.toast(
+                        'Algunos productos no quedaron en la memoria',
+                        'La operación se guardó, pero la próxima vez esos productos no se van a sugerir solos.',
+                        'warning'
+                    );
+                }
+                return { ok: true, cliente_id: cliente.id, historial_guardado: data.historial_guardado };
             }
             // Error real: mostrar al user en vez de silenciar.
-            // Preferimos dev_detail (técnico) si vino, para diagnosticar; si no, el detail amigable.
-            const dev = data && data.dev_detail;
-            const msg = dev || (data && data.detail) || ('HTTP ' + res.status);
+            // El servidor ya no manda el detalle técnico (DATOS-1, D6): queda en su log.
+            const msg = (data && data.detail) || ('HTTP ' + res.status);
             console.error('[history] save_client_operation fallo:', msg, data);
             CDI.track('operation_save_failed', {
                 cliente_id: cliente.id,
@@ -1250,13 +1330,14 @@
             });
             CDI.toast && CDI.toast(
                 'No se guardó al cliente',
-                'La operación no quedó en el historial de ' + (cliente.nombre || 'el cliente') + '. Detalle: ' + String(msg).slice(0, 100),
+                'La operación no quedó en el historial de ' + (cliente.nombre || 'el cliente') + '. Detalle: ' + String(msg).slice(0, 200),
                 'error'
             );
             return { ok: false, reason: 'http_error', error: msg };
         } catch (err) {
             if (err && err.code === 'payment_required') {
                 console.warn('[history] save_client_operation: 402 payment required');
+                CDI.toast && CDI.toast('No se guardó al cliente', err.message || 'Plan vencido o límite alcanzado', 'error');
                 return { ok: false, reason: 'payment_required', error: 'Plan vencido o límite alcanzado' };
             }
             console.error('[history] save_client_operation excepción:', err);
@@ -1275,11 +1356,13 @@
 
     // Expongo para que el panel huérfano u otro lugar pueda forzar un reintento.
     CDI.saveOperationToHistory = saveOperationToHistory;
+    CDI.seguroSinLeer = seguroSinLeer;
 
+    // true si aprendió o no había nada para aprender.
     async function saveCatalogLearn(items, carga) {
         const op = (carga && carga.operacion) || {};
         const vendorName = String(op.vendedor_nombre || '').trim();
-        if (!vendorName || !Array.isArray(items) || !items.length) return;
+        if (!vendorName || !Array.isArray(items) || !items.length) return true;
 
         const productos = items.map(it => ({
             descripcion: String(it.descripcion || '').trim(),
@@ -1288,13 +1371,13 @@
             unidad_medida: String(it.unidad_medida || '').trim(),
         })).filter(p => p.descripcion && p.ncm);
 
-        if (!productos.length) return;
+        if (!productos.length) return true;
 
         // Derivar vendor_id slug (mismo criterio que backend: alfanumerico lowercased sin acentos)
         const vendor_id = vendorName
             .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
             .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
-            .slice(0, 64) || 'proveedor';
+            .slice(0, 60) || 'proveedor';
         try {
             const res = await CDI.api('/api/catalog/' + encodeURIComponent(vendor_id) + '/productos', {
                 method: 'POST',
@@ -1310,7 +1393,10 @@
                     updated: data && data.updated || 0,
                 });
             }
-        } catch (_) { /* best-effort */ }
+            return res.ok;
+        } catch (_) {
+            return false;
+        }
     }
 
     function trimPreview(text, maxLines) {

@@ -243,7 +243,8 @@ with TestClient(main_mod.app) as c:
         def post(self, url, json):
             return c.post(url, json=json, headers=self.h)
 
-    # 5. Un id que Postgres no acepta: en las tres rutas es una operación nueva, no un 500.
+    # 5. Un id que Postgres no acepta es una operación nueva, no un 500. Guardar
+    # rechaza todo el cuerpo con medio par: no cuenta ni guarda nada.
     rutas = {
         "generar": lambda ct, oid: _generar(ct, operacion_id=oid),
         "exportar": lambda ct, oid: ct.post("/generate_maria_export", json={**EXPORTACION, "operacion_id": oid}),
@@ -253,8 +254,11 @@ with TestClient(main_mod.app) as c:
         for nombre, raro in (("NUL", "a\x00b"), ("surrogate", "a\ud800b")):
             u, t = entrar()
             r = enviar(ConToken(t), raro)
-            chequear(r.status_code == 200 and ops_de("users", "username", u) == 1 and len(operaciones(u)) == 1,
-                     f"id con {nombre} al {ruta}: una operación nueva y contada ({r.status_code}, "
+            rechazado = (ruta, nombre) == ("guardar", "surrogate")
+            esperado = 0 if rechazado else 1
+            chequear(r.status_code == (400 if rechazado else 200)
+                     and ops_de("users", "username", u) == esperado and len(operaciones(u)) == esperado,
+                     f"id con {nombre} al {ruta}: {'rechazado sin contar' if rechazado else 'una operación nueva y contada'} ({r.status_code}, "
                      f"{ops_de('users', 'username', u)}, {len(operaciones(u))} operaciones)")
 
     # 6. Borrar un cliente reescribe sus operaciones: espera el mismo candado que generar.

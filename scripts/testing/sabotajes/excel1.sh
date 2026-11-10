@@ -172,11 +172,11 @@ sabotaje $M "las filas vacías vuelven a recorrerse una por una" \
   "FAILED $L::test_celda_en_la_ultima_fila_no_recorre_un_millon_de_filas"
 sabotaje $F "el índice del .xlsx vuelve a mirarse en el hilo del servidor" \
   "            try:
-                hojas = await asyncio.wait_for(" \
+                hojas, caro = await asyncio.wait_for(" \
   "            if file_ext == '.xlsx' and _excel_descomprimido_bytes(contents) > _excel_max_descomprimido_bytes():
                 raise HTTPException(400, 'demasiado grande descomprimido')
             try:
-                hojas = await asyncio.wait_for(" \
+                hojas, caro = await asyncio.wait_for(" \
   "FAILED $L::test_el_indice_del_xlsx_se_mira_fuera_del_hilo_del_servidor"
 sabotaje $M "deja de haber tope de filas" \
   '        if len(df) > _MAX_FILAS_EXCEL:' \

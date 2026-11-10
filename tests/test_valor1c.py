@@ -104,10 +104,10 @@ def test_con_las_cuentas_en_error_tambien_se_puede_dejar():
     assert r["els"]["valorDejarSeguro"]["hidden"] is False
 
 
-def test_dejarlo_saca_la_marca_y_pide_las_cuentas_de_nuevo():
+def test_dejarlo_lo_marca_como_dejado_y_pide_las_cuentas_de_nuevo():
     r = _pantalla({"seguro": 14.88, "seguro_calculado": True}, "dejarSeguro();",
                   {**VALOR, "seguro": 14.88})
-    assert r["op"] == {"seguro": 14.88}
+    assert r["op"] == {"seguro": 14.88, "seguro_dejado": True}
     assert r["refrescos"] == 1
     assert r["els"]["valorDejarSeguro"]["hidden"] is True
 
@@ -243,7 +243,8 @@ def test_al_entrar_a_validar_no_quedan_las_cuentas_de_antes():
     stubs = ("let ultimoValor = null; let cuentasCon = null; let vLoading = null;\n"
              "function enlazarAvisos() {} function enlazarValor() {} function init() {}\n")
     codigo = stubs + _funciones("finalize.js", ["ajusteMalEscrito", "importeEscrito", "otroDeducir", "seguroSinLeer",
-                                                "ajusteDelPedido", "pintarValor", "onEnterValidating"]) + (
+                                                "ajusteDelPedido", "pintarValor", "borrarSeguroCalculado",
+                                                "onEnterValidating"]) + (
         f"\npintarValor({json.dumps(VALOR)}, 'firma de otra operación');"
         "\nonEnterValidating();"
         "\nconsole.log(JSON.stringify({ultimoValor, cuentasCon, cuentas: els.valorCuentas.innerHTML,"

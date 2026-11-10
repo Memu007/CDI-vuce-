@@ -35,7 +35,7 @@ pandas==2.3.2                 # Data manipulation
 numpy<2.0.0                   # Fix crash with pandas 2.x
 openpyxl==3.1.5              # Excel files (.xlsx)
 xlrd>=2.0.1                  # Legacy Excel files (.xls)
-pypdf>=6.19.0                # PDF; sucesor de PyPDF2 (X3: se colgaba con un PDF armado)
+pypdf>=6.21.4                # PDF; sucesor de PyPDF2 (X3: se colgaba con un PDF armado)
 pdfminer.six>=20251107       # GHSA-wf5f-4jwr-ppcp
 pdfplumber>=0.11.5           # Advanced PDF processing
 

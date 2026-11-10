@@ -9,9 +9,12 @@ Implements:
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request, Response
+import os
 import time
 import logging
 from typing import Callable
+
+from proyecto_maria.config import es_desarrollo
 
 logger = logging.getLogger("maria.security")
 
@@ -58,9 +61,7 @@ class EnhancedSecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers['X-XSS-Protection'] = '1; mode=block'
 
         # HSTS - Force HTTPS en producción (OWASP A2)
-        import os
-        is_prod = os.getenv("ENVIRONMENT", "development") == "production"
-        if is_prod or os.getenv("ENABLE_HSTS", "false").lower() == "true":
+        if not es_desarrollo() or os.getenv("ENABLE_HSTS", "false").lower() == "true":
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
 
         # Referrer policy
@@ -207,8 +208,7 @@ class RateLimitByEndpointMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         
         # No bypass for any IP in production (OWASP A5)
-        import os
-        if os.getenv("ENVIRONMENT", "development") != "production" and client_ip in ["127.0.0.1", "localhost"]:
+        if es_desarrollo() and client_ip in ["127.0.0.1", "localhost"]:
             return await call_next(request)
 
         # Determine limits

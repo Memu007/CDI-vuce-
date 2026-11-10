@@ -73,13 +73,13 @@ reemplazar $J '            seguro_calculado: !!op.seguro_calculado,
 caso "pedido_sin_la_marca" "FAILED $T::test_el_pedido_dice_si_el_seguro_lo_calculo_el_sistema"
 
 # 2. el servidor genera igual
-reemplazar $M '        if _viejo:
+reemplazar $M '        if _por_corregir:
             raise' '        if False:
             raise'
 caso "genera_con_seguro_viejo" "FAILED $T::test_un_seguro_calculado_con_otras_cuentas_no_genera"
 
 # 3. los avisos no lo dicen antes
-reemplazar $M '    if viejo:
+reemplazar $M '    if por_corregir:
         avisos_valor' '    if False:
         avisos_valor'
 caso "avisos_sin_seguro_viejo" "FAILED $T::test_los_avisos_lo_dicen_antes_con_el_mismo_texto"
@@ -91,6 +91,9 @@ reemplazar $M '    if valor["seguro"] == valor["seguro_sugerido"]:
 caso "frena_al_dia" "FAILED $T::test_un_seguro_calculado_con_las_cuentas_de_ahora_genera"
 
 # 5. frena también al seguro que escribió la persona
+reemplazar $M '    if not (request.seguro_calculado or request.seguro_dejado):
+        return None
+' ''
 reemplazar $M '    if not request.seguro_calculado:
         return None
 ' ''
@@ -120,7 +123,7 @@ reemplazar $J '(valor.error || valor.seguro !== valor.seguro_sugerido)' '(valor.
 caso "dejar_solo_con_error" "FAILED $T::test_con_otras_cuentas_se_ofrece_dejarlo_como_esta"
 
 # 10. «Dejar» se ofrece aunque el seguro no lo haya calculado el sistema
-reemplazar $J '!(valor && op.seguro_calculado &&' '!(valor &&'
+reemplazar $J '!(valor && !enElPrecio && op.seguro_calculado &&' '!(valor && !enElPrecio &&'
 caso "dejar_sin_la_marca" "FAILED $T::test_si_no_hay_nada_viejo_no_se_ofrece_dejarlo[no_lo_calculo]"
 
 # 11. con las cuentas en error no se puede dejar
@@ -130,7 +133,7 @@ caso "error_sin_salida" "FAILED $T::test_con_las_cuentas_en_error_tambien_se_pue
 # 12. dejarlo no saca la marca
 reemplazar $J '        delete op.seguro_calculado;
         cuentasViejas();' '        cuentasViejas();'
-caso "dejar_con_la_marca" "FAILED $T::test_dejarlo_saca_la_marca_y_pide_las_cuentas_de_nuevo"
+caso "dejar_con_la_marca" "FAILED $T::test_dejarlo_lo_marca_como_dejado_y_pide_las_cuentas_de_nuevo"
 
 # 13. el botón no está enlazado
 reemplazar $J "        if (dejar) dejar.addEventListener('click', dejarSeguro);

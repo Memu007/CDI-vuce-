@@ -55,7 +55,7 @@ if ! "$PY" -m pytest -q --no-cov -p no:cacheprovider $P >/dev/null 2>&1; then
 fi
 # Lector del PDF, la copia «pdf_directo» (la de producción): el flete leído se pierde.
 sabotaje $E "el lector pierde el flete de la factura" \
-  "                            'flete': _numero_factura(operacion.get('flete'), decimal) or 0.0," \
+  "                            'flete': _monto_factura(operacion.get('flete'), decimal) or 0.0," \
   "                            'flete': 0.0," \
   'FAILED tests/test_punta_a_punta1.py::test_pdf_de_punta_a_punta_da_el_archivo_real'
 # Mapeo del Excel: el precio y el peso quedan cruzados.

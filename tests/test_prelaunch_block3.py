@@ -246,8 +246,7 @@ class TestProduccionDemoUsers:
         """Una SECRET_KEY débil lanza RuntimeWarning en dev, no ValueError (que sería en prod)."""
         # Esta prueba verifica que el código de arranque NO lanzó un ValueError
         # (si hubiera fallado, el módulo no se habría importado)
-        assert main_mod.SECRET_KEY is not None
-        assert len(main_mod.SECRET_KEY) > 0
+        assert main_mod._CLAVE_JWT
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -309,9 +308,9 @@ class TestWebhookSeguridad:
         assert resp.json().get("skipped") is not None
 
     def test_produccion_sin_secret_rechaza_todo(self, client, monkeypatch):
-        """En IS_PRODUCTION=True sin MP_WEBHOOK_SECRET → rechaza (401) por defensa en profundidad."""
+        """En producción sin MP_WEBHOOK_SECRET → rechaza (401) por defensa en profundidad."""
         monkeypatch.setattr(main_mod, "MP_WEBHOOK_SECRET", "")
-        monkeypatch.setattr(main_mod, "IS_PRODUCTION", True)
+        monkeypatch.setenv("ENVIRONMENT", "production")
         body = {"type": "payment", "data": {"id": "pay-prod"}}
         resp = client.post(
             "/api/payments/webhook",
@@ -345,7 +344,7 @@ class TestJWTSecurity:
     def test_token_expirado_401(self, anon):
         """Token expirado (exp en el pasado) → 401."""
         # Usamos la misma clave del módulo para forzar que sea solo el exp
-        secret = main_mod.SECRET_KEY
+        secret = main_mod._CLAVE_JWT
         token = pyjwt.encode(
             {"sub": "user_exp", "exp": datetime.utcnow() - timedelta(hours=1)},
             secret,
@@ -731,21 +730,9 @@ class TestJWTSecretUnificado:
     mismo orden de prioridad que main.py.
     """
 
-    def test_settings_jwt_secret_igual_a_main_secret_key(self):
-        """settings.jwt_secret debe ser igual a main.SECRET_KEY (mismo valor en runtime)."""
-        from proyecto_maria.config import get_settings
-        # Limpiar cache para forzar re-lectura con el env actual
-        get_settings.cache_clear()
-        settings = get_settings()
-        assert settings.jwt_secret == main_mod.SECRET_KEY, (
-            f"DUAL SECRET BUG: settings.jwt_secret='{settings.jwt_secret[:8]}…' "
-            f"!= main.SECRET_KEY='{main_mod.SECRET_KEY[:8]}…'. "
-            "Los tokens se firmarían con una clave y se verificarían con otra."
-        )
-
-    def test_token_generado_por_login_es_verificable_por_decode_token(self, client):
-        """Un token emitido por /auth/login puede ser verificado por jwt_utils.decode_token."""
-        from proyecto_maria.auth.jwt_utils import decode_token
+    def test_token_generado_por_login_es_verificable_por_datos_del_token(self, client):
+        """Un token emitido por /auth/login lo abre datos_del_token (settings.jwt_secret)."""
+        from proyecto_maria.auth.dependencies import datos_del_token
         uname = _unique("jwt_uni")
         _register_and_login(client, uname)
         login = client.post("/auth/login", json={
@@ -753,20 +740,9 @@ class TestJWTSecretUnificado:
             "password": "SecureP@ss1",
         })
         assert login.status_code == 200, f"Login falló: {login.text}"
-        token = login.json().get("access_token")
-        assert token, "No se recibió access_token"
-
-        # decode_token usa settings.jwt_secret — debe poder verificarlo
-        try:
-            payload = decode_token(token)
-        except Exception as e:
-            pytest.fail(
-                f"decode_token falló con el token emitido por login: {e}\n"
-                "Probable causa: dual-secret bug — login firma con una clave "
-                "y decode_token verifica con otra."
-            )
-        assert payload.get("sub") or payload.get("username") or payload.get("user_id"), (
-            "El payload del token no contiene identificador de usuario"
+        payload = datos_del_token(login.json()["access_token"])
+        assert payload and payload.get("sub") == uname, (
+            "login firma con una clave y datos_del_token verifica con otra"
         )
 
     def test_config_lee_jwt_secret_key_con_prioridad(self, monkeypatch):

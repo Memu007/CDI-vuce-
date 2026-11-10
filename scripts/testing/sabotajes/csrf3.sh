@@ -14,12 +14,12 @@ D=proyecto_maria/auth/dependencies.py
 M=proyecto_maria/main.py
 CASO=tests/test_csrf.py::test_sesion_sin_token_csrf_lo_recibe_y_escribe
 MARCA=$'    # CSRFMiddleware le emite el csrf_token a esta sesión si le falta.\n    request.state.sesion_valida = True\n'
-REVOCADO=$'    if user.active_jti is not None and token_jti != user.active_jti:\n        raise HTTPException(status_code=401, detail="Token revocado")\n'
+VERIFICA=$'    sesion = await sesion_de_la_request(request, db)\n    if sesion is None:\n        raise HTTPException(status_code=401, detail="Sesión inválida o vencida")\n    user = sesion[0]\n'
 EMITE='            if getattr(request.state, "sesion_valida", False) and not request.cookies.get(CSRF_COOKIE_NAME):'
 sabotaje pytest_csrf $D "la sesión se marca válida antes de mirar si está revocada" \
-  "FAILED $CASO[revocada-/auth/current_user]" "$REVOCADO$MARCA" "$MARCA$REVOCADO"
+  "FAILED $CASO[revocada-/auth/current_user]" "$VERIFICA$MARCA" "$MARCA$VERIFICA"
 sabotaje pytest_csrf $D "la sesión se marca válida antes de verificar la firma" \
-  "FAILED $CASO[vencida-/auth/current_user]" '    if token.startswith("Bearer "):' "    request.state.sesion_valida = True"$'\n''    if token.startswith("Bearer "):'
+  "FAILED $CASO[vencida-/auth/current_user]" "$VERIFICA$MARCA" "$MARCA$VERIFICA"
 sabotaje pytest_csrf $M "el token se emite sin sesión" \
   "FAILED $CASO[sin_sesion-/auth/current_user]" "$EMITE" '            if not request.cookies.get(CSRF_COOKIE_NAME):'
 sabotaje pytest_csrf $M "el token se cambia aunque la sesión ya lo tenga" \

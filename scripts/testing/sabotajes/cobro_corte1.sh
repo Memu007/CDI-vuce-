@@ -360,10 +360,10 @@ sabotaje $F "v2: guardar anota en la carga de la pantalla" \
   "                carga.operacionId = data.operation_id || '';" "                CDI.state.operacionId = data.operation_id || '';"
 sabotaje $F "v2: generar guarda con la carga de la pantalla" \
   "FALLA: v2, generar: la respuesta tardía no se guardó en el cliente de su carga" \
-  "            saveOperationToHistory(items, data, carga, foto).catch(" "            saveOperationToHistory(items, data, undefined, foto).catch("
+  "            saveOperationToHistory(items, data, carga, foto).then(" "            saveOperationToHistory(items, data, undefined, foto).then("
 sabotaje $F "v2: el guardado toma los valores de la pantalla al responder" \
   "FALLA: v2, generar: guardó los valores de la carga nueva" \
-  "            saveOperationToHistory(items, data, carga, foto).catch(" "            saveOperationToHistory(items, data, carga).catch("
+  "            saveOperationToHistory(items, data, carga, foto).then(" "            saveOperationToHistory(items, data, carga).then("
 sabotaje $F "v2: la respuesta tardía marca lista la carga nueva" \
   "FALLA: v2, generar: la respuesta tardía marcó lista la carga nueva" \
   "            if (carga === CDI.state) mostrarListo(data);" "            mostrarListo(data);"

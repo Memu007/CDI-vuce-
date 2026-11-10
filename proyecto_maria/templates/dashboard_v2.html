@@ -329,7 +329,7 @@
                                     <div class="field">
                                         <label class="field-label" for="f_seguro">Seguro (USD)</label>
                                         <input class="input" type="text" inputmode="decimal" id="f_seguro" name="seguro" autocomplete="off">
-                                        <span class="field-hint">Dejar en 0 si no aplica.</span>
+                                        <span class="field-hint">Si la factura no trae seguro, escribí 0.</span>
                                         <span class="field-error" data-error-for="seguro" hidden></span>
                                     </div>
                                     <div class="field">
@@ -991,11 +991,25 @@
                                     <div class="cx-catalogo-section">
                                         <div class="cx-catalogo-header">
                                             <h4 class="cx-catalogo-title">Productos aprendidos</h4>
-                                            <button type="button" class="btn btn-ghost btn-sm" id="cxCatalogoExcelBtn">Descargar en Excel</button>
+                                            <div class="cx-catalogo-header-actions">
+                                                <button type="button" class="btn btn-ghost btn-sm" id="cxDespachoBtn">Cargar desde despacho</button>
+                                                <button type="button" class="btn btn-ghost btn-sm" id="cxCatalogoExcelBtn">Descargar en Excel</button>
+                                            </div>
+                                            <input type="file" id="cxDespachoFile" accept="application/pdf,.pdf" hidden>
                                         </div>
+                                        <section class="cx-despacho" id="cxDespacho" aria-labelledby="cxDespachoTitulo" hidden>
+                                            <h5 class="cx-despacho-titulo" id="cxDespachoTitulo">Productos del despacho</h5>
+                                            <p class="caption cx-despacho-estado" id="cxDespachoEstado" role="status"></p>
+                                            <ul class="cx-despacho-avisos" id="cxDespachoAvisos" hidden></ul>
+                                            <ol class="cx-despacho-renglones" id="cxDespachoRenglones"></ol>
+                                            <div class="cx-catalogo-actions" id="cxDespachoAcciones" hidden>
+                                                <button type="button" class="btn btn-ghost btn-sm" id="cxDespachoDescartar">Descartar</button>
+                                                <button type="button" class="btn btn-primary btn-sm" id="cxDespachoGuardar">Guardar en el catálogo</button>
+                                            </div>
+                                        </section>
                                         <div class="cx-catalogo-productos-empty" id="cxCatalogoProductosEmpty" hidden>
                                             <p class="caption">Todavía no aprendí productos de este cliente.</p>
-                                            <p class="caption">Se van a guardar cuando generés una MARIA con ítems asociados a este cliente.</p>
+                                            <p class="caption">Se van a guardar cuando generés una MARIA con ítems asociados a este cliente, o cuando los cargues desde un despacho.</p>
                                         </div>
                                         <ul class="cx-catalogo-productos-list" id="cxCatalogoProductosList"></ul>
                                     </div>
@@ -1475,6 +1489,11 @@
                 <label class="field-label" for="pfEmail">Email</label>
                 <input class="input" type="email" id="pfEmail" placeholder="tu@email.com" autocomplete="email">
             </div>
+            <div class="field" id="pfEmailPasswordField" hidden>
+                <label class="field-label" for="pfEmailPassword">Contraseña actual</label>
+                <input class="input" type="password" id="pfEmailPassword" autocomplete="current-password">
+                <span class="field-hint">Para cambiar el email confirmá tu contraseña.</span>
+            </div>
             <div class="field">
                 <button type="button" class="btn btn-ghost btn-sm" id="pfReplayTour">Ver tour de bienvenida</button>
                 <span class="field-hint">Repasá en 30 segundos los 3 pasos del flujo (subir, revisar, descargar).</span>
@@ -1718,6 +1737,7 @@
         })();
     </script>
 
+    <script src="/static/errores.js?v={{ version }}" defer></script>
     <script src="/static/v2/app_v2.js?v={{ version }}" defer></script>
     <script src="/static/v2/montos_ar.js?v={{ version }}" defer></script>
     <script src="/static/v2/topbar_financials.js?v={{ version }}" defer></script>

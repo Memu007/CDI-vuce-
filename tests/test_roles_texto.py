@@ -15,7 +15,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import delete
 
 from proyecto_maria import main
-from proyecto_maria.auth.jwt_utils import create_access_token
+from datetime import datetime, timedelta, timezone
+
+from proyecto_maria.auth.dependencies import firmar_token
+
+
+def create_access_token(datos):
+    return firmar_token({**datos, "exp": datetime.now(timezone.utc) + timedelta(minutes=5)})
 from proyecto_maria.auth.roles import require_role
 from proyecto_maria.database.connection import AsyncSessionLocal
 from proyecto_maria.database.models import User

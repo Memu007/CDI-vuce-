@@ -16,7 +16,7 @@ import pytest
 
 from proyecto_maria import main
 from proyecto_maria.database.connection import AsyncSessionLocal
-from proyecto_maria.database.models import Client
+from proyecto_maria.database.models import Client, NcmHistorial
 
 
 @pytest.mark.parametrize(
@@ -113,12 +113,27 @@ def test_sugerir_ignora_mayusculas_tildes_y_plural(client, auth_override):
     ]
 
 
+@pytest.fixture()
+def historial_de_test_user_limpio():
+    """La confirmación también va al historial de test_user, que está en la
+    base (DISCO-1): se retira para no sugerírsela a los casos que siguen."""
+    yield
+
+    async def borrar():
+        async with AsyncSessionLocal() as session:
+            await session.execute(NcmHistorial.__table__.delete().where(
+                NcmHistorial.owner_username == "test_user",
+                NcmHistorial.descripcion == "Notebook industrial de prueba",
+            ))
+            await session.commit()
+    asyncio.run(borrar())
+
+
 def test_confirmacion_alimenta_memoria_de_cliente_y_proveedor(
-    client, auth_override, monkeypatch, tmp_path
+    client, auth_override, historial_de_test_user_limpio
 ):
     """Una SIM confirmada se memoriza como NCM base, nunca como DC automático."""
     client_id = str(uuid.uuid4())
-    monkeypatch.setattr(main, "_ncm_historial_path", lambda _owner: str(tmp_path / "historial.json"))
 
     async def seed_client():
         async with AsyncSessionLocal() as session:

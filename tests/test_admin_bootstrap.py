@@ -8,7 +8,7 @@ import os
 import asyncio
 from fastapi.testclient import TestClient
 
-from proyecto_maria.main import app, _admin_usernames
+from proyecto_maria.main import app, _admin_usernames, hash_password
 from proyecto_maria.database.connection import AsyncSessionLocal
 from proyecto_maria.database.models import User
 from sqlalchemy import select, delete
@@ -21,6 +21,10 @@ def _run_async(coro):
     finally:
         loop.close()
 
+# Cambiar el email pide la contraseña actual: la fila guarda un hash de verdad.
+_CLAVE = "Clave#123"
+_HASH = hash_password(_CLAVE)
+
 async def _ensure_user(username, email, roles=None):
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(User).where(User.username == username))
@@ -28,7 +32,7 @@ async def _ensure_user(username, email, roles=None):
         if not user:
             user = User(
                 username=username,
-                password="hashed",
+                password=_HASH,
                 email=email,
                 name="Test",
                 plan="premium",
@@ -103,7 +107,7 @@ def test_lo_que_puso_el_usuario_en_su_perfil_no_da_admin(monkeypatch, en_admin_u
     monkeypatch.setenv("DISABLE_DB_INIT", "true")
     app.dependency_overrides[get_current_user] = lambda: {"username": "admin_by_email", "roles": []}
     try:
-        r = TestClient(app).put("/api/user/profile", json={"email": ADMIN_EMAIL, "name": ADMIN_EMAIL})
+        r = TestClient(app).put("/api/user/profile", json={"email": ADMIN_EMAIL, "name": ADMIN_EMAIL, "current_password": _CLAVE})
     finally:
         app.dependency_overrides.pop(get_current_user, None)
     assert r.status_code == 200, r.text[:200]

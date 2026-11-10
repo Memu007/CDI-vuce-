@@ -15,6 +15,7 @@ inventados. Las carreras van contra un Postgres local en
 """
 import asyncio
 import os
+import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -660,8 +661,10 @@ ENVIAR_ID = {
 def test_un_id_que_la_base_no_guarda_es_una_operacion_nueva(cuenta, ruta, oid):
     c, u = cuenta()
     r = ENVIAR_ID[ruta](c, IDS_QUE_NO_SE_GUARDAN[oid])
-    assert r.status_code == 200, r.text
-    assert _leer(u)["ops"] == 1 and len(_operaciones(u)) == 1
+    # Guardar rechaza todo el cuerpo con medio par: no cuenta ni guarda nada.
+    rechazado = (ruta, oid) == ("guardar", "surrogate")
+    assert r.status_code == (400 if rechazado else 200), r.text
+    assert _leer(u)["ops"] == len(_operaciones(u)) == (0 if rechazado else 1)
 
 
 def test_guardar_con_la_operacion_de_otra_cuenta_no_la_toca(cuenta):
@@ -820,7 +823,13 @@ def _supuestos_que_fallan(*a, **k):
     raise RuntimeError("falla después de contar")
 
 
+_confirmar = main.AsyncSession.commit
+
+
 async def _commit_que_falla(self):
+    # La autenticación confirma antes de la ruta: falla sólo el de main.py.
+    if sys._getframe(1).f_code.co_filename != main.__file__:
+        return await _confirmar(self)
     raise RuntimeError("la base se cayó al confirmar")
 
 

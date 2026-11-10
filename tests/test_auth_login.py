@@ -8,13 +8,13 @@ Cubre:
 - Rate limit después de 5 fails → 429
 """
 import pytest
-import jwt as pyjwt
 import asyncio
 
-from proyecto_maria.main import app, login_attempts, hash_password, SECRET_KEY, ALGORITHM
+from proyecto_maria.main import app, hash_password
+from proyecto_maria.auth.dependencies import datos_del_token
 from proyecto_maria.database.connection import AsyncSessionLocal
 from proyecto_maria.database.models import User
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, text
 
 
 # ── helpers ──────────────────────────────────────────────────────────
@@ -53,6 +53,12 @@ async def _ensure_login_test_user(username="logintest", email="logintest@example
         await session.commit()
 
 
+async def _vaciar_limites():
+    async with AsyncSessionLocal() as session:
+        await session.execute(text("delete from limites_auth"))
+        await session.commit()
+
+
 async def _cleanup_login_test_user(username="logintest"):
     async with AsyncSessionLocal() as session:
         await session.execute(delete(User).where(User.username == username))
@@ -64,9 +70,9 @@ async def _cleanup_login_test_user(username="logintest"):
 @pytest.fixture(autouse=True)
 def _clean_rate_limits():
     """Limpiar rate limits entre tests para que no interfieran."""
-    login_attempts.clear()
+    _run_async(_vaciar_limites())
     yield
-    login_attempts.clear()
+    _run_async(_vaciar_limites())
 
 
 @pytest.fixture(autouse=True)
@@ -97,7 +103,7 @@ def test_login_with_username(client):
     token = data["access_token"]
 
     # Decodificar JWT y verificar sub == username (no email)
-    payload = pyjwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    payload = datos_del_token(token)
     assert payload["sub"] == "logintest"
 
     # Usar el token para llamar a /auth/current_user
@@ -126,7 +132,7 @@ def test_login_with_email(client):
     token = data["access_token"]
 
     # JWT.sub DEBE ser el username, no el email
-    payload = pyjwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    payload = datos_del_token(token)
     assert payload["sub"] == "logintest", (
         f"JWT sub debería ser 'logintest' pero es '{payload['sub']}'"
     )

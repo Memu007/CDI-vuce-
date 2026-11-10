@@ -183,17 +183,40 @@ def faltan(consulta: dict, presentes: Iterable[str]) -> list[str]:
 COMPLETA = (("AA", ("marca",)), ("AB", ("modelo",)), ("AI", ("codigo_parte",)))
 
 
-def solo_letras_numeros_espacios(texto) -> str:
-    """Letras sin tilde, números y espacios; lo demás, espacio (el MARIA
-    rechazó guiones y puntos el 24/10)."""
-    sin_tildes = "".join(c for c in unicodedata.normalize("NFKD", str(texto or ""))
-                         if not unicodedata.combining(c))
-    return re.sub(r"[^A-Za-z0-9 ]", " ", sin_tildes)
+# Un número con decimales: un solo punto o coma entre dígitos, que no sea
+# parte de una cadena como «1.2.3» (un código, no un número). [0-9] y no \d,
+# que en Python también toma dígitos que no son ASCII.
+_DECIMAL = r"(?<![0-9])(?<![0-9][.,])([0-9]+)[.,]([0-9]+)(?![.,]?[0-9])"
+_DECIMAL_O_SIGNO = re.compile(rf"{_DECIMAL}|[^A-Za-z0-9 ]")
+
+
+def caracteres_del_maria(texto) -> str:
+    """Letras sin tilde, números, espacios y la coma de un número con
+    decimales; lo demás, espacio. El MARIA rechazó guiones y puntos el 24/10
+    y el despachante confirmó el 28/10 que un número puede llevar coma
+    (SUFIJOS-2): «2.5» sale «2,5», no «2 5», que es otro número."""
+    return _DECIMAL_O_SIGNO.sub(lambda m: (" " if not m[1] else f"{m[1]} {m[2]}"
+                                          if miles_o_decimales(m[0]) else f"{m[1]},{m[2]}"),
+                                sin_tildes(texto))
+
+
+def sin_tildes(texto) -> str:
+    """NFKD sin las marcas que se combinan: la base de caracteres_del_maria,
+    carácter por carácter del mismo largo que su salida."""
+    return "".join(c for c in unicodedata.normalize("NFKD", str(texto or ""))
+                   if not unicodedata.combining(c))
+
+
+def miles_o_decimales(numero: str) -> bool:
+    """«1.500» puede ser mil quinientos o uno y medio: un punto seguido de
+    tres dígitos, sin un cero adelante, no se pasa a coma."""
+    entero, _, decimales = numero.partition(".")
+    return bool(decimales) and len(decimales) == 3 and entero.lstrip("0") != ""
 
 
 def valor_de_sufijo(texto) -> str:
     """El valor tal como entra entre paréntesis, sin espacios de más."""
-    return " ".join(solo_letras_numeros_espacios(texto).split())
+    return " ".join(caracteres_del_maria(texto).split())
 
 
 def proponer(item: dict, consulta: dict | None, tope: int = 120) -> dict:

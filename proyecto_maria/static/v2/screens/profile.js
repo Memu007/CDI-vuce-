@@ -10,6 +10,8 @@
 
     let modal, overlay, closeBtn, cancelBtn, saveBtn;
     let nameInput, cuitInput, emailEl, cuitErrorEl;
+    // Cambiar el email pide la contraseña actual (SESION-1)
+    let emailPwdField, emailPwdInput, originalEmail = '';
     let pfDefaultAduana, pfDefaultPuerto, pfDefaultTipoDest;
     let replayTourBtn;
     // Seguridad (cambio password)
@@ -37,6 +39,9 @@
         cuitInput = $('pfCuit');
         emailEl = $('pfEmail');
         cuitErrorEl = $('pfCuitError');
+        emailPwdField = $('pfEmailPasswordField');
+        emailPwdInput = $('pfEmailPassword');
+        if (emailEl) emailEl.addEventListener('input', syncEmailPassword);
         pfDefaultAduana = $('pfDefaultAduana');
         pfDefaultPuerto = $('pfDefaultPuerto');
         pfDefaultTipoDest = $('pfDefaultTipoDest');
@@ -154,6 +159,8 @@
             nameInput.value = p.name || '';
             cuitInput.value = p.cuit ? CDI.formatCuit(p.cuit) : '';
             emailEl.value = p.email || '';
+            originalEmail = normalizeEmail(p.email);
+            syncEmailPassword();
             if (pfDefaultAduana) pfDefaultAduana.value = p.default_aduana_codigo || '';
             if (pfDefaultPuerto) pfDefaultPuerto.value = p.default_puerto_destino || '';
             if (pfDefaultTipoDest) pfDefaultTipoDest.value = p.default_tipo_destinacion || '';
@@ -174,6 +181,15 @@
         }
     }
 
+    function normalizeEmail(v) { return String(v || '').trim().toLowerCase(); }
+    function emailChanged() { return normalizeEmail(emailEl.value) !== originalEmail; }
+    function syncEmailPassword() {
+        if (!emailPwdField) return;
+        const changed = emailChanged();
+        emailPwdField.hidden = !changed;
+        if (!changed && emailPwdInput) emailPwdInput.value = '';
+    }
+
     function showError(msg) {
         if (!cuitErrorEl) return;
         cuitErrorEl.textContent = msg;
@@ -192,13 +208,19 @@
         const name = String(nameInput.value || '').trim();
         const cuitRaw = String(cuitInput.value || '').trim();
         const cuitNorm = CDI.normalizeCuit(cuitRaw);
-        const emailVal = String(emailEl.value || '').trim().toLowerCase();
+        const emailVal = normalizeEmail(emailEl.value);
+        const emailPwd = String((emailPwdInput && emailPwdInput.value) || '');
         if (cuitRaw && cuitNorm.length !== 11) {
             showError('El CUIT debe tener 11 digitos.');
             return;
         }
         if (emailVal && !emailVal.match(/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/)) {
             if (CDI.toast) CDI.toast('Email no válido', 'Revisá el formato.', 'error');
+            return;
+        }
+        if (emailChanged() && !emailPwd) {
+            showError('Para cambiar el email ingresá tu contraseña actual.');
+            if (emailPwdInput) emailPwdInput.focus();
             return;
         }
 
@@ -209,16 +231,18 @@
         saveBtn.disabled = true;
         saveBtn.textContent = 'Guardando…';
         try {
+            const payload = {
+                name,
+                cuit: cuitNorm,
+                email: emailVal,
+                default_aduana_codigo: aduanaVal,
+                default_puerto_destino: puertoVal,
+                default_tipo_destinacion: tipoVal
+            };
+            if (emailChanged()) payload.current_password = emailPwd;
             const res = await CDI.api('/api/user/profile', {
                 method: 'PUT',
-                body: JSON.stringify({
-                    name,
-                    cuit: cuitNorm,
-                    email: emailVal,
-                    default_aduana_codigo: aduanaVal,
-                    default_puerto_destino: puertoVal,
-                    default_tipo_destinacion: tipoVal
-                })
+                body: JSON.stringify(payload)
             });
             const data = await res.json();
             if (!res.ok || !data.success) throw new Error((data && data.detail) || 'No se pudo guardar');
@@ -232,6 +256,8 @@
                 puerto_destino: data.profile.default_puerto_destino || '',
                 tipo_destinacion: data.profile.default_tipo_destinacion || ''
             };
+            originalEmail = normalizeEmail(data.profile.email);
+            syncEmailPassword();
             const hasDefaults = !!(aduanaVal || puertoVal || tipoVal);
             const subtitle = hasDefaults
                 ? 'Tus defaults se aplicarán en las próximas operaciones.'
@@ -279,7 +305,7 @@
             if (!res.ok || !data.success) {
                 throw new Error((data && data.detail) || 'No se pudo cambiar la contraseña');
             }
-            CDI.toast('Contraseña actualizada', 'Usá la nueva la próxima vez que ingreses.', 'success');
+            CDI.toast('Contraseña actualizada', 'Cerramos tus otras sesiones abiertas. Usá la nueva la próxima vez que ingreses.', 'success');
             CDI.track('password_changed');
             currentPwdInput.value = '';
             newPwdInput.value = '';

@@ -1,5 +1,6 @@
 import logging
 import os
+import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -43,6 +44,72 @@ class TestingHTTPBearer(HTTPBearer):
 
 security = TestingHTTPBearer()
 
+
+def _token_de_la_request(request: Request) -> str | None:
+    """El JWT de la sesión: la cookie del frontend web o, si no hay, el header
+    Bearer de las integraciones. Sin el prefijo «Bearer »."""
+    token = request.cookies.get("access_token")
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header
+    if token and token.startswith("Bearer "):
+        token = token.split(" ")[1]
+    return token or None
+
+
+def revocar_sesiones(user: User) -> None:
+    """Revoca todas las sesiones del usuario.
+
+    El mecanismo es `active_jti`: sólo entra el token con ese jti. Nunca se
+    escribe NULL, porque NULL quiere decir «aceptar cualquier token» (usuarios
+    de antes de la columna) y revocar resucitaría todas las sesiones viejas.
+    Para revocarlas todas se guarda un jti nuevo que ningún token tiene.
+    """
+    user.active_jti = uuid.uuid4().hex
+
+
+def firmar_token(datos: dict) -> str:
+    """El único lugar que firma un token: con la misma clave que lo abre."""
+    return jwt.encode(datos, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def datos_del_token(token: str) -> dict | None:
+    """El contenido de un JWT nuestro con la firma y el vencimiento verificados,
+    o None. Es el único lugar que abre un token; uno sin vencimiento no vale."""
+    try:
+        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm],
+                          options={"require": ["exp"]})
+    except jwt.PyJWTError:
+        return None
+
+
+async def sesion_de_la_request(request: Request, db: AsyncSession) -> tuple[User, dict] | None:
+    """El usuario y el contenido del token si es la sesión vigente, o None.
+    Un token con `type` (el de verificar el email) no es una sesión."""
+    token = _token_de_la_request(request)
+    payload = datos_del_token(token) if token else None
+    if payload is None or payload.get("type") is not None or not payload.get("sub"):
+        return None
+    user = (await db.execute(select(User).where(User.username == payload["sub"]))).scalars().first()
+    if user is None:
+        return None
+    # NULL: usuario de antes de la columna, cualquier token suyo vale.
+    if user.active_jti is not None and payload.get("jti") != user.active_jti:
+        return None
+    return user, payload
+
+
+async def revocar_sesion_de_la_request(request: Request, db: AsyncSession) -> None:
+    """Revoca el token con el que se llama sólo si es la sesión vigente: uno
+    viejo o inválido no puede sacar a la que sí vale."""
+    sesion = await sesion_de_la_request(request, db)
+    if sesion is None:
+        return
+    revocar_sesiones(sesion[0])
+    await db.commit()
+
+
 async def get_current_user(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     """
     Obtiene el usuario actual centralizado.
@@ -51,13 +118,7 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
     - Cookie auth (frontend web)
     - Bearer Auth (integraciones API)
     """
-    token = request.cookies.get("access_token")
-
-    # Fallback to Authorization header
-    if not token:
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header
+    token = _token_de_la_request(request)
 
     if not token:
         if _is_testing_runtime():
@@ -71,28 +132,10 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
             }
         raise HTTPException(status_code=401, detail="No autenticado")
 
-    if token.startswith("Bearer "):
-        token = token.split(" ")[1]
-
-    try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-        username: str = payload.get("sub")
-        if username is None:
-            raise HTTPException(status_code=401, detail="Token inválido")
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Token inválido o expirado")
-
-    result = await db.execute(select(User).where(User.username == username))
-    user = result.scalars().first()
-
-    if user is None:
-        raise HTTPException(status_code=401, detail="Usuario no encontrado")
-
-    # Validar jti contra active_jti (blacklist de tokens)
-    # NULL = backward compat: no bloquear usuarios pre-migración
-    token_jti = payload.get("jti")
-    if user.active_jti is not None and token_jti != user.active_jti:
-        raise HTTPException(status_code=401, detail="Token revocado")
+    sesion = await sesion_de_la_request(request, db)
+    if sesion is None:
+        raise HTTPException(status_code=401, detail="Sesión inválida o vencida")
+    user = sesion[0]
     # CSRFMiddleware le emite el csrf_token a esta sesión si le falta.
     request.state.sesion_valida = True
 
@@ -111,6 +154,9 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
             await db.refresh(user)
         except Exception:
             await db.rollback()
+    # Devuelve la conexión antes de la ruta: las de main.py abren otra sesión y,
+    # con las dos tomadas a la vez, más pedidos que conexiones traban el pool.
+    await db.commit()
 
     team_owner = getattr(user, "team_owner_username", None)
     effective_owner = team_owner or user.username

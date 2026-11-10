@@ -2,515 +2,130 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ORG-1, ORG-1b y DESPACHO-1a: listas, **sin entregar** (2026-10-28)
+## EMAIL-1 (D45 (1)): **entregada sin cambio de producto**, pruebas en `40423be` (2026-11-08)
 
-**DESPACHO-1a está hecha** (producto `e438dad`, probado en `51890cd`), en
-commits aparte sobre ORG-1b. Va en el mismo `/entregar` que ORG-1 y ORG-1b,
-con su propio apartado y su diff: «DESPACHO-1a», abajo.
+| SHA | qué |
+|---|---|
+| `dc2943d` | test: un email vacío no encuentra la cuenta sin email (la prueba de `_cuenta_por_email` que pediste) |
+| `9c5f671` | test: dos sabotajes de `email1.sh` apuntan al código de hoy (estaban **ROTO**) |
+| `40423be` | test: `scripts/testing/email1_minusculas_pg.py`, qué letras pasan a minúscula distinto en Python y en PG |
+| este commit | docs: el informe |
 
-**ORG-1b (D27 b) está hecha**, en commits aparte, con su propio SHA de
-producto (`f8616cf`). Va en el mismo `/entregar` que ORG-1. Detalle en
-«ORG-1b», abajo.
+**Producto +0/−0.** La premisa de D45 ya no se cumple:
 
-**ORG-1. Estado:** los cinco puntos están hechos. Tienen casos en SQLite, un script
-contra Postgres, sabotajes y suite completa. **No la entrego todavía.** Tu
-canal dice «`/entregar` espera a que vuelva el cupo», y el cupo de
-subagentes y `/code-review` vuelve el 28/10 a las 18:00 UTC. Ahí corro la
-autorrevisión independiente y `/security-review`, reproduzco lo que
-encuentren y entrego con el timbre. Subo ahora para que el trabajo no se
-pierda si el contenedor muere. **No hace falta que la revises todavía.**
+1. **No hay tope por correo.** Los topes de recuperar son por IP
+   (`recuperar:ip:`, `main.py:1850`) y por cuenta encontrada
+   (`recuperar:cuenta:{user.username}`, `main.py:1859`, de ABUSO-2). La cuenta
+   la encuentra la base con `lower()` de los dos lados (`_cuenta_por_email`,
+   `main.py:1768`). Entonces dos textos que la base toma por el mismo email
+   cuentan para la misma cuenta, sin importar cómo los baje Python.
+2. **El rojo con «İ» en Postgres 16 ya existe.** Está en
+   `scripts/testing/abuso2_postgres.py`, caso 1: cinco variantes con İ
+   mandan 3 mails, no 5. Su sabotaje está en `abuso2.sh` y corre con
+   `PG_URL`. Salida abajo.
+3. **«Otra letra de la misma familia» no existe con la collation de la base
+   ni con ICU.** Recorrí todo lo imprimible hasta U+2FFFF:
+   ```
+   PG 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) collation base: C.UTF-8
+   default: 1 letras con minúscula distinta en Python; primeras: ['U+0130']
+   und-x-icu: 0 letras con minúscula distinta en Python; primeras: []
+   ucs_basic: 1407 letras con minúscula distinta en Python; primeras: ['U+00C0', 'U+00C1', 'U+00C2', 'U+00C3', 'U+00C4']
+   ```
+   No puedo darte el segundo rojo que pedís: no hay letra con la que
+   hacerlo. Con `ucs_basic` sí hay muchas, pero ahí la base no baja las
+   letras con tilde. Eso es la D131.
+4. **La İ sólo puede estar en filas viejas.** Todo email nuevo pasa por
+   `_email_valido` (`main.py:331`), que acepta sólo ASCII. Lo usan el perfil
+   (2378), el registro (3391), el alta de estudio (10643) y la invitación
+   (10799). La otra creación de cuentas (`main.py:1701`) son los usuarios
+   demo, y no llevan email.
+
+**La prueba de `_cuenta_por_email`.** Ya está en `dc2943d`. Con
+`if not email:` cambiado a `if False:` da rojo: «un email vacío encuentra la
+cuenta sin email», en recuperar usuario y en recuperar contraseña.
+
+**Lo admito:** `email1.sh` estaba roto desde ENTRADAS-1. Dos patrones ya no
+estaban en el código (la invitación con `func.lower` y el registro con
+`.strip().lower()`) y el arnés se commiteó así. Lo arreglé en `9c5f671`.
 
 ## Decisiones
 
-**D28 — contestada (a) en `be1cac2`.** DESTINO-1 rompe seis pruebas que
-comparan el golden entero. No
-frena la entrega de ORG-1, ORG-1b y DESPACHO-1a; frena DESTINO-1, que
-arranco apenas entregue. Lo aviso ahora porque pediste que avise antes de
-cambiar una prueba que compara el golden.
+**D131. No sabemos qué collation tiene la base de producción.** Si fuera
+`ucs_basic` (o `C`), `lower()` de la base no bajaría las mayúsculas con
+tilde. Una fila vieja `ÁLVARO@x.com` no se encontraría con `álvaro@x.com`:
+no se manda el mail de recuperar, aunque nunca se manda a otra cuenta.
 
-Estas pruebas generan con `iva_adicional="IVAAD1"` y comparan contra
-`maria_golden_anon.TXT` todo el archivo, byte a byte. El golden trae
-`COMERC` + `IVAAD1`:
+- (a) Emi o la PM miran `select datcollate from pg_database where datname = current_database()`
+  en producción. Es de sólo lectura, pero es producción, así que no lo corro
+  yo. Recomiendo esta.
+- (b) Dejarlo: los emails nuevos son ASCII y el riesgo queda en filas viejas
+  con tilde.
 
-- `tests/test_generar_maria_txt.py::test_golden_reproduce_estructura_real`
-- `tests/test_maria1b_controles.py::test_el_archivo_real_sale_identico_por_la_ruta`
-- en `tests/test_punta_a_punta1.py`, las cuatro que comparan con
-  `_GOLDEN_PATH`: líneas 433, 438, 445 y 478.
+**D132. Pedir el reset de contraseña tiene sólo tope por IP**
+(`reset:{ip}`, 5 cada 15 minutos, `main.py:1783`). No tiene tope por
+cuenta, como recuperar usuario. Quien cambia de IP puede llenarle el correo
+de links a una cuenta. Cada link nuevo mata el anterior (RESET-1), así que
+no abre la cuenta, pero molesta y sirve para phishing.
 
-Con DESTINO-1, `IVAAD1` se lee como bien de uso de una persona. Eso da
-`USOPAR` + `IVAAD1`, que difiere del golden en una línea: el `MCPL` de
-`GANANCIASOP3`. Ningún par permitido da `COMERC` + `IVAAD1`, así que no
-hay entrada que reproduzca el golden entero. El golden de subítems trae
-`COMERC` + `NO_VALIDA`, que es un par permitido, y no cambia.
-
-- **(a) Recomiendo esta.** El golden no se toca. Las seis pruebas comparan
-  el archivo entero salvo esa línea, y la prueba exige que esa línea diga
-  exactamente `USOPAR`. Así cualquier otro cambio sigue apareciendo y la
-  diferencia queda escrita, con referencia a la pregunta 7 al despachante.
-- **(b)** Las pruebas siguen generando con comercialización. Ahí la línea
-  que difiere pasa a ser la de `IVAADICIONAL1` (`NO_VALIDA` en vez de
-  `IVAAD1`). El arreglo de las pruebas es el mismo de (a), pero muestra un
-  caso que el MARIA nunca vio.
-- **(c)** DESTINO-1 espera la respuesta a la pregunta 7.
-
-D26 y D27 ya están contestadas: D26 (a) por ahora, D27 (b) como ORG-1b.
-
-| Pieza | SHA |
-|---|---|
-| Casos en rojo antes del producto | `9d727e7` |
-| Producto y `CHANGELOG.md` | `e43810b` |
-| Sabotajes (9, uno por motivo) | `18f7f25` |
-| Carrera de dos invitaciones a la vez, en Postgres | `ddfc798` |
-| **SHA probado:** suite, compileall, smoke, aislamiento | **`18f7f25`** |
-| ORG-1b: la prueba de pantalla, en rojo antes del producto | `9ad42e4` |
-| **ORG-1b: producto y `CHANGELOG.md`** | **`f8616cf`** |
-| ORG-1b: sabotajes (7, uno por motivo) | `b7a7927` |
-| ORG-1b: arreglo de la prueba (dos sabotajes no daban su rojo) | `5d42909` |
-| **ORG-1b, SHA probado:** pantalla y sabotajes | **`5d42909`** |
-
-Entre `18f7f25` y `ddfc798` sólo cambia `scripts/testing/org1_postgres.py`,
-que pytest no junta. Tu diff de revisión de ORG-1 parte de `ea64a9c`, la
-punta de tu rama.
-
-ORG-1b está encima de `ddfc798`, pero no pegada a él. En el medio quedan mi
-informe (`de8d175`) y el merge de tu rama (`373ef55`). Ninguno de los dos
-toca producto. Para ver sólo ORG-1b: `git diff 373ef55..5d42909`.
-
-Toqué estos archivos de producto:
-- `proyecto_maria/main.py` (ORG-1)
-- `proyecto_maria/templates/landing.html` (ORG-1b)
-- `CHANGELOG.md` (las tres)
-- `proyecto_maria/main.py`, `proyecto_maria/templates/dashboard_v2.html` y
-  `proyecto_maria/static/v2/screens/clientes.js` (DESPACHO-1a)
-
-## 1. La premisa: confirmada
-
-Corrí `org1_postgres.py` contra un Postgres 16 local con el código de
-`ea64a9c`. El resultado fue `fallas: 15`. Cada 500 trae en el log
-`TypeError: can't compare offset-naive and offset-aware datetimes` (15
-veces). Es tu sospecha: asyncpg devuelve `expires_at` con zona, y se compara
-con `datetime.utcnow()`, que no tiene zona. Validar, registrarse, una
-vencida y una usada daban 500 en Postgres. Invitar no daba 500, porque no
-compara fechas.
-
-## 2. Qué cambió, por punto
-
-Todo está en `proyecto_maria/main.py`.
-
-1. **Sin 500 en las dos bases.** El registro y `validate_invitation`
-   comparan `_utc(expires_at) < datetime.now(timezone.utc)`. `_utc` ya
-   existía y toma una fecha sin zona como UTC. Así entran los registros
-   viejos de SQLite y los de Postgres, que vienen con zona.
-2. **Atada al email.** Al registrarse con `invite_token`, el email del
-   registro, ya con `strip().lower()`, tiene que ser el de la invitación. Si
-   no, responde 400 «Esta invitación es para otro email. Registrate con el
-   email al que te invitaron.». La invitación sigue pendiente y no se crea el
-   usuario. Una invitación sin email no deja entrar a nadie. El otro camino
-   que pone `organization_id` es `/api/organizations/create`, que es el
-   dueño creando su estudio. Sacar un miembro lo vuelve a `None`. No hay
-   camino para que una cuenta existente se sume.
-3. **Tope del plan.** El tope sale de
-   `billing_service.get_plan(org.plan or "premium")["users"]`. Un helper
-   nuevo, `_emails_de_miembros`, cuenta los usuarios del estudio, dueño
-   incluido.
-   - Al invitar: responde 400 «El estudio ya ocupa los {tope} usuarios de
-     su plan, contando las invitaciones pendientes.» si miembros más
-     pendientes sin vencer llegan al tope.
-   - Al registrarse: responde 400 «El estudio ya tiene los {tope} usuarios
-     de su plan.» si los miembros ya llegaron. Hace rollback y la invitación
-     queda pendiente.
-4. **Un solo uso.** Pasos del registro:
-   - Gasta la invitación con
-     `UPDATE invitations SET status='accepted' WHERE id=… AND status='pending'`.
-   - Comprueba `rowcount == 1`; si no, hace rollback y responde 400 «Esta
-     invitación ya fue usada».
-   - Recién después cuenta el tope.
-   - Hace un solo commit con el usuario.
-
-   El estudio se lee con `FOR UPDATE` al invitar y al registrarse.
-
-## 3. Qué deja una carrera
-
-| Carrera | Antes (`ea64a9c`) | Ahora |
-|---|---|---|
-| Dos registros con la misma invitación, SQLite | `[(200, ''), (500, 'No pudimos procesar tu solicitud…')]` | `[200, 400 «ya fue usada»]`, un usuario, invitación `accepted` |
-| Lo mismo, Postgres | dos 500 (el `TypeError`) | `[(200, ''), (400, 'Esta invitación ya fue usada')]` |
-| Dos registros con invitaciones distintas por el último lugar, SQLite | `[(200, ''), (200, '')]`: entran los dos | `[200, 400 «los 2 usuarios»]`, miembros 2, `['accepted', 'pending']` |
-| Lo mismo, Postgres | dos 500 | `[(200, ''), (400, 'El estudio ya tiene los 2 usuarios de su plan.')], miembros 2, ['accepted', 'pending']` |
-| Dos invitaciones enviadas a la vez por el último lugar, Postgres | `[(200, ''), (200, '')], pendientes 2` | `[(200, ''), (400, 'El estudio ya ocupa los 2 usuarios de su plan, contando las invitaciones pendientes.')], pendientes 1` |
-| Lo mismo, SQLite | — | **No está protegido** (riesgo abajo) |
-
-Cómo se serializa cada base:
-- **SQLite:** el primer `UPDATE` del registro toma el candado de escritura
-  de la base. Por eso el tope se cuenta después de gastar la invitación: el
-  otro registro espera y cuenta con el primero ya adentro.
-- **Postgres:** el `FOR UPDATE` sobre el estudio serializa los registros y
-  las invitaciones del mismo estudio.
-
-Las carreras son reales, no secuenciales. En SQLite, dos hilos esperan
-juntos en una barrera después del hash de la clave. En Postgres, cada
-invitación espera en su commit, ya pasado el control del tope. Espera a que
-la otra también llegue al commit o quede frenada en el candado, mirado en
-`pg_stat_activity`. No hay esperas fijas: el plazo de 20 s sólo corre si no
-pasa ninguna de las dos.
-
-## Supuestos reversibles
-
-- **Las pendientes cuentan por email distinto.** Una pendiente de alguien
-  que ya es miembro no cuenta. Reinvitar a un email pendiente no ocupa otro
-  lugar y responde 200, como hoy.
-- **El `FOR UPDATE` sobre el estudio**, al invitar y al registrarse. Es una
-  fila por estudio y por pedido, no un candado global.
-- **Los tres textos de error nuevos** (arriba).
-- **Una invitación «expired» con fecha futura** responde «ya fue usada»,
-  porque no está pendiente. Hoy sólo `validate_invitation` marca «expired»,
-  y lo hace con la fecha vencida, así que no debería existir.
-
-## D26 y D27: contestadas
-
-- **D26 (a) por ahora.** No hay forma de cancelar una invitación pendiente.
-  Se lo proponés a Emi. No la empiezo sin tu aviso.
-- **D27 (b): es ORG-1b**, abajo.
-
-## ORG-1b: el registro con invitación trae el email invitado
-
-En `landing.html`, cuando `/api/invitations/{token}` responde válida y trae
-email:
-- El email del registro se completa con ese email.
-- Queda `readOnly`, no `disabled`, así viaja en el envío.
-- Debajo aparece «Es el email al que te invitaron.».
-
-Sin `invite`, con un token que no existe, con uno ya usado o con una
-respuesta válida sin email, el campo queda como antes: vacío y editable. El
-servidor no cambia, y su 400 sigue siendo la guarda.
-
-**La prueba** es `scripts/testing/pantalla_org1b.js`. Usa Playwright, la API
-local de verdad y datos inventados. Los casos van en este orden:
-
-1. Sin `invite`, y con un token que no existe: el campo queda vacío y
-   editable, y la línea no se ve. El registro se abre con el botón del
-   inicio, como lo haría una persona.
-2. Respuesta válida sin email: igual que el caso 1. Es el único caso con la
-   respuesta simulada (`page.route`), porque la API no deja invitar sin
-   email.
-3. Invitación válida con el email cambiado a mano en el DOM (se le sacan
-   `readOnly` y `disabled`): da 400, y el error dice «otro email».
-4. Invitación válida:
-   - el email viene completo, es de sólo lectura y no `disabled`;
-   - la línea se ve;
-   - escribir encima no lo cambia;
-   - el registro da 200, manda el email y el token, y la invitada queda en
-     el estudio.
-5. El mismo token ya usado: igual que el caso 1.
-
-**Rojo antes del producto** (contra `373ef55`): `FALLA: con invitación
-válida el email no viene completo: {"value":"","readOnly":false,"disabled":false}`.
-
-**Dos sabotajes no daban su rojo en la primera vuelta**, y los arreglé en la
-prueba (`5d42909`):
-- **«La línea se ve siempre»:** sin invitación válida, el registro está
-  cerrado, así que «no se ve» era cierto para cualquier cosa. Ahora la
-  prueba abre el registro antes de mirar.
-- **«Además disabled»:** caía antes, en el caso del DOM, con un 422. Ahora
-  ese caso saca también `disabled`, como haría quien edita el DOM.
-
-| Sabotaje (`sabotajes/org1b.sh`) | Rojo |
-|---|---|
-| no se completa el email | «con invitación válida el email no viene completo» |
-| el email completo queda editable | «con invitación válida el email no es de sólo lectura» |
-| además `disabled` (no viaja en el envío) | «con invitación válida el email está disabled» |
-| la línea del email invitado no aparece | «con invitación válida no se ve la línea del email invitado» |
-| la línea se ve siempre | «sin invite: se ve la línea del email invitado» |
-| se bloquea aunque la invitación no traiga email | «válida sin email: el email no queda vacío y editable» |
-| el servidor deja de exigir el email invitado | «con el email cambiado en el DOM el registro dio 200, no 400» |
-
-**Supuesto reversible:** el texto «Es el email al que te invitaron.».
-
-La captura a 390 px se ve bien. El campo de sólo lectura se ve igual que uno
-editable; lo explica la línea de abajo. No le cambié el estilo, porque no lo
-pediste.
-
-## DESPACHO-1a: el catálogo del cliente en Excel
-
-En la pestaña Catálogo del cliente, arriba de «Productos aprendidos», hay un
-botón «Descargar en Excel». Baja `GET /api/clientes/{id}/catalogo/productos.xlsx`:
-- un renglón por producto de `ClientProductHistory` de ese cliente y ese
-  dueño, en el orden de la pantalla (el último usado primero);
-- columnas: Posición, Descripción, Origen, Valor unitario promedio,
-  Cantidad promedio, Peso unitario promedio, Veces usado, Última vez;
-- un cliente ajeno o que no existe da el mismo 404 que
-  `/catalogo/productos` (`_get_owned_client`); sin sesión, 401;
-- todo texto se escribe como texto. El que empieza con `=`, `+`, `-` o
-  `@` además lleva el apóstrofo invisible (`quotePrefix`), así sigue
-  siendo texto si alguien edita la celda;
-- la posición va como texto y con formato de texto (`@`), tal como está
-  guardada: `01012100`, `0402100Z`, `0101.21.00`.
-
-Toqué `proyecto_maria/main.py` (el endpoint y `_catalogo_xlsx`),
-`proyecto_maria/templates/dashboard_v2.html` (el botón),
-`proyecto_maria/static/v2/screens/clientes.js` (la descarga) y
-`CHANGELOG.md`.
-
-| Pieza | SHA |
-|---|---|
-| Casos en rojo antes del producto | `ee82997` |
-| **Producto y `CHANGELOG.md`** | **`e438dad`** |
-| Prueba en el navegador y sabotajes (14, uno por motivo); ajuste del mensaje del caso de aislamiento | `51890cd` |
-| **SHA probado** | **`51890cd`** |
-
-Su diff propio parte del merge de tu rama que trajo la tarea:
-`git diff fe1571c..51890cd`.
-
-**Rojo antes del producto:**
-- `tests/test_despacho1a.py` contra `fe1571c`: `13 failed, 5 warnings in 0.70s`;
-  todos por la ruta que no existía (`{"detail":"Not Found"}`).
-- `pantalla_despacho1a.js` contra `fe1571c`:
-  `FALLA: 1280 px: no se ve «Descargar en Excel»`, salida 1.
-
-**Los casos** (`tests/test_despacho1a.py`, 13 con los parametrizados):
-- el archivo se abre con openpyxl y trae lo guardado, fila por fila y en
-  orden;
-- la posición como texto, con ceros y letra;
-- el catálogo vacío trae sólo los encabezados;
-- `=HYPERLINK(...)`, `+1+1`, `-2+3` y `@SUMA(A1)` en la descripción, y
-  `=1` en el origen, quedan como texto con `quotePrefix`;
-- caracteres de control en la descripción no rompen la descarga;
-- el nombre del archivo es ASCII aunque el cliente se llame
-  «Ñandú Café — … 🚢»;
-- otro dueño recibe el mismo 404 que el catálogo de la pantalla, y en el
-  cuerpo no aparece el producto;
-- un cliente que no existe da 404;
-- no se mezclan productos de otro cliente ni de otro dueño;
-- sin sesión da 401.
-
-**En el navegador** (`scripts/testing/pantalla_despacho1a.js`, API local y
-datos inventados, 1280 y 390 px): carga dos productos, uno con `=1+1` en
-la descripción, abre el catálogo, aprieta el botón, baja el archivo y lo
-lee con openpyxl. Compara las descripciones con la pantalla y las
-posiciones con la API, y exige que sean texto. Salida:
-`OK 1280 px: «catalogo_cliente_inventado_d1a_1280.xlsx» trae ["=1+1 NOTEBOOK INVENTADA","CABALLO INVENTADO"], posiciones ["8471.30.12","0101.21.00"], todo como texto`,
-y lo mismo a 390 px.
-
-**Sabotajes** (`scripts/testing/sabotajes/despacho1a.sh 51890cd`): salida
-0, `sabotajes sin rojo: 0`. Sin sabotaje, las pruebas y la pantalla dan
-verde.
-
-| Sabotaje | Rojo (copiado de la salida) |
-|---|---|
-| no se mira de quién es el cliente | `test_otro_dueno_recibe_el_mismo_404_que_en_el_catalogo`, «assert 200 == 404» |
-| la consulta no filtra por dueño | `test_no_se_mezclan_…`, «trae productos de otro dueño» |
-| la consulta no filtra por cliente | `test_no_se_mezclan_…`, «trae productos de otro cliente» |
-| se puede bajar sin sesión | `test_sin_sesion_da_401`, «assert 404 == 401» |
-| «=» queda como fórmula | `test_una_descripcion_con_formula_queda_como_texto[=HYPERLINK…]`, «assert 'f' == 's'» |
-| sin el apóstrofo invisible | `…[+1+1]` y `…[@SUMA(A1)]`, «quotePrefix» |
-| la posición sólo de dígitos sale como número | `test_la_posicion_sale_como_texto_con_ceros_y_letra`, «1012100» |
-| la posición sin formato de texto | `test_la_posicion_…`, «number_format» |
-| el orden no es el de la pantalla | `test_el_archivo_se_abre_y_trae_lo_guardado`, «TELEFONO INVENTADO» |
-| cantidad y peso cruzados | `test_el_archivo_…`, «450.25» |
-| el catálogo vacío sale sin encabezados | `test_un_catalogo_vacio_trae_solo_los_encabezados` |
-| no se limpian los caracteres de control | `test_una_descripcion_con_caracteres_de_control_…`, «IllegalCharacterError» |
-| el nombre del archivo va como viene | `test_el_nombre_del_archivo_es_ascii`, «UnicodeEncodeError» |
-| el botón no está conectado | `FALLA: 1280 px: el botón no bajó nada` |
-
-En la primera vuelta, el sabotaje «no filtra por cliente» dio rojo, pero
-el mensaje de pytest cambiaba según las pruebas de antes en la misma base.
-Le puse al caso un mensaje propio para cada fuga (`51890cd`). El rojo es
-el mismo, ahora se lee.
-
-**Puertas de DESPACHO-1a, sobre `51890cd`:**
-
-| Puerta | Resultado |
-|---|---|
-| Las 12 de `tests/` que tocan clientes, catálogo o DESPACHO-1a | `249 passed, 3 warnings in 71.12s (0:01:11)` |
-| `compileall -q proyecto_maria` | `compile-ok` (rc 0) |
-| `node --check …/clientes.js` | `js-ok` |
-| `pantalla_despacho1a.js` | `OK 1280 px …` y `OK 390 px …`, salida 0 |
-| `sabotajes/despacho1a.sh 51890cd` | `sabotajes sin rojo: 0`, salida 0 |
-
-**Sin correr todavía**, para el `/entregar` del 28/10 a las 18:00 UTC: la
-suite completa sobre el SHA final, `smoke_friccion.sh`,
-`ataque_aislamiento.sh` (no cubre esta ruta nueva: el aislamiento de esta
-ruta lo cubren los casos y tres sabotajes), subagentes, `/code-review high`
-y `/security-review`.
-
-**Supuestos reversibles:**
-- Se limpian los caracteres de control que Excel no acepta. Sin eso, la
-  descarga da 500 con una descripción así.
-- El nombre del archivo, en ASCII: `catalogo_<nombre>.xlsx`. El servidor
-  y la pantalla lo arman cada uno, con el mismo criterio.
-- El apóstrofo invisible (`quotePrefix`) en lo que empieza con
-  `=`, `+`, `-` o `@`.
-- La fecha como fecha de Excel, `dd/mm/yyyy`, y el día en UTC, igual que
-  la pantalla (`slice(0, 10)`).
-- El texto del botón, «Descargar en Excel», y el toast «Descarga iniciada.».
-
-**Riesgos de DESPACHO-1a:**
-- **Empates en «última vez».** En Postgres, los productos aprendidos en un
-  mismo pedido llevan el mismo `now()`. El orden entre ellos no está fijado,
-  ni en la pantalla ni en el Excel, y puede salir distinto entre una y
-  otro. No lo arreglé: cambiaría también la consulta de la pantalla.
-- **Un texto de más de 32767 caracteres** se escribe entero; Excel lo corta
-  al abrirlo o se queja. No lo vi en el catálogo; no lo traté.
-- **Un promedio NaN** se escribiría como NaN. El aprendizaje no debería
-  dejarlo; no lo traté.
-- **A 390 px el tablero ya se corre 133 px de costado**, con o sin el botón
-  (lo medí también sacando el botón). El botón se ve entero. No es de esta
-  pieza y no lo toqué.
-
-## Puertas de ORG-1 y ORG-1b
-
-| Puerta | Resultado |
-|---|---|
-| `tests/test_org1.py` sobre `ddfc798` | `46 passed, 3 warnings in 31.56s` |
-| Los mismos casos contra `ea64a9c` | `36 failed, 10 passed, 39 warnings in 45.26s` |
-| `org1_postgres.py`, Postgres 16 local, sobre `ddfc798` | `fallas: 0`, 3 de 3 corridas |
-| Lo mismo contra `ea64a9c` | `fallas: 15` |
-| `sabotaje_org1.sh 18f7f25` | `OK: los 9 sabotajes dan rojo por la razón esperada`, salida 0 |
-| Suite completa, worktree limpio en `18f7f25` | `1 failed, 3323 passed, 302 skipped, 2 xfailed, 94 warnings in 505.43s (0:08:25)` |
-| `compileall -q proyecto_maria` | rc 0 |
-| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
-| `ataque_aislamiento.sh` | `Bloqueado: 22 · Fugas: 0`, «✅ PUERTA G3 PASADA. Ningún despachante ve datos de otro.» |
-| ORG-1b: `sabotajes/org1b.sh 5d42909` | `sabotajes sin rojo: 0`, salida 0; los 7 dan su rojo, y sin sabotaje la prueba da verde |
-| ORG-1b: `pantalla_org1b.js` contra `373ef55` | `FALLA: con invitación válida el email no viene completo`, salida 1 |
-| ORG-1b: `test_pa1_textos`, `test_regression_phase0`, `test_static_endpoints` (las que leen la landing) y `test_org1`, sobre `5d42909` | `93 passed, 1 skipped, 3 warnings in 32.68s` |
-
-Los casos corren cada uno dos veces, `sqlite_sin_zona` y
-`postgres_con_zona`. El segundo inyecta un `expires_at` con zona al cargar
-la fila, que es lo que hace asyncpg.
-
-**El único rojo de la suite** es
-`test_excel2.py::test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_a_una_subida_normal`.
-Es el de tiempo ya informado en SUFIJOS-1, 1c y 1d: «la subida normal dio
-400 a los 30.0 s: … tardó demasiado». ORG-1 no toca la lectura de Excel.
-
-**Sabotajes** (`sabotaje_org1.sh`). Cada uno vuelve a lo de antes o rompe
-una guarda:
-
-| Sabotaje | Qué hace | Rojos |
-|---|---|---|
-| `fecha_sin_zona` | vuelve a comparar con `datetime.utcnow()` | 14 failed |
-| `sin_email` | cualquiera con el enlace entra | 10 failed |
-| `invitar_sin_tope` | invitar sin tope | 13 failed |
-| `tope_fijo` | tope 3 escrito a mano | 10 failed |
-| `vencida_ocupa` | guarda: una pendiente vencida ocupa lugar | 2 failed |
-| `reinvitar_ocupa` | guarda: reinvitar ocupa otro lugar | 1 failed |
-| `registro_sin_tope` | registrarse sin tope | 3 failed |
-| `gasto_sin_condicion` | gasta sin mirar si seguía pendiente | 2 failed |
-| `contar_antes` | cuenta el tope antes de gastar (la carrera de SQLite) | 1 failed |
-
-Dos sabotajes más se aplicaron a mano en Postgres, porque el candado sólo se
-ve ahí:
-- Sin `FOR UPDATE` al invitar: `FALLA | dos invitaciones a la vez por el
-  último lugar: sale una ([(200, ''), (200, '')], pendientes 2)`, 3 de 3.
-- Sin `FOR UPDATE` al registrarse: `FALLA | dos invitaciones por el último
-  lugar: entra una ([(200, ''), (200, '')], miembros 3, ['accepted',
-  'accepted'])`, 3 de 3.
-
-**Lo que no corrí:**
-- Subagentes adversariales, `/code-review` ni `/security-review`. No tengo
-  cuota hasta el 28/10 a las 18:00 UTC. La autorrevisión del diff completo
-  contra `ea64a9c` es sólo mía, sin independencia. Por eso todavía no
-  entrego.
-- ORG-1: la pantalla en un navegador. ORG-1 no toca pantallas.
-- ORG-1b: la suite completa ni el smoke. ORG-1b cambia sólo la plantilla
-  `landing.html`; corrí las pruebas que la leen, arriba.
+- (a) Pieza aparte: tope por cuenta como `recuperar:cuenta:`, con su rojo
+  y su sabotaje. Recomiendo esta.
+- (b) Dejarlo como está.
 
 ## Comandos
 
-Este muestra sólo lo de ORG-1:
-
 ```bash
-git diff ea64a9c..ddfc798
+git checkout 40423be
+# negativos de EMAIL-1: «sabotajes sin rojo: 0»
+PY=python scripts/testing/sabotajes/email1.sh 40423be
+# la İ en PG: «fallas: 0», y en el arnés el sabotaje de la İ en ROJO
+python scripts/testing/abuso2_postgres.py postgresql://cdi@127.0.0.1:55432/postgres
+PG_URL=postgresql://cdi@127.0.0.1:55432/postgres PY=python scripts/testing/sabotajes/abuso2.sh 40423be
+# la familia: default 1 (U+0130), und-x-icu 0
+python scripts/testing/email1_minusculas_pg.py postgresql://cdi@127.0.0.1:55432/postgres
+python docs/pm/herramientas/chequeo-6.py 3af69c0 40423be
 ```
 
-Este tiene que dar `46 passed`:
+## Puertas
 
-```bash
-python -m pytest -q --no-cov -p no:randomly tests/test_org1.py
+| qué | dónde | resultado |
+|---|---|---|
+| `email1.sh` | árbol de `f7d7eb7` con el script de `9c5f671` (lo único que agrega `40423be` es `email1_minusculas_pg.py`, que el arnés no usa); no se volvió a correr sobre `40423be` por el corte | 15 ROJO, «sabotajes sin rojo: 0», salida 0 |
+| `abuso2_postgres.py` | PG 16, árbol de `9c5f671` | 6 OK, «fallas: 0», salida 0 |
+| `abuso2.sh` con `PG_URL` | `9c5f671` | 20 ROJO, «fallas: 0», salida 0; el de la İ: «ROJO  | Postgres: el tope de recuperar va por el texto en minúsculas de Python: dice «FALLA \| cinco variantes del mismo email mandan tres mails»» |
+| `email1_minusculas_pg.py` | PG 16 | la tabla de arriba |
+| suite completa | — | **no corrida**: el producto no cambia |
+| `/code-review`, `/security-review`, adversario | — | **no corridos**: el diff es sólo de pruebas (+48/−6) |
+
+Las últimas líneas de `email1.sh`:
+```
+ROJO  | el registro no pasa el email a minúsculas: «FAILED tests/test_email1.py::test_registro_con_invitacion_acepta_otras_mayusculas» 
+ROJO  | la pista de dev vuelve con ENVIRONMENT que falta (RESET-2): «FAILED tests/test_email1.py::test_la_pista_de_dev_solo_en_el_entorno_de_prueba» 
+ROJO  | un email vacío encuentra la cuenta sin email: «FAILED tests/test_email1.py::test_un_email_vacio_no_encuentra_la_cuenta_sin_email[/auth/recover-username-dev_username_hint]» «FAILED tests/test_email1.py::test_un_email_vacio_no_encuentra_la_cuenta_sin_email[/auth/request-password-reset-dev_token_hint]» 
+sabotajes sin rojo: 0
 ```
 
-Este tiene que dar «OK: los 9 sabotajes dan rojo por la razón esperada» y
-salida 0:
+## chequeo-6
 
-```bash
-scripts/testing/sabotaje_org1.sh 18f7f25 <venv>
+```
+chequeo-6 3af69c0..HEAD: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +48/−6
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+avisos: 0
 ```
 
-Este tiene que dar `fallas: 0`. Usá un Postgres local y descartable; el
-script rechaza cualquier host que no sea local:
+## Riesgos
 
-```bash
-python scripts/testing/org1_postgres.py postgresql://<usuario>@127.0.0.1:<puerto>/<base>
-```
+- D131 y D132, arriba.
+- Ya los marcaste vos y siguen abiertos: `user.name` va sin escapar en el
+  HTML del mail de recuperar (`main.py:1824` y `1864`); el mail se manda en el
+  mismo pedido.
+- En el producto hay cuatro líneas con historia, «EMAIL-1», en `main.py`
+  1754, 1771, 2373 y 3406. No son de este diff: van a la cola de limpieza.
 
-Este muestra sólo lo de ORG-1b:
+## Archivos de producto
 
-```bash
-git diff 373ef55..5d42909
-```
+Ninguno.
 
-Este tiene que terminar con `OK ORG-1b`. Va contra una API local
-levantada con datos inventados:
-
-```bash
-BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_org1b.js
-```
-
-Este tiene que dar `sabotajes sin rojo: 0` y salida 0. Necesita `node` y
-el Chromium de Playwright:
-
-```bash
-PY=<venv>/bin/python scripts/testing/sabotajes/org1b.sh 5d42909
-```
-
-Este muestra sólo lo de DESPACHO-1a:
-
-```bash
-git diff fe1571c..51890cd
-```
-
-Este tiene que dar `13 passed`:
-
-```bash
-python -m pytest -q --no-cov -p no:randomly tests/test_despacho1a.py
-```
-
-Este tiene que terminar con `OK 1280 px …` y `OK 390 px …`, y salida 0. Va
-contra una API local levantada con datos inventados:
-
-```bash
-BASE_URL=http://127.0.0.1:<puerto> PY=<venv>/bin/python node scripts/testing/pantalla_despacho1a.js
-```
-
-Este tiene que dar `sabotajes sin rojo: 0` y salida 0. Arma su propio
-worktree, su SQLite y su API en el puerto 8853:
-
-```bash
-PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
-```
-
-## Riesgos de ORG-1 y ORG-1b
-
-- **ORG-1b: una invitación a un email que la pantalla no acepta queda sin
-  salida.** Invitar sólo exige una «@» (`a@b` entra). La pantalla, al
-  enviar, pide `usuario@dominio.tld` y responde «Email no válido». Con el
-  campo de sólo lectura, el invitado no lo puede cambiar. Antes de ORG-1b
-  también quedaba sin salida, porque otro email da el 400 de ORG-1. Es de
-  antes y no lo cambié. Si querés, va como D.
-
-- **La carrera de dos invitaciones a la vez no está protegida en SQLite.**
-  `FOR UPDATE` no hace nada ahí, y la invitación no escribe antes de
-  contar. Puede quedar un lugar de más pendiente. Al registrarse, el tope se
-  vuelve a controlar, así que no entra un miembro de más. Producción es
-  Postgres, y ahí está cubierta.
-- **En Postgres puede faltar el índice único de `users.email`.** El modelo
-  lo declara, pero no comprobé la base de producción, y no la toco. Ahora la
-  carrera del mismo email la frena la invitación, no el índice.
-- **El registro con un email de prueba reemplazable** confirma ese borrado
-  antes de los controles de la invitación. Es de antes y ORG-1 no lo cambia.
-- **El 400 «es para otro email»** dice que el email escrito no es el
-  invitado. No dice cuál es. Hace falta el token para preguntar.
-
-Última vuelta: Wed Oct 28 00:38:37 UTC 2026
-
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1 lista y subida SIN ENTREGAR (producto e43810b, sabotajes 18f7f25, carrera PG ddfc798; suite 18f7f25 1 failed conocido de test_excel2, 3323 passed). ORG-1b (D27 b) lista y subida SIN ENTREGAR (prueba 9ad42e4, producto f8616cf, sabotajes b7a7927, arreglo 5d42909; sabotajes 7/7). DESPACHO-1a lista y subida SIN ENTREGAR (casos ee82997, producto e438dad, pantalla y sabotajes 51890cd; sabotajes 14/14; 249 passed en clientes/catálogo). D26 (a) por ahora: no empezar sin aviso. DESPACHO-1 no se empieza (espera ejemplo del despachante). Pendiente: el 28/10 después de las 18:00 UTC, un solo /entregar de ORG-1, ORG-1b y DESPACHO-1a con subagentes (hasta alto), /code-review high y /security-review; reproducir lo que encuentren, suite completa en el SHA final, actualizar este informe y timbre «Dev MARIA: entregué ORG-1, ORG-1b y DESPACHO-1a en <SHA>». Después, apagar el Postgres local (puerto 55432). Apenas entregues: DESTINO-1 (datos del 28/10 en PREGUNTAS-DESPACHANTE.md; D28 (a): golden intacto, las seis pruebas comparan todo salvo el MCPL de GANANCIASOP3, que tiene que decir USOPAR, con referencia a la pregunta 7), después SUFIJOS-2 y SEGURO-1; PESO-NETO-1 y PRORRATEO-1 esperan al despachante. DESPACHO-1 (lectura) va después de esas tres. La próxima D es la D29. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (send_message next, «Dev MARIA: …»), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. EMAIL-1 entregada sin producto en 40423be (informe en este archivo); D129 (a) y D130 (a) decididas por la PM en 28a27a7; abiertas D131 y D132; la próxima D libre es la D133. Sigue AVISOS-2 (con las tres bajas), CONEXIONES-1, después OBSERVABILIDAD-1, ORG-1+D40 y D102. Nunca main, nada se publica sin el «dale» de Emi para el SHA, sin secretos, sólo datos inventados.

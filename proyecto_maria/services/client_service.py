@@ -337,6 +337,7 @@ class ClientService:
         Esto se llama después de confirmar/guardar una operación
         """
         from difflib import SequenceMatcher
+        from .client_memory import sumar_al_promedio, valor_para_promedio
 
         async with AsyncSessionLocal() as session:
             for item in items:
@@ -357,38 +358,36 @@ class ClientService:
                 existing = result.scalar_one_or_none()
 
                 if existing:
-                    # Actualizar estadísticas
-                    new_count = existing.veces_usado + 1
-                    existing.veces_usado = new_count
-
-                    # Actualizar promedios (media móvil simple)
-                    if item.get('peso_unitario', 0) > 0:
-                        existing.peso_unitario_avg = (
-                            (existing.peso_unitario_avg * (new_count - 1) + item['peso_unitario']) / new_count
-                        )
-
-                    if item.get('valor_unitario', 0) > 0:
-                        existing.valor_unitario_avg = (
-                            (existing.valor_unitario_avg or 0) * (new_count - 1) + item['valor_unitario']
-                        ) / new_count
-
-                    if item.get('cantidad', 0) > 0:
-                        existing.cantidad_avg = (
-                            (existing.cantidad_avg or 0) * (new_count - 1) + item['cantidad']
-                        ) / new_count
+                    # Cada promedio cuenta sólo los usos que trajeron ese valor.
+                    usado = existing.veces_usado
+                    peso, existing.veces_peso = sumar_al_promedio(
+                        existing.peso_unitario_avg, existing.veces_peso, usado, item.get('peso_unitario'))
+                    existing.peso_unitario_avg = peso or 0.0
+                    existing.valor_unitario_avg, existing.veces_valor = sumar_al_promedio(
+                        existing.valor_unitario_avg, existing.veces_valor, usado, item.get('valor_unitario'))
+                    existing.cantidad_avg, existing.veces_cantidad = sumar_al_promedio(
+                        existing.cantidad_avg, existing.veces_cantidad, usado, item.get('cantidad'))
+                    existing.veces_usado = max(usado or 1, 1) + 1
 
                     # Actualizar origen si es más frecuente
                     existing.origen_frecuente = item.get('origen', existing.origen_frecuente)
                 else:
                     # Crear nuevo registro
+                    # Sin valor queda vacío: no se inventa un 0 ni una cantidad 1.
+                    peso = valor_para_promedio(item.get('peso_unitario'))
+                    valor = valor_para_promedio(item.get('valor_unitario'))
+                    cantidad = valor_para_promedio(item.get('cantidad'))
                     history_entry = ClientProductHistory(
                         client_id=client_id,
                         ncm=ncm,
                         descripcion=descripcion,
-                        peso_unitario_avg=item.get('peso_unitario', 0.0),
+                        peso_unitario_avg=peso or 0.0,
                         origen_frecuente=item.get('origen', 'XX'),
-                        valor_unitario_avg=item.get('valor_unitario', 0.0),
-                        cantidad_avg=item.get('cantidad', 1.0),
+                        valor_unitario_avg=valor,
+                        cantidad_avg=cantidad,
+                        veces_peso=1 if peso else 0,
+                        veces_valor=1 if valor else 0,
+                        veces_cantidad=1 if cantidad else 0,
                         veces_usado=1
                     )
                     session.add(history_entry)

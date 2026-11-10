@@ -68,9 +68,10 @@ def test_dashboard_ignora_v1_y_borra_la_cookie_vieja(client):
 
 
 def test_session_state(client):
-    """POST /api/session/state acepta eventos de telemetría."""
+    """POST /api/session/state acepta eventos de telemetría (sin sesión, sólo
+    los de la lista de ABUSO-1)."""
     r = client.post("/api/session/state", json={
-        "version": "v2", "screen": "test", "action": "click",
+        "version": "v2", "screen": "test", "action": "hero_cta_clicked",
     })
     assert r.status_code == 200
     assert r.json()["ok"] is True
