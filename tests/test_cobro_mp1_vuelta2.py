@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from tests.test_cobro_mp1 import (  # noqa: F401
-    COBROS, PAGOS, SUSCRIPCIONES, _SDK, _Pagos, _aviso_cobro, _aviso_ipn, _cobros, _fin, _leer_org,
+    COBROS, PAGOS, SUSCRIPCIONES, _SDK, _Pagos, _aviso_cobro, _aviso_pago, _cobros, _fin, _leer_org,
     _leer_pago, _mp, _org, _pago, _pago_de_suscripcion, _renovacion, _sin_suscripciones, _Suscripciones,
     _vencida,
 )
@@ -63,7 +63,7 @@ def test_si_no_se_puede_leer_el_pago_mercado_pago_reintenta(client, monkeypatch,
     pid = _pago(f"pl-{usuario}", f"{usuario}:premium")
     monkeypatch.setattr(_Pagos, "get", get)
     with caplog.at_level("WARNING", logger="mp_webhook"):
-        r = _aviso_ipn(client, pid)
+        r = _aviso_pago(client, pid)
     assert r.status_code == 503, r.text[:300]
     assert _leer_pago(pid) == {}
     assert _get_user(usuario)["billing_status"] == "past_due"
@@ -81,7 +81,7 @@ def test_si_no_se_puede_leer_la_suscripcion_reintenta(client, monkeypatch, caplo
         avisar = lambda: _aviso_cobro(client, cobro)  # noqa: E731
     else:
         pid = _pago_de_suscripcion(usuario, 30000.0)
-        avisar = lambda: _aviso_ipn(client, pid)  # noqa: E731
+        avisar = lambda: _aviso_pago(client, pid)  # noqa: E731
     monkeypatch.setattr(_Suscripciones, "get", get)
     with caplog.at_level("WARNING", logger="mp_webhook"):
         r = avisar()
@@ -126,7 +126,7 @@ def test_un_pago_aprobado_sin_id_reconocible_reintenta(client, id_en_la_respuest
     _vencida(usuario)
     pid = _pago(f"si-{usuario}", f"{usuario}:premium")
     PAGOS[pid]["id"] = id_en_la_respuesta
-    r = _aviso_ipn(client, pid)
+    r = _aviso_pago(client, pid)
     assert r.status_code == 503, r.text[:300]
     assert _leer_pago(pid) == {}
     assert _get_user(usuario)["billing_status"] == "past_due"
@@ -142,7 +142,7 @@ def test_un_pago_con_referencia_que_no_sirve_queda_rechazado(client, referencia)
     lo tiene que ver. Sin referencia reintenta (test_cobro_mp1_h.py)."""
     pid = _pago(f"pr-{_unique('v2')}", "")
     PAGOS[pid]["external_reference"] = referencia
-    r = _aviso_ipn(client, pid)
+    r = _aviso_pago(client, pid)
     assert r.status_code == 200, r.text[:300]
     assert "rechazado" in r.json().get("skipped", ""), r.json()
     fila = _leer_pago(pid)
@@ -154,7 +154,7 @@ def test_un_pago_de_una_cuenta_que_no_existe_queda_rechazado(client, cuenta):
     nombre = _unique("v2_nadie")
     ref = f"{nombre}:premium" if cuenta == "usuario" else "org:00000000-0000-0000-0000-000000000000:premium"
     pid = _pago(f"pn-{nombre}", ref)
-    r = _aviso_ipn(client, pid)
+    r = _aviso_pago(client, pid)
     assert r.status_code == 200, r.text[:300]
     fila = _leer_pago(pid)
     assert fila.get("estado") == "rechazado" and "no existe" in (fila.get("motivo") or ""), fila
@@ -235,7 +235,7 @@ def test_un_pago_con_un_id_de_suscripcion_que_no_sirve_queda_rechazado(client, d
         PAGOS[pid]["preapproval_id"] = valor
     else:
         PAGOS[pid]["point_of_interaction"] = {"transaction_data": {"subscription_id": valor}}
-    r = _aviso_ipn(client, pid)
+    r = _aviso_pago(client, pid)
     assert r.status_code == 200, r.text[:300]
     assert _get_user(usuario)["billing_status"] == "past_due"
     fila = _leer_pago(pid)
@@ -253,7 +253,7 @@ def test_un_pago_con_un_dato_secundario_nulo_se_aplica(client, campo):
         PAGOS[pid]["card"] = {"last_four_digits": "1234", "payment_method": None}
     else:
         PAGOS[pid][campo] = None
-    r = _aviso_ipn(client, pid)
+    r = _aviso_pago(client, pid)
     assert r.status_code == 200 and r.json().get("skipped") is None, r.text[:300]
     assert _get_user(usuario)["billing_status"] == "active"
 
@@ -264,7 +264,7 @@ def test_el_formato_viejo_con_barra_y_sin_payer_se_aplica(client):
     _vencida(usuario)
     pid = _pago(f"pb-{usuario}", f"{usuario}|premium")
     PAGOS[pid]["payer"] = None
-    r = _aviso_ipn(client, pid)
+    r = _aviso_pago(client, pid)
     assert r.status_code == 200 and r.json().get("skipped") is None, r.text[:300]
     assert _get_user(usuario)["billing_status"] == "active"
 
@@ -275,7 +275,7 @@ def test_el_usuario_org_puede_pagar(client):
                                         "email": "org@test.billing", "name": "Usuario org"})
     _vencida("org")
     pid = _pago(f"porg-{_unique('v2')}", "org:premium")
-    r = _aviso_ipn(client, pid)
+    r = _aviso_pago(client, pid)
     assert r.status_code == 200 and r.json().get("skipped") is None, r.text[:300]
     assert _get_user("org")["billing_status"] == "active"
 
@@ -309,7 +309,7 @@ def test_sin_el_inicio_del_registro_no_se_aplica_nada(client, caplog):
     _en_la_base(_borrar)
     try:
         with caplog.at_level("WARNING", logger="mp_webhook"):
-            r = _aviso_ipn(client, pid)
+            r = _aviso_pago(client, pid)
     finally:
         _en_la_base(_restaurar)
     assert r.status_code == 503, r.text[:300]
@@ -325,7 +325,7 @@ def test_el_corte_del_registro_no_tiene_margen(client, corrimiento, aplica):
     _vencida(usuario)
     pid = _pago(f"pc-{usuario}", f"{usuario}:premium")
     PAGOS[pid]["date_approved"] = (_inicio_del_registro() + timedelta(seconds=corrimiento)).isoformat()
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert _leer_pago(pid).get("estado") == ("aplicado" if aplica else "rechazado"), _leer_pago(pid)
     assert _get_user(usuario)["billing_status"] == ("active" if aplica else "past_due")
 
@@ -336,7 +336,7 @@ def test_pagar_de_mas_se_aplica(client):
     _register(client, usuario)
     _vencida(usuario)
     pid = _pago(f"pm-{usuario}", f"{usuario}:premium", monto=45000.5)
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert _leer_pago(pid).get("estado") == "aplicado", _leer_pago(pid)
     assert _get_user(usuario)["billing_status"] == "active"
 
@@ -348,7 +348,7 @@ def test_una_cuenta_en_mora_con_fin_por_delante_suma_desde_hoy(client):
     _register(client, usuario)
     _set_user(usuario, billing_status="past_due", trial_ends_at=datetime.now(timezone.utc) + timedelta(days=10))
     pid = _pago(f"pmo-{usuario}", f"{usuario}:premium")
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     falta = _fin(_get_user(usuario)) - datetime.now(timezone.utc)
     assert timedelta(days=29) < falta <= timedelta(days=30), falta
 
@@ -359,11 +359,11 @@ def test_el_registro_de_un_pago_de_organizacion_dice_que_es_una_organizacion(cli
     _register(client, usuario)
     org_id = _org(usuario)
     pid = _pago(f"pro-{usuario}", f"org:{org_id}:premium", monto=100.0)
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert _leer_pago(pid).get("cuenta") == f"org:{org_id}", _leer_pago(pid)
 
 
-def test_el_panel_muestra_los_ultimos_200_rechazados_del_mas_nuevo_al_mas_viejo(client, monkeypatch):
+def test_el_panel_muestra_los_ultimos_200_rechazados_del_mas_nuevo_al_mas_viejo(client):
     from sqlalchemy import delete
     from proyecto_maria.database.models import PagoMercadoPagoAplicado
     prefijo = _unique("v2_panel")
@@ -380,8 +380,8 @@ def test_el_panel_muestra_los_ultimos_200_rechazados_del_mas_nuevo_al_mas_viejo(
     _en_la_base(_sembrar)
     try:
         admin = _unique("v2_admin")
-        monkeypatch.setenv("ADMIN_USERNAMES", admin)
         _register(client, admin)
+        _set_user(admin, roles=["admin"])
         r = client.get("/api/dev/pagos-mp-rechazados")
     finally:
         _en_la_base(_retirar)
@@ -464,7 +464,7 @@ def test_una_recarga_que_no_entra_queda_rechazada_y_no_suma(client, cuenta, extr
     org_id = _con_extras(usuario, cuenta, extras, datetime.now(timezone.utc) + timedelta(days=10))
     ref = f"org:{org_id}:topup" if org_id else f"{usuario}:topup"
     pid = _pago(f"pt-{usuario}", ref, monto=10000.0)
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     despues = _leer_org(org_id) if org_id else _get_user(usuario)
     assert despues["extra_ops_remaining"] == extras, despues
     fila = _leer_pago(pid)
@@ -479,6 +479,6 @@ def test_una_recarga_que_entra_suma_entera(client, extras, vencen, queda):
     _register(client, usuario)
     _con_extras(usuario, "usuario", extras, datetime.now(timezone.utc) + vencen)
     pid = _pago(f"pt-{usuario}", f"{usuario}:topup", monto=10000.0)
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert _get_user(usuario)["extra_ops_remaining"] == queda, _get_user(usuario)
     assert _leer_pago(pid).get("estado") == "aplicado", _leer_pago(pid)

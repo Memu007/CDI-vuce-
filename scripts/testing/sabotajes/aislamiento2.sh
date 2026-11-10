@@ -4,6 +4,7 @@
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/aislamiento2.sh [prueba|ataque|todo] [SHA]
 #   prueba  pytest de admin y roles: WebSocket y ruta exacta sin control,
+#           también dentro de un router incluido;
 #           roles guardados como texto (un minuto)
 #   ataque  ataque_aislamiento.sh completo una vez por filtro saboteado:
 #           tiene que dar FUGA en el caso de ese filtro (unos 3 minutos cada
@@ -108,6 +109,20 @@ app.router.add_route("/dev", _dev_crudo)')" "$R_USUARIO" "$R_SIN"
   sabotaje $M "una ruta de FastAPI en /api/dev, sin barra final" "$ANCLA" "$(agregar '@app.get("/api/dev")
 async def _api_dev_exacto():
     return {"secreto": 1}')" "$R_USUARIO" "$R_SIN"
+  # Un router incluido sin require_admin: app.routes no muestra sus rutas.
+  sabotaje $M "un WebSocket abierto dentro de un router incluido en /api/dev" "$ANCLA" "$(agregar 'from fastapi import APIRouter as _AR
+_r_dev = _AR(prefix="/api/dev")
+@_r_dev.websocket("/ws")
+async def _ws_dev_abierto(websocket: WebSocket):
+    await websocket.accept()
+    await websocket.close()
+app.include_router(_r_dev)')" "$WS_USUARIO" "$WS_SIN" "/api/dev/ws"
+  sabotaje $M "una ruta oculta del esquema dentro de un router incluido en /api/dev" "$ANCLA" "$(agregar 'from fastapi import APIRouter as _AR
+_r_dev = _AR(prefix="/api/dev")
+@_r_dev.get("/oculta", include_in_schema=False)
+async def _dev_oculta():
+    return {"secreto": 1}
+app.include_router(_r_dev)')" "$R_USUARIO" "$R_SIN" "GET /api/dev/oculta"
   sabotaje $M "_es_admin vuelve a buscar «admin» dentro del texto de roles" \
     '"admin" in roles_de(user)' \
     '"admin" in (user.get("roles") or [])' \
@@ -218,6 +233,25 @@ ataques() {
     'select(Estudio).where(Estudio.id == estudio_id, Estudio.owner_username == user["username"])' \
     'select(Estudio).where(Estudio.id == estudio_id)' \
     "Borrar el estudio de Ana" "El estudio de Ana quedó intacto"
+  # Un 204 también es fuga: el ataque no puede contar sólo el 200.
+  ataque $M "estudios: borrar no mira el dueño y contesta 204" \
+    'select(Estudio).where(Estudio.id == estudio_id, Estudio.owner_username == user["username"])
+    )
+    estudio = result.scalars().first()
+    if estudio is None:
+        raise HTTPException(status_code=404, detail="Estudio no encontrado")
+    await db.delete(estudio)
+    await db.commit()
+    return {"success": True}' \
+    'select(Estudio).where(Estudio.id == estudio_id)
+    )
+    estudio = result.scalars().first()
+    if estudio is None:
+        raise HTTPException(status_code=404, detail="Estudio no encontrado")
+    await db.delete(estudio)
+    await db.commit()
+    return Response(status_code=204)' \
+    "Borrar el estudio de Ana"
   ataque $M "estudios: generar acepta el estudio de otro" \
     'select(Estudio).where(Estudio.id == estudio_id, Estudio.owner_username == username)' \
     'select(Estudio).where(Estudio.id == estudio_id)' \
@@ -237,9 +271,30 @@ ataques() {
         raise HTTPException(status_code=403, detail="Solo el administrador puede remover miembros")' \
     "Un miembro (no administrador) saca a otro miembro de su estudio" "El miembro que quiso sacar otro miembro sigue en el estudio A"
   ataque $M "admin: cualquier usuario es administrador" \
-    '    return user["username"] in _admin_usernames() or "admin" in roles_de(user)' \
+    '    return "admin" in roles_de(user)' \
     '    return True' \
     "Beto en GET /api/admin/stats/summary" "Beto en GET /api/dev/stats" "Beto en GET /dev/dashboard"
+  # Un 201 también es fuga en los ataques directos, no sólo el 200.
+  ataque $M "clientes: el mapeo de columnas no mira el dueño y contesta 201" \
+    '    client = await _get_owned_client(db, client_id, user["username"])
+    mapping = client.column_mapping if isinstance(client.column_mapping, dict) else {}
+    return {
+        "success": True,
+        "cliente_id": client_id,
+        "mapping": mapping or {},
+        "canonicos": _CANON_COLUMNS,
+    }' \
+    '    client = (await db.execute(sa_select(ClientModel).where(ClientModel.id == client_id))).scalars().first()
+    return JSONResponse(status_code=201, content={"success": True, "cliente_id": client_id, "nombre": client.name})' \
+    "Ver mapeo de columnas"
+  # Una respuesta larga con lo de Ana arriba: grep corta antes de leerla entera.
+  ataque $M "notas: ver no filtra por dueño y la respuesta es larga" \
+    '    notas = await _fetch_notas_ordered(db, user["username"], ncm_key)
+    return {"notas": [n.note for n in notas]}' \
+    "    notas = $TODAS
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(\"\\n\".join([n.note for n in notas] + [\"x\" * 40] * 20000))" \
+    "Beto no ve la nota de Ana"
 }
 
 [ "$QUE" != ataque ] && prueba

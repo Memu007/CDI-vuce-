@@ -60,6 +60,8 @@ pasar al aceptar, va como escape («Revisión y aceptación»).
 
 ## 4. Veredicto
 
+- **Consejero antes de escribir el veredicto** (sólo la PM principal;
+  cuándo, en `ONBOARDING-PM.md`, «Subagentes»).
 - `docs/pm/REPRODUCCION-<PIEZA>-<fecha>.md` con la evidencia.
 - Arriba del canal de esa Dev (`PARA-DEV.md` o `PARA-DEV-N.md`): aceptada,
   rechazada o con devolución, sobre qué SHA, y las respuestas a cada D con

@@ -77,7 +77,7 @@ def test_el_generador_tampoco_escribe_lo_que_no_es_un_codigo(destinacion):
     ("IC04", 400), ("TRAN", 400), ("ZFI1", 400), ("", 400), ("0EC01", 400), ("EC011", 400), ("​EC01", 400),
     pytest.param(" " * 70 + "EC01", 200, id="70blancos-EC01-200"),
 ])
-def test_la_exportacion_sólo_genera_con_una_ec(destinacion, status):
+def test_la_exportacion_sólo_genera_con_una_ec(auth_override, destinacion, status):
     r = TestClient(main.app).post("/generate_maria_export", json={**EXPORT, "tipo_destinacion": destinacion})
     assert r.status_code == status, r.text[:300]
     if status == 200:

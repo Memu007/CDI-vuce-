@@ -83,7 +83,7 @@ def esperando_un_lock():
                   where datname = current_database() and wait_event_type = 'Lock'""")[0][0]
 
 
-# El primero que lee la cuenta dentro del checkout espera a ver al otro.
+# El primero que bloquea la cuenta dentro del checkout espera a ver al otro.
 # En el caso 3, el checkout espera a que cancelar haya leído la cuenta o
 # esté esperando el lock.
 LLEGADAS = []
@@ -119,7 +119,8 @@ async def _execute_con_carrera(self, statement, *args, **kwargs):
     resultado = await _execute_original(self, statement, *args, **kwargs)
     tabla = getattr(getattr(statement, "column_descriptions", [{}])[0].get("entity"), "__tablename__", None) \
         if getattr(statement, "is_select", False) else None
-    if tabla != "users":
+    # Sólo la lectura que bloquea: la previa sin lock no ordena a los dos pedidos.
+    if tabla != "users" or getattr(statement, "_for_update_arg", None) is None:
         return resultado
     if CON_CANCEL:
         if _en("cancel_billing"):

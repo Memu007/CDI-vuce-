@@ -86,5 +86,5 @@ def test_checkout_prod_https_agrega_auto_return(client, monkeypatch):
 
     pref = _FakeSDK.captured["preference_data"]
     assert pref["auto_return"] == "approved"
-    assert pref["notification_url"] == "https://cdi.example.com/api/payments/webhook"
+    assert pref["notification_url"] == "https://cdi.example.com/api/payments/webhook?source_news=webhooks"
     assert pref["back_urls"]["success"] == "https://cdi.example.com/dashboard?billing=success"

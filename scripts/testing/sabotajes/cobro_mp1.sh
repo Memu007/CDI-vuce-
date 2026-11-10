@@ -66,6 +66,11 @@ sabotaje() {
   fi
   local salida codigo
   salida="$(correr)"; codigo=$?
+  # Un caso trabado no es el rojo del sabotaje aunque el esperado también falle:
+  # pytest-timeout en modo hilo imprime «+++ Timeout +++» y `timeout` sale con 124.
+  if [ "$codigo" -eq 124 ] || grep -qE '^\++ Timeout \++$' <<<"$salida"; then
+    echo "TRABA | $nombre: un caso pasó su tope de tiempo"; FALLAS=$((FALLAS+1)); return
+  fi
   if [ "$codigo" -eq 0 ]; then
     echo "VERDE | $nombre: la prueba no lo vio"; FALLAS=$((FALLAS+1))
   elif grep -qF -- "$esperado" <<<"$salida"; then
@@ -186,10 +191,6 @@ sin_rojo $M "sin mirar antes de insertar" \
   $'    if False:\n        return None'
 
 # ── Paso 4: renovaciones de una suscripción ──
-sabotaje $M "el aviso IPN de una renovación se ignora" \
-  '            if topic in ("payment", "subscription_authorized_payment"):' \
-  '            if topic in ("payment",):' \
-  "FAILED $T1::test_una_renovacion_extiende_el_periodo_una_sola_vez[ipn]"
 sabotaje $M "vuelve a decidir el estado que copia el cobro" \
   '    return pago_id, _id_mp(cobro.get("preapproval_id"))' \
   $'    if cobro.get("status") != "approved":\n        raise _MPIlegible("cobro no aprobado")\n    return pago_id, _id_mp(cobro.get("preapproval_id"))' \
@@ -229,7 +230,7 @@ sabotaje $M "un id booleano pasa" \
 sabotaje $M "la renovación no toma la referencia de la suscripción" \
   '        pay_resp = {**pay_resp, "external_reference": sus.get("external_reference")}' \
   '        pass' \
-  "FAILED $T1::test_una_renovacion_extiende_el_periodo_una_sola_vez[ipn]"
+  "FAILED $T1::test_una_renovacion_extiende_el_periodo_una_sola_vez"
 sabotaje $M "la suscripción ilegible de una renovación no reintenta" \
   '_consultar_mp(lambda: sdk.preapproval().get(suscripcion), f"suscripción {suscripcion}")' \
   '(sdk.preapproval().get(suscripcion).get("response") or {})' \
@@ -477,40 +478,31 @@ sabotaje $M "i: una fecha de aprobación sin zona pasa" \
 # B: la exportación cuenta la operación (tests/test_cobro_corte1.py).
 T=tests/test_cobro_corte1.py
 sabotaje $M "B: la exportación no cuenta la operación" \
-  $'        await _contar_maria(db, user["username"], filename, txt_content,\n                            len(request.items or []))\n\n        with open(filepath, \'w\', encoding=\'utf-8\') as f:' \
-  $'        with open(filepath, \'w\', encoding=\'utf-8\') as f:' \
+  $'        operacion_id, filename = await _contar_maria(\n            db, user["username"], request.operacion_id, _FECHA_DE_EMISION.sub(r"\\1", txt_content),\n            txt_content, len(request.items or []), f"MARIA-EXPORT_{safe_id}")' \
+  $'        operacion_id, filename = "", f"MARIA-EXPORT_{safe_id}.TXT"\n        await _escribir_y_confirmar(db, user["username"], filename, txt_content)' \
   "la exportación no cuenta la operación"
-# Vuelta 2, g: los ids de la exportación no chocan con los de la importación.
-sabotaje $M "g: la exportación usa el prefijo de la importación" \
-  '        filename = f"MARIA-EXPORT_{safe_id}.TXT"' \
-  '        filename = f"MARIA_EXPORT_{safe_id}.TXT"' \
-  "la importación reusó la operación de la exportación"
-sabotaje $M "g: un id largo de la exportación no se reconoce" \
-  '_ARCHIVO_MARIA = re.compile(r"MARIA(?:_|-EXPORT_)[A-Za-z0-9_-]{1,50}\.TXT")' \
-  '_ARCHIVO_MARIA = re.compile(r"MARIA_[A-Za-z0-9_-]{1,50}\.TXT")' \
-  "guardar la exportación de id largo cuenta otra vez"
 
 # C y E: cancelar desde past_due y reactivar una prueba con recarga.
 T=tests/test_cobro_mp1_cde.py
 sabotaje $M "C: past_due no puede cancelar" \
-  '    if db_user.billing_status not in ("trial", "active", "past_due") and not db_user.mp_preapproval_id:' \
-  '    if db_user.billing_status not in ("trial", "active") and not db_user.mp_preapproval_id:' \
+  '    if entidad.billing_status not in ("trial", "active", "past_due") and not con_sid:' \
+  '    if entidad.billing_status not in ("trial", "active") and not con_sid:' \
   "past_due no se puede cancelar"
 sabotaje $M "C: cancelar desde past_due deja los días que quedaban" \
-  '        db_user.trial_ends_at = ahora' \
+  '        entidad.trial_ends_at = ahora' \
   '        pass' \
   "cancelar desde past_due da acceso"
 sabotaje $M "C: sólo past_due pierde los días al cancelar" \
-  '    corta = billing_service.cancelar_corta_acceso(db_user, ahora)' \
-  '    corta = db_user.billing_status == "past_due"' \
+  '    corta = billing_service.cancelar_corta_acceso(entidad, ahora)' \
+  '    corta = entidad.billing_status == "past_due"' \
   "AssertionError: cancelar dejó otro acceso (corta=True)"
 sabotaje $M "C: cancelar promete servicio hasta una fecha sin acceso" \
-  '    hasta = None if corta else db_user.trial_ends_at' \
-  '    hasta = db_user.trial_ends_at' \
+  '    hasta = None if corta else entidad.trial_ends_at' \
+  '    hasta = entidad.trial_ends_at' \
   "FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[renovacion_tardia]"
 sabotaje $M "E: decide payment_provider aunque haya pagos registrados" \
-  $'    if not tipos:\n        return db_user.payment_provider == "mercadopago"\n' \
-  $'    return db_user.payment_provider == "mercadopago"\n' \
+  $'    if not tipos:\n        return entidad.payment_provider == "mercadopago"\n' \
+  $'    return entidad.payment_provider == "mercadopago"\n' \
   "una prueba con recarga no vuelve a la prueba"
 sabotaje $M "E: la recarga cuenta como plan pagado" \
   '    return any(tipo != "topup" for tipo in tipos)' \
@@ -524,33 +516,33 @@ sabotaje $M "E: un pago rechazado cuenta como plan" \
 # payment_provider.
 sabotaje $M "E: un rechazo saca la decisión de payment_provider" \
   $'               PagoMercadoPagoAplicado.estado == "aplicado")\n    )).scalars().all()\n    if not tipos:' \
-  $'               PagoMercadoPagoAplicado.estado == "aplicado")\n    )).scalars().all()\n    if not tipos and not (await db.execute(select(PagoMercadoPagoAplicado.payment_id).where(PagoMercadoPagoAplicado.cuenta == db_user.username))).first():' \
+  $'               PagoMercadoPagoAplicado.estado == "aplicado")\n    )).scalars().all()\n    if not tipos and not (await db.execute(select(PagoMercadoPagoAplicado.payment_id).where(PagoMercadoPagoAplicado.cuenta == cuenta_ref))).first():' \
   "una cuenta pagada volvió como prueba"
 
 # Con una suscripción abierta se cancela desde cualquier estado.
 sabotaje $M "C: una cancelada con suscripción nueva no puede cancelarla" \
-  ' and not db_user.mp_preapproval_id:' \
+  ' and not con_sid:' \
   ':' \
   "la suscripción nueva no se puede cancelar"
 sabotaje $M "C: sólo la cancelada con suscripción puede cancelarla" \
-  ' and not db_user.mp_preapproval_id:' \
-  ' and not (db_user.billing_status == "canceled" and db_user.mp_preapproval_id):' \
+  ' and not con_sid:' \
+  ' and not (entidad.billing_status == "canceled" and con_sid):' \
   "No se puede cancelar desde el estado actual: none"
 sabotaje $M "C: una cancelada sin suscripción vuelve a cancelar" \
-  ' and not db_user.mp_preapproval_id:' \
-  ' and not (db_user.mp_preapproval_id or db_user.billing_status == "canceled"):' \
+  ' and not con_sid:' \
+  ' and not (con_sid or entidad.billing_status == "canceled"):' \
   "assert 200 == 409"
 sabotaje $M "C: /billing/me nunca dice que hay suscripción abierta" \
-  '        "suscripcion_abierta": bool(db_user.mp_preapproval_id),' \
+  '        "suscripcion_abierta": hay_sid,' \
   '        "suscripcion_abierta": False,' \
   "cancelada_con_checkout"
 sabotaje $M "C: /billing/me dice abierta a cualquier cancelada" \
-  '        "suscripcion_abierta": bool(db_user.mp_preapproval_id),' \
-  '        "suscripcion_abierta": db_user.billing_status == "canceled" or bool(db_user.mp_preapproval_id),' \
+  '        "suscripcion_abierta": hay_sid,' \
+  '        "suscripcion_abierta": billing_entity.billing_status == "canceled" or hay_sid,' \
   "cancelada_sin"
 sabotaje $M "C: /billing/me dice abierta sólo a la cancelada" \
-  '        "suscripcion_abierta": bool(db_user.mp_preapproval_id),' \
-  '        "suscripcion_abierta": db_user.billing_status == "canceled" and bool(db_user.mp_preapproval_id),' \
+  '        "suscripcion_abierta": hay_sid,' \
+  '        "suscripcion_abierta": billing_entity.billing_status == "canceled" and hay_sid,' \
   "sin_plan_con"
 sabotaje $M "C: /billing/me nunca dice que cancelar corta el acceso" \
   '        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(billing_entity),' \
@@ -578,18 +570,18 @@ sabotaje $B "C: cancelar_corta_acceso no ve la cuenta que ya pasó su fecha" \
 
 # D13 (c): una autorizada sin cuenta vigente frena el checkout y sale cancelando.
 sabotaje $M "D13: el checkout cancela la autorizada vieja" \
-  $'            raise HTTPException(\n                status_code=409,\n                detail="Tu suscripción' \
-  $'            if False: raise HTTPException(\n                status_code=409,\n                detail="Tu suscripción' \
+  $'        raise HTTPException(\n            status_code=409,\n            detail="Tu suscripción' \
+  $'        if False: raise HTTPException(\n            status_code=409,\n            detail="Tu suscripción' \
   "assert 200 == 409"
 sabotaje $M "D13: sin cuenta vigente, el 409 dice que se renueva sola" \
-  '            if entidad.billing_status in ("trial", "active") and fin and fin > datetime.now(timezone.utc):' \
-  '            if True:' \
+  '        if entidad.billing_status in ("trial", "active") and fin and fin > datetime.now(timezone.utc):' \
+  '        if True:' \
   "assert 'cancelá el plan primero' in 'Ya tenés una suscripción activa en Mercado Pago; se renueva sola"
 # La salida que nombra el 409 tiene que existir en cada estado: la cuenta
 # con la autorizada guardada puede cancelarla.
 sabotaje $M "D13: la cancelada no puede cancelar la autorizada que la frena" \
-  ' and not db_user.mp_preapproval_id:' \
-  ' and not (db_user.mp_preapproval_id and db_user.billing_status != "canceled"):' \
+  ' and not con_sid:' \
+  ' and not (con_sid and entidad.billing_status != "canceled"):' \
   "FAILED $T::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[cancelada_vieja]"
 
 # j: Mercado Pago no conoce la suscripción guardada.
@@ -610,12 +602,12 @@ if ! correr >/dev/null; then
 else
   echo "BASE  | la carrera de D en Postgres, en verde"
   sabotaje $M "D: el checkout no bloquea la cuenta" \
-    '    result = await db.execute(select(User).where(User.username == username).with_for_update())' \
-    '    result = await db.execute(select(User).where(User.username == username))' \
-    "FALLA | sin suscripción anterior: queda una sola suscripción viva en Mercado Pago"
+    $'.order_by(User.username)\n        .with_for_update()' \
+    '.order_by(User.username)' \
+    "FALLA | sin suscripción anterior: los dos pedidos se cruzaron"
   sabotaje $M "D: cancelar no espera al checkout en curso" \
-    '    result = await db.execute(select(User).where(User.username == user["username"]).with_for_update())' \
-    '    result = await db.execute(select(User).where(User.username == user["username"]))' \
+    $'    db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])\n    plazo = anyio.current_time() + _TOPE_MP\n    entidad = org or db_user' \
+    $'    db_user = (await db.execute(select(User).where(User.username == user["username"]))).scalars().first(); org = None; con_sid = [db_user] if db_user.mp_preapproval_id else []\n    plazo = anyio.current_time() + _TOPE_MP\n    entidad = org or db_user' \
     "FALLA | cancelar durante un checkout: no queda ninguna suscripción viva en Mercado Pago"
 fi
 T=scripts/testing/cobro_mp1_postgres.py
@@ -786,8 +778,8 @@ if ! correr >/dev/null; then
 else
   echo "BASE  | la pantalla Listo, en verde"
   sabotaje $F2 "g: Listo guarda la operación sin el archivo del MARIA" \
-    "            saveOperationToHistory(items, data).catch(err => {" \
-    "            saveOperationToHistory(items, {}).catch(err => {" \
+    "            saveOperationToHistory(items, data, carga, foto).catch(err => {" \
+    "            saveOperationToHistory(items, {}, carga, foto).catch(err => {" \
     "FALLA: import: la pantalla hizo"
 fi
 

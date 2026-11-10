@@ -1205,7 +1205,7 @@ def test_un_cargo_con_medidas_que_no_son_no_entra_como_producto(medida, cargo, i
     _el_cargo_h1_no_entra_como_producto(data, cargo, monto)
 
 
-# Los .xls de la familia que corren también donde no está xlwt (la CI).
+# Los .xls de la familia que corren también donde no está xlwt.
 XLS_H1 = {
     "flete_barra": ("flete", "barra", "importe_y_precio"),
     "seguro_guion": ("seguro", "guion", "solo_importe"),

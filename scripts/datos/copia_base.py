@@ -23,6 +23,9 @@ sino en PGPASSWORD, y ningún error la muestra.
     COPIA_DESTINO=/mnt/copias python scripts/datos/copia_base.py enviar /copias/cdi.dump
 
 COPIA_PG_BIN es la carpeta de pg_dump y pg_restore (por defecto, los del PATH).
+COPIA_PLAZO_S es cuántos segundos puede durar la orden entera (por defecto, 3600):
+en copiar, cuenta también la verificación. Al cortarse, borrar la base de prueba
+puede sumar hasta TOPE_BORRADO_S.
 Correrlo contra producción lo decide Emi.
 """
 import argparse
@@ -35,6 +38,7 @@ import os
 import re
 import secrets
 import shutil
+import signal
 import sys
 from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
@@ -45,6 +49,7 @@ from scripts.datos.clientes_fecha_inic_activ import _SEPARADORES, _tapar  # noqa
 FORMATO = "cdi-copia-1"
 ESQUEMAS = ("postgres://", "postgresql://", "postgresql+asyncpg://")
 VARIABLES = ("COPIA_ORIGEN_URL", "COPIA_PRUEBA_URL")
+TOPE_BORRADO_S = 60
 
 # La salida de un valor como texto depende de la sesión: se fija igual al
 # copiar y al restaurar, así la configuración de cada base no cambia la huella.
@@ -257,12 +262,63 @@ def leer_huella(archivo: str) -> dict:
     return datos
 
 
+async def _esperar(proc) -> str:
+    """El stderr del hijo. Si se corta la espera, el hijo no queda corriendo."""
+    try:
+        _, err = await proc.communicate()
+    except BaseException:
+        if proc.returncode is None:
+            proc.kill()
+            await proc.wait()
+        raise
+    return err.decode("utf-8", "replace")
+
+
 async def _correr(*args, env) -> tuple:
     proc = await asyncio.create_subprocess_exec(
         *args, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.PIPE, env=env)
-    _, err = await proc.communicate()
-    return proc.returncode, err.decode("utf-8", "replace")
+    err = await _esperar(proc)
+    return proc.returncode, err
+
+
+def _filas(tablas: dict) -> int:
+    """Una dirección equivocada o una base recién creada restauran «igual»."""
+    filas = sum(t["filas"] for t in tablas.values())
+    if not filas:
+        raise Falla(f"la copia está vacía: {len(tablas)} tablas, 0 filas")
+    return filas
+
+
+async def _borrar_restauracion(admin, base: str) -> bool:
+    """Un corte no deja el borrado a medias: se termina, con su tope, y sigue el corte.
+    Si la base queda se avisa acá: una excepción taparía la del corte o la de verificar."""
+    async def borrar():
+        try:
+            await admin.execute(f'DROP DATABASE IF EXISTS "{base}" WITH (FORCE)')
+            await admin.close()
+        finally:
+            if not admin.is_closed():
+                admin.terminate()
+    tarea = asyncio.ensure_future(asyncio.wait_for(borrar(), TOPE_BORRADO_S))
+    try:
+        await asyncio.shield(tarea)
+    except asyncio.CancelledError:
+        await asyncio.wait([tarea])
+        _quedo(tarea, base)
+        raise
+    except Exception:  # noqa: BLE001 - lo informa _quedo
+        pass
+    return not _quedo(tarea, base)
+
+
+def _quedo(tarea, base: str) -> bool:
+    error = tarea.exception()
+    if error is not None:
+        motivo = (f"en {TOPE_BORRADO_S} s" if isinstance(error, TimeoutError)
+                  else f"({tapar(f'{type(error).__name__}: {error}')})")
+        print(f"no se pudo borrar {base} {motivo}: hay que borrarla a mano", file=sys.stderr)
+    return error is not None
 
 
 def _resumen(err: str) -> str:
@@ -291,18 +347,19 @@ async def copiar(archivo: str) -> int:
                 f"--file={temporal}", f"--dbname={origen.url()}",
                 stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.PIPE, env=origen.entorno())
-            volcado = asyncio.ensure_future(proc.communicate())
+            volcado = asyncio.ensure_future(_esperar(proc))
             try:
                 tablas = await huella(conn)
             except BaseException:
+                # Cancelar la espera no alcanza: si todavía no arrancó, no mata a pg_dump.
                 if proc.returncode is None:
                     proc.kill()
                 await asyncio.gather(volcado, return_exceptions=True)
                 raise
-            _, err = await volcado
+            err = await volcado
             if proc.returncode != 0:
-                raise Falla(f"pg_dump falló (salida {proc.returncode}):\n    "
-                            f"{_resumen(err.decode('utf-8', 'replace'))}")
+                raise Falla(f"pg_dump falló (salida {proc.returncode}):\n    {_resumen(err)}")
+            _filas(tablas)
             datos = {
                 "formato": FORMATO,
                 "creada": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
@@ -331,6 +388,7 @@ async def verificar(archivo: str) -> int:
     datos = leer_huella(archivo)
     if not re.fullmatch(r"[A-Z0-9_]+", str(datos.get("codificacion", ""))):
         raise Falla(f"la huella {_de_huella(archivo)} no se entiende")
+    filas = _filas(datos["tablas"])
     prueba = Direccion("COPIA_PRUEBA_URL")
     suma = sha256_de(archivo)
     base = "cdi_restauracion_" + secrets.token_hex(8)
@@ -338,30 +396,28 @@ async def verificar(archivo: str) -> int:
     try:
         await admin.execute(f'CREATE DATABASE "{base}" TEMPLATE template0 '
                             f"ENCODING '{datos['codificacion']}' LOCALE 'C'")
-        try:
-            codigo, err = await _correr(
-                _bin("pg_restore"), "--exit-on-error", "--single-transaction", "--no-owner",
-                "--no-acl", "--no-password", f"--dbname={prueba.url(base)}", archivo,
-                env=prueba.entorno())
-            if codigo != 0:
-                problemas = [f"pg_restore falló (salida {codigo}):\n    {_resumen(err)}"]
-            else:
-                restaurada = await prueba.conectar(base)
-                try:
-                    async with _instante(restaurada):
-                        problemas = diferencias(datos["tablas"], await huella(restaurada))
-                finally:
-                    await restaurada.close()
-        finally:
-            await admin.execute(f'DROP DATABASE IF EXISTS "{base}" WITH (FORCE)')
+        codigo, err = await _correr(
+            _bin("pg_restore"), "--exit-on-error", "--single-transaction", "--no-owner",
+            "--no-acl", "--no-password", f"--dbname={prueba.url(base)}", archivo,
+            env=prueba.entorno())
+        if codigo != 0:
+            problemas = [f"pg_restore falló (salida {codigo}):\n    {_resumen(err)}"]
+        else:
+            restaurada = await prueba.conectar(base)
+            try:
+                async with _instante(restaurada):
+                    problemas = diferencias(datos["tablas"], await huella(restaurada))
+            finally:
+                await restaurada.close()
     finally:
-        await admin.close()
+        borrada = await _borrar_restauracion(admin, base)
     if problemas:
         print("LA COPIA NO SIRVE:\n  " + "\n  ".join(problemas), file=sys.stderr)
         return 1
+    if not borrada:
+        return 1
     _escribir(_de_marca(archivo), f"{suma}  {os.path.basename(archivo)}\n")
-    tablas = datos["tablas"]
-    print(f"copia verificada: {len(tablas)} tablas, {sum(t['filas'] for t in tablas.values())} filas")
+    print(f"copia verificada: {len(datos['tablas'])} tablas, {filas} filas")
     return 0
 
 
@@ -401,6 +457,32 @@ async def enviar(archivo: str) -> int:
 ORDENES = {"copiar": copiar, "verificar": verificar, "enviar": enviar}
 
 
+async def _cortable(orden, archivo: str) -> int:
+    """La orden, cortada por el plazo o una señal como si fallara, así sus `finally`
+    limpian; sólo cuenta el primer corte, para que otro no interrumpa la limpieza."""
+    plazo = os.environ.get("COPIA_PLAZO_S", "3600")
+    if not re.fullmatch(r"[0-9]+", plazo) or int(plazo) == 0:
+        raise Falla("COPIA_PLAZO_S tiene que ser una cantidad entera de segundos mayor que 0")
+    tarea, loop, motivo = asyncio.current_task(), asyncio.get_running_loop(), []
+
+    def cortar(por: str) -> None:
+        if not motivo:
+            motivo.append(por)
+            tarea.cancel()
+
+    for senal in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        # Quien la ignoró a propósito (nohup) no quiere que corte.
+        if signal.getsignal(senal) is not signal.SIG_IGN:
+            loop.add_signal_handler(senal, cortar, f"se cortó por {senal.name} antes de terminar")
+    loop.call_later(int(plazo), cortar, f"no terminó en {plazo} s")
+    try:
+        return await orden(archivo)
+    except asyncio.CancelledError:
+        if not motivo:
+            raise
+        raise Falla(motivo[0]) from None
+
+
 class _Argumentos(argparse.ArgumentParser):
     def error(self, message):
         # Un argumento que no se entiende sale en el mensaje: si alguien pasó
@@ -421,8 +503,13 @@ def main(argv=None) -> int:
                           ("enviar", "lleva una copia verificada a COPIA_DESTINO")):
         ordenes.add_parser(nombre, help=ayuda).add_argument("archivo")
     args = p.parse_args(argv)
+    # La copia es la base entera: lo que escriben el script y pg_dump lo lee
+    # sólo quien lo corre.
+    os.umask(0o077)
     try:
-        return asyncio.run(ORDENES[args.orden](os.path.abspath(args.archivo)))
+        orden, archivo = ORDENES[args.orden], os.path.abspath(args.archivo)
+        # enviar sólo copia archivos: no tiene hijos ni bases que limpiar al cortarse.
+        return asyncio.run(orden(archivo) if orden is enviar else _cortable(orden, archivo))
     except Falla as e:
         print(f"error: {tapar(str(e))}", file=sys.stderr)
     except Exception as e:  # noqa: BLE001 - se informa sin traceback: puede tener la dirección

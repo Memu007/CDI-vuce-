@@ -77,6 +77,9 @@ class User(Base):
 
     # Ola 4: contadores y metadata de suscripción/tarjeta.
     mp_preapproval_id = Column(String(100), nullable=True)
+    # La suscripción que Mercado Pago no confirmó cancelar cuando esta cuenta lo pidió:
+    # sólo con ella un miembro concilia el reintento.
+    cancelar_sin_confirmar = Column(String(100), nullable=True)
     mp_plan_id = Column(String(100), nullable=True)
     ops_used_this_period = Column(Integer, default=0)
     extra_ops_remaining = Column(Integer, default=0)

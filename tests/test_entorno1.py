@@ -19,6 +19,8 @@ SONDA = REPO / "tests" / "entorno_sonda.py"
 AUSENTE = None
 CERRADOS = [AUSENTE, "", "production", "prod", "staging", "Development", " development", "TESTING"]
 ABIERTOS = ["development", "test", "testing"]
+# Un aviso de pago sin secreto no se puede verificar: tampoco abre en desarrollo.
+SIEMPRE_CERRADAS = ["webhook_sin_secreto"]
 
 SIN_DOTENV = "import dotenv; dotenv.load_dotenv = lambda *a, **k: False; "
 IMPORTAR_SIN_ENV = SIN_DOTENV + "import proyecto_maria.main"
@@ -125,7 +127,13 @@ def test_puerta_cerrada_fuera_de_desarrollo(sondas, puerta):
     assert not otros, f"{puerta} no queda cerrada: {otros!r}"
 
 
-@pytest.mark.parametrize("puerta", PUERTAS)
+@pytest.mark.parametrize("puerta", SIEMPRE_CERRADAS)
+def test_puerta_cerrada_tambien_en_desarrollo(sondas, puerta):
+    otros = _distintos(sondas, puerta, ABIERTOS, "cerrada")
+    assert not otros, f"{puerta} no queda cerrada: {otros!r}"
+
+
+@pytest.mark.parametrize("puerta", [p for p in PUERTAS if p not in SIEMPRE_CERRADAS])
 def test_puerta_abierta_en_desarrollo(sondas, puerta):
     """Contrapunto: la prueba distingue, porque en desarrollo la puerta sigue."""
     otros = _distintos(sondas, puerta, ABIERTOS, "abierta")

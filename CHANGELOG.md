@@ -64,6 +64,48 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - Desde el cuarto pedido de la hora la respuesta es la misma, pero no se manda el mail ni se crea un link: uno nuevo anularía el que la persona sí pidió.
 - La cuenta del tope no se puede gastar con pedidos que inventan su IP: se lleva aparte de los contadores por IP.
+## 2026-11-08 · fix: un nombre de usuario que ya existe con otras mayúsculas no se registra (NOMBRES-1)
+
+- **fix(permisos):** el registro y crear un estudio rechazan con «Usuario ya existe» un nombre que ya existe escrito con otras mayúsculas (`emi` existe → `Emi`, `EMI`), para todas las cuentas. Las cuentas que ya difieren sólo en mayúsculas siguen entrando con su nombre exacto; nada se migra.
+
+## 2026-11-08 · fix: nadie registra un nombre que se lea como el de una admin (PERMISOS-3)
+
+- **fix(seguridad):** el registro y crear un estudio rechazan con 400 un nombre de usuario con un salto de línea u otro carácter fuera de letras, números, `_` y `-`, y un nombre de `ADMIN_USERNAMES` escrito con otras mayúsculas («Usuario ya existe»).
+
+## 2026-11-08 · fix(permisos): ADMIN_USERNAMES ya no da admin por sí solo (PERMISOS-2)
+
+- **fix(permisos):** admin es sólo quien tiene el rol guardado. Al arrancar, la cuenta que ya existe con un nombre de `ADMIN_USERNAMES` recibe el rol (aunque sus roles estuvieran guardados como texto u otro formato), y nadie puede registrar ni crear un estudio con un nombre de la lista. Para sumar un admin nuevo: que se registre primero y después agregar su nombre a la lista y reiniciar.
+
+## 2026-11-08 · fix: en un estudio, sólo quien recibió el 503 de cancelar o la dueña concilian el reintento (COBRO-MP-4)
+
+- **fix(cobro):** si Mercado Pago canceló sin confirmarlo, el 503 queda anotado en la cuenta que lo recibió (columna nueva `users.cancelar_sin_confirmar`, la agrega el arranque) y la marca se borra al conciliar. Un miembro sin esa marca recibe 403 y no cambia nada. Volver atrás: primero el código anterior y después `alter table users drop column if exists cancelar_sin_confirmar` (se pierden las marcas pendientes).
+
+## 2026-11-08 · fix: un Excel chico armado para costar segundos ya no traba el servidor (EXCEL-2d)
+
+- **fix(excel):** antes de abrir, se rechaza un libro con un formato de número de más de 255 caracteres o 32 «[» (en un `.xls` se lee el texto del formato, así un formato en chino no cuenta como «[»), más de 65 490 formatos de celda (aunque haya un `cellXfs` vacío adentro), o más de 64 000 rangos en la primera hoja, sumando los `sqref` (formato condicional, validación), las celdas combinadas y los vínculos.
+- **fix(excel):** miles de filas rellenadas desde celdas combinadas se leen en ~1 s: cada columna se rellena una sola vez; 9995 combinadas en 19 990 filas dan el rechazo de filas en ~1.2 s, sin frenar a otro pedido.
+
+## 2026-11-08 · fix: un Excel chico con forma cara se lee en el carril pesado (EXCEL-2c)
+
+- **fix(excel):** antes de leer, se miden la fila y la columna máximas de la primera hoja (celdas, filas y `<dimension>`), los elementos de `styles.xml` y los del sst. Más de 20 000 filas, 64 columnas, 5 000 elementos de estilos o 40 000 del sst (unos 20 000 textos) mandan la lectura a los hilos pesados aunque el archivo pese poco; los topes se cambian con `EXCEL_LIVIANO_FILAS`, `_COLUMNAS`, `_ESTILOS` y `_TEXTOS`.
+- **fix(excel):** las celdas sin `r` también cuentan para el rechazo de más de 256 columnas. Un `.xls` no se mide: su carril sigue saliendo de los bytes.
+
+## 2026-11-08 · fix: un miembro con una suscripción cancelada no toca el plan del estudio (COBRO-MP-2)
+
+- **fix(cobro):** reintentar cancelar después de un corte concilia sólo si todas las suscripciones del estudio ya están canceladas en Mercado Pago. Un miembro con la suya cancelada ya no cancela la pendiente de otro ni reactiva el plan.
+
+## 2026-11-08 · fix: un email que puso el usuario ya no da admin (PERMISOS-1)
+
+- **fix(permisos):** al arrancar, `ADMIN_USERNAMES` da el rol de admin sólo por username. Antes también lo daba al usuario cuyo email coincidía, y el email cada uno lo cambia sin verificarlo.
+
+## 2026-11-08 · fix: cancelar se puede reintentar si Mercado Pago canceló sin confirmarlo, y el aviso con la firma repetida da 401 (COBRO-MP-2, COBRO-MP-3)
+
+- **fix(cobro):** si Mercado Pago canceló la suscripción pero CDI no lo supo (503), quien la abrió puede volver a cancelar y CDI queda igual que Mercado Pago, mientras ninguna otra suscripción del estudio pague.
+- **fix(cobro):** un aviso de pago con una clave repetida en la firma (dos `v1=`) se rechaza con 401 sin consultar a Mercado Pago.
+
+## 2026-11-08 · fix: la copia de la base no da por buena una base vacía ni deja restos al cortarse (BACKUP-1a)
+
+- **fix(datos):** una copia sin filas sale con error, no queda verificada y copiar no deja ni la copia ni su huella. Copiar o verificar, si pasan `COPIA_PLAZO_S` (por defecto, una hora) o reciben una señal que no se ignoró a propósito (como con nohup), borran la base descartable (aunque llegue otro corte; si la base no se puede borrar, o no termina en 60 s, lo avisan y verificar no marca la copia), cortan pg_dump o pg_restore y salen con error. La copia, su huella y su marca sólo las lee quien corre el script.
 
 ## 2026-11-08 · fix: la destinación que llega al TXT es un código de 4 letras o números, y la exportación sólo genera con una EC (AVISOS-2)
 
@@ -123,6 +165,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - Cuando la API rechaza un dato (falta un campo, no es texto ni número, es demasiado largo, la clave pasa de 72 bytes), la pantalla dice cuál y por qué, con el número de ítem si viene de una lista; si el motivo no es uno de esos, pide revisar ese dato. Antes mostraba «[object Object]», un mensaje genérico o el texto en inglés.
 
+## 2026-11-07 · fix: cancelar sin respuesta de Mercado Pago no afirma que el plan sigue igual (COBRO-MP-2)
+
+- **fix(cobro):** si Mercado Pago no contesta a tiempo al cancelar, el aviso dice que no se pudo confirmar la cancelación, sin afirmar que el plan sigue igual: Mercado Pago pudo haberla cancelado.
+
+## 2026-11-07 · fix: la validación sale de la carga que se ve (VALIDACION-1)
+
+- **fix(validación):** al pasar de una carga a otra en menos de un minuto, el panel, el botón «Generar» y lo que se guarda en el historial ya no muestran ni usan la validación de la carga anterior, aunque ésa conteste después o el validador falle.
+
 ## 2026-11-07 · fix: sin ENVIRONMENT o con un valor desconocido los controles de producción quedan puestos (ENTORNO-2)
 
 - Fuera de `development`, `test` o `testing`: el CSRF bloquea, las cookies van `Secure`, `/docs`, `/redoc` y `/openapi.json` dan 404, sin `DATABASE_URL` la app no arranca y el VUCE simulado no responde.
@@ -148,6 +198,29 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - Un surrogate suelto o un NUL en el usuario o el email de login, recuperar contraseña y recuperar usuario se cambia por «�» y la respuesta es la de un dato que no existe, en vez de 500.
 - Lo mismo para el token de restablecer contraseña, y un pedido mal armado con uno de esos caracteres da 422 en cualquier ruta.
+
+## 2026-11-06 · fix: en un estudio, una sola regla de quién toca la suscripción que paga (COBRO-MP-2)
+
+- **fix(cobro):** cancelar y reactivar el plan de un estudio lo hacen la dueña o quien abrió la suscripción que paga (autorizada o pausada). Sacar a un miembro sólo se frena si su suscripción es la que paga; una pendiente suya se cancela en Mercado Pago al sacarlo. Una pausada de otro miembro frena el checkout. Todos los miembros ven en el perfil la suscripción del estudio.
+- **fix(cobro):** si Mercado Pago no contesta, cancelar, reactivar, pagar y sacar a un miembro contestan 503 sin cambiar nada, a los 15 s de esperarlo (la espera de otro pedido del estudio no cuenta); la recarga da 503 cuando corta el SDK, unos 20 s.
+
+## 2026-11-06 · fix: Mercado Pago lento no frena el servidor y el aviso de pago exige firma (COBRO-MP-3)
+
+- **fix(cobro):** las consultas a Mercado Pago (aviso de pago, checkout, recarga y cancelar) corren en hilos propios, hasta 8 consultas a la vez. Una consulta trabada contesta 503 a los 15 s y deja su lugar, y su hilo sigue hasta que corta el SDK, unos 20 s: un Mercado Pago trabado ya no deja sin hilos al resto del servidor.
+- **fix(cobro):** el aviso de pago acepta 60 avisos firmados por minuto por IP (los sin firma no gastan ese cupo) y sólo atiende avisos con firma válida: sin clave configurada, sin firma (IPN) o con un cuerpo inválido contesta 401 sin cambiar nada. Hay que configurar en Mercado Pago los Webhooks con la clave.
+
+## 2026-11-06 · fix: en un estudio, cancelar o pagar no toca una suscripción que no corresponde (COBRO-MP-2)
+
+- **fix(cobro):** un miembro del estudio sólo cancela el plan si su suscripción es la que paga (autorizada o pausada); con una pendiente propia da 403, y si Mercado Pago no contesta, 503 sin cambiar nada. Al pagar, si mientras se leían o cancelaban las suscripciones viejas una se autorizó, ésa no se cancela y da 409; y si una cancelación falla, las que ya estaban canceladas en Mercado Pago dejan de figurar.
+- **fix(cobro):** al cancelar el plan de un estudio, la suscripción que cobra se cancela última: si falla otra, el plan sigue cobrando como dice el aviso y quien la abrió puede volver a intentarlo.
+
+## 2026-11-06 · fix: una respuesta tardía no escribe en la carga que sigue y regenerar no depende del disco (COBRO-CORTE-1)
+
+- **fix(cobro):** en v2, guardar en el historial y aprender el catálogo usan el cliente y el proveedor de la carga que pidió el TXT. Lo que se pide mientras otra generación espera se genera cuando ésa vuelve, y el botón ya no queda trabado. Regenerar un archivo ya entregado guarda una copia en vez de un enlace, así funciona en discos que no admiten enlaces. Si se elige el cliente mientras la generación espera, se guarda en ése, y un doble clic en «Reintentar» genera una sola vez.
+
+## 2026-11-06 · fix: el checkout de una organización no cancela nada si hay una suscripción autorizada (COBRO-MP-2)
+
+- **fix(cobro):** antes de abrir una suscripción nueva se mira el estado de todas las de la organización; si una está autorizada se frena sin haber cancelado las pendientes. Si una no se puede cancelar, las que sí se cancelaron dejan de figurar como abiertas.
 
 ## 2026-11-06 · fix: el token de reset vuelve en la respuesta sólo en el entorno de prueba (RESET-2)
 
@@ -181,6 +254,28 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - Contar intentos fallidos usa la conexión del pedido, y revisar la sesión devuelve la suya antes de la ruta: muchos pedidos a la vez, con la clave mala o con sesión, ya no dejan a los demás sin entrar.
 - Los tokens se firman y se abren con la misma clave, y uno sin vencimiento no vale.
 
+## 2026-11-05 · fix: lo que no se entrega no se cobra (COBRO-CORTE-1)
+
+- **fix(cobro):** generar cuenta la operación sólo si el archivo quedó escrito. Una respuesta que llega cuando ya empezó otra carga no le pone su operación a la nueva y, en v2, se guarda en el cliente de su carga. Un id de operación con caracteres que la base no guarda es una operación nueva, no un error. Borrar un cliente espera a la generación en curso de la cuenta, y su aviso dice que las operaciones quedan «Sin cliente».
+- **fix(cobro):** regenerar con una falla deja entero el archivo ya entregado. En v2, la respuesta tardía no marca «Listo» la carga nueva. Un guardado que esperaba al borrado de su cliente da 404.
+- **fix(cobro):** si falla también deshacer la base, el archivo ya entregado vuelve igual. En v2, una carga nueva que llega a «Listo» mientras la anterior espera genera cuando ésa vuelve, y no hereda su error.
+
+## 2026-11-05 · fix: cancelar y reactivar en una organización actúan sobre el plan del estudio (COBRO-MP-2)
+
+- **fix(cobro):** en una organización, cancelar cancela la suscripción del estudio y el acceso sigue hasta el fin del período; sólo la dueña o quien abrió la suscripción puede cancelar. Reactivar mira el plan del estudio. No se saca del estudio a quien abrió la suscripción.
+
+## 2026-11-05 · fix: la operación se reconoce por su id, no por el número de factura (COBRO-CORTE-1)
+
+- **fix(cobro):** generar y guardar devuelven el id de la operación y la pantalla lo manda de vuelta: regenerar el mismo contenido no gasta una de las 10, la 11.ª distinta es una operación nueva y contada, dos operaciones con la misma factura no comparten fila y borrar el cliente ya no recuenta. Guardar en otro cliente mueve la operación. El 402 siempre dice su razón, una cuenta con el plan viejo «trial» genera, y las rutas que cuentan piden sesión también en pruebas. Las regeneraciones que le quedaban a una operación no pasan al período siguiente, dos operaciones manuales no comparten el nombre del archivo y, en la importación, otra fecha de factura es otro resultado.
+
+## 2026-11-05 · fix: un miembro de una organización no abre una segunda suscripción (COBRO-MP-2)
+
+- **fix(cobro):** el checkout mira también las suscripciones que abrieron los otros miembros de la organización: si una está autorizada da 409 y dice quién la abrió; si está pendiente o pausada, la cancela antes de crear la nueva. Dos miembros pagando a la vez no dejan dos suscripciones vivas.
+
+## 2026-11-05 · fix: guardar la misma factura en otro cliente no le saca la operación al primero (COBRO-CORTE-1)
+
+- **fix(cobro):** guardar un MARIA ya generado completa la operación sólo si no tiene cliente o es del mismo; si es de otro cliente, se cuenta y se crea una nueva. El aviso de una cuenta cancelada que todavía tiene período y llegó al tope se titula «Llegaste al tope de tu plan».
+
 ## 2026-11-05 · fix: el catálogo del proveedor guarda entero el origen y el nombre del proveedor (CATALOGO-LARGO-2)
 
 - Un origen como «TAIWAN» o un proveedor de más de 200 caracteres se guardan enteros en el catálogo, al cambiar un producto y al confirmar un NCM; antes, en Postgres, daban 500 o «guardado» sin guardar.
@@ -202,6 +297,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - Al generar, guardar la operación y aprender el catálogo van a la vez: si el catálogo no responde, la operación igual queda guardada y su aviso no se tapa. Red caída o plan vencido al confirmar un NCM o aprender el catálogo avisan como un error del servidor.
 - El id del proveedor se corta en 60 caracteres. Reintentar después de crear un cliente no crea otro. «Guardamos este NCM» sólo aparece si se guardó.
+
 
 ## 2026-11-05 · feat: se retira la interfaz vieja (v1)
 
@@ -452,7 +548,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-28 · feat: copia de la base que se restaura y se compara antes de darla por buena (BACKUP-1a)
 
-- **feat(datos):** `scripts/datos/copia_base.py` saca la copia de Postgres (`pg_dump -Fc`), la restaura en una base descartable y compara, tabla por tabla, la cantidad de filas y un resumen del contenido; si no da igual, sale con error y no la marca como verificada.
+- **feat(datos):** `scripts/datos/copia_base.py` saca la copia de Postgres (`pg_dump -Fc`), la restaura en una base descartable y compara, tabla por tabla, la cantidad de filas y un resumen del contenido (no índices, restricciones, secuencias ni objetos grandes); si no da igual, sale con error y no la marca como verificada.
 - `enviar` lleva sólo una copia verificada y sin cambios a una carpeta local de prueba. Adónde va de verdad y cuándo corre lo define Emi; todavía no corre en producción.
 
 ## 2026-10-28 · fix: los roles guardados como texto no dan administrador por una parte (AISLAMIENTO-2)

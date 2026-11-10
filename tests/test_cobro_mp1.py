@@ -8,11 +8,11 @@ Pasos 1 y 3 del plan (PARA-PM.md):
 
 Mercado Pago simulado: ni el SDK real ni internet.
 """
-import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from tests.mp_firma import aviso_firmado
 from tests.test_prelaunch_block2 import _get_user, _register, _set_user, _unique, client  # noqa: F401
 
 PAGOS: dict = {}
@@ -48,10 +48,10 @@ def _pago(pid: str, referencia: str, monto: float = 45000.0) -> str:
     return pid
 
 
-def _aviso_ipn(client, pid: str):
-    """El aviso IPN, sin firma: cualquiera lo puede mandar sin sesión."""
+def _aviso_pago(client, pid: str):
+    """El aviso de pago firmado, sin sesión, como lo manda Mercado Pago."""
     client.cookies.clear()
-    return client.post(f"/api/payments/webhook?topic=payment&id={pid}")
+    return client.post("/api/payments/webhook", **aviso_firmado("payment", pid, "secreto-de-prueba"))
 
 
 def _fin(usuario: dict) -> datetime:
@@ -68,13 +68,13 @@ def test_alternar_dos_pagos_viejos_no_renueva(client):
     _register(client, usuario)
     a = _pago(f"pa-{usuario}", f"{usuario}:premium")
     b = _pago(f"pb-{usuario}", f"{usuario}:premium")
-    assert _aviso_ipn(client, a).status_code == 200
-    assert _aviso_ipn(client, b).status_code == 200
+    assert _aviso_pago(client, a).status_code == 200
+    assert _aviso_pago(client, b).status_code == 200
 
     vencida = datetime.now(timezone.utc) - timedelta(days=40)
     _set_user(usuario, billing_status="past_due", trial_ends_at=vencida, ops_used_this_period=999)
     for pid in (a, b, a, b):
-        r = _aviso_ipn(client, pid)
+        r = _aviso_pago(client, pid)
         assert r.status_code == 200, r.text[:300]
     despues = _get_user(usuario)
     assert despues["billing_status"] == "past_due", despues
@@ -87,10 +87,10 @@ def test_una_recarga_reenviada_no_suma_operaciones(client):
     t = _pago(f"pt-{usuario}", f"{usuario}:topup", monto=10000.0)
     u = _pago(f"pu-{usuario}", f"{usuario}:premium")
     for pid in (t, u):
-        assert _aviso_ipn(client, pid).status_code == 200
+        assert _aviso_pago(client, pid).status_code == 200
     extra = _get_user(usuario)["extra_ops_remaining"]
     for pid in (t, u, t):
-        assert _aviso_ipn(client, pid).status_code == 200
+        assert _aviso_pago(client, pid).status_code == 200
     assert _get_user(usuario)["extra_ops_remaining"] == extra
 
 
@@ -103,7 +103,7 @@ def test_el_pago_aplicado_queda_registrado(client):
     usuario = _unique("mp1_reg")
     _register(client, usuario)
     pid = _pago(f"pr-{usuario}", f"{usuario}:premium")
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
 
     async def _leer():
         async with AsyncSessionLocal() as db:
@@ -120,7 +120,7 @@ def test_pagar_con_la_cuenta_activa_extiende_desde_el_fin(client):
     fin_actual = datetime.now(timezone.utc) + timedelta(days=20)
     _set_user(usuario, billing_status="active", plan="premium", trial_ends_at=fin_actual)
     pid = _pago(f"pe-{usuario}", f"{usuario}:premium")
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     nuevo = _fin(_get_user(usuario))
     assert abs((nuevo - (fin_actual + timedelta(days=30))).total_seconds()) < 120, nuevo
 
@@ -130,7 +130,7 @@ def test_pagar_con_la_cuenta_vencida_cuenta_desde_hoy(client):
     _register(client, usuario)
     _set_user(usuario, billing_status="past_due", trial_ends_at=datetime.now(timezone.utc) - timedelta(days=10))
     pid = _pago(f"pv-{usuario}", f"{usuario}:premium")
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     despues = _get_user(usuario)
     assert despues["billing_status"] == "active"
     falta = _fin(despues) - datetime.now(timezone.utc)
@@ -182,12 +182,12 @@ def test_organizacion_alternar_dos_pagos_viejos_no_renueva(client):
     b = _pago(f"pob-{usuario}", f"org:{org_id}:premium")
     t = _pago(f"pot-{usuario}", f"org:{org_id}:topup", monto=10000.0)
     for pid in (a, b, t):
-        assert _aviso_ipn(client, pid).status_code == 200
+        assert _aviso_pago(client, pid).status_code == 200
     vencida = datetime.now(timezone.utc) - timedelta(days=40)
     extra = _leer_org(org_id, billing_status="past_due", trial_ends_at=vencida,
                       ops_used_this_period=999)["extra_ops_remaining"]
     for pid in (a, b, t, a, b, t):
-        assert _aviso_ipn(client, pid).status_code == 200
+        assert _aviso_pago(client, pid).status_code == 200
     despues = _leer_org(org_id)
     assert despues["billing_status"] == "past_due", despues
     assert despues["ops_used_this_period"] == 999, despues
@@ -200,7 +200,7 @@ def test_organizacion_pagar_activa_extiende_desde_el_fin(client):
     fin_actual = datetime.now(timezone.utc) + timedelta(days=20)
     org_id = _org(usuario, billing_status="active", plan="premium", trial_ends_at=fin_actual)
     pid = _pago(f"poe-{usuario}", f"org:{org_id}:premium")
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     nuevo = _fin(_leer_org(org_id))
     assert abs((nuevo - (fin_actual + timedelta(days=30))).total_seconds()) < 120, nuevo
 
@@ -250,7 +250,7 @@ def test_un_plan_pagado_de_menos_no_se_aplica_y_queda_rechazado(client):
     _register(client, usuario)
     _vencida(usuario)
     pid = _pago(f"pm-{usuario}", f"{usuario}:premium", monto=30000.0)
-    r = _aviso_ipn(client, pid)
+    r = _aviso_pago(client, pid)
     assert r.status_code == 200, r.text
     assert "rechazado" in r.json().get("skipped", ""), r.json()
     assert _get_user(usuario)["billing_status"] == "past_due"
@@ -258,7 +258,7 @@ def test_un_plan_pagado_de_menos_no_se_aplica_y_queda_rechazado(client):
     assert fila["estado"] == "rechazado" and fila["monto_esperado"] == 45000.0, fila
     assert "30000" in fila["motivo"] and "45000" in fila["motivo"], fila
     # reenviarlo no lo vuelve a evaluar ni lo aplica
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert _get_user(usuario)["billing_status"] == "past_due"
 
 
@@ -268,7 +268,7 @@ def test_un_plan_en_otra_moneda_no_se_aplica(client):
     _vencida(usuario)
     pid = _pago(f"pu-{usuario}", f"{usuario}:premium", monto=45000.0)
     PAGOS[pid]["currency_id"] = "USD"
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert _get_user(usuario)["billing_status"] == "past_due"
     assert _leer_pago(pid)["estado"] == "rechazado"
 
@@ -278,7 +278,7 @@ def test_una_recarga_pagada_de_menos_no_suma(client):
     _register(client, usuario)
     antes = _get_user(usuario)["extra_ops_remaining"] or 0
     pid = _pago(f"pr-{usuario}", f"{usuario}:topup", monto=5000.0)
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert (_get_user(usuario)["extra_ops_remaining"] or 0) == antes
     assert _leer_pago(pid)["estado"] == "rechazado"
 
@@ -292,7 +292,7 @@ def test_un_link_viejo_sin_precio_se_compara_con_el_precio_de_hoy(client, monto,
     _vencida(usuario)
     pid = _pago(f"pv-{usuario}", f"{usuario}:premium", monto=monto)
     assert "metadata" not in PAGOS[pid]
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert (_get_user(usuario)["billing_status"] == "active") is aplica
 
 
@@ -303,7 +303,7 @@ def test_un_link_con_el_precio_de_cuando_se_armo_se_respeta(client):
     _vencida(usuario)
     pid = _pago(f"pl-{usuario}", f"{usuario}:premium", monto=40000.0)
     PAGOS[pid]["metadata"] = {"precio_esperado": 40000.0}
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert _get_user(usuario)["billing_status"] == "active"
     assert _leer_pago(pid)["estado"] == "aplicado"
 
@@ -353,7 +353,7 @@ def test_una_suscripcion_se_compara_con_su_monto_en_mercado_pago(client):
     _register(client, usuario)
     _vencida(usuario)
     pid = _pago_de_suscripcion(usuario, 30000.0)
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert _get_user(usuario)["billing_status"] == "active"
     assert _leer_pago(pid)["monto_esperado"] == 30000.0
 
@@ -363,7 +363,7 @@ def test_una_suscripcion_pagada_de_menos_no_se_aplica(client):
     _register(client, usuario)
     _vencida(usuario)
     pid = _pago_de_suscripcion(usuario, 20000.0)
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert _get_user(usuario)["billing_status"] == "past_due"
     assert _leer_pago(pid)["estado"] == "rechazado"
 
@@ -373,7 +373,7 @@ def test_la_suscripcion_de_otra_cuenta_no_vale(client):
     _register(client, usuario)
     _vencida(usuario)
     pid = _pago_de_suscripcion(usuario, 30000.0, ref_suscripcion="otro_usuario:premium")
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert _get_user(usuario)["billing_status"] == "past_due"
     assert _leer_pago(pid)["estado"] == "rechazado"
 
@@ -385,22 +385,22 @@ def test_si_no_se_puede_leer_la_suscripcion_mercado_pago_reintenta(client):
     _vencida(usuario)
     pid = _pago_de_suscripcion(usuario, 30000.0)
     SUSCRIPCIONES.clear()
-    assert _aviso_ipn(client, pid).status_code == 503
+    assert _aviso_pago(client, pid).status_code == 503
     assert _leer_pago(pid) == {}
     assert _get_user(usuario)["billing_status"] == "past_due"
 
 
-def test_emi_ve_los_pagos_rechazados_y_un_usuario_comun_no(client, monkeypatch):
+def test_emi_ve_los_pagos_rechazados_y_un_usuario_comun_no(client):
     """D29, condición 3: un pago rechazado es un cliente que pagó y no
     recibió nada; el admin lo ve en el panel."""
     usuario = _unique("mp2_ve")
     _register(client, usuario)
     pid = _pago(f"pa-{usuario}", f"{usuario}:premium", monto=100.0)
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
 
     admin = _unique("mp2_admin")
-    monkeypatch.setenv("ADMIN_USERNAMES", admin)
     _register(client, admin)
+    _set_user(admin, roles=["admin"])
     r = client.get("/api/dev/pagos-mp-rechazados")
     assert r.status_code == 200, r.text
     fila = next(p for p in r.json()["pagos"] if p["payment_id"] == pid)
@@ -450,8 +450,9 @@ def test_dos_avisos_del_mismo_pago_a_la_vez_se_aplican_una_sola_vez(client, monk
     async def _dos_a_la_vez():
         transporte = httpx.ASGITransport(app=main_mod.app)
         async with httpx.AsyncClient(transport=transporte, base_url="http://test") as c:
-            url = f"/api/payments/webhook?topic=payment&id={pid}"
-            return await asyncio.gather(c.post(url), c.post(url))
+            aviso = aviso_firmado("payment", pid, "secreto-de-prueba")
+            url = "/api/payments/webhook"
+            return await asyncio.gather(c.post(url, **aviso), c.post(url, **aviso))
 
     respuestas = asyncio.new_event_loop().run_until_complete(_dos_a_la_vez())
     assert pasaron == ["aplicado", "aplicado"], pasaron  # los dos pasaron el «¿ya está?»
@@ -504,30 +505,17 @@ def _renovacion(usuario: str, monto: float = 30000.0, estado_pago: str = "approv
 
 def _aviso_cobro(client, cobro: str):
     client.cookies.clear()
-    return client.post(f"/api/payments/webhook?topic=subscription_authorized_payment&id={cobro}")
-
-
-def _aviso_cobro_firmado(client, cobro: str):
-    import hashlib
-    import hmac
-    client.cookies.clear()
-    ts, req_id = "1700000000", "req-cobro"
-    v1 = hmac.new(b"secreto-de-prueba", f"id:{cobro};request-id:{req_id};ts:{ts};".encode(),
-                  hashlib.sha256).hexdigest()
     return client.post("/api/payments/webhook",
-                       content=json.dumps({"type": "subscription_authorized_payment", "data": {"id": cobro}}),
-                       headers={"x-signature": f"ts={ts},v1={v1}", "x-request-id": req_id,
-                                "content-type": "application/json"})
+                       **aviso_firmado("subscription_authorized_payment", cobro, "secreto-de-prueba"))
 
 
-@pytest.mark.parametrize("aviso", [_aviso_cobro, _aviso_cobro_firmado], ids=["ipn", "firmado"])
-def test_una_renovacion_extiende_el_periodo_una_sola_vez(client, aviso):
+def test_una_renovacion_extiende_el_periodo_una_sola_vez(client):
     usuario = _unique("mp4_ren")
     _register(client, usuario)
     fin_actual = datetime.now(timezone.utc) + timedelta(days=2)
     _set_user(usuario, billing_status="active", plan="premium", trial_ends_at=fin_actual)
     cobro, pid = _renovacion(usuario)
-    r = aviso(client, cobro)
+    r = _aviso_cobro(client, cobro)
     assert r.status_code == 200 and r.json().get("skipped") is None, r.text
     nuevo = _fin(_get_user(usuario))
     assert abs((nuevo - (fin_actual + timedelta(days=30))).total_seconds()) < 120, nuevo
@@ -535,7 +523,7 @@ def test_una_renovacion_extiende_el_periodo_una_sola_vez(client, aviso):
     # el mismo cobro otra vez, y su pago avisado como pago: no suma de nuevo
     PAGOS[pid]["metadata"] = {"preapproval_id": f"pre-{usuario}"}
     PAGOS[pid]["external_reference"] = f"{usuario}:premium"
-    for r in (aviso(client, cobro), _aviso_ipn(client, pid)):
+    for r in (_aviso_cobro(client, cobro), _aviso_pago(client, pid)):
         assert r.status_code == 200, r.text
     assert abs((_fin(_get_user(usuario)) - nuevo).total_seconds()) < 1
 
@@ -780,14 +768,6 @@ def _pago_numerico(referencia: str, monto: float = 45000.0) -> str:
     return pid
 
 
-def _aviso_ipn_tal_cual(client, pid: str):
-    """El aviso IPN con el id tal como lo escribe quien lo manda: escapado
-    entero, para que el servidor lo reciba con «%», «#» o «?» adentro."""
-    from urllib.parse import quote
-    client.cookies.clear()
-    return client.post(f"/api/payments/webhook?topic=payment&id={quote(pid, safe='')}")
-
-
 VARIANTES = {
     "fragmento": lambda p: f"{p}#a",
     "consulta": lambda p: f"{p}?a=1",
@@ -806,10 +786,10 @@ def test_el_mismo_pago_escrito_de_otra_forma_no_se_aplica_otra_vez(client, mp_co
     plan = _pago_numerico(f"{usuario}:premium")
     recarga = _pago_numerico(f"{usuario}:topup", monto=10000.0)
     for pid in (plan, recarga):
-        assert _aviso_ipn_tal_cual(client, pid).status_code == 200
+        assert _aviso_pago(client, pid).status_code == 200
     antes = _get_user(usuario)
     for pid in (plan, recarga):
-        r = _aviso_ipn_tal_cual(client, VARIANTES[variante](pid))
+        r = _aviso_pago(client, VARIANTES[variante](pid))
         assert r.status_code < 500, r.text[:300]
     despues = _get_user(usuario)
     assert _fin(despues) == _fin(antes), (antes["trial_ends_at"], despues["trial_ends_at"])
@@ -819,7 +799,7 @@ def test_el_mismo_pago_escrito_de_otra_forma_no_se_aplica_otra_vez(client, mp_co
 def test_un_id_con_barras_no_llega_a_mercado_pago(client, mp_como_mp):
     """El aviso IPN no viene firmado: su id no puede cambiar la ruta que se
     le pide a Mercado Pago (llegaba a /preapproval/ABC)."""
-    r = _aviso_ipn_tal_cual(client, "../../preapproval/ABC")
+    r = _aviso_pago(client, "../../preapproval/ABC")
     assert r.status_code == 400, r.text[:300]
     assert PEDIDOS == []
 
@@ -840,7 +820,7 @@ def test_el_ultimo_pago_de_antes_del_registro_no_se_aplica_otra_vez(client, cuen
         org_id = _org(usuario, billing_status="active", plan="premium", trial_ends_at=fin, last_payment_id=pid)
         _pago(pid, f"org:{org_id}:premium")
         leer = lambda: _leer_org(org_id)  # noqa: E731
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert abs((_fin(leer()) - fin).total_seconds()) < 2, leer()
 
 
@@ -872,7 +852,7 @@ def test_un_pago_viejo_que_no_es_el_ultimo_no_se_aplica_otra_vez(client, cuenta)
         _pago(pid, ref)
         PAGOS[pid]["date_approved"] = APROBADO_ANTES_DEL_REGISTRO
     for pid in (viejo, ultimo, viejo):
-        r = _aviso_ipn(client, pid)
+        r = _aviso_pago(client, pid)
         assert r.status_code == 200, r.text[:300]
     despues = leer()
     assert despues["billing_status"] == "past_due", f"un pago viejo reenviado se volvió a aplicar: {despues}"
@@ -887,7 +867,7 @@ def test_un_pago_viejo_queda_a_la_vista_del_admin(client):
     _register(client, usuario)
     pid = _pago(f"pvis-{usuario}", f"{usuario}:premium")
     PAGOS[pid]["date_approved"] = APROBADO_ANTES_DEL_REGISTRO
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     fila = _leer_pago(pid)
     assert fila.get("estado") == "rechazado", f"el pago viejo no quedó a la vista: {fila}"
     assert "antes de que empezara el registro" in (fila.get("motivo") or ""), fila
@@ -908,7 +888,7 @@ def test_un_pago_sin_fecha_de_aprobacion_legible_no_se_aplica(client, fecha):
         PAGOS[pid]["date_approved"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     else:
         PAGOS[pid]["date_approved"] = fecha
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert _get_user(usuario)["billing_status"] == "past_due", "se aplicó un pago sin fecha de aprobación legible"
     fila = _leer_pago(pid)
     assert (fila.get("estado"), fila.get("motivo")) == ("rechazado", "sin fecha de aprobación legible"), fila
@@ -920,7 +900,7 @@ def test_un_pago_nuevo_se_aplica(client):
     _register(client, usuario)
     _vencida(usuario)
     pid = _pago(f"pn-{usuario}", f"{usuario}:premium")
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert _get_user(usuario)["billing_status"] == "active"
 
 

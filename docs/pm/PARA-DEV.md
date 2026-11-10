@@ -3,29 +3,85 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Tarea activa: NOMBRES-1 (sí de Emi, 2026-11-08 17:05 UTC)
+## INTEGRAR-1: aceptada sobre `4555f7c4` e integrada (2026-11-10 13:45 UTC)
 
-Emi dio 12 h más: hasta el **2026-11-09 05:00 UTC**. Ahí cortás como hoy:
-terminás el paso, commit y push, anotás dónde quedaste y frenás.
+Evidencia: `docs/pm/REPRODUCCION-INTEGRAR-1-2026-11-10.md`. Suite igual a la
+tuya (5907 passed), ataques 47/0, migraciones con datos viejos y doble
+arranque limpios, cuatro sabotajes míos en rojo y el g de `cobro_mp1` con el
+patrón al día en rojo. Integré exactamente `4555f7c4`. No es un SHA para
+publicar: los dos adversarios encontraron cosas que se arreglan en piezas de
+MARIA (el link que sobrevive al pase de cliente por `operacion_id`, que es tu
+fila 3, y el arnés de pantalla del 402, que quedó con el contrato viejo).
 
-**Qué tiene que pasar** (sale de tu D127 b): nadie puede registrarse, ni
-cambiar su nombre, con uno que ya existe escrito con otras mayúsculas
-(`emi` existe → `Emi`, `EMI`, `eMi` dan «Usuario ya existe», igual que hoy
-el nombre exacto). Vale para todas las cuentas, no sólo las de
-`ADMIN_USERNAMES`.
+- **D144:** contestada en D143 (a).
+- **D145 (a):** sí. Lo hace MARIA en sus arneses; `abuso1` sigue
+  registrando desde una sola IP, porque eso es lo que prueba.
+- **D146 (b):** a la cola de limpieza hasta que CONEXIONES-1 B mida bcrypt.
+- **D147 (a):** queda por worker, anotado.
+- **D148:** confirmada. El VERDE de `limpiar` lo explicó MARIA en
+  PRUEBA-LIMPIAR-1: cuando corre, el pedido no tiene conexión tomada.
+- **D149 (a):** poné al día tus patrones: `cobro_mp1` g, `despacho1d` y
+  `estudio1`. `despacho1c` lo hace MARIA, junto con el arnés del 402, para
+  no tocar los dos el mismo archivo. MARIA, también los suyos.
+- **El ataque sin Postgres:** que falle en vez de seguir sobre SQLite. Va con
+  D149, en el mismo commit de arnés.
+- **Filas 4 y 7 del code-review del merge:** a la cola de limpieza; ya
+  estaban en sus ramas antes de unir. La fila 3 la cierra
+  PRESUPUESTO-CLIENTE-1 sobre la unión.
+- **El smoke:** lo pone al día MARIA con ABUSO-1.
+- **Tu rango de D: D180 a D189.**
 
-**Sin mirar producción:** no tenés acceso y no hace falta. Lo que ya existe
-queda como está: si en la base hay dos cuentas que difieren sólo en
-mayúsculas, las dos siguen entrando con su nombre exacto, el arranque no
-cambia a quién promueve y nada se migra ni se borra. Por eso no va un índice
-único nuevo; si creés que hace falta, es una D.
+## Tarea activa: D149 (a), mientras reviso BORRADOR-1 (2026-11-10 13:45 UTC)
 
-**Prueba:** un caso con la familia como datos (otras mayúsculas, la cuenta
-de la lista y una que no está, el cambio de nombre si existe esa ruta) que
-dé rojo con el chequeo de hoy; otro con dos cuentas viejas que difieren en
-mayúsculas, sembradas directo en la base, que siguen entrando cada una con
-su clave. En SQLite y en Postgres 16 descartable. Es permisos: revisión
-fuerte (§3), con guion de sabotaje propio. Próxima D libre: D128.
+BORRADOR-1 llegó en `22163cec` (base `4555f7c4`, D170–D173): la reviso
+después de PRESUPUESTO-CLIENTE-1 de MARIA. Si los arneses de navegador
+terminan, sumá su salida al informe. Mientras tanto:
+
+1. D149 (a) y el ataque sin Postgres: sólo arnés, un commit, cada patrón
+   nuevo con su rojo mostrado una vez.
+2. Después, CONEXIONES-1 parte B sobre lo integrado (cierra D134).
+
+## NOMBRES-1: aceptada sobre `1960a9a` (2026-11-08 PM)
+
+Evidencia: `docs/pm/REPRODUCCION-NOMBRES-1-2026-11-08.md`, vuelta 2. Igual a
+tu informe: `nombres1.sh` 40 passed y 7 ROJO, falla 0; en PG 16 real 15
+passed. Mi sabotaje con `ilike` + `.first()` también da rojo, en PG y en
+SQLite. Tenías razón con lo de SQLite: corregí el acta y el riesgo va a la
+cola de limpieza. No hay D nuevas. La carrera queda como límite conocido; el
+índice sobre `lower(username)` lo veo con Emi.
+
+## CONEXIONES-1, después de D149 (2026-11-08 PM)
+
+Pasa de la cola de MARIA a la tuya, decidido por la PM: es de base y de
+servidor, y MARIA tiene cuatro piezas por delante. Está en el roadmap (sí de
+Emi del 28/10). El origen es la D37 de MARIA:
+`git show 1f648c3:docs/pm/PARA-DEV-2.md`, y la D46 en `PARA-DEV-2.md`.
+
+- Medí si un `await session.close()` cancelado (el `finally` de
+  `get_async_session`, `database/connection.py`) deja conexiones tomadas:
+  gunicorn con la misma configuración del `Dockerfile` y Postgres 16
+  descartable, muchas respuestas 401 y algunas normales, mirando
+  `pg_stat_activity` y el pool.
+- Condiciones de la D46: esperás a que `api_logs` tenga todos los pedidos
+  (no tiempos fijos); un control que cancele el `close` a propósito y tenga
+  que dar rojo; cortes en vuelo de verdad (cliente que corta a mitad).
+- También entran la conexión tomada durante bcrypt, Gemini en
+  `/api/ncm/sugerir` (con la clave vacía y sin red) y la subida pública de
+  PDF (D74 de MARIA).
+- Si quedan conexiones tomadas: arreglo con una prueba roja antes y verde
+  después. Si no quedan: producto sin cambio, el informe trae los números y
+  el aviso de las pruebas sigue en riesgos.
+- Toca todas las rutas: revisión fuerte, adversario y `/security-review` si
+  hay producto.
+- Corte, como antes: el **2026-11-09 a las 05:00 UTC**. Si no llegás,
+  commit, push y anotá dónde quedaste.
+
+**D134: (c), decidido por la PM.** Medí A y B en las dos ramas. En MARIA,
+sobre `40423be` (EMAIL-1, su última aceptada), no sobre su punta, que trae
+AVISOS-2 sin revisar. Un arreglo de A (middlewares o `get_async_session`, que
+son iguales) va en tu rama. Un arreglo de B (`dependencies.py` o rutas) espera
+a que yo integre la rama de MARIA: hasta entonces, el informe trae los
+números y el arreglo propuesto, sin commitearlo.
 
 ## PERMISOS-3: aceptada sobre `9428e00`, sin integrar (2026-11-08 PM)
 

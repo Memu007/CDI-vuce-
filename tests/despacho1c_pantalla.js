@@ -48,14 +48,13 @@ function armar(fuente, extraCDI) {
   for (const d of DESTINOS) respuestas[d] = conFlag(respuestas[d]);
   if ('catalogo' in opciones) respuestas['/productos'] = opciones.catalogo;
   let clientesNuevos = 0;
-  let cliente = null;
   const CDI = Object.assign({
     state: { items: [], operacion: {} },
     registerScreen: (n, h) => { handlers[n] = h; },
     escapeHtml: v => String(v ?? ''), formatNcm: v => String(v ?? ''), formatMoney: v => String(v),
     track() {}, goTo() {}, hint: clave => hints.push(clave),
     toast: (titulo, detalle, tipo) => toasts.push({ titulo, detalle, tipo }),
-    getClienteActivo: () => cliente, setClienteActivo: c => { cliente = c; },
+    getClienteActivo: () => (CDI.state && CDI.state.clienteActivo) || null, setClienteActivo: c => { CDI.state.clienteActivo = c || null; },
     api: async (url, opciones) => {
       llamadas.push(url); enCurso++;
       if (url.endsWith('/operaciones')) operaciones.push({ url, resumen: JSON.parse(opciones.body).resumen });
@@ -98,7 +97,7 @@ function armar(fuente, extraCDI) {
   caja.children['[data-client-success-title]'] = [new Node()];
   caja.children['[data-client-success-text]'] = [new Node()];
   for (const fn of events.DOMContentLoaded || []) fn();
-  return { CDI, node, handlers, toasts, llamadas, operaciones, hints, enCurso: () => enCurso, ponerCliente: c => { cliente = c; } };
+  return { CDI, node, handlers, toasts, llamadas, operaciones, hints, enCurso: () => enCurso, ponerCliente: c => { CDI.state.clienteActivo = c || null; } };
 }
 
 // Sin red real todo sigue en microtareas, y setImmediate corre recién con esa cola vacía:
@@ -156,10 +155,11 @@ const escenarios = {
   },
   // Listo con cliente: generar el TXT anda y armar la operación lanza antes de mandarla.
   'listo-no-arma': async () => {
+    // Los valores se leen antes de pedir; la foto que usa la operación lanza al copiarse.
     let lecturas = 0;
     const app = armar('finalize.js', { despachante: { valores() {
-      if (++lecturas > 1) throw new Error('falla sintética');
-      return {};
+      if (++lecturas > 1) return {};
+      return { get banco_bcra() { throw new Error('falla sintética'); } };
     } } });
     app.ponerCliente({ id: 7, nombre: 'Cliente Sintético' });
     app.CDI.state.items = [Object.assign({}, ITEM, { pieza: '9403.60.00.000 A' })];

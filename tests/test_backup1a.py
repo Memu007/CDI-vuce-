@@ -12,9 +12,11 @@ import hashlib
 import json
 import os
 import secrets
+import signal
 import stat
 import subprocess
 import sys
+import time
 from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
 
@@ -140,7 +142,7 @@ def origen_icu():
     sql(PG_URL, f'DROP DATABASE IF EXISTS "{nombre}" WITH (FORCE)')
 
 
-def correr(*args, origen=None, cwd=None, **env_extra):
+def _entorno(origen, env_extra) -> dict:
     env = {k: v for k, v in os.environ.items()
            if not k.startswith(("COPIA_", "PG")) and k != "BACKUP1A_PG_URL"}
     env["COPIA_PG_BIN"] = PG_BIN
@@ -148,8 +150,12 @@ def correr(*args, origen=None, cwd=None, **env_extra):
         env["COPIA_ORIGEN_URL"] = _url_de(origen)
     env["COPIA_PRUEBA_URL"] = PG_URL
     env.update(env_extra)
-    return subprocess.run([sys.executable, str(SCRIPT), *args], env=env, capture_output=True,
-                          text=True, timeout=300, cwd=cwd)
+    return env
+
+
+def correr(*args, origen=None, cwd=None, **env_extra):
+    return subprocess.run([sys.executable, str(SCRIPT), *args], env=_entorno(origen, env_extra),
+                          capture_output=True, text=True, timeout=300, cwd=cwd, umask=0o022)
 
 
 def volcar_de_nuevo(origen: str, archivo: Path) -> None:
@@ -263,6 +269,40 @@ def test_una_copia_cortada_a_la_mitad_da_error(origen, tmp_path):
     assert r.returncode == 1 and "no está verificada" in r.stderr, r.stdout + r.stderr
 
 
+@pytest.mark.parametrize("tablas, dice", [
+    ([], "la copia está vacía: 0 tablas"),
+    (["CREATE TABLE vacia (x int)", "CREATE TABLE otra_vacia (x int)"], "la copia está vacía: 2 tablas, 0 filas"),
+])
+def test_una_copia_vacia_da_error(tmp_path, tablas, dice):
+    """Una dirección equivocada o una base recién creada no dejan una copia
+    verificada."""
+    nombre = "b1a_vacia_" + secrets.token_hex(6)
+    sql(PG_URL, f'CREATE DATABASE "{nombre}" TEMPLATE template0')
+    try:
+        if tablas:
+            sql(_url_de(nombre), *tablas)
+        archivo = tmp_path / "copia.dump"
+        # La segunda corrida, con el mismo nombre, no choca con restos de la primera.
+        for vuelta in (1, 2):
+            r = correr("copiar", str(archivo), origen=nombre)
+            assert r.returncode == 1 and dice in r.stderr, f"vuelta {vuelta}: {r.stdout + r.stderr}"
+            assert list(tmp_path.iterdir()) == [], f"vuelta {vuelta}: quedó algo"
+    finally:
+        sql(PG_URL, f'DROP DATABASE IF EXISTS "{nombre}" WITH (FORCE)')
+
+
+def test_otro_esquema_entra_en_la_huella(origen, tmp_path):
+    url = _url_de(origen)
+    sql(url, "CREATE SCHEMA otro", "CREATE TABLE otro.t (x text)", "INSERT INTO otro.t VALUES ('a')")
+    archivo = tmp_path / "copia.dump"
+    _copiar_ok(origen, archivo)
+    sql(url, "UPDATE otro.t SET x = 'b'")
+    volcar_de_nuevo(origen, archivo)
+
+    r = correr("verificar", str(archivo))
+    assert r.returncode == 1 and "otro.t: el contenido no coincide" in r.stderr, r.stdout + r.stderr
+
+
 # ── Una base que se escribe mientras se copia, y la configuración de cada base ─
 
 def _envoltorio(tmp_path: Path) -> Path:
@@ -279,6 +319,11 @@ def _envoltorio(tmp_path: Path) -> Path:
             f'if [ "{nombre}" = pg_dump ] && [ -n "${{B1A_ESCRITURA:-}}" ]; then\n'
             f'  "{PG_BIN}/psql" -X -q "$B1A_ESCRITURA_URL" -c "$B1A_ESCRITURA" || exit 9\n'
             "fi\n"
+            f'if [ "{nombre}" = pg_restore ] && [ -n "${{B1A_RESTORE:-}}" ]; then\n'
+            '  [ "$B1A_RESTORE" = falla ] && exit 1\n'
+            f'  echo $$ > "{tmp_path}/pid.tmp" && mv "{tmp_path}/pid.tmp" "{tmp_path}/pid_pg_restore"\n'
+            "  exec sleep 30\n"
+            "fi\n"
             f'exec "{PG_BIN}/{nombre}" "$@"\n')
         p.chmod(p.stat().st_mode | stat.S_IXUSR)
     return carpeta
@@ -292,6 +337,79 @@ def test_una_escritura_durante_la_copia_no_la_rompe(origen, tmp_path):
     assert sql(_url_de(origen), "SELECT count(*) AS n FROM ncm_cache")[0]["n"] == FILAS - 1, \
         "la escritura no pasó"
     assert huella(archivo)["tablas"]["public.ncm_cache"]["filas"] == FILAS
+
+
+def test_copiar_sale_con_error_si_la_verificacion_falla(origen, tmp_path):
+    """El código de salida es lo que mira quien la programa."""
+    archivo = tmp_path / "copia.dump"
+    r = correr("copiar", str(archivo), origen=origen,
+               COPIA_PG_BIN=str(_envoltorio(tmp_path)), B1A_RESTORE="falla")
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "pg_restore falló (salida 1)" in r.stderr
+    assert not marca(archivo).exists()
+
+
+def _vivo(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return Path(f"/proc/{pid}/stat").read_text().split(")")[-1].split()[0] != "Z"
+    except (ProcessLookupError, FileNotFoundError):
+        return False
+
+
+def _pendiente(pid: int, senal: int) -> bool:
+    campos = dict(linea.split(":\t", 1) for linea in Path(f"/proc/{pid}/status").read_text().splitlines())
+    return any(int(campos[c], 16) >> (senal - 1) & 1 for c in ("SigPnd", "ShdPnd"))
+
+
+def _sin_restos(pid_restore: Path) -> None:
+    assert not _vivo(int(pid_restore.read_text())), "pg_restore quedó corriendo"
+    assert descartables() == []
+
+
+def test_un_corte_no_deja_la_base_ni_el_pg_restore(origen, tmp_path):
+    """Con la base descartable creada y pg_restore colgado: el plazo vencido y un
+    SIGTERM la borran y matan a pg_restore; un SIGHUP ignorado (nohup) no corta."""
+    archivo = tmp_path / "copia.dump"
+    _copiar_ok(origen, archivo)
+    pid_restore = tmp_path / "pid_pg_restore"
+    env = {"COPIA_PG_BIN": str(_envoltorio(tmp_path)), "B1A_RESTORE": "colgado"}
+
+    r = correr("verificar", str(archivo), COPIA_PLAZO_S="3", **env)
+    assert r.returncode == 1 and "no terminó en 3 s" in r.stderr, r.stdout + r.stderr
+    assert pid_restore.exists(), "el plazo venció antes de llegar a pg_restore"
+    _sin_restos(pid_restore)
+
+    pid_restore.unlink()
+    proc = subprocess.Popen([sys.executable, str(SCRIPT), "verificar", str(archivo)],
+                            env=_entorno(None, env), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            preexec_fn=lambda: signal.signal(signal.SIGHUP, signal.SIG_IGN))
+    try:
+        limite = time.monotonic() + 60
+        while not pid_restore.exists() and proc.poll() is None and time.monotonic() < limite:
+            time.sleep(0.1)
+        assert pid_restore.exists(), "no llegó a pg_restore"
+        proc.send_signal(signal.SIGHUP)
+        # Dos señales juntas se atienden en cualquier orden: SIGTERM va cuando SIGHUP ya se entregó.
+        while _pendiente(proc.pid, signal.SIGHUP) and time.monotonic() < limite:
+            time.sleep(0.01)
+        proc.send_signal(signal.SIGTERM)
+        _, err = proc.communicate(timeout=30)
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+    assert proc.returncode == 1 and "se cortó por SIGTERM" in err, err
+    _sin_restos(pid_restore)
+    assert not marca(archivo).exists()
+
+
+@pytest.mark.parametrize("plazo", ["0", "-5", "una hora", "²"])
+def test_un_plazo_que_no_se_entiende_no_copia(origen, tmp_path, plazo):
+    archivo = tmp_path / "copia.dump"
+    r = correr("copiar", str(archivo), origen=origen, COPIA_PLAZO_S=plazo)
+    assert r.returncode == 1 and "COPIA_PLAZO_S tiene que ser" in r.stderr, r.stdout + r.stderr
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_la_clave_no_va_en_los_argumentos(origen, tmp_path):
@@ -392,6 +510,9 @@ def test_enviar_lleva_la_copia_verificada_al_destino(origen, tmp_path):
     assert sorted(p.name for p in destino.iterdir()) == \
         ["copia.dump", "copia.dump.huella.json", "copia.dump.sha256"]
     assert (destino / "copia.dump").read_bytes() == archivo.read_bytes()
+    # La copia es la base entera: sólo la lee quien la sacó, acá y en el destino.
+    for p in [*tmp_path.glob("copia.dump*"), *destino.iterdir()]:
+        assert stat.S_IMODE(p.stat().st_mode) == 0o600, f"{p.name}: {oct(p.stat().st_mode)}"
 
     r = correr("enviar", str(archivo), COPIA_DESTINO=str(destino))
     assert r.returncode == 1 and "ya existe en el destino" in r.stderr, r.stdout + r.stderr

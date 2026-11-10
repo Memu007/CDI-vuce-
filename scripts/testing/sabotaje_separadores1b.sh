@@ -64,11 +64,17 @@ G=proyecto_maria/core/maria_generator.py
 M=proyecto_maria/main.py
 T=tests/test_separadores1b.py
 
+salida="$(correr)"
+if grep -qE "[0-9]+ (failed|error)" <<<"$salida" || ! grep -q "passed" <<<"$salida"; then
+  echo "BASE   en rojo: sin sabotaje los casos no pasan"; tail -15 <<<"$salida"; exit 1
+fi
+echo "BASE   en verde: $(grep -E '[0-9]+ passed' <<<"$salida" | tail -1)"
+
 # --- La factura
 
 # 1. «4500.000» con la coma decimal vuelve a leerse 4500000
 reemplazar $P '        if sin_grupo and decimal != sin_grupo.group(1):' '        if False:'
-caso "factura_multiplica" "FAILED $T::test_en_la_factura_con_la_pista_en_contra_queda_sin_leer"
+caso "factura_multiplica" "FAILED $T::test_en_la_factura_con_grupos_de_espacio_tambien[4 500.000-,]"
 
 # 2. la regla deja sin leer aunque la pista esté a favor
 reemplazar $P '        if sin_grupo and decimal != sin_grupo.group(1):' '        if sin_grupo:'
@@ -81,12 +87,12 @@ caso "factura_grupo_con_espacio" "FAILED $T::test_en_la_factura_con_grupos_de_es
 # --- La pantalla
 
 # 3. «2500.125» se lee 2500,125 sin preguntar
-reemplazar $A "            } else if (/^[1-9]\\d{3,}\$/.test(partes[0]) && partes[1].length === 3) {" "            } else if (false) {"
+reemplazar $A "            } else if (/^\\d{4,}\$/.test(partes[0]) && !/^0+\$/.test(partes[0]) && partes[1].length === 3) {" "            } else if (false) {"
 caso "pantalla_no_pregunta" "FAILED $T::test_en_la_pantalla_se_pregunta"
 
-# 3b. los grupos de la pregunta vuelven a armarse con una regex con lookahead
-reemplazar $A "                const grupos = trozos.join('.');" "                const grupos = partes[0].replace(/\\B(?=(\\d{3})+\$)/g, '.');"
-caso "pantalla_se_traba" "FAILED $T::test_una_cifra_larga_pegada_no_traba_la_pantalla"
+# 3b. una cifra de más de quince dígitos se pregunta en vez de rechazarse
+reemplazar $A "                if (partes[0].replace(/^0+/, '').length + 3 > 15) return { valor: null, error: NO_ES_NUMERO };" ""
+caso "pantalla_sin_tope" "FAILED $T::test_una_cifra_larga_pegada_no_traba_la_pantalla"
 
 # 4. el monto que no se pudo leer viaja como 0
 reemplazar $J '        if (r.error) return String(v).trim();' '        if (r.error) return 0;'

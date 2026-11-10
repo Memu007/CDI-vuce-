@@ -547,3 +547,157 @@ Emi: «Trabaja 12 horas mas». Vuelven las tres rutinas; corte el 2026-11-09 a l
 ### 2026-11-08 17:40 UTC (PM principal)
 
 EMAIL-1 (D45) aceptada sin producto. D132 (a), decidida por la PM bajo «arreglos chicos de seguridad»: RESET-3, tope por cuenta al pedir el reset, después de AVISOS-2. D131 (a) va a Emi: mirar la collation de la base de producción, una consulta de sólo lectura.
+
+### 2026-11-08 18:40 UTC (PM principal)
+
+NOMBRES-1 aceptada sobre `1960a9a` (producto `ccded98`, +4/−2). Escape de la PM en la vuelta 1: el acta decía «PG 16» y corrió en SQLite porque `tests/conftest.py` pisa `DATABASE_URL`; corregido, y el riesgo va a la cola de limpieza. La carrera de altas simultáneas queda como límite conocido; el índice sobre `lower(username)` va con Emi. CONEXIONES-1 pasa de MARIA a la técnica, decidido por la PM (pieza de base y servidor; MARIA tiene cuatro por delante).
+
+### 2026-11-08 19:35 UTC (PM principal)
+
+AVISOS-2 aceptada sobre `4db641b`, sin integrar. D133 (a) y D135 (a) → AVISOS-2b de MARIA antes de RESET-3, con el hueco `IC_4` de mi negativo. D136: la rama de MARIA y la mía (con la técnica) chocan en 5 archivos de producto con conductas aceptadas distintas; la integración es la pieza INTEGRAR-1 de la técnica, antes de CONEXIONES-1, con cada choque de fondo como D para la PM. MARIA no trae mi rama hasta que INTEGRAR-1 esté aceptada.
+
+### 2026-11-08 20:58 UTC (PM principal)
+
+AVISOS-2b aceptada sobre `aa115f4`, sin integrar (D136). D137 (a): el smoke quedó viejo desde ABUSO-1; se ajusta el script a que los eventos sin sesión se rechazan (pieza chica SMOKE-1 de MARIA, después de RESET-3). Escape mío: le mandé a MARIA por mensaje un orden distinto del canal; manda el canal.
+
+### 2026-11-08 21:40 UTC (PM principal)
+
+RESET-3 aceptada sobre `8fda3d2`, sin integrar (D136). D138 (a), decidida por la PM: el tope por cuenta puede dejar a la cuenta sin links una hora, igual que recuperar. Riesgos bajos del adversario (ventana fija, emails viejos repetidos en mayúsculas) quedan anotados en el acta. MARIA ya entregó SMOKE-1.
+
+### 2026-11-08 21:55 UTC (PM principal)
+
+SMOKE-1 aceptada sobre `00df4de`, sin integrar (D136): el smoke espera el rechazo sin sesión; sabotajes en rojo. MARIA sigue OBSERVABILIDAD-1. Numeración: MARIA D139, técnica D140 en adelante.
+
+### 2026-11-09 05:00 UTC (PM principal)
+
+Corte de las 12 h extra que dio Emi el 08/11. Rutinas apagadas. INTEGRAR-1
+recibida en `19036a2`, sin aceptar: D140 (a) la cambia la técnica; D141 (a) y
+D143 (a) se proponen a Emi como piezas nuevas. D102 aceptada sobre `af924ea`
+(D153 a la cola, D154 a). Para retomar: revisar INTEGRAR-1 y prender rutinas.
+
+### 2026-11-09 19:59 UTC (Emi)
+
+«Continua trabajando sin límite». La PM lo lee así: sin hora de corte y
+vuelven los adversarios Opus; un rechazo real por límite sigue cortando.
+Publicar, roadmap y esfuerzo de las Devs, sin cambios. Rutina de MARIA
+apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
+
+### 2026-11-09 20:10 UTC (Emi)
+
+- Sí a **CATALOGO-3** (MARIA, ya; D76, D77, D78, D80 con D84-D86).
+- **D141 (a)**: sí, como pieza PRESUPUESTO-CLIENTE-1 (MARIA, tras CATALOGO-3).
+- **D143 (a)**: sí, como pieza BORRADOR-1 (técnica, tras INTEGRAR-1).
+- «Fusioná» quería decir **publicar**. Nada se publica sin «dale <SHA>»: la
+  PM le pasa el SHA cuando INTEGRAR-1 esté aceptada y lo previo a publicar
+  esté hecho (D64, FRONTEND_URL y ALLOWED_ORIGINS en Railway, riesgo de D102).
+
+### 2026-11-09 20:20 UTC (PM, modo automático)
+
+- **D155 (a)** en CATALOGO-3: origen válido = lo que reconoce
+  `pais_reconocido` (nombre o código), guardado tal cual, en despacho,
+  catálogo y extractor. Con (b) quedaban sin origen 143, 402, 403, 408 y 423.
+
+### 2026-11-09 20:55 UTC (Emi: «fijate online»; la PM busca)
+
+- En CATALOGO-3, Países Bajos lleva el código María **423**: así lo dicen
+  las tablas de AFIP (Códigos María, la guía de factura de exportación). El
+  434 viene del formulario F. 2672, que usa cuatro dígitos. Los sitios de
+  AFIP e infoleg no se abren desde la sesión: el dato sale del resumen del
+  buscador, sin haber abierto el documento.
+
+### 2026-11-09 20:43 UTC (Emi)
+
+- «Usalo más seguido al advisor por favor sos la pm usalo, esto es rule para
+  vos». Los momentos en que se lo consulta quedan escritos en
+  `ONBOARDING-PM.md`, «Subagentes».
+
+### 2026-11-09 21:00 UTC (PM; corrige la entrada de las 20:55)
+
+- Retiro «Países Bajos = 423». El consejero lo objetó y volví a buscar: las
+  tablas oficiales y `paises_maria.js` traen dos entradas, 423 PAISES BAJOS
+  y 434 HOLANDA. Ningún código de país cambia de valor. «NL» sigue en 434
+  hasta que Emi confirme cuál lleva un despacho real; va a la lista de antes
+  de publicar.
+
+## 2026-11-09 20:53 UTC (PM, con el consejero)
+
+- D157 (a): el `vendor_id` de un proveedor mixto suma el hash de sus letras no
+  latinas, con la función de D77.
+- D156 (a): `operation_items.origen` pasa a `Text` y sale el recorte a 3. Medido
+  en Postgres 16.15: `varchar(3)` → `text` no reescribe la tabla (mismo
+  filenode); sólo toma un lock exclusivo. (b), guardar el código de 3 dígitos,
+  no tenía respuesta para un texto que no se reconoce.
+
+## 2026-11-10 02:34 UTC — CATALOGO-3: devolución, D158 (a), D159 (a) (PM, con el consejero)
+
+- Devolución sobre `f4ade80` por tres causas (acta
+  `REPRODUCCION-CATALOGO-3-2026-11-10.md`): un origen no reconocido hace
+  perder la confirmación entera en guardar-uso; textos iguales bajo NFKC
+  dan claves distintas y «Screw M8» deja de encontrar a «Screw M8 螺丝»;
+  el lookup es ~10 veces más lento.
+- D158 (a): «123» es LIBIA en `PAISES_INDEC` y se acepta. Pedir rechazarlo
+  fue un error de la PM.
+- D159 (a): el origen en clientes (`clientes.js`, `clients.default_origin`
+  VARCHAR(3), los `[:3]` de `main.py:7479/7557` y el de `/api/ncm/calcular`) va como pieza aparte, ORIGEN-2, a
+  proponer a Emi. Extractor, guardar-uso, PUT del catálogo y
+  `catalogo.js` entran en la devolución.
+- A la lista de antes de publicar, junto a D156: el primer arranque puede
+  frenarse si otra sesión tiene una transacción abierta sobre
+  `operation_items`.
+
+## 2026-11-10 10:40 UTC — CATALOGO-3 aceptada, D160-D162 (a) (PM, con el consejero)
+
+- Aceptada la vuelta sobre `ec0092a`, en el rango `1345ca7..ec0092a`; el
+  acta está en `REPRODUCCION-CATALOGO-3-2026-11-10.md`, sección «Vuelta».
+  No se integra la rama: la integra INTEGRAR-1.
+- D160 (a): las formas de país que no están en la tabla quedan sin origen y
+  con aviso.
+- D161 (a): se mantiene la excepción a NFKC para «ºª№™℠».
+- D162 (a): los 22 alias que no son países quedan fuera de la lectura del
+  país.
+- A la lista de antes de publicar: si el primer arranque dice que N filas
+  quedan por un choque y N > 0, se frena antes de que alguien confirme. Con
+  un choque, el texto exacto lee la otra fila y pisa su NCM, su origen y su
+  descripción.
+- Se le propone a Emi MEMORIA-ORDEN-1, con la recomendación de hacerla. Al
+  empatar, la memoria del cliente devuelve la primera fila. Ya pasaba antes
+  de CATALOGO-3: al reclasificar un producto, sigue sugiriendo el NCM
+  viejo.
+
+## 2026-11-10 10:45 UTC — CATALOGO-3 vuelve sobre `ec0092a`; queda sin efecto la aceptación de las 10:40 (PM, con el consejero)
+
+- Escape de la PM: se aceptó llamando preexistente a H1 sin correr la base.
+  En la base, ²/2 y el ancho completo aciertan; en la vuelta empatan, porque
+  NFKC (pedido por la PM en la causa 2) iguala esos textos.
+- Causa de la devolución: ante un empate, la memoria del cliente se queda
+  con la fila que la base devuelva primero, y confirmar no lo corrige.
+  Camino de hoy: la misma factura leída del PDF y tipeada a mano. Pedido,
+  en orden: gana el texto idéntico al guardado; entre iguales o empatadas,
+  la última confirmada; el mismo resultado en cada corrida, en SQLite y PG.
+- MEMORIA-ORDEN-1 se retira: entra en esta devolución.
+- Siguen D160-D162 (a), la condición de publicar sobre los choques de la
+  migración, los riesgos menores y la corrección de SUR.
+
+## 2026-11-10 13:15 UTC — CATALOGO-3 aceptada sobre `e81b961`, sin integrar (PM, con el consejero)
+
+- Acta: `REPRODUCCION-CATALOGO-3-2026-11-10.md`, «Vuelta sobre `e81b961`».
+  Ejemplos propios, distintos de los de la devolución: 72 OK en SQLite y en
+  PG; la base sin el arreglo da 33 y 43 FALLA. Sabotajes 50 de 50.
+  Adversario: sin defectos.
+- Decidido por la PM: el mismo desempate en el catálogo del proveedor
+  (`catalog_service.py:381-402`) queda fuera de CATALOGO-3. Se le propone a
+  Emi como pieza aparte. El caso de `ultima_vez` nula va a la cola de
+  limpieza.
+
+## 2026-11-10 13:45 UTC — INTEGRAR-1 aceptada sobre `4555f7c4` e integrada (PM, con el consejero)
+
+- Acta: `REPRODUCCION-INTEGRAR-1-2026-11-10.md`. No es un SHA para publicar.
+- Decidido por la PM: D145 (a), cada sabotaje con su `X-Forwarded-For`
+  (MARIA; `abuso1` sigue con una sola IP); D146 (b), a la cola; D147 (a), el
+  tope de avisos de MP es por worker sin `REDIS_URL`; D148, confirmada;
+  D149 (a), cada dueña pone al día sus patrones.
+- Antes de publicar, además: PRESUPUESTO-CLIENTE-1 sobre la unión (el pase
+  por `operacion_id`), el arnés de pantalla del 402 al día y el lock de
+  `_migrate_catalogo_sin_tope` probado con una conexión abierta.
+- Retiro de la PM: el rojo de «`descontar` con su propia conexión» que le
+  pasé a MARIA era `database is locked` en la preparación, no la condición.

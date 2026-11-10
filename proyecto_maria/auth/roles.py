@@ -6,9 +6,8 @@ from proyecto_maria.auth.dependencies import get_current_user
 
 
 def roles_de(user) -> list:
-    """Los roles del usuario como lista. La columna es JSON y puede guardar un
-    texto: vale como un único rol entero («administrador» no es «admin»).
-    Cualquier otra cosa que no sea lista no da roles."""
+    """La columna JSON puede guardar un texto: vale como un único rol entero
+    («administrador» no es «admin»); lo que no sea texto ni lista no da roles."""
     roles = user.get("roles")
     if isinstance(roles, str):
         return [roles]

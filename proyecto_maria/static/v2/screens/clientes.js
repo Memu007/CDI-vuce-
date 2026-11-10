@@ -1818,7 +1818,7 @@
         const ok = await CDI.confirm({
             title: 'Eliminar cliente',
             lead: '¿Eliminar "' + (c.nombre || 'este cliente') + '"?',
-            text: 'Se borrará su historial de operaciones, productos aprendidos y notas NCM, y dejarán de andar los links de presupuestos que compartiste. Esta acción no se puede deshacer.',
+            text: 'Sus operaciones quedan en el historial como «Sin cliente», sin el detalle de sus ítems, y dejan de andar los links de presupuestos que compartiste. Se borran sus productos aprendidos y notas NCM. Esta acción no se puede deshacer.',
             acceptText: 'Eliminar cliente',
             kind: 'danger',
         });

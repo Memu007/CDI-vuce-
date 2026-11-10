@@ -23,9 +23,9 @@ cerrar() {
 trap cerrar EXIT
 [ "$(id -u)" -eq 0 ] && chown postgres "$DIR"
 
-PUERTO="$("$PY" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+PG_PUERTO="$("$PY" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
 CLAVE="$("$PY" -c 'import secrets; print(secrets.token_urlsafe(12) + " :@%/;ñ")')"
-URL="$("$PY" -c 'import sys, urllib.parse as u; print(f"postgresql://cdi:{u.quote(sys.argv[1], safe=str())}@127.0.0.1:{sys.argv[2]}/postgres")' "$CLAVE" "$PUERTO")"
+URL="$("$PY" -c 'import sys, urllib.parse as u; print(f"postgresql://cdi:{u.quote(sys.argv[1], safe=str())}@127.0.0.1:{sys.argv[2]}/postgres")' "$CLAVE" "$PG_PUERTO")"
 
 printf '%s\n' "$CLAVE" > "$DIR/clave"
 [ "$(id -u)" -eq 0 ] && chown postgres "$DIR/clave"
@@ -33,6 +33,6 @@ como_pg "$BIN/initdb" -D "$DIR/data" -U cdi --auth=scram-sha-256 --pwfile="$DIR/
   --encoding=UTF8 --locale=C.UTF-8 >"$DIR/initdb.log" 2>&1 || { cat "$DIR/initdb.log" >&2; exit 3; }
 rm -f -- "$DIR/clave"
 como_pg "$BIN/pg_ctl" -D "$DIR/data" -l "$DIR/pg.log" -w \
-  -o "-p $PUERTO -k $DIR -c listen_addresses=127.0.0.1" start >/dev/null || { cat "$DIR/pg.log" >&2; exit 3; }
+  -o "-p $PG_PUERTO -k $DIR -c listen_addresses=127.0.0.1" start >/dev/null || { cat "$DIR/pg.log" >&2; exit 3; }
 
 BACKUP1A_PG_URL="$URL" PG16_BIN="$BIN" "$@"

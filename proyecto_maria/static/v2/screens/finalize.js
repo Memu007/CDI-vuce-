@@ -18,9 +18,12 @@
 
     let lastValidation = null;    // { errores, advertencias, sugerencias, estadisticas }
     let lastValidationTs = 0;
+    let lastValidationPedido = '';  // el pedido del que salió lastValidation
     let lastMaria = null;         // { filename, download_url, content }
-    let validatingInFlight = false;
+    let turnoValidacion = 0;      // sólo la validación más reciente pinta la pantalla
     let generateInFlight = false;
+    // Lo que se pide mientras otra generación espera se genera cuando ésa vuelve.
+    let pedidaMientrasOtra = false;
 
     function $(id) { return document.getElementById(id); }
     function show(el) { if (el) el.hidden = false; }
@@ -99,43 +102,39 @@
 
     async function runValidation(force) {
         init();
-        if (validatingInFlight) return;
-        const now = Date.now();
-        // Cache: si ya tenemos resultado de hace menos de 60s y no forzamos, reusar
-        if (!force && lastValidation && (now - lastValidationTs) < 60000) {
-            renderValidation(lastValidation);
-            return;
-        }
-
-        validatingInFlight = true;
         show(vLoading);
         hide(vResults);
-
+        const turno = ++turnoValidacion;
         const items = buildItemsForValidation();
+        const startedAt = Date.now();
+        let pedido = '', data = null, err = null;
         try {
-            const startedAt = Date.now();
-            const res = await CDI.api('/api/validate/smart', {
-                method: 'POST',
-                body: JSON.stringify({ items, operacion: cabeceraParaValidar() })
-            });
-            const data = await res.json();
-            const dur = Date.now() - startedAt;
+            pedido = JSON.stringify({ items, operacion: cabeceraParaValidar() });
+            // Se reusa sólo el resultado de este mismo pedido, de hace menos de 60 s.
+            if (!force && lastValidation && pedido === lastValidationPedido && (Date.now() - lastValidationTs) < 60000) {
+                renderValidation(lastValidation);
+                return;
+            }
+            const res = await CDI.api('/api/validate/smart', { method: 'POST', body: pedido });
+            data = await res.json();
             if (!res.ok || !data || data.success === false) {
                 throw new Error((data && data.detail) || 'No se pudo validar');
             }
-            lastValidation = data;
-            lastValidationTs = Date.now();
-            CDI.track('validation_ok', {
-                errores: (data.errores || []).length,
-                advertencias: (data.advertencias || []).length,
-                sugerencias: (data.sugerencias || []).length,
-                duration_ms: dur
-            });
-            renderValidation(data);
-        } catch (err) {
+        } catch (e) {
+            err = e;
+        }
+        // Otra carga pidió después: esta respuesta ya no es la que se ve.
+        if (turno !== turnoValidacion) return;
+        if (err) {
             console.error('[validating]', err);
             CDI.track('validation_error', { message: String(err && err.message || err) });
             CDI.toast('Error al validar', String(err && err.message || err), 'error');
+            // Volver a validar la misma carga: su resultado anterior sigue valiendo.
+            if (lastValidation && pedido === lastValidationPedido) {
+                renderValidation(lastValidation);
+                return;
+            }
+            lastValidation = null;
             // Mostrar resultados "vacios" para no bloquear: permitimos seguir
             renderValidation({
                 errores: [],
@@ -143,9 +142,18 @@
                 sugerencias: [],
                 estadisticas: { total_items: items.length, total_valor_usd: 0, total_peso_kg: 0, ncms_unicos: 0 }
             });
-        } finally {
-            validatingInFlight = false;
+            return;
         }
+        lastValidation = data;
+        lastValidationTs = Date.now();
+        lastValidationPedido = pedido;
+        CDI.track('validation_ok', {
+            errores: (data.errores || []).length,
+            advertencias: (data.advertencias || []).length,
+            sugerencias: (data.sugerencias || []).length,
+            duration_ms: Date.now() - startedAt
+        });
+        renderValidation(data);
     }
 
     function buildItemsForValidation() {
@@ -595,7 +603,7 @@
         vIssues.innerHTML = groups.join('');
 
         // Generate button
-        vGenerate.disabled = errores.length > 0 || generateInFlight;
+        vGenerate.disabled = errores.length > 0;
         vGenerate.title = errores.length > 0 ? 'Corregí los errores antes de generar' : '';
     }
 
@@ -654,7 +662,6 @@
        Pantalla 5: ready (generar + descargar)
        ========================================================== */
     async function onGenerate() {
-        if (generateInFlight) return;
         if (lastValidation && (lastValidation.errores || []).length > 0) return;
 
         // Guardar SBT del input al estado antes de generar
@@ -693,8 +700,9 @@
     }
 
     async function generateMaria() {
-        if (generateInFlight) return;
+        if (generateInFlight) { pedidaMientrasOtra = true; return; }
         generateInFlight = true;
+        if (CDI.estudios) await CDI.estudios.listo();
 
         const items = (CDI.state && CDI.state.items) || [];
         if (!items.length) {
@@ -703,8 +711,12 @@
             return;
         }
 
-        if (CDI.estudios) await CDI.estudios.listo();   // ESTUDIO-1
+        // Una carga nueva reemplaza CDI.state: la respuesta tardía se anota en la suya.
+        const carga = CDI.state;
+        const foto = fotoDeLaPantalla();
         const body = buildMariaRequest();
+        // Regenerar la misma operación no la cuenta otra vez: el servidor la reconoce por su id.
+        body.operacion_id = carga.operacionId || '';
         try {
             const startedAt = Date.now();
             const res = await CDI.api('/generate_maria', {
@@ -713,7 +725,10 @@
             });
             const data = await res.json();
             const dur = Date.now() - startedAt;
-            if (!res.ok || !data || data.success === false) {
+            const fallo = !res.ok || !data || data.success === false;
+            // El error de una carga que ya no está en pantalla no la cambia de paso.
+            if (fallo && carga !== CDI.state) return;
+            if (fallo) {
                 const detail = (data && (data.detail || data.message)) || res.statusText;
                 // El error de un subítem (su sufijo incluido) va bajo ese
                 // subítem, en el paso de NCM (SUBITEMS-1, MARIA-9).
@@ -747,28 +762,21 @@
                     if (CDI.marcarEnLaRevision) CDI.marcarEnLaRevision('seguro', detail);
                     throw new Error(detail);
                 }
-                // Los controles de antes de generar llegan como {errors: [...]};
-                // el tope de regeneraciones de un mismo id, como {code, message}.
-                const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ')
-                    : (detail && typeof detail === 'object' && detail.message) ? detail.message : detail;
+                // Los controles de antes de generar llegan como {errors: [...]}.
+                const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ') : detail;
                 throw new Error(texto || 'No se pudo generar el archivo');
             }
-            lastMaria = {
-                filename: data.filename,
-                download_url: data.download_url,
-                content: data.content || '',
-                warnings: data.warnings || []
-            };
+            carga.operacionId = data.operacion_id || '';
             CDI.track('maria_generated', {
                 items: items.length,
                 filename: data.filename,
                 duration_ms: dur
             });
-            renderReady();
+            if (carga === CDI.state) mostrarListo(data);
             // A la vez y best-effort. Toast reemplaza al anterior: si la operación ya
             // avisó algo (que puede ser un error), el aviso del catálogo no lo tapa.
             let avisoDeLaOperacion = false;
-            saveOperationToHistory(items, data).then(r => {
+            saveOperationToHistory(items, data, carga, foto).then(r => {
                 avisoDeLaOperacion = (!r.ok && r.reason !== 'sin_cliente') || r.historial_guardado === false;
             }).catch(err => {
                 console.warn('[history] no se pudo armar la operacion', err);
@@ -776,7 +784,7 @@
                 CDI.toast && CDI.toast('No se guardó al cliente',
                     'La operación no quedó en el historial. Volvé a Listo y reintentá.', 'error');
             });
-            saveCatalogLearn(items).then(r => {
+            saveCatalogLearn(items, carga).then(r => {
                 if (!r.ok && !avisoDeLaOperacion && CDI.toast) {
                     CDI.toast('Algunos productos no quedaron en la memoria',
                         (r.detail ? r.detail + ' ' : '') +
@@ -788,11 +796,25 @@
         } catch (err) {
             console.error('[ready] generate error', err);
             CDI.track('maria_generate_error', { message: String(err && err.message || err) });
-            // Un 402 trae la razón (impago, vencido, tope); el modal ya salió.
-            showReadyError(String((err && err.motivo) || (err && err.message) || err));
+            showReadyError(String(err && err.message || err));
         } finally {
             generateInFlight = false;
+            const otra = pedidaMientrasOtra;
+            pedidaMientrasOtra = false;
+            // Con lo que hay ahora en pantalla, que puede haber cambiado mientras ésta esperaba.
+            if (otra) onEnterReady();
         }
+    }
+
+    // Lo que muestra «Listo» es de la carga en pantalla: una respuesta tardía no lo pisa.
+    function mostrarListo(data) {
+        lastMaria = {
+            filename: data.filename,
+            download_url: data.download_url,
+            content: data.content || '',
+            warnings: data.warnings || []
+        };
+        renderReady();
     }
 
     // La cabecera que controla el servidor antes de generar (MARIA-1b), tal
@@ -815,8 +837,8 @@
         const incoterm = (op.incoterm || '').toString().trim().toUpperCase();
 
         const factura = numeroDeFactura(op);
-        // Sin factura, el id sale de cuándo se cargó la operación: regenerar
-        // la misma no la cuenta otra vez.
+        // Sin factura, el nombre del archivo sale de cuándo se cargó la operación,
+        // así regenerarla no lo cambia. La operación se reconoce por operacionId.
         const cargada = (CDI.state && CDI.state.uploadedAt) || new Date().toISOString();
         const operation_id = factura ? ('FAC_' + factura.replace(/[^a-zA-Z0-9_-]/g, '')) :
             ('OP_' + String(cargada).replace(/[^0-9]/g, '').slice(0, 17));
@@ -1213,16 +1235,24 @@
         CDI.track && CDI.track('op_orphan_resolved', { via: via });
     }
 
-    // Lee el cliente y la operación en el momento en que se llama.
-    function armarOperacion(items, mariaData) {
-        const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
+    // Cliente, totales y valores del despachante, tomados al pedir: lo que cambie después no los pisa.
+    function fotoDeLaPantalla() {
+        return { cliente: (CDI.state && CDI.state.clienteActivo) || null,
+                 stats: (lastValidation && lastValidation.estadisticas) || {},
+                 maria: CDI.despachante ? CDI.despachante.valores() : {} };
+    }
+
+    function armarOperacion(items, mariaData, carga, foto) {
+        // Sin cliente al pedir, el que se le eligió a esa carga mientras esperaba.
+        const cliente = foto.cliente || carga.clienteActivo || null;
         const opCode = (mariaData && mariaData.filename) || null;
-        const stats = (lastValidation && lastValidation.estadisticas) || {};
-        const op = (CDI.state && CDI.state.operacion) || {};
+        const stats = foto.stats;
+        const op = carga.operacion || {};
         const total_valor = Number(stats.total_valor_usd || 0);
         const total_peso = Number(stats.total_peso_kg || 0);
         const body = {
             operation_id: opCode,
+            operacion_id: carga.operacionId || '',
             source: 'pdf_v2',
             currency: (op.moneda || 'USD').toString().toUpperCase(),
             comprador_domicilio: op.comprador_domicilio || '',
@@ -1237,7 +1267,7 @@
                 // MARIA-4: para proponer el último banco y la última empresa.
                 maria: Object.assign(
                     { banco_bcra: '', empresa_digitalizacion: '', iva_adicional: '' },
-                    CDI.despachante ? CDI.despachante.valores() : {},
+                    foto.maria,
                     { items: items.map(it => ({ estado: it.estado || null, iva_adicional: it.iva_adicional || null })) }
                 )
             },
@@ -1256,15 +1286,16 @@
         return { cliente, opCode, body };
     }
 
-    async function saveOperationToHistory(items, mariaData) {
-        const { cliente, opCode, body } = armarOperacion(items, mariaData);
+    async function saveOperationToHistory(items, mariaData, carga, foto = fotoDeLaPantalla()) {
+        carga = carga || (CDI.state = CDI.state || {});
+        const { cliente, opCode, body } = armarOperacion(items, mariaData, carga, foto);
         if (!cliente || !cliente.id) {
             console.warn('[history] no hay cliente activo, no se guarda al historial');
             return { ok: false, reason: 'sin_cliente' };
         }
         // Idempotencia: si ya guardamos esta misma operación para este mismo
         // cliente, no la re-posteamos (cubre re-entry a Listo, F5 suave, etc.).
-        const savedFor = (CDI.state && CDI.state.operationSavedFor) || null;
+        const savedFor = carga.operationSavedFor || null;
         if (savedFor && savedFor.cliente_id === cliente.id && savedFor.op_code === opCode) {
             return { ok: true, reason: 'ya_guardada' };
         }
@@ -1275,8 +1306,9 @@
             );
             const data = await res.json().catch(() => ({}));
             if (res.ok && data && data.success) {
-                CDI.state = CDI.state || {};
-                CDI.state.operationSavedFor = { cliente_id: cliente.id, op_code: opCode };
+                // Guardar antes de generar crea la operación: generar después la completa, no cuenta otra.
+                carga.operacionId = data.operation_id || '';
+                carga.operationSavedFor = { cliente_id: cliente.id, op_code: opCode };
                 CDI.track('operation_saved_to_history', {
                     cliente_id: cliente.id,
                     items: items.length
@@ -1306,9 +1338,9 @@
             );
             return { ok: false, reason: 'http_error', error: msg };
         } catch (err) {
-            if (err && err.message === 'payment_required') {
+            if (err && err.code === 'payment_required') {
                 console.warn('[history] save_client_operation: 402 payment required');
-                CDI.toast && CDI.toast('No se guardó al cliente', err.motivo || 'Plan vencido o límite alcanzado', 'error');
+                CDI.toast && CDI.toast('No se guardó al cliente', err.message || 'Plan vencido o límite alcanzado', 'error');
                 return { ok: false, reason: 'payment_required', error: 'Plan vencido o límite alcanzado' };
             }
             console.error('[history] save_client_operation excepción:', err);
@@ -1330,8 +1362,8 @@
     CDI.seguroSinLeer = seguroSinLeer;
 
     // ok si aprendió o no había nada para aprender; detail, qué producto rechazó el servidor.
-    async function saveCatalogLearn(items) {
-        const op = (CDI.state && CDI.state.operacion) || {};
+    async function saveCatalogLearn(items, carga) {
+        const op = (carga && carga.operacion) || {};
         const vendorName = String(op.vendedor_nombre || '').trim();
         if (!vendorName || !Array.isArray(items) || !items.length) return { ok: true };
 
@@ -1428,7 +1460,8 @@
         const retry = e.target.closest('[data-action="retry-generate"]');
         if (retry) {
             e.preventDefault();
-            generateMaria();
+            // Oculta el error, y con él el botón: un segundo clic no pide otra generación.
+            onEnterReady();
         }
     });
 
@@ -1442,8 +1475,8 @@
         onLeave() {
             // Si el usuario va a 'upload' (nueva operacion), limpiamos cache
             lastMaria = null;
-            lastValidation = null;
-            lastValidationTs = 0;
+            // Fuera de «Listo», la carga que esperaba no genera sola.
+            pedidaMientrasOtra = false;
         }
     });
 

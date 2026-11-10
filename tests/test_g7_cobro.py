@@ -23,6 +23,7 @@ os.environ.setdefault("EMAIL_VERIFICATION_REQUIRED", "false")
 
 from proyecto_maria import main  # noqa: E402
 from proyecto_maria.main import app  # noqa: E402
+from tests.mp_firma import aviso_firmado  # noqa: E402
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -126,7 +127,7 @@ def test_g7_1_cobro_aprobado_activa_el_plan(client, monkeypatch):
     assert fin_prueba > datetime.now(timezone.utc) + timedelta(days=1), antes
 
     with patch.object(main.mercadopago, "SDK", return_value=_mock_sdk_approved(uname)):
-        wh = client.post(f"/api/payments/webhook?id=999000111&topic=payment")
+        wh = client.post("/api/payments/webhook", **aviso_firmado("payment", "999000111", "test-secret"))
         assert wh.status_code == 200, wh.text
         assert wh.json()["success"] is True
 

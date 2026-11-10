@@ -73,7 +73,7 @@ fijo, una mejora no pedida se propone y se decide; no entra por costumbre.
 **Antes de mandar una tarea:**
 
 - **Cada premisa, comprobada en el código.** Si la tarea dice «sin backend», «el dato ya existe» o «el filtro ya está», se mira antes en el código y se cita archivo y línea. Una premisa sin comprobar se escribe como pregunta, no como hecho.
-- **Plata, sesión, permisos o un recorrido nuevo:** consejero antes de mandarla.
+- **Consejero antes de mandarla** (cuándo, en «Subagentes»).
 - **Qué se puede reusar:** si la pieza es grande, la tarea dice qué librería o código abierto se buscó y qué se encontró («Reusar antes de escribir», en los Límites).
 - **«Aprobado por quien decide», sólo con su confirmación.** Lo que la PM define por su cuenta se escribe como «decidido por la PM», y lo que espera, como «pendiente».
 
@@ -185,10 +185,16 @@ dos. En la primera entrega de la pieza, los dos.
 
 - Haiku nunca ataca: un «no encontré nada» de Haiku no prueba nada.
 - Se elige lo menor que alcance: subir el esfuerzo gasta mucho más.
-- **Consejero (`/advisor fable`), sólo la PM principal**, sólo en los
-  momentos caros: antes de aceptar o devolver, antes de publicar, antes de
-  cambiar una regla, antes de mandar una tarea de plata, sesión o permisos
-  y cuando algo no cierra. Nunca en una vuelta de rutina sin novedades.
+- **Consejero (`/advisor fable`), sólo la PM principal, y seguido** (regla
+  de Emi, 2026-11-09: «usalo más seguido, sos la PM»). Se lo consulta:
+  - antes de cada «decidido por la PM»;
+  - antes de pasarle a una Dev algo que cambia lo que construye: tarea,
+    corrección, devolución o dato;
+  - antes de contarle a Emi un hallazgo o una recomendación;
+  - antes de aceptar, devolver, publicar o cambiar una regla;
+  - y cuando algo no cierra.
+  
+  Sólo se lo saltea en una vuelta de rutina en la que no pasó nada.
 - **Ningún subagente usa Fable**, ni de la PM ni de las Devs (Emi,
   2026-10-07). Fable es sólo el consejero de la PM principal.
 - **Las Devs, hasta esfuerzo alto** (Emi, 2026-10-07): su sesión y sus

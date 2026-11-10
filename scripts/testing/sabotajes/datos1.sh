@@ -106,18 +106,18 @@ sabotaje $M "los 4xx pierden su motivo" \
 
 # --- D5 / D32 (a): borrar un cliente con presupuesto compartido
 sabotaje $M "no se borran los presupuestos del cliente" \
-  $'            await db.execute(\n                sa_delete(PublicQuoteModel).where(\n                    PublicQuoteModel.operation_id.in_(op_ids)\n                )\n            )\n' '' \
+  $'            await db.execute(\n                sa_delete(PublicQuoteModel).where(\n                    PublicQuoteModel.operation_id.in_([o.id for o in operaciones])\n                )\n            )\n' '' \
   "FAILED $T::test_borrar_cliente_borra_sus_presupuestos_y_no_los_ajenos" "assert 200 == 404"
 sabotaje $M "se borran también los presupuestos ajenos" \
-  '                    PublicQuoteModel.operation_id.in_(op_ids)' '                    PublicQuoteModel.operation_id.isnot(None)' \
+  '                    PublicQuoteModel.operation_id.in_([o.id for o in operaciones])' '                    PublicQuoteModel.operation_id.isnot(None)' \
   "FAILED $T::test_borrar_cliente_borra_sus_presupuestos_y_no_los_ajenos" "assert 404 == 200"
 sabotaje $M "el borrado no es una sola transacción" \
-  $'        await db.delete(client)\n        await db.commit()\n        return {\n            "success": True,\n            "message": "Cliente y operaciones eliminados",' \
-  $'        await db.commit()\n        await db.delete(client)\n        await db.commit()\n        return {\n            "success": True,\n            "message": "Cliente y operaciones eliminados",' \
+  $'        await db.delete(client)\n        await db.commit()\n        return {\n            "success": True,\n            "message": "Cliente eliminado",' \
+  $'        await db.commit()\n        await db.delete(client)\n        await db.commit()\n        return {\n            "success": True,\n            "message": "Cliente eliminado",' \
   "FAILED $T::test_si_falla_a_mitad_no_se_borra_nada" "assert 404 == 200"
 sabotaje $M "otro dueño puede borrar el cliente" \
-  $'    username = user["username"]\n    client = await _get_owned_client(db, client_id, username)\n\n    try:\n        # CASCADE' \
-  $'    username = user["username"]\n    client = await db.get(ClientModel, client_id)\n    username = client.owner_username\n\n    try:\n        # CASCADE' \
+  $'        client = await _cliente_con_cuenta_bloqueada(db, client_id, username)\n        op_rows' \
+  $'        client = await db.get(ClientModel, client_id)\n        username = client.owner_username\n        op_rows' \
   "FAILED $T::test_otro_dueno_no_borra_el_cliente_ni_su_presupuesto" "assert 200 == 404"
 
 # --- D141 (a): pasar una operación compartida a otro cliente

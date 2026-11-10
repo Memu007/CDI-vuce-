@@ -57,8 +57,8 @@ if ! "${PRUEBA[@]}" >/dev/null 2>&1; then
 fi
 
 sabotaje $F "la operación vuelve a esperar al catálogo" \
-  'saveOperationToHistory(items, data).then(r => {' \
-  'saveCatalogLearn(items).then(() => saveOperationToHistory(items, data)).then(r => {' \
+  'saveOperationToHistory(items, data, carga, foto).then(r => {' \
+  'saveCatalogLearn(items, carga).then(() => saveOperationToHistory(items, data, carga, foto)).then(r => {' \
   "FAILED $T::$C[colgado-guardado]"
 sabotaje $F "aprender el catálogo con la red caída no avisa" \
   "            return { ok: false, detail: '' };" \

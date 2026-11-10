@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Tuple
 
 import mercadopago
+from mercadopago.config import RequestOptions
 
 from proyecto_maria.config import get_frontend_url
 
@@ -63,7 +64,15 @@ def _get_sdk():
     token = _access_token()
     if not token:
         raise RuntimeError("MP_ACCESS_TOKEN no configurado")
-    return mercadopago.SDK(token)
+    return sdk_mp(token)
+
+
+def sdk_mp(token: str):
+    # Por defecto espera 60 s por intento y reintenta tres veces: una consulta
+    # trabada retendría su hilo cuatro minutos. Así, unos 20 s.
+    sdk = mercadopago.SDK(token)
+    sdk.request_options = RequestOptions(access_token=token, connection_timeout=10.0, max_retries=1)
+    return sdk
 
 
 def get_plan(plan_id: str) -> dict[str, Any]:
@@ -71,6 +80,11 @@ def get_plan(plan_id: str) -> dict[str, Any]:
     if not plan:
         raise ValueError(f"Plan '{plan_id}' no disponible. El único plan activo es Premium.")
     return plan
+
+
+def plan_de_la_cuenta(user) -> dict[str, Any]:
+    # Una cuenta con un plan que ya no existe («trial» de antes) cuenta como Premium.
+    return PLANS.get(getattr(user, "plan", None) or "premium") or PLANS["premium"]
 
 
 def plans_public() -> list[dict[str, Any]]:
@@ -114,7 +128,7 @@ def recarga_entra(cuenta) -> tuple[bool, int]:
 
 def tiene_acceso(cuenta, ahora: datetime | None = None) -> bool:
     """trial y active tienen acceso; canceled, hasta el fin del período ya
-    pagado (COBRO-MP-2, C2); el resto, no."""
+    pagado; el resto, no."""
     status = getattr(cuenta, "billing_status", "none")
     if status in ("trial", "active"):
         return True
@@ -149,8 +163,7 @@ def can_create_operation(user) -> Tuple[bool, str | None]:
     # Limpiar créditos extra vencidos antes de evaluar.
     _expire_extra_ops(user)
 
-    plan_id = getattr(user, "plan", "premium") or "premium"
-    plan = get_plan(plan_id)
+    plan = plan_de_la_cuenta(user)
     ops_limit = plan["ops"]
 
     # Premium (u otros ilimitados)
@@ -169,9 +182,7 @@ def can_create_operation(user) -> Tuple[bool, str | None]:
 
 def record_operation_created(user):
     """Incrementa contadores y consume extra_ops si hace falta."""
-    # Ola 4 MVP: solo existe Premium, fallback a premium.
-    plan_id = getattr(user, "plan", "premium") or "premium"
-    plan = get_plan(plan_id)
+    plan = plan_de_la_cuenta(user)
     ops_limit = plan["ops"]
 
     used = int(getattr(user, "ops_used_this_period", 0) or 0)
@@ -219,7 +230,7 @@ def create_checkout(user, plan_id: str, org_id: str | None = None) -> dict[str, 
             "status": "authorized",
         }
         if base_url.startswith("https://"):
-            preapproval_data["notification_url"] = f"{base_url}/api/payments/webhook"
+            preapproval_data["notification_url"] = f"{base_url}/api/payments/webhook?source_news=webhooks"
 
         resp = sdk.preapproval().create(preapproval_data)
         if resp.get("status") not in (200, 201):
@@ -259,7 +270,7 @@ def create_checkout(user, plan_id: str, org_id: str | None = None) -> dict[str, 
         preference_data["payer"] = {"email": email}
     if base_url.startswith("https://"):
         preference_data["auto_return"] = "approved"
-        preference_data["notification_url"] = f"{base_url}/api/payments/webhook"
+        preference_data["notification_url"] = f"{base_url}/api/payments/webhook?source_news=webhooks"
 
     resp = sdk.preference().create(preference_data)
     if resp.get("status") != 201:
@@ -307,7 +318,7 @@ def create_topup_checkout(user, org_id: str | None = None) -> dict[str, Any]:
     if email:
         preference_data["payer"] = {"email": email}
     if base_url.startswith("https://"):
-        preference_data["notification_url"] = f"{base_url}/api/payments/webhook"
+        preference_data["notification_url"] = f"{base_url}/api/payments/webhook?source_news=webhooks"
 
     resp = sdk.preference().create(preference_data)
     if resp.get("status") != 201:

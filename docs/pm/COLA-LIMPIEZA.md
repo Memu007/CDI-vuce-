@@ -120,3 +120,34 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - Arnés de sabotajes y helpers de `scripts/testing/*_postgres.py` (crear y borrar base, registrar usuario, `chequear`) copiados entre piezas: unificar.
 - `tests/test_separadores1b.py`: `test_en_la_factura_con_la_pista_en_contra_queda_sin_leer` ya no distingue la regla `sin_grupo` (`_numero_factura` ya devuelve None): darle una entrada que sólo la regla rechace, o sacarlo.
 - `proyecto_maria/main.py` 1754, 1771, 2373 y 3406: comentarios con historia («EMAIL-1»), sacarlos.
+- `tests/conftest.py:19`: pisa `DATABASE_URL` con SQLite sin avisar, así que
+  un `pytest` con la URL de Postgres corre en SQLite. Hoy se esquiva con
+  `--noconftest -p pg_nullpool`; que avise o que respete una URL de PG pedida.
+- `core/maria_generator_export.py:114`: el generador de exportación no pasa
+  la destinación por `destinacion_del_txt` (sólo lo hace el endpoint), y el
+  de importación chequea en el endpoint y en el generador. El chequeo, una
+  vez, en los dos generadores.
+- `tests/test_abuso1.py`: el caso del tope de reset casi copia el de
+  recuperar; un caso con las dos rutas como datos.
+- `tests/test_excel2d.py:199`: el tope de 0,5 s entre pasos del hilo testigo
+  falló en la CI de `d9a6962` (sólo docs) con 0,506 s, y pasó en `2d08e94`
+  con el mismo producto. Medir el freno sin depender de la carga del runner.
+- `proyecto_maria/main.py` `_guardable_en_pg(endpoint)` en el registro de pedidos
+  (D150): el molde no trae NUL ni caracteres sueltos; sacar la llamada, con su rojo.
+- `proyecto_maria/main.py` `register` (219 líneas): partirla en validar la
+  invitación, crear la cuenta y usar las otras pendientes, sin partir la transacción.
+- `proyecto_maria/main.py:166` `pwd_context` de passlib: el producto no lo usa
+  (el hash va directo con `bcrypt`), pero `tests/test_password_recovery_manual.py:5`
+  lo importa. Sacarlo con ese import, y `passlib[bcrypt]` de `requirements.txt` (D153).
+- `tests/test_catalogo3.py`: ningún caso de la memoria del cliente con
+  `ultima_vez` nula («sin fecha pierde» sólo lo prueba el acta de la PM):
+  un caso con la fila sin fecha en los dos órdenes, con su rojo.
+- `proyecto_maria/main.py` login: el límite cuenta después de `verify_password`;
+  cada clave mala paga bcrypt antes del freno. Contar antes, si CONEXIONES-1 B
+  muestra que pesa (D146 b).
+- `proyecto_maria/main.py` `delete_cliente`: la operación queda sin cliente con su
+  `generated_file`, y el TXT se sigue bajando (fila 4 del code-review de INTEGRAR-1).
+- `proyecto_maria/main.py` tope de registro: el `or` corta antes y el intento
+  frenado por hora no suma al diario (fila 7 del code-review de INTEGRAR-1).
+- `finalize.js`: el `{code, message}` del 409 de regeneraciones quedó sin uso
+  desde COBRO-CORTE-1; sacarlo.

@@ -211,7 +211,8 @@ def test_un_ajuste_que_no_es_numero_no_frena_el_txt(client):
     sin = client.post("/generate_maria", json=_pedido())
     con = client.post("/generate_maria", json={**_pedido(), "ajustes_incluir": "abc", "ajustes_deducir": True})
     assert sin.status_code == con.status_code == 200, con.text
-    assert con.content == sin.content
+    # Cada generación es otra operación, con su id y su archivo: se compara el TXT.
+    assert [con.json()[k] for k in ("content", "warnings")] == [sin.json()[k] for k in ("content", "warnings")]
 
 
 def test_un_ajuste_escrito_como_texto_con_numero_se_toma():
