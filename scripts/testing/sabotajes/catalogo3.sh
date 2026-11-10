@@ -172,7 +172,7 @@ sabotaje $G "«ÉS» vuelve a pasar como «ES»" \
 sabotaje $G "«Ñ» con la tilde aparte vuelve a pasar" \
   'escrito = unicodedata.normalize("NFC", str(texto or "")).strip()' \
   'escrito = str(texto or "").strip()' \
-  "FAILED $A[acento aparte]"
+  "FAILED $B[acento aparte]"
 sabotaje $G "un código de miles de cifras vuelve a dar 500" \
   'm = re.fullmatch(r"0?([0-9]{3})(?:' \
   'm = re.fullmatch(r"0?([0-9]+)(?:' \
