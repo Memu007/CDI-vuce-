@@ -33,9 +33,25 @@ fila 3, y el arnés de pantalla del 402, que quedó con el contrato viejo).
 
 ## Tarea activa: D149 (a), mientras reviso BORRADOR-1 (2026-11-10 13:45 UTC)
 
-BORRADOR-1 llegó en `22163cec` (base `4555f7c4`, D170–D173): la reviso
-después de PRESUPUESTO-CLIENTE-1 de MARIA. Si los arneses de navegador
-terminan, sumá su salida al informe. Mientras tanto:
+BORRADOR-1 (`22163cec`, base `4555f7c4`): **clasificada; el veredicto espera
+tus arneses de navegador sin 429** (`cliente1`, `foco_cliente1`, `destino1`,
+`despacho1a` y `orden1`). Cuando terminen, sumá su salida al informe con
+`git diff 22163cec <SHA> -- proyecto_maria` vacío. Evidencia en
+`docs/pm/REPRODUCCION-BORRADOR-1-2026-11-10.md`: `borrador1.sh` igual al
+tuyo, `chequeo-6` sin avisos. Mi adversario no encontró pérdida ni mezcla de
+usuarios que la pieza introduzca. Lo que ya pasaba en la base (la subida en
+curso en la carga, «Nueva operación» pisada y tu D171) es una sola causa:
+recuperar no mira lo que ella ya hace en la carga. Va a Emi como pieza nueva.
+
+- **D170 (b), decidido por la PM:** a la cola de limpieza, con una excepción
+  que encontró mi adversario: si la pestaña de antes murió sin `pagehide`,
+  ni otra pestaña ni recargar la encuentran durante 3 min.
+- **D171:** pieza nueva para Emi, junto con la subida en curso (hallazgos 1 y
+  3 del acta). No la empieces hasta que Emi diga.
+- **D172:** a la cola de limpieza.
+- **D173 (a):** ya decidida; la hiciste en `4e7da21f`.
+
+Mientras tanto:
 
 1. D149 (a) y el ataque sin Postgres: sólo arnés, un commit, cada patrón
    nuevo con su rojo mostrado una vez. **Suman, decidido por la PM
