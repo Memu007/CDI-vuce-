@@ -10,6 +10,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - Un proveedor con nombre sólo en chino, emoji o con los mismos 60 primeros caracteres que otro ya no comparte catálogo; «电线 2mm» y «钢管 2mm» son dos productos. Las filas viejas se migran al arrancar sin perder ninguna.
 - El origen vale si es un país reconocido, por nombre o código, y se guarda tal cual: «TAIWAN» ya no queda como «TAI» (310). Cuando el catálogo rechaza un producto, la pantalla dice cuál.
+- Un origen hecho de miles de cifras ya no rompe los avisos con un error 500: generar lo rechaza como origen no reconocido.
 
 ## 2026-11-09 · chore: bcrypt queda fijado en 5.0.0 (D102)
 

@@ -798,8 +798,9 @@ def get_pais_codigo(pais: str) -> int:
     if not pais:
         return PAIS_DEFAULT_IMPORT
 
-    # Si ya es un número, devolverlo
-    if re.fullmatch(r"[0-9]+", str(pais).strip()):
+    # Un código tiene hasta 4 cifras, como en `_codigo_de_la_tabla`: con miles
+    # de cifras int() lanza ValueError.
+    if re.fullmatch(r"[0-9]{1,4}", str(pais).strip()):
         return int(str(pais).strip())
 
     norm = _normalizar_pais(pais)
