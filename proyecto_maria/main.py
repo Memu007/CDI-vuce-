@@ -8137,6 +8137,11 @@ async def save_client_operation(
         )
         if operation is not None:
             # Ya se contó al generar: se completa y sus ítems se reemplazan.
+            if operation.client_id not in (None, client_id):
+                # El link compartido muestra datos del cliente anterior: se va, como al borrarlo.
+                await db.execute(
+                    sa_delete(PublicQuoteModel).where(PublicQuoteModel.operation_id == operation.id)
+                )
             for campo, valor in campos.items():
                 setattr(operation, campo, valor)
             operation.extra = {**(operation.extra or {}), "resumen": resumen}

@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-10 · fix: pasar una operación a otro cliente da de baja su presupuesto compartido (PRESUPUESTO-CLIENTE-1)
+
+- Si una operación ya compartida se guarda en otro cliente, el link que mostraba los datos del cliente anterior deja de andar, como al borrarlo. Si el guardado falla, el link queda como estaba.
+
 ## 2026-11-09 · fix: el catálogo y la memoria no mezclan proveedores ni productos en chino, y el origen se guarda entero (CATALOGO-3)
 
 - Un proveedor con nombre sólo en chino, emoji o con los mismos 60 primeros caracteres que otro ya no comparte catálogo; «电线 2mm» y «钢管 2mm» son dos productos. Las filas viejas se migran al arrancar sin perder ninguna.
