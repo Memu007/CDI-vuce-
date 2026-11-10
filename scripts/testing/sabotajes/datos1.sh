@@ -126,6 +126,17 @@ BORRA=$'    if operation.client_id not in (None, client_id):\n'
 sabotaje $M "pasada a otro cliente, el link sigue andando" \
   "$BORRA" $'    if False:\n' \
   "$P" "AssertionError: (True, 200)" "assert 200 == 404"
+sabotaje $M "borrar el cliente anterior deja el link de la operación pasada" \
+  "$BORRA" $'    if False:\n' \
+  "FAILED $T::test_borrar_el_cliente_anterior_no_deja_el_link_de_la_operacion_pasada" "assert 200 == 404"
+sabotaje $M "pasada a otro cliente, sólo se borra uno de sus links" \
+  $'        await db.execute(\n            sa_delete(PublicQuoteModel).where(PublicQuoteModel.operation_id == operation.id)\n        )\n' \
+  $'        q = (await db.execute(sa_select(PublicQuoteModel).where(PublicQuoteModel.operation_id == operation.id))).scalars().first()\n        await db.delete(q)\n' \
+  "$P" "AssertionError: (True, 200)" "assert 200 == 404"
+sabotaje $M "borrar el cliente anterior suelta también la operación que ya pasó" \
+  $'        op_rows = await db.execute(\n            sa_select(OperationModel).where(\n                OperationModel.client_id == client_id,\n                OperationModel.owner_username == username,\n' \
+  $'        op_rows = await db.execute(\n            sa_select(OperationModel).where(\n                OperationModel.owner_username == username,\n' \
+  "FAILED $T::test_borrar_el_cliente_anterior_no_deja_el_link_de_la_operacion_pasada" "assert None =="
 sabotaje $M "se borra aunque siga en el mismo cliente" \
   "$BORRA" $'    if True:\n' \
   "$P" "AssertionError: (False, 200)" "assert 404 == 200"
@@ -141,9 +152,9 @@ sabotaje $M "se borran también los links de otras operaciones" \
   'sa_delete(PublicQuoteModel).where(PublicQuoteModel.operation_id.isnot(None))' \
   "$P" "AssertionError: otra operación del mismo cliente" "assert 404 == 200"
 sabotaje $M "el guardado encuentra la operación de otro dueño" \
-  $'            OperationModel.owner_username == owner_username,\n            OperationModel.generated_file == archivo,\n' \
-  $'            OperationModel.generated_file == archivo,\n' \
-  "$P" "AssertionError: otro dueño" "assert 404 == 200"
+  $'        OperationModel.id == operacion_id,\n        OperationModel.owner_username == username,\n' \
+  $'        OperationModel.id == operacion_id,\n' \
+  "$P" "AssertionError: assert '" "' != '"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

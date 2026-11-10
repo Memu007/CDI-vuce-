@@ -189,8 +189,8 @@ def otro_usuario(auth_override):
 
 @pytest.fixture()
 def creados(cliente_http):
-    """Clientes que creó la prueba; al terminar se borran (con sus operaciones
-    y presupuestos) como su dueño."""
+    """Clientes que creó la prueba; al terminar los borra su dueño, y sus
+    operaciones quedan sin cliente."""
     lista = []
     yield lista
     app.dependency_overrides.pop(get_db, None)
@@ -311,7 +311,7 @@ async def test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto(
     _como(dueno)
     a, b = _cliente(c, creados), _cliente(c, creados)
     op = _guardar(c, a).json()["operation_id"]
-    token = _compartir(c, op)
+    tokens = [_compartir(c, op), _compartir(c, op)]
     otro_op = _guardar(c, a).json()["operation_id"]
     otro_token = _compartir(c, otro_op)
     op_suelta = await _operacion_sin_cliente(dueno, f"MARIA_{uuid.uuid4().hex}.TXT")
@@ -329,7 +329,8 @@ async def test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto(
         assert r.status_code == codigo, (cid == b, opid == op, r.text)
         assert r.status_code != 200 or r.json()["operation_id"] == opid, "la misma operación"
         esperado = 200 if sigue else 404
-        assert c.get(f"/api/quotes/public/{token}").status_code == esperado, (cid == b, codigo)
+        for token in tokens:
+            assert c.get(f"/api/quotes/public/{token}").status_code == esperado, (cid == b, codigo)
     assert c.get(f"/api/quotes/public/{otro_token}").status_code == 200, "otra operación del mismo cliente"
     assert await _presupuestos_de(op) == 0
     assert await _cliente_de(op) == b
@@ -346,20 +347,18 @@ async def test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto(
     assert await _cliente_de(otro_op) == a
 
 
-@pytest.mark.parametrize("pasarla", [True, False])
 async def test_borrar_el_cliente_anterior_no_deja_el_link_de_la_operacion_pasada(
-    pasarla, dueno, cliente_http, creados
+    dueno, cliente_http, creados
 ):
     """Pasada a B, la operación ya no es de A: borrar A no la toca y su link no
-    vuelve. Sin pasarla, borrar A se lleva el link."""
+    vuelve."""
     c = cliente_http
     _como(dueno)
     a, b = _cliente(c, creados), _cliente(c, creados)
     op = _guardar(c, a).json()["operation_id"]
     token = _compartir(c, op)
-    if pasarla:
-        assert _guardar(c, b, op).status_code == 200
+    assert _guardar(c, b, op).status_code == 200
     assert c.delete(f"/api/clientes/{a}").status_code == 200
     assert c.get(f"/api/quotes/public/{token}").status_code == 404
     assert await _presupuestos_de(op) == 0
-    assert await _cliente_de(op) == (b if pasarla else None)
+    assert await _cliente_de(op) == b
