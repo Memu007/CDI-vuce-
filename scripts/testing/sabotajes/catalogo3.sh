@@ -129,9 +129,17 @@ sabotaje $M "la migración no salta la fila que choca" \
   "FAILED $T::test_la_migracion_separa_los_proveedores_y_los_productos_mezclados"
 # D78: memoria y NCM recordado
 sabotaje proyecto_maria/services/client_memory.py "la memoria del cliente compara sin las letras no latinas" \
-  'score = parecido(clave, clave_de_producto(row.descripcion or ""))' \
-  'score = parecido(clave.partition("~")[0], clave_de_producto(row.descripcion or "").partition("~")[0])' \
+  'parecido(clave, clave_de_producto(row.descripcion or ""))' \
+  'parecido(clave.partition("~")[0], clave_de_producto(row.descripcion or "").partition("~")[0])' \
   "FAILED $T::test_la_memoria_del_cliente_usa_la_misma_clave"
+sabotaje proyecto_maria/services/client_memory.py "ante un empate vuelve a no preferir el texto idéntico" \
+  'row.descripcion == tal_cual,' \
+  'False,' \
+  "FAILED $T::test_ante_un_empate_gana_el_texto_identico"
+sabotaje proyecto_maria/services/client_memory.py "ante un empate vuelve a ganar la primera fila que da la base" \
+  'row.ultima_vez is not None, row.ultima_vez, row.id)' \
+  ')' \
+  "FAILED $T::test_ante_un_empate_gana_la_ultima_confirmada"
 sabotaje $M "el NCM recordado vuelve a comparar con la clave vieja" \
   'catalog_svc.clave_de_producto(recordado.get("descripcion") or "")' \
   'catalog_svc._normalize(recordado.get("descripcion") or "")' \

@@ -166,6 +166,43 @@ def test_lo_que_se_lee_igual_se_encuentra(client, guardado, buscado, como):
         "ninguno" if como == "none" else "cliente", como == "exact"), mem
 
 
+def _confirmar(client, cid, desc, ncm):
+    r = client.post("/api/ncm/guardar-uso", json={
+        "descripcion": desc, "ncm": ncm, "vendor_name": VENDOR, "client_id": cid})
+    assert r.json() == {"success": True, "historial_guardado": True}, r.text
+
+
+def _recordado(client, cid, desc):
+    r = client.post("/api/catalog/lookup", json={
+        "items": [{"descripcion": desc}], "vendor_name": "Otro", "client_id": cid})
+    assert r.status_code == 200, r.text
+    return r.json()["items"][0]["ncm"]
+
+
+@pytest.mark.parametrize("invertido", [False, True])
+@pytest.mark.parametrize("a, b", [("Cable 2,5mm²", "Cable 2,5mm2"), ("Bolt Ｍ８", "Bolt M8"),
+                                  ("Capacitor 10µF", "Capacitor 10μF")])
+def test_ante_un_empate_gana_el_texto_identico(client, a, b, invertido):
+    cid = _cliente(client)
+    guardados = [(a, NCM), (b, "84714900")]
+    for desc, ncm in reversed(guardados) if invertido else guardados:
+        _confirmar(client, cid, desc, ncm)
+    assert [_recordado(client, cid, desc) for desc, _ in guardados] == [NCM, "84714900"]
+
+
+@pytest.mark.parametrize("a, b, buscado", [
+    ("Cable 2,5mm2", "Cable 2,5mm2", "Cable 2,5mm2"),
+    ("Cable 2,5mm²", "Cable 2,5mm2", "CABLE 2,5MM2"),
+])
+def test_ante_un_empate_gana_la_ultima_confirmada(client, a, b, buscado):
+    cid = _cliente(client)
+    vistos = []
+    for desc, ncm in [(a, NCM), (b, "84714900"), (a, NCM)]:
+        _confirmar(client, cid, desc, ncm)
+        vistos.append(_recordado(client, cid, buscado))
+    assert vistos == [NCM, "84714900", NCM]
+
+
 @pytest.mark.parametrize("recordado, del_proveedor, sale", [
     ("螺丝钉", "螺丝钉", SIM),
     ("电线 2mm", "钢管 2mm", "84714900"),

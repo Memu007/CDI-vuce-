@@ -19,7 +19,9 @@ Comprueba:
 - que «电线 2mm» y «钢管 2mm» quedan en dos filas;
 - que un tercer arranque no cambia nada;
 - que un worker arranca aunque otro tenga tomada más de 5 s la migración
-  de las claves.
+  de las claves;
+- que ante dos productos que empatan en parecido gana el texto idéntico y
+  después el último confirmado, guardados en cualquier orden.
 
 uso (con un Postgres local y descartable, nunca el de producción; el usuario
 tiene que poder crear bases):
@@ -93,6 +95,42 @@ with TestClient(m.app, raise_server_exceptions=False) as c:
         r = c.post("/api/ncm/guardar-uso", json={"descripcion": desc, "ncm": ncm, "vendor_name": nombre})
         out[desc] = r.status_code
 print("GUARDADO " + json.dumps(out))
+'''
+
+# Dos textos que empatan en parecido, guardados en un orden y en el otro, y el
+# mismo texto con dos NCM confirmados A, B, A: imprime qué NCM sugiere cada vez.
+EMPATAR = r'''
+import json, sys
+from fastapi.testclient import TestClient
+import proyecto_maria.main as m
+from proyecto_maria.core.rate_limit import limiter
+limiter.enabled = False
+usuario, clave, a, b = json.loads(sys.argv[1])
+pares = [("Cable 2,5mm²", "Cable 2,5mm2"), ("Bolt Ｍ８", "Bolt M8"), ("Capacitor 10µF", "Capacitor 10μF")]
+out = {"identico": [], "ultima": []}
+with TestClient(m.app, raise_server_exceptions=False) as c:
+    assert c.post("/auth/login", json={"username": usuario, "password": clave}).status_code == 200
+    def cliente():
+        return c.post("/api/clientes", json={"nombre": "Cliente sintetico"}).json()["cliente"]["id"]
+    def confirmar(cid, desc, ncm):
+        c.post("/api/ncm/guardar-uso", json={"descripcion": desc, "ncm": ncm, "vendor_name": "P", "client_id": cid})
+    def sugiere(cid, desc):
+        r = c.post("/api/catalog/lookup", json={"items": [{"descripcion": desc}], "vendor_name": "Otro", "client_id": cid})
+        return r.json()["items"][0]["ncm"]
+    for x, y in pares:
+        for guardados in ([(x, a), (y, b)], [(y, b), (x, a)]):
+            cid = cliente()
+            for desc, ncm in guardados:
+                confirmar(cid, desc, ncm)
+            out["identico"].append([sugiere(cid, x), sugiere(cid, y)])
+    for x, y, buscado in [("Cable 2,5mm2",) * 3, ("Cable 2,5mm²", "Cable 2,5mm2", "CABLE 2,5MM2")]:
+        cid = cliente()
+        vistos = []
+        for desc, ncm in [(x, a), (y, b), (x, a)]:
+            confirmar(cid, desc, ncm)
+            vistos.append(sugiere(cid, buscado))
+        out["ultima"].append(vistos)
+print("EMPATES " + json.dumps(out))
 '''
 
 ARRANCAR = r'''
@@ -225,6 +263,15 @@ try:
     tomado.close()
     chequear("ARRANCO" in s, "un worker arranca mientras otro tiene tomada la migración de claves: "
              + (e.strip().splitlines() or [""])[-1][:200])
+
+    # --- 6. un empate no depende del orden de las filas
+    OTRO = "84714900"
+    s, e = correr(NUEVA, EMPATAR, json.dumps([USUARIO, CLAVE, NCM, OTRO])).communicate(timeout=600)
+    empates = json.loads(s.split("EMPATES ")[1].splitlines()[0]) if "EMPATES " in s else e[-1500:]
+    chequear(isinstance(empates, dict) and empates["identico"] == [[NCM, OTRO]] * 6,
+             f"ante un empate gana el texto idéntico, en los dos órdenes de guardado: {empates}")
+    chequear(isinstance(empates, dict) and empates["ultima"] == [[NCM, OTRO, NCM]] * 2,
+             f"ante un empate sin texto idéntico gana la última confirmada: {empates}")
 finally:
     with contextlib.suppress(Exception):
         con = psycopg2.connect(URL)
