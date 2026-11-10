@@ -80,17 +80,17 @@ def ncm_para_guardar(valor) -> str:
     return ncm
 
 
-def origen_para_guardar(valor) -> str:
-    """El origen como se guarda; "" si no hay. «XX» es el «sin origen» de la factura."""
+def origen_para_guardar(valor) -> tuple[str, str]:
+    """(origen como se guarda, aviso): ("", "") si no hay, ("", aviso) si no es
+    un país de la tabla. «XX» es el «sin origen» de la factura. ValueError si
+    no se puede guardar como texto."""
     origen = texto_para_guardar(valor, "El origen")
     if not origen or origen.upper() == "XX":
-        return ""
+        return "", ""
     # Import local: despacho_lector importa de este módulo.
     from proyecto_maria.core.despacho_lector import origen_para_catalogo
-    guardado, problema = origen_para_catalogo(origen)
-    if problema:
-        raise ValueError(problema)
-    return guardado or ""
+    guardado, aviso = origen_para_catalogo(origen)
+    return ("", aviso) if aviso else (guardado or "", "")
 
 
 # Patron valido para vendor_id (slug generado por _vendor_key).
@@ -112,28 +112,45 @@ def _normalize(text: str) -> str:
     """Normaliza texto para usar como clave de catalogo."""
     if not text:
         return ""
-    text = unicodedata.normalize("NFD", text)
-    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
+    if not text.isascii():
+        text = unicodedata.normalize("NFD", text)
+        text = "".join(c for c in text if unicodedata.category(c) != "Mn")
     text = re.sub(r"[^a-z0-9\s]", " ", text.lower())
     return re.sub(r"\s+", " ", text).strip()
 
 
 def _sufijo(texto: str) -> str:
     """Resumen de las letras y cifras no latinas que _normalize descarta (CJK,
-    ancho completo); «º», «ª» y «µ» son de Latin-1 y no cuentan."""
+    kana); «º», «ª» y «µ» son de Latin-1 y no cuentan."""
     fuera = "".join(
         c for c in unicodedata.normalize("NFC", texto)
-        if unicodedata.category(c)[0] == "L" or unicodedata.category(c) == "Nd"
-        if not _normalize(c) and c > "\u024f" and not unicodedata.name(c, "").startswith("LATIN")
+        if c > "\u024f" and (unicodedata.category(c)[0] == "L" or unicodedata.category(c) == "Nd")
+        if not _normalize(c) and not unicodedata.name(c, "").startswith("LATIN")
     )
     if not fuera:
         return ""
     return hashlib.sha256(fuera.casefold().encode("utf-8", "surrogatepass")).hexdigest()[:16]
 
 
+def _compatible(texto: str) -> str:
+    """NFKC salvo en «º», «ª» y los símbolos, para que «Nº» siga igual a «N°» y
+    «Bolt™» a «Bolt»."""
+    if texto.isascii() or unicodedata.is_normalized("NFKC", texto):
+        return texto
+    return unicodedata.normalize("NFC", "".join(
+        c if c in "ºª" or unicodedata.category(c)[0] == "S" else unicodedata.normalize("NFKC", c)
+        for c in texto
+    ))
+
+
 def clave_de_producto(descripcion: str) -> str:
-    """Clave del producto en el catálogo. Lo que normaliza a vacío (CJK, emoji) usa
-    un resumen del texto: entra en el índice único y «~» no sale de _normalize."""
+    """Clave del producto en el catálogo: lo que se lee igual da la misma."""
+    return _clave(_compatible(descripcion))
+
+
+def _clave(descripcion: str) -> str:
+    """Lo que normaliza a vacío (CJK, emoji) usa un resumen del texto: entra en
+    el índice único y «~» no sale de _normalize."""
     clave = _normalize(descripcion)
     sufijo = _sufijo(descripcion) if clave else ""
     if clave:
@@ -144,14 +161,16 @@ def clave_de_producto(descripcion: str) -> str:
 
 def parecido(clave_a: str, clave_b: str) -> float:
     """Parecido entre dos claves de producto: con letras no latinas distintas
-    no se parecen, aunque compartan el resto."""
+    no se parecen; si sólo una las tiene, a lo sumo llegan a parecidas."""
     if clave_a == clave_b:
         return 1.0
     base_a, _, sufijo_a = clave_a.partition("~")
     base_b, _, sufijo_b = clave_b.partition("~")
-    if sufijo_a != sufijo_b:
+    if sufijo_a == sufijo_b:
+        return _similarity(base_a, base_b)
+    if sufijo_a and sufijo_b:
         return 0.0
-    return _similarity(base_a, base_b)
+    return min(_similarity(base_a, base_b), FUZZY_THRESHOLD)
 
 
 _MAX_VENDOR_ID = 60
@@ -163,7 +182,7 @@ def _vendor_key(vendor_name: str) -> str:
     nombre = (vendor_name or "").replace("\x00", "").strip()
     if not nombre:
         return ""
-    clave = clave_de_producto(nombre).replace(" ", "_")
+    clave = _clave(nombre).replace(" ", "_")
     if len(clave) <= _MAX_VENDOR_ID:
         return clave
     return clave[:39] + "~" + hashlib.sha256(clave.encode("utf-8")).hexdigest()[:20]
@@ -418,7 +437,9 @@ def _producto_valido(prod) -> Optional[tuple]:
     if not desc:
         return None
     ncm = ncm_para_guardar(prod.get("ncm")) or ncm_para_guardar(prod.get("pieza"))
-    origen = origen_para_guardar(prod.get("origen"))
+    origen, aviso = origen_para_guardar(prod.get("origen"))
+    if aviso:
+        raise ValueError(aviso)
     unidad = texto_para_guardar(prod.get("unidad_medida"), "La unidad")
     return desc, ncm, origen, unidad, _precio(prod.get("valor_unitario"))
 
@@ -578,8 +599,11 @@ async def update_product(
         ("descripcion_original", "La descripción"),
         ("unidad_medida", "La unidad"),
     ) if updates.get(campo) is not None}
+    aviso = ""
     if updates.get("origen") is not None:
-        textos["origen"] = origen_para_guardar(updates["origen"])
+        origen, aviso = origen_para_guardar(updates["origen"])
+        if not aviso:
+            textos["origen"] = origen
     if updates.get("ncm") is not None:
         textos["ncm"] = ncm_para_guardar(updates["ncm"])
 
@@ -618,7 +642,7 @@ async def update_product(
     await db.commit()
     await db.refresh(row)
 
-    return {**_row_to_dict(row), "_key": new_key}
+    return {**_row_to_dict(row), "_key": new_key, **({"aviso": aviso} if aviso else {})}
 
 
 async def delete_product(

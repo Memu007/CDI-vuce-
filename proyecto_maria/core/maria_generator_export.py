@@ -9,9 +9,8 @@ from datetime import datetime
 # para que import y export no diverjan. La tabla anterior tenia codigos MAL.
 from proyecto_maria.core.maria_generator import (
     PAISES_INDEC,
+    codigo_de_pais,
     get_unidad_codigo,
-    _normalizar_pais,
-    _PAISES_NORM,
     pais_reconocido,
 )
 
@@ -28,30 +27,10 @@ TIPOS_DESTINACION_EXPORT = {
 
 
 def get_pais_codigo(pais: str) -> int:
-    """Obtiene el código de país oficial MARIA para exportación.
-
-    Misma estrategia que importación (match exacto normalizado primero, luego
-    prefijo estricto) pero con default 212 (USA) en vez de China. Usar
-    `pais_reconocido()` para detectar el caso "no reconocido" y avisar.
-    """
-    if not pais:
-        return PAIS_DEFAULT_EXPORT
-
-    if str(pais).strip().isdigit():
-        return int(str(pais).strip())
-
-    norm = _normalizar_pais(pais)
-    # 1) Match exacto normalizado
-    if norm in _PAISES_NORM:
-        return _PAISES_NORM[norm]
-    # 2) Fallback por prefijo estricto (>=4 chars) solo si no hubo exacto
-    if len(norm) >= 4:
-        prefijo = norm[:4]
-        for key_norm, code in _PAISES_NORM.items():
-            if key_norm.startswith(prefijo):
-                return code
-
-    return PAIS_DEFAULT_EXPORT
+    """El código MARIA del país de destino, con el criterio de importación;
+    si no se reconoce, 212 (USA). Usar `pais_reconocido()` para avisar."""
+    codigo = codigo_de_pais(pais)
+    return PAIS_DEFAULT_EXPORT if codigo is None else codigo
 
 
 def generate_maria_export_txt(

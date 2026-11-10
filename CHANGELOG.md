@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-10 · fix: el catálogo no pierde el NCM por un origen que no reconoce y encuentra lo que se lee igual (CATALOGO-3)
+
+- Guardar un uso o cambiar el NCM de una fila con un origen viejo o no reconocido guarda el NCM y avisa que el origen quedó sin cambiar.
+- Dos descripciones que se leen igual (µ/μ, ｶﾞｽ/ガス, ², ﬁ) dan la misma clave; «123» se lee como LIBIA.
+
 ## 2026-11-10 · fix: pasar una operación a otro cliente da de baja su presupuesto compartido (PRESUPUESTO-CLIENTE-1)
 
 - Si una operación ya compartida se guarda en otro cliente, el link que mostraba los datos del cliente anterior deja de andar, como al borrarlo. Si el guardado falla, el link queda como estaba.

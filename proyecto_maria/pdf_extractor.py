@@ -2069,10 +2069,9 @@ def _iso2_por_codigo_maria() -> dict:
 
 def _origen_desde_factura(raw) -> str:
     """País leído de la factura → código de dos letras de la tabla oficial
-    VUCE, o "" si no se reconoce. Acepta dos letras, tres letras (ISO 3166-1)
-    y el nombre ("China", "P.R. China")."""
+    VUCE (o el nombre, si el país no tiene uno), o "" si no se reconoce.
+    Acepta dos letras, tres letras (ISO 3166-1) y el nombre ("China", "P.R. China")."""
     from proyecto_maria.core.maria_generator import get_pais_codigo, pais_reconocido
-    from proyecto_maria.core.paises_iso3 import ISO3_A_ISO2
 
     texto = str(raw or '').strip()
     # «NA» en una factura casi siempre es «no aplica», no Namibia.
@@ -2081,10 +2080,8 @@ def _origen_desde_factura(raw) -> str:
     mayus = texto.upper()
     if len(mayus) == 2 and mayus.isalpha():
         return mayus if pais_reconocido(mayus) else ''
-    if len(mayus) == 3 and mayus in ISO3_A_ISO2:
-        return ISO3_A_ISO2[mayus]
     if pais_reconocido(texto):
-        return _iso2_por_codigo_maria().get(get_pais_codigo(texto), '')
+        return _iso2_por_codigo_maria().get(get_pais_codigo(texto), texto)
     return ''
 
 

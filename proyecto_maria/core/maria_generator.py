@@ -694,6 +694,32 @@ def codigos_tabla_oficial() -> frozenset:
     return frozenset(int(p["code"]) for p in json.loads(m.group(1)))
 
 
+@lru_cache(maxsize=1)
+def _nombres_de_pais() -> dict:
+    """Nombre normalizado -> código: los alias de la pantalla más los del servidor."""
+    js = _PAISES_PANTALLA.read_text(encoding="utf-8")
+    m = re.search(r"const ALIASES = (\{.*?\});", js)
+    if not m:
+        raise RuntimeError(f"No se encontró la tabla de nombres (const ALIASES) en {_PAISES_PANTALLA}")
+    return {**{k: int(v) for k, v in json.loads(m.group(1)).items()}, **_PAISES_NORM}
+
+
+def codigo_de_pais(texto) -> int | None:
+    """El código del país si se reconoce con certeza (código de la tabla, «0313»,
+    «313 · TAIWAN» o un nombre conocido); si no, None. Es el criterio de
+    `resolve` en paises_maria.js: la pantalla y el servidor aceptan lo mismo.
+    La forma se mira antes de normalizar: «ＢＲ» o «ÉS» pasarían como «BR» y «ES»."""
+    escrito = unicodedata.normalize("NFC", str(texto or "")).strip()
+    if not escrito or unicodedata.normalize("NFKC", escrito) != escrito:
+        return None
+    if len(escrito) <= 2 and not (escrito.isascii() and escrito.isalpha()):
+        return None
+    m = re.fullmatch(r"0?([0-9]{3})(?:\s*[·-].*)?", escrito, flags=re.DOTALL)
+    if m and int(m.group(1)) in codigos_tabla_oficial():
+        return int(m.group(1))
+    return _nombres_de_pais().get(_normalizar_pais(escrito))
+
+
 def _codigo_de_la_tabla(texto: str) -> bool:
     """Un código de país: sólo cifras 0-9 y en la tabla oficial («²», «٢٢٢» o
     «99999» no son países)."""
@@ -752,24 +778,14 @@ def pais_reconocido(pais) -> bool:
     que son adivinanzas. Sirve para que el sistema AVISE en vez de meter un
     código de origen errado en el TXT aduanero (ej: 'XX', 'Vietnam').
     """
-    if pais is None or str(pais).strip() == "":
-        return False
-    texto = str(pais).strip()
-    if any(c.isdigit() for c in texto):
-        return _codigo_de_la_tabla(texto)
-    return _normalizar_pais(pais) in _PAISES_NORM
+    return codigo_de_pais(pais) is not None
 
 
 def origen_valido(texto) -> str | None:
-    """El origen como se guarda si es un país de la tabla (nombre o código); si no, None.
-    La forma se mira antes de normalizar: «ＢＲ» o «ÉS» pasarían como «BR» y «ES»."""
-    escrito = unicodedata.normalize("NFC", str(texto or "")).strip()
-    if not escrito or unicodedata.normalize("NFKC", escrito) != escrito:
+    """El origen como se guarda si es un país de la tabla (nombre o código); si no, None."""
+    if codigo_de_pais(texto) is None:
         return None
-    if len(escrito) <= 2 and not (escrito.isascii() and escrito.isalpha()):
-        return None
-    if not pais_reconocido(escrito):
-        return None
+    escrito = unicodedata.normalize("NFC", str(texto)).strip()
     return escrito.upper() if len(escrito) == 2 else escrito
 
 
@@ -797,6 +813,9 @@ def get_pais_codigo(pais: str) -> int:
     """
     if not pais:
         return PAIS_DEFAULT_IMPORT
+    codigo = codigo_de_pais(pais)
+    if codigo is not None:
+        return codigo
 
     # Un código tiene hasta 4 cifras, como en `_codigo_de_la_tabla`: con miles
     # de cifras int() lanza ValueError.
@@ -804,10 +823,7 @@ def get_pais_codigo(pais: str) -> int:
         return int(str(pais).strip())
 
     norm = _normalizar_pais(pais)
-    # 1) Match exacto normalizado
-    if norm in _PAISES_NORM:
-        return _PAISES_NORM[norm]
-    # 2) Fallback por prefijo estricto (>=4 chars) solo si no hubo exacto
+    # Fallback por prefijo estricto (>=4 chars) solo si no hubo exacto
     if len(norm) >= 4:
         prefijo = norm[:4]
         for key_norm, code in _PAISES_NORM.items():

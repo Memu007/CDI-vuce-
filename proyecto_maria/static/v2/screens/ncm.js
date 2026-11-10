@@ -1847,6 +1847,7 @@
             });
             const data = await res.json().catch(() => ({}));
             guardado = data.success === true && data.historial_guardado !== false;
+            if (guardado && data.aviso && CDI.toast) CDI.toast('Origen no reconocido', data.aviso, 'warning');
         } catch (_) { /* red caída o plan vencido: el mismo aviso */ }
         if (!guardado && CDI.toast) {
             CDI.toast('No se guardó en la memoria de productos',

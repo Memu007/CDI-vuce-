@@ -10466,7 +10466,7 @@ async def guardar_uso_ncm(
         descripcion = catalog_svc.texto_para_guardar(data.get("descripcion"))
         ncm = catalog_svc.texto_para_guardar(data.get("ncm"), "El NCM")
         vendor_name = catalog_svc.texto_para_guardar(data.get("vendor_name"), "El proveedor")
-        origin = catalog_svc.origen_para_guardar(data.get("origen"))
+        origin, aviso_origen = catalog_svc.origen_para_guardar(data.get("origen"))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not descripcion or not ncm:
@@ -10522,7 +10522,8 @@ async def guardar_uso_ncm(
         logging.warning("ncm confirmation memory unavailable: %s", err)
         historial_guardado = False
 
-    return {"success": True, "historial_guardado": historial_guardado}
+    respuesta = {"success": True, "historial_guardado": historial_guardado}
+    return {**respuesta, "aviso": f"Se guardó sin origen. {aviso_origen}"} if aviso_origen else respuesta
 
 @app.post("/api/ncm/import-historial")
 async def import_ncm_historial(
@@ -12086,7 +12087,9 @@ async def catalog_update_product(
                 status_code=404,
                 detail=f"Producto '{product_key}' no existe o la nueva descripción colisiona con otro producto",
             )
-        return {"success": True, "vendor_id": vendor_id, "producto": updated}
+        aviso = updated.pop("aviso", "")
+        respuesta = {"success": True, "vendor_id": vendor_id, "producto": updated}
+        return {**respuesta, "aviso": f"El origen no cambió. {aviso}"} if aviso else respuesta
     except HTTPException:
         raise
     except ValueError as e:
