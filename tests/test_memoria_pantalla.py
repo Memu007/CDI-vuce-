@@ -29,21 +29,21 @@ def test_la_posicion_de_la_pantalla_alimenta_la_memoria_por_las_cuatro_entradas(
     cid = _cliente(client)
     base = f"/api/clientes/{cid}/catalogo/productos"
 
-    r = client.post("/api/ncm/guardar-uso", json={
-        "descripcion": "MONITOR GUARDAR USO", "ncm": posicion, "origen": "CN", "client_id": cid})
+    r = client.post(f"{base}/learn", json={"items": [{"ncm": "84719000", "descripcion": "MONITOR PUT"}]})
     assert r.status_code == 200, r.text
-    r = client.post(f"/api/clientes/{cid}/operaciones", json={"items": [{
-        "pieza": posicion, "ncm": posicion, "descripcion": "MONITOR OPERACION",
-        "cantidad": 1, "valor_unitario": 10}]})
-    assert r.status_code == 200, r.text
-    r = client.post(f"{base}/learn", json={"items": [
-        {"ncm": posicion, "descripcion": "MONITOR LEARN"},
-        {"ncm": "84719000", "descripcion": "MONITOR PUT"}]})
-    assert r.status_code == 200, r.text
-    editado = next(p["id"] for p in client.get(base).json()["productos"] if p["descripcion"] == "MONITOR PUT")
-    r = client.put(f"{base}/{editado}", json={"ncm": posicion})
-    assert r.status_code == 200, r.text
+    editado = client.get(base).json()["productos"][0]["id"]
 
+    entradas = {
+        "guardar-uso": client.post("/api/ncm/guardar-uso", json={
+            "descripcion": "MONITOR GUARDAR USO", "ncm": posicion, "origen": "CN", "client_id": cid}),
+        "operacion": client.post(f"/api/clientes/{cid}/operaciones", json={"items": [{
+            "pieza": posicion, "ncm": posicion, "descripcion": "MONITOR OPERACION",
+            "cantidad": 1, "valor_unitario": 10}]}),
+        "learn": client.post(f"{base}/learn", json={"items": [{"ncm": posicion, "descripcion": "MONITOR LEARN"}]}),
+        "put": client.put(f"{base}/{editado}", json={"ncm": posicion}),
+    }
     catalogo = {p["descripcion"]: p["ncm"] for p in client.get(base).json()["productos"]}
-    assert catalogo == {d: "84713000" for d in (
-        "MONITOR GUARDAR USO", "MONITOR OPERACION", "MONITOR LEARN", "MONITOR PUT")}, (posicion, catalogo)
+    assert ({e: r.status_code for e, r in entradas.items()}, catalogo) == (
+        dict.fromkeys(entradas, 200),
+        dict.fromkeys(("MONITOR GUARDAR USO", "MONITOR OPERACION", "MONITOR LEARN", "MONITOR PUT"), "84713000"),
+    ), posicion
