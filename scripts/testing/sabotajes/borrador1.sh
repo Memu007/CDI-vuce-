@@ -2,8 +2,11 @@
 # El arranque no saca a la usuaria de Clientes (scripts/testing/pantalla_borrador1.js).
 # Corre la prueba con el producto (tiene que dar ok) y con cada parte del
 # arreglo revertida en un worktree descartable (tiene que dar su FALLA):
-#   decide_tarde: el borrador se adopta aunque ya haya pantalla
-#   sin_freno:    el arranque cambia de pantalla aunque ya haya una
+#   decide_tarde:  el borrador se adopta aunque ya haya pantalla
+#   sin_freno:     el arranque cambia de pantalla aunque ya haya una
+#   siempre_tarde: el borrador se trata como llegado tarde aunque no haya pantalla
+#   tour_ocupa:    la carga a la que llevó el tour cuenta como pantalla elegida
+#   queda_carga:   recuperado en la carga, no se pasa a review
 # Cada corrida levanta la API con una base nueva: el registro tiene límite por hora.
 #
 # uso: PY=/ruta/al/venv/bin/python [PUERTO=8863] scripts/testing/sabotajes/borrador1.sh [SHA]
@@ -65,13 +68,22 @@ correr() {
 git checkout -q -- "$J"
 correr producto 0 ""
 
-cambiar "return buscarBorrador().then(b => (!b ? null : currentScreen ? adoptarTarde(b) : adoptarBorrador(b)));" \
-        "return buscarBorrador().then(b => (b ? adoptarBorrador(b) : null));"
+D="currentScreen && currentScreen !== 'upload' ? adoptarTarde(b) : adoptarBorrador(b)"
+cambiar "$D" "adoptarBorrador(b)"
 correr decide_tarde 1 "hay una operación de antes: no apareció el aviso «Quedó guardada la operación»"
 
-cambiar "                if (currentScreen) return;
+cambiar "                if (currentScreen && !parsed) return;
 " ""
-correr sin_freno 1 "el usuario no llega a tiempo: el arranque la sacó de Clientes y la llevó a upload"
+correr sin_freno 1 "el usuario no llega a tiempo: el arranque tenía que dejarla en clientes y la llevó a upload"
+
+cambiar "$D" "adoptarTarde(b)"
+correr siempre_tarde 1 "sin ir a ninguna pantalla: el arranque tenía que dejarla en review y la llevó a upload"
+
+cambiar "$D" "currentScreen ? adoptarTarde(b) : adoptarBorrador(b)"
+correr tour_ocupa 1 "el tour la lleva a la carga: el arranque tenía que dejarla en review y la llevó a upload"
+
+cambiar "if (currentScreen && !parsed) return;" "if (currentScreen) return;"
+correr queda_carga 1 "el tour la lleva a la carga: el arranque tenía que dejarla en review y la llevó a upload"
 
 git checkout -q -- "$J"
 echo "corridas que no dieron lo esperado: $FALLAS"
