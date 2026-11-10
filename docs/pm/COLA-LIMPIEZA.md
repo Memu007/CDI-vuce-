@@ -142,3 +142,12 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `tests/test_catalogo3.py`: ningún caso de la memoria del cliente con
   `ultima_vez` nula («sin fecha pierde» sólo lo prueba el acta de la PM):
   un caso con la fila sin fecha en los dos órdenes, con su rojo.
+- `proyecto_maria/main.py` login: el límite cuenta después de `verify_password`;
+  cada clave mala paga bcrypt antes del freno. Contar antes, si CONEXIONES-1 B
+  muestra que pesa (D146 b).
+- `proyecto_maria/main.py` `delete_cliente`: la operación queda sin cliente con su
+  `generated_file`, y el TXT se sigue bajando (fila 4 del code-review de INTEGRAR-1).
+- `proyecto_maria/main.py` tope de registro: el `or` corta antes y el intento
+  frenado por hora no suma al diario (fila 7 del code-review de INTEGRAR-1).
+- `finalize.js`: el `{code, message}` del 409 de regeneraciones quedó sin uso
+  desde COBRO-CORTE-1; sacarlo.

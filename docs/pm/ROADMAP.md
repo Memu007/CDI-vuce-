@@ -183,8 +183,9 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | 🔵 BACKUP-1 | Dev técnica (pasada por la PM el 28/10) | Ver `AUDITORIA-2026-10-06.md`. BACKUP-1a ✅ (08/11, `ca84c5f`): copia y restauración probada; el destino fuera de Railway y dónde se programa esperan a Emi |
 | ✅ DISCO-1 | Dev MARIA | El historial de NCM de cada estudio pasa del disco de Railway a la base (D4 de `AUDITORIA-2026-10-06.md`) |
 | ✅ CATALOGO-3 | Dev MARIA | Sí de Emi el 09/11: un proveedor sólo en chino (o emoji) tiene su propio catálogo, dos productos que sólo difieren en caracteres chinos no se pisan, la memoria del cliente encuentra lo guardado con la clave nueva, el origen se valida igual en los tres lugares, y la pantalla dice qué producto no se pudo aprender (D76, D77, D78, D80, D84-D86) |
-| ⚪ PRESUPUESTO-CLIENTE-1 | Dev MARIA, tras CATALOGO-3 | Sí de Emi el 09/11 (D141 a): al pasar una operación a otro cliente, el link de presupuesto compartido con los datos del cliente anterior deja de andar |
-| ⚪ BORRADOR-1 | Dev técnica, tras INTEGRAR-1 | Sí de Emi el 09/11 (D143 a): recuperar el borrador no saca a la usuaria de la pantalla donde está (Clientes) |
+| 🔵 PRESUPUESTO-CLIENTE-1 | Dev MARIA, se reentrega sobre la unión (INTEGRAR-1) | Sí de Emi el 09/11 (D141 a): al pasar una operación a otro cliente, el link de presupuesto compartido con los datos del cliente anterior deja de andar |
+| ✅ INTEGRAR-1 | Dev técnica | Sumada por la PM el 08/11: unir las ramas de las dos Devs sobre la de la PM; aceptada el 10/11 sobre `4555f7c4` |
+| 🔵 BORRADOR-1 | Dev técnica, entregada en `22163cec` | Sí de Emi el 09/11 (D143 a): recuperar el borrador no saca a la usuaria de la pantalla donde está (Clientes) |
 | ⚪ AUDITORIA-FINAL | PM | Ver `AUDITORIA-2026-10-06.md` |
 
 **Cierre:** publicar y probar volver atrás (cierra G3 y G6). Recién ahí
