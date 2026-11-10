@@ -25,9 +25,10 @@ async function dejarOperacion(ctx) {
     CDI.goTo('ncm');
   }, FACTURA);
   await p.waitForFunction(f => Object.keys(localStorage).some(k => k.startsWith('cdi_v2_state') && (localStorage.getItem(k) || '').includes(f)), FACTURA);
-  const cerrada = new Promise(r => p.once('close', r));
+  const cerrada = new Promise(r => p.once('close', () => r(true)));
   await p.close({ runBeforeUnload: true });
-  await cerrada;
+  if (!await Promise.race([cerrada, new Promise(r => setTimeout(() => r(false), 10000))]))
+    falla('la pestaña que deja la operación no se cerró');
 }
 
 (async () => {
@@ -55,12 +56,20 @@ async function dejarOperacion(ctx) {
         return el && !el.hidden && el.textContent.includes(t);
       }, caso.aviso, { timeout: 15000 }).then(() => true, () => false);
       soltar();
+      // Que termine lo que el arranque hace al llegar el usuario antes de mirar la pantalla.
+      await p.waitForFunction(() => CDI.currentUser && !(document.getElementById('avisoBorrador').textContent || '').includes('No se pudo comprobar'));
       const pantalla = await p.evaluate(() => (document.querySelector('.screen.is-active') || {}).dataset.screen || null);
       if (pantalla !== 'clientes') mala(caso.nombre + ': el arranque la sacó de Clientes y la llevó a ' + pantalla);
       if (!visto) mala(caso.nombre + ': no apareció el aviso «' + caso.aviso + '»');
       if (caso.borrador) {
-        const guardada = await p.evaluate(f => Object.keys(localStorage).some(k => k.startsWith('cdi_v2_state') && (localStorage.getItem(k) || '').includes(f)), FACTURA);
-        if (!guardada) mala(caso.nombre + ': la operación de antes ya no está guardada');
+        // Adoptarla la copia a la clave de esta pestaña y borra la otra: tiene que seguir en la otra.
+        const { enOtra, enEsta } = await p.evaluate(f => {
+          const propia = 'cdi_v2_state:' + sessionStorage.getItem('cdi_v2_tab');
+          return { enEsta: JSON.stringify(CDI.state || {}).includes(f),
+            enOtra: Object.keys(localStorage).some(k => k.startsWith('cdi_v2_state') && k !== propia && (localStorage.getItem(k) || '').includes(f)) };
+        }, FACTURA);
+        if (enEsta) mala(caso.nombre + ': la operación de antes se cargó en la pestaña');
+        if (!enOtra) mala(caso.nombre + ': la operación de antes ya no está guardada');
       }
       await ctx.close();
     }

@@ -28,7 +28,10 @@ levantar() {
   DATABASE_URL="sqlite+aiosqlite:///$TMPD/$1.db" \
     "$PY" -m uvicorn proyecto_maria.main:app --host 127.0.0.1 --port "$PUERTO" >"$TMPD/api_$1.log" 2>&1 &
   API=$!
-  for _ in $(seq 1 60); do curl -fsS "$BASE_URL/health" >/dev/null 2>&1 && return; sleep 1; done
+  for _ in $(seq 1 60); do
+    kill -0 "$API" 2>/dev/null || break   # otra API en el puerto no cuenta
+    curl -fsS "$BASE_URL/health" >/dev/null 2>&1 && return; sleep 1
+  done
   echo "ROTO  | $1: la API no levantó"; tail -20 "$TMPD/api_$1.log"; exit 1
 }
 
