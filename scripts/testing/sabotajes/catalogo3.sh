@@ -259,6 +259,11 @@ sabotaje $X "el extractor vuelve a tirar el origen hecho de cifras" \
   "if not texto or texto.isdigit() or texto.upper() in ('NA', 'N/A'):" \
   "FAILED $T::test_el_extractor_conserva_el_nombre_del_pais"
 
+sabotaje $C "la clave de cada fila vuelve a calcularse una vez por ítem" \
+  "@functools.lru_cache(maxsize=4096)" \
+  "@functools.lru_cache(maxsize=0)" \
+  "FAILED $T::test_un_pedido_calcula_la_clave_de_cada_fila_una_sola_vez"
+
 git checkout -q -- proyecto_maria/
 echo "fallas: $FALLAS"
 [ "$FALLAS" -eq 0 ]
