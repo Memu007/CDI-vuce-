@@ -6,8 +6,14 @@ El ancho de operation_items.origen en Postgres lo prueba
 scripts/testing/catalogo3_postgres.py.
 """
 import ast
+import hashlib
 import inspect
+import json
 import os
+import re
+import shutil
+import subprocess
+import unicodedata
 from unittest.mock import Mock, patch
 
 import pytest
@@ -112,6 +118,32 @@ def test_la_memoria_del_cliente_usa_la_misma_clave(client):
     assert (otro["source"], otro["ncm"]) == ("ninguno", None), otro
 
 
+@pytest.mark.parametrize("guardado, buscado, como", [
+    ("Capacitor 10µF 50V", "Capacitor 10μF 50V", "exact"),
+    ("Capacitor 10μF 50V", "Capacitor 10µF 50V", "exact"),
+    ("Bolt ｶﾞｽ M8", "Bolt ガス M8", "exact"),
+    ("Bolt ガス M8", "Bolt ｶﾞｽ M8", "exact"),
+    ("Cable 2,5mm²", "Cable 2,5mm2", "exact"),
+    ("Arandela ﬁna", "Arandela fina", "exact"),
+    ("Tornillo Nº 8", "Tornillo N° 8", "exact"),
+    ("Screw M8", "Screw M8 螺丝", "fuzzy"),
+    ("Screw M8 螺丝", "Screw M8", "fuzzy"),
+    ("电线 2mm", "钢管 2mm", "none"),
+])
+def test_lo_que_se_lee_igual_se_encuentra(client, guardado, buscado, como):
+    cid = _cliente(client)
+    r = client.post("/api/ncm/guardar-uso", json={
+        "descripcion": guardado, "ncm": NCM, "vendor_name": VENDOR, "client_id": cid})
+    assert r.json() == {"success": True, "historial_guardado": True}, r.text
+    m = _match(client, VENDOR, buscado)
+    assert (m["match_type"], m["match_score"] == 1.0) == (como, como == "exact"), m
+    r = client.post("/api/catalog/lookup", json={
+        "items": [{"descripcion": buscado}], "vendor_name": "Otro", "client_id": cid})
+    mem = r.json()["items"][0]
+    assert (mem["source"], mem["confidence"] == 1.0) == (
+        "ninguno" if como == "none" else "cliente", como == "exact"), mem
+
+
 @pytest.mark.parametrize("recordado, del_proveedor, sale", [
     ("螺丝钉", "螺丝钉", SIM),
     ("电线 2mm", "钢管 2mm", "84714900"),
@@ -201,12 +233,66 @@ def test_el_extractor_conserva_el_nombre_del_pais():
     assert [it["origen"] for it in items] == ["TAIWAN", "XX"]
 
 
-def test_guardar_uso_con_un_origen_que_no_es_pais_da_400_y_no_suma(client):
+# Reconocidos con su código MARIA; los demás se guardan sin origen y avisan.
+FAMILIA_ORIGEN = {"CHN": 310, "ITA": 417, "Hong Kong": 341, "MACAO": 344, "Viet Nam": None,
+                  "U.S.A.": None, "PRC": None, "Turkey": None, "TAI": None}
+
+
+@pytest.mark.parametrize("origen", FAMILIA_ORIGEN)
+def test_guardar_uso_no_pierde_el_ncm_por_un_origen_que_no_reconoce(client, origen):
     cid = _cliente(client)
+    owner, desc = _dueno(cid), f"TORNILLO {origen}"
     r = client.post("/api/ncm/guardar-uso", json={
-        "descripcion": "TORNILLO", "ncm": NCM, "vendor_name": VENDOR, "origen": "XYZ", "client_id": cid})
-    assert r.status_code == 400 and "XYZ" in r.json()["detail"], r.text
-    assert _sql("select count(*) from ncm_historial where descripcion='TORNILLO' and ncm=:n", n=NCM)[0][0] == 0
+        "descripcion": desc, "ncm": NCM, "vendor_name": VENDOR, "origen": origen, "client_id": cid})
+    assert r.status_code == 200 and r.json()["historial_guardado"] is True, r.text
+    assert _sql("select ncm from ncm_historial where owner_username=:o and descripcion=:d",
+                o=owner, d=desc) == [(NCM,)]
+    (hist,), (cat,) = (_sql("select origen_frecuente from client_product_history where client_id=:c", c=cid),
+                       _sql("select origen from vendor_catalog_products where owner_username=:o", o=owner))
+    codigo = FAMILIA_ORIGEN[origen]
+    if codigo is None:
+        assert origen in r.json()["aviso"] and cat == (None,) and hist[0] in (None, "XX"), (r.text, hist, cat)
+    else:
+        assert "aviso" not in r.json() and get_pais_codigo(cat[0]) == codigo == get_pais_codigo(hist[0]), (hist, cat)
+
+
+@pytest.mark.parametrize("origen", ["TAI", "PRC"])
+def test_cambiar_el_ncm_de_una_fila_con_origen_viejo_guarda_el_ncm(client, origen):
+    owner = _dueno(_cliente(client))
+    vid = _guardar(client, VENDOR, "TUERCA").json()["vendor_id"]
+    _escribir("update vendor_catalog_products set origen=:x where owner_username=:o", x=origen, o=owner)
+    (key,) = [k for (_, k, _) in _ids(owner)]
+    r = client.put(f"/api/catalog/{vid}/productos/{key}", json={"ncm": "84714900", "origen": origen})
+    assert r.status_code == 200 and origen in r.json()["aviso"], r.text
+    assert _sql("select ncm, origen from vendor_catalog_products where owner_username=:o", o=owner) == [
+        ("84714900", origen)]
+
+
+def _resolve_de_la_pantalla(valores):
+    js = maria_generator._PAISES_PANTALLA
+    codigo = (f"global.window = {{}}; require({str(js)!r}); const v = JSON.parse(require('fs')"
+              ".readFileSync(0, 'utf8')); console.log(JSON.stringify(v.map(window.CDI.paisesMaria.resolve)));")
+    return json.loads(subprocess.run(["node", "-e", codigo], input=json.dumps(valores), check=True,
+                                     capture_output=True, text=True).stdout)
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="sin node")
+def test_la_pantalla_y_el_servidor_reconocen_los_mismos_paises():
+    from proyecto_maria.core.paises_iso3 import ISO3_A_ISO2
+    codigos = sorted(maria_generator.codigos_tabla_oficial())
+    valores = [*FAMILIA_ORIGEN, *PAISES_INDEC, *ISO3_A_ISO2, *(f"0{c}" for c in codigos),
+               *(f"{c} · X" for c in codigos), "0313", "123", "ÉS", "ＢＲ", "XYZ", "99999", "Türkiye", ""]
+    servidor = [str(maria_generator.codigo_de_pais(v) or "") for v in valores]
+    distintos = [(v, p, s) for v, p, s in zip(valores, _resolve_de_la_pantalla(valores), servidor) if p != s]
+    assert distintos == []
+
+
+def test_el_txt_usa_el_codigo_de_cada_forma_reconocida():
+    items = [{"pieza": "84713000", "descripcion": f"Producto {o}", "cantidad": 1, "valor_unitario": 10,
+              "peso_unitario": 1, "origen": o, "unidad": "07", "grupo_id": i}
+             for i, o in enumerate(["Hong Kong", "CHN", "ITA", "313 · TAIWAN"], start=1)]
+    txt = _gen("OP123456", items)
+    assert re.findall(r"CARTPAYORI=(\d+)", txt) == ["341", "310", "417", "313"]
 
 
 ORIGENES = ("313", "TAIWAN", "TW")
@@ -259,3 +345,38 @@ def test_un_origen_de_miles_de_cifras_no_rompe_los_avisos_ni_el_txt(client):
     assert r.status_code == 200, r.text[:300]
     r = client.post("/generate_maria", json=pedido)
     assert r.status_code == 400 and "Origen no reconocido" in r.text, r.text[:300]
+
+
+@pytest.mark.parametrize("escenario", ["confirmar-ncm", "asignar-ncm"])
+def test_la_pantalla_avisa_que_se_guardo_sin_origen(escenario):
+    from tests.test_despacho1c import pantalla
+
+    aviso = "Se guardó sin origen. Origen sintético no reconocido."
+    vista = pantalla(escenario, {"success": True, "historial_guardado": True, "aviso": aviso})
+    assert vista["toasts"] and vista["toasts"][-1]["tipo"] == "warning", vista
+    assert vista["toasts"][-1]["detalle"] == aviso, vista
+
+
+def _normalize_lento(text):
+    text = unicodedata.normalize("NFD", text or "")
+    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
+    text = re.sub(r"[^a-z0-9\s]", " ", text.lower())
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _sufijo_lento(texto):
+    fuera = "".join(
+        c for c in unicodedata.normalize("NFC", texto)
+        if unicodedata.category(c)[0] == "L" or unicodedata.category(c) == "Nd"
+        if not _normalize_lento(c) and c > "ɏ" and not unicodedata.name(c, "").startswith("LATIN")
+    )
+    return hashlib.sha256(fuera.casefold().encode("utf-8", "surrogatepass")).hexdigest()[:16] if fuera else ""
+
+
+def test_acelerar_no_cambia_ninguna_clave():
+    textos = ["", " ", "TORNILLO M8 x 20", "Tornillo  m8\tx20", "Ñandú ÉSPÁRRAGO çà", "Nº1 ª º µ ß ÿ",
+              "螺丝 M8", "电线", "Ｂｏｌｔ １２", "ｶﾞｽ", "🔩 bolt", "Bolt™ ©", "ǅ ǈ Ⅻ ①", "Ωmega Σ", "ɐ ʼn",
+              "á̧", "\ud800x", "x" * 2000, "Tornillo acero inoxidable " * 20, "螺丝" * 300]
+    for t in textos:
+        assert catalog_service._normalize(t) == _normalize_lento(t), t
+        assert catalog_service._sufijo(t) == _sufijo_lento(t), t

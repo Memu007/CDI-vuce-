@@ -70,11 +70,10 @@ def test_el_origen_y_el_proveedor_se_guardan_enteros(client, via):
     assert get_pais_codigo(origen) == 313 != get_pais_codigo("TAI")
 
 
-# Descripciones sin letras latinas ni dígitos, cada una con su NCM. «ß» y «ﬁ»
-# no son «ss» ni «fi»: son productos distintos.
+# Descripciones sin letras latinas ni dígitos, cada una con su NCM. «ß» no es
+# «ss»: son productos distintos.
 SIN_LATINAS = [("螺丝", "73181500"), ("螺母", "73181600"), ("🔩", "85044090"),
-               ("🔧", "84137010"), ("ß", "73182100"), ("ss", "73182200"),
-               ("ﬁ", "73182300"), ("fi", "73182400")]
+               ("🔧", "84137010"), ("ß", "73182100"), ("ss", "73182200")]
 
 
 @pytest.mark.parametrize("via", ["catalogo", "guardar-uso"])
