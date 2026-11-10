@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-10 · fix: recuperar la operación de antes no saca a la usuaria de la pantalla a la que fue (BORRADOR-1)
+
+- **fix:** si mientras la página arranca la usuaria ya fue a otra pantalla (por ejemplo Clientes), el arranque la deja ahí: la operación de antes queda guardada y se avisa, en vez de llevarla a la revisión o a la carga.
+
 ## 2026-11-08 · fix: un nombre de usuario que ya existe con otras mayúsculas no se registra (NOMBRES-1)
 
 - **fix(permisos):** el registro y crear un estudio rechazan con «Usuario ya existe» un nombre que ya existe escrito con otras mayúsculas (`emi` existe → `Emi`, `EMI`), para todas las cuentas. Las cuentas que ya difieren sólo en mayúsculas siguen entrando con su nombre exacto; nada se migra.

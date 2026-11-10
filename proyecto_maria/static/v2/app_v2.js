@@ -916,11 +916,13 @@
                         .catch(e => console.warn('[app_v2] failed to restore state', e));
                     return null;
                 }
-                return recuperarBorrador();
+                // Se decide al tenerlo, sin esperar más: si ya fue a otra pantalla, no se la saca de ahí.
+                return buscarBorrador().then(b => (!b ? null : currentScreen ? adoptarTarde(b) : adoptarBorrador(b)));
             })
             .catch(e => { console.warn('[app_v2] failed to restore state', e); return null; })
             .then(parsed => {
                 if (parsed) recuperada(parsed);
+                if (currentScreen) return;
                 // Si ya había items (por ej. carga asíncrona de PDF, o restaurado recién)
                 // nos vamos a review. Sino, arrancamos en upload.
                 if (CDI.state && CDI.state.items && CDI.state.items.length > 0) {
@@ -1160,11 +1162,6 @@
             if (!elegido || b.savedAt > elegido.savedAt) elegido = b;
         });
         return elegido;
-    }
-
-    async function recuperarBorrador() {
-        const b = await buscarBorrador();
-        return b ? adoptarBorrador(b) : null;
     }
 
     CDI.borrador = { borrar: borrarBorrador, buscar: buscarBorrador, adoptar: adoptarBorrador, avisar: avisarBorrador, usuario: usuarioActual };
