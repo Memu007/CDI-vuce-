@@ -62,7 +62,7 @@ fi
 
 # D76: proveedor
 sabotaje $C "el proveedor sólo CJK vuelve a quedar con id vacío" \
-  'clave = clave_de_producto(nombre).replace(" ", "_")' \
+  'clave = _clave(nombre).replace(" ", "_")' \
   'clave = _normalize(nombre).replace(" ", "_")' \
   "FAILED $T::test_dos_proveedores_distintos_no_comparten_catalogo[cjk]"
 sabotaje $C "sin nombre de proveedor vuelve a guardar" \
@@ -85,10 +85,26 @@ sabotaje $C "la clave del producto vuelve a perder las letras no latinas" \
   'return clave' \
   "FAILED $T::test_productos_sin_letras_latinas_con_la_misma_medida_no_se_pisan"
 sabotaje $C "el parecido vuelve a ignorar las letras no latinas" \
-  '    if sufijo_a != sufijo_b:
+  '    if sufijo_a and sufijo_b:
         return 0.0' \
   '' \
   "FAILED $T::test_productos_sin_letras_latinas_con_la_misma_medida_no_se_pisan"
+sabotaje $C "la clave vuelve a distinguir lo que se lee igual" \
+  'return _clave(_compatible(descripcion))' \
+  'return _clave(descripcion)' \
+  "FAILED $T::test_lo_que_se_lee_igual_se_encuentra"
+sabotaje $C "«Nº» vuelve a ser «No» y no «N°»" \
+  'c if c in "ºª" or ' \
+  'c if ' \
+  "FAILED $T::test_lo_que_se_lee_igual_se_encuentra[Tornillo N"
+sabotaje $C "«Bolt™» vuelve a ser «BoltTM» y no «Bolt»" \
+  ' or unicodedata.category(c)[0] == "S" else' \
+  ' else' \
+  "FAILED $T::test_lo_que_se_lee_igual_se_encuentra[Bolt"
+sabotaje $C "lo latino y lo que tiene además letras no latinas vuelve a ser exacto" \
+  'return min(_similarity(base_a, base_b), FUZZY_THRESHOLD)' \
+  'return _similarity(base_a, base_b)' \
+  "FAILED $T::test_lo_que_se_lee_igual_se_encuentra[Screw M8-"
 sabotaje $M "la migración no le da la clave de hoy al producto" \
   'nueva = catalog_svc.clave_de_producto(descripcion) if descripcion else clave' \
   'nueva = clave' \
@@ -139,10 +155,19 @@ sabotaje proyecto_maria/pdf_extractor.py "el extractor vuelve a recortar a 3" \
   "origen = origen_valido(str(it.get('origen') or '')) or 'XX'" \
   "origen = str(it.get('origen') or '').strip().upper()[:3] or 'XX'" \
   "FAILED $T::test_el_extractor_conserva_el_nombre_del_pais"
-sabotaje $M "guardar-uso vuelve a aceptar cualquier origen" \
-  'origin = catalog_svc.origen_para_guardar(data.get("origen"))' \
-  'origin = str(data.get("origen") or "")' \
-  "FAILED $T::test_guardar_uso_con_un_origen_que_no_es_pais_da_400_y_no_suma"
+sabotaje $M "guardar-uso vuelve a perder el NCM por el origen" \
+  'origin, aviso_origen = catalog_svc.origen_para_guardar(data.get("origen"))' \
+  'origin, aviso_origen = catalog_svc.origen_para_guardar(data.get("origen"))
+        if aviso_origen:
+            raise ValueError(aviso_origen)' \
+  "FAILED $T::test_guardar_uso_no_pierde_el_ncm_por_un_origen_que_no_reconoce"
+sabotaje $C "el PUT vuelve a perder el NCM por el origen" \
+  '        if not aviso:
+            textos["origen"] = origen' \
+  '        if aviso:
+            raise ValueError(aviso)
+        textos["origen"] = origen' \
+  "FAILED $T::test_cambiar_el_ncm_de_una_fila_con_origen_viejo_guarda_el_ncm"
 sabotaje $G "el TXT vuelve a agrupar por la forma del país" \
   "origenes = {clave_de_origen(it.get('pais_origen') or it.get('origen')) for it in grupo_items}" \
   "origenes = {str(it.get('pais_origen') or it.get('origen')) for it in grupo_items}" \

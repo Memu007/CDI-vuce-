@@ -126,6 +126,7 @@ def test_la_memoria_del_cliente_usa_la_misma_clave(client):
     ("Cable 2,5mm²", "Cable 2,5mm2", "exact"),
     ("Arandela ﬁna", "Arandela fina", "exact"),
     ("Tornillo Nº 8", "Tornillo N° 8", "exact"),
+    ("Bolt™ M8", "Bolt M8", "exact"),
     ("Screw M8", "Screw M8 螺丝", "fuzzy"),
     ("Screw M8 螺丝", "Screw M8", "fuzzy"),
     ("电线 2mm", "钢管 2mm", "none"),
@@ -373,6 +374,12 @@ def _sufijo_lento(texto):
     return hashlib.sha256(fuera.casefold().encode("utf-8", "surrogatepass")).hexdigest()[:16] if fuera else ""
 
 
+def _compatible_lento(texto):
+    return unicodedata.normalize("NFC", "".join(
+        c if c in "ºª" or unicodedata.category(c)[0] == "S" else unicodedata.normalize("NFKC", c)
+        for c in texto))
+
+
 def test_acelerar_no_cambia_ninguna_clave():
     textos = ["", " ", "TORNILLO M8 x 20", "Tornillo  m8\tx20", "Ñandú ÉSPÁRRAGO çà", "Nº1 ª º µ ß ÿ",
               "螺丝 M8", "电线", "Ｂｏｌｔ １２", "ｶﾞｽ", "🔩 bolt", "Bolt™ ©", "ǅ ǈ Ⅻ ①", "Ωmega Σ", "ɐ ʼn",
@@ -380,3 +387,4 @@ def test_acelerar_no_cambia_ninguna_clave():
     for t in textos:
         assert catalog_service._normalize(t) == _normalize_lento(t), t
         assert catalog_service._sufijo(t) == _sufijo_lento(t), t
+        assert catalog_service._compatible(t) == _compatible_lento(t), t
