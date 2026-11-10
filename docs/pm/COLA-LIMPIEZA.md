@@ -151,3 +151,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   frenado por hora no suma al diario (fila 7 del code-review de INTEGRAR-1).
 - `finalize.js`: el `{code, message}` del 409 de regeneraciones quedó sin uso
   desde COBRO-CORTE-1; sacarlo.
+- `app_v2.js` recuperar el borrador: `b && adoptarTarde(b)` dos veces y un
+  ternario en el arranque; unificar en un `recuperar(b)` (D172).
+- `app_v2.js` aviso «pendiente»: no se borra, puede pisar el de «lleno» y, si la
+  pestaña de antes murió sin `pagehide`, otra pestaña no lo encuentra por 3 min
+  (D170 b; acta de BORRADOR-1, hallazgo 4).

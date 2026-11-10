@@ -714,3 +714,7 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   D145 en las puertas de BORRADOR-1 (`cliente1`, `foco_cliente1`,
   `destino1`, `despacho1a`) son de la Técnica, con D173 (a). Una dueña por
   archivo.
+- BORRADOR-1 (`22163cec`), decidido por la PM: D170 (b) a la cola con la
+  excepción de la pestaña muerta sin `pagehide`; D172 a la cola; D171 y la
+  subida en curso que pisa el borrador en la carga van juntas a Emi como
+  pieza nueva (misma causa, ya pasaba en `4555f7c4`).
