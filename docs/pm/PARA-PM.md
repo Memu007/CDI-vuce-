@@ -2,7 +2,7 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## INTEGRAR-1 vuelta 2: todo lo que no se había corrido ya está corrido. Ningún rojo viene del merge; D145 a D149 las decidís vos
+## INTEGRAR-1 vuelta 2: todo lo que no se había corrido ya está corrido. Tres ROTO son del merge, con el mismo comportamiento; D145 a D149 las decidís vos
 
 | Qué | SHA |
 |---|---|
@@ -13,7 +13,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 | Suite completa | `f7a45660`: `git diff f7a45660 HEAD -- proyecto_maria tests scripts` da vacío |
 
 **Resultado**
-- Ningún rojo nuevo viene del merge. Los únicos que tocan el merge son tres patrones de arnés que quedaron viejos, y el comportamiento es el mismo:
+- Del merge vienen tres ROTO: patrones de arnés que quedaron viejos, con el comportamiento igual. Ningún control se perdió:
   - `despacho1c`;
   - `despacho1d`;
   - uno de `estudio1`.
@@ -100,19 +100,23 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 
 ## Arneses
 
-Están los 57 nombres de la lista «No corrido» de la vuelta 1 (decía «56», pero son 57) más `cobro_mp1` y `cobro_corte1` enteros.
+Están los 56 nombres de la lista «No corrido» de la vuelta 1, más `cobro_mp1` y `cobro_corte1` enteros. Además corrí abuso1, catalogolargo1 y nombres1.
 
 **Dónde corrió cada tanda**
 
 | Tanda | SHA |
 |---|---|
+| lab2 | `2e775aa4`: primera tanda. Todo lo que corrió ahí se volvió a correr en otra tanda |
 | lab3 | `56756f84` |
-| lab5 y lab5rep | `c9e9a69c` |
-| sab_lab | `80c1afbc` |
+| lab5, lab5rep, lab6 y lab14 | `c9e9a69c` |
+| lab8 | `6d6efb86` (excel1 y observabilidad1, después de arreglar sus arneses) |
+| lab10 | `ed8d9769` (punta_a_punta1, después de arreglar su arnés) |
+| sab_lab | `80c1afbc`: commit de laboratorio fuera de la rama, padre `50682549`. Su producto es el de `c9e9a69c` con el `import re` que saca `d26d477b`; abuso1, catalogolargo1 y cliente1 no cambian entre los dos |
 | lab15 | `4899fc51` |
+| lab4, lab6, lab7, lab9, lab11, lab13 | `0d829b8a` y `4db641b0` por separado, y la bisección de `30533fe4..ebe7b97a`: sirven para clasificar, no son la corrida del SHA final |
 
 **Por qué valen sobre el SHA final**
-- De `56756f84` a `c9e9a69c`, en scripts y tests sólo cambiaron excel1, observabilidad1 y punta_a_punta1, y los tres se volvieron a correr.
+- De `56756f84` a `c9e9a69c`, en scripts y tests sólo cambiaron excel1, observabilidad1 y punta_a_punta1, y los tres se volvieron a correr (lab8 y lab10).
 - En el producto sólo cambió `d26d477b`.
 - Ninguno de esos arneses cambió después.
 
@@ -129,42 +133,43 @@ Están los 57 nombres de la lista «No corrido» de la vuelta 1 (decía «56», 
 | cobro_corte1 entero | lab5rep | 5271 s, 88 ROJO, BASE, pantalla y lock en verde |
 | rendimiento1, rendimiento1d | lab5rep | 11 y 12 ROJO |
 | rendimiento1c | lab6 | 18 ROJO con pypdf 6.21.4 (ver Entorno) |
-| conexiones1 | `c9e9a69c` | close_cancelado y close_cancelado_suelto: 1 cada uno |
-| observabilidad1, excel1 | `6d6efb86` | «sabotajes sin rojo: 0; no corridos: 0» y «sabotajes con falla: 0» |
-| punta_a_punta1 | `ed8d9769` o posterior | «sabotajes con falla: 0» |
-| guardar1 | `c9e9a69c` | «sabotajes con falla: 0» después de arreglar el arnés en `1c36ef2a` (ver merge) |
+| nombres1 | lab14 | «sabotajes con falla: 0» |
+| conexiones1 | lab6 | close_cancelado y close_cancelado_suelto: 1 cada uno |
+| observabilidad1, excel1 | lab8 | «sabotajes sin rojo: 0; no corridos: 0» y «sabotajes con falla: 0» |
+| punta_a_punta1 | lab10 | «sabotajes con falla: 0» |
+| guardar1 | lab6 | «sabotajes con falla: 0» después de arreglar el arnés en `1c36ef2a` (ver merge) |
 
 **Merge: el patrón del arnés quedó viejo y el comportamiento es el mismo**
 
-| Arnés | Qué dio | Causa |
-|---|---|---|
-| despacho1c | 1 ROTO «el plan vencido no avisa que no se guardó» | MARIA tiraba `Error('payment_required')` con `err.motivo`. El merge quedó con la forma de dev-tecnica, `err.code='payment_required'`, y `finalize.js:1338-1341` y `upload.js:438` la leen igual. D149 |
-| despacho1d | 1 ROTO «la operación vuelve a esperar al catálogo» | Es la misma llamada con más argumentos: `saveOperationToHistory(items, data, carga, foto).then(r => {` en `finalize.js:779`. D149 |
-| estudio1 | 1 de sus 2 ROTO «generar no espera la lista de estudios» | El patrón incluye el comentario `// ESTUDIO-1`, que el merge sacó (§6). La línea `if (CDI.estudios) await CDI.estudios.listo();` es igual. D149 |
-| guardar1 | 1 ROTO «el NUL vuelve a llegar a la base» | Es un arnés mío: ENTRADAS-2 (`a91c7b8f`) cambió `data = _sin_nul(await request.json())` por `data = _sin_nul(data)`. Ya lo arreglé en `1c36ef2a` y quedó limpio |
+| Arnés | Tanda | Qué dio | Causa |
+|---|---|---|---|
+| despacho1c | lab5 | 1 ROTO «el plan vencido no avisa que no se guardó» | MARIA tiraba `Error('payment_required')` con `err.motivo`. El merge quedó con la forma de dev-tecnica, `err.code='payment_required'`, y `finalize.js:1338-1341` y `upload.js:438` la leen igual. D149 |
+| despacho1d | lab5 | 1 ROTO «la operación vuelve a esperar al catálogo» | Es la misma llamada con más argumentos: `saveOperationToHistory(items, data, carga, foto).then(r => {` en `finalize.js:779`. D149 |
+| estudio1 | lab5 | 1 de sus 2 ROTO «generar no espera la lista de estudios» | El patrón incluye el comentario `// ESTUDIO-1`, que el merge sacó (§6). La línea `if (CDI.estudios) await CDI.estudios.listo();` es igual. D149 |
+| guardar1 | lab5; arreglado, lab6 | 1 ROTO «el NUL vuelve a llegar a la base» | Es un arnés mío: ENTRADAS-2 (`a91c7b8f`) cambió `data = _sin_nul(await request.json())` por `data = _sin_nul(data)`. Ya lo arreglé en `1c36ef2a` y quedó limpio |
 
 **Previos de MARIA: el arnés o el comportamiento ya estaban así en `4db641b0`**
 
-| Arnés | Qué dio | Causa |
-|---|---|---|
-| maria1b | rc=4, 4 ROTO | SEGURO-1 `4e4a58ba` pasó el saneo a una función. ENTRADAS-2 `28c72f84` pasó los números a `_numero_de_afuera`. D149 |
-| despacho1b | rc=1, 6815 s: 8 ROTO + 2 VACÍO + 3 ROJO? | Los 8 patrones tampoco están en `4db641b0` (ENTRADAS-2: `_entero_de_afuera`, `_cuerpo_guardable`). Los 2 VACÍO vienen detrás de su ROTO. D149. Los 3 ROJO? de CPU están en «No corrido» |
-| entradas1 | 1 ROTO «los ítems de agrupar sin validar» | En `4db641b0` ya es `Field(default=[], max_length=10000)`, en `main.py:8216`. D149 |
-| estudio1 | 26 ROJO, 1 ROTO, 9 ROJO? | Los 9 ROJO? son 429 del registro (D145). El ROTO «los avisos anotan el uso» espera `_items_con_procedencia`, que en `4db641b0` ya es `_textos_como_van_al_txt` (`main.py:4910`). D149 |
-| estudio1b | 19 ROJO + 1 ROTO | Es la misma causa que el ROTO de estudio1. D149 |
-| cobro_mp2 entero | rc=1, 11791 s, 86 ROJO + 1 ROTO | ROTO «sin la variable de entorno hay demo»: ENTORNO-2 `c8afa6ff` llevó el chequeo a `config.py:15`. BASE y cruces de Postgres en verde. D149 |
-| orden1, orden1b, org1b, validacion1 | 429 del registro | D145. orden1b da verde en `0d829b8a` y 429 en la BASE de `4db641b0` |
-| sesion1 | 2 ROTO + 1 ROJO? + 1 VERDE | D148 |
-| abuso1 | 1 ROTO «vencido el bloqueo…» | ABUSO-2 `59778f92` cambió la línea de `case(...)`. El arnés y el código son iguales en `4db641b0` y en el merge |
-| catalogolargo1 | 4 ROTO + 1 ROJO? | CATALOGO-LARGO-2 `1ecab6f1` partió las líneas. El arnés y el código son iguales en `4db641b0` y en el merge |
+| Arnés | Tanda | Qué dio | Causa |
+|---|---|---|---|
+| maria1b | lab5 | rc=4, 4 ROTO | SEGURO-1 `4e4a58ba` pasó el saneo a una función. ENTRADAS-2 `28c72f84` pasó los números a `_numero_de_afuera`. D149 |
+| despacho1b | lab5 | rc=1, 6815 s: 8 ROTO + 2 VACÍO + 3 ROJO? | Los 8 patrones tampoco están en `4db641b0` (ENTRADAS-2: `_entero_de_afuera`, `_cuerpo_guardable`). Los 2 VACÍO vienen detrás de su ROTO. D149. Los 3 ROJO? de CPU están en «No corrido» |
+| entradas1 | lab5 | 1 ROTO «los ítems de agrupar sin validar» | En `4db641b0` ya es `Field(default=[], max_length=10000)`, en `main.py:8216`. D149 |
+| estudio1 | lab5 | 26 ROJO, 1 ROTO, 9 ROJO? | Los 9 ROJO? son 429 del registro (D145). El ROTO «los avisos anotan el uso» espera `_items_con_procedencia`, que en `4db641b0` ya es `_textos_como_van_al_txt` (`main.py:4910`). D149 |
+| estudio1b | lab5 | 19 ROJO + 1 ROTO | Es la misma causa que el ROTO de estudio1. D149 |
+| cobro_mp2 entero | lab5rep | rc=1, 11791 s, 86 ROJO + 1 ROTO | ROTO «sin la variable de entorno hay demo»: ENTORNO-2 `c8afa6ff` llevó el chequeo a `config.py:15`. BASE y cruces de Postgres en verde. D149 |
+| orden1, orden1b, org1b, validacion1 | lab3 | 429 del registro | D145. orden1b da verde en `0d829b8a` y 429 en la BASE de `4db641b0` |
+| sesion1 | lab3 | 2 ROTO + 1 ROJO? + 1 VERDE | D148 |
+| abuso1 | sab_lab | 1 ROTO «vencido el bloqueo…» | ABUSO-2 `59778f92` cambió la línea de `case(...)`. El arnés y el código son iguales en `4db641b0` y en el merge |
+| catalogolargo1 | sab_lab | 4 ROTO + 1 ROJO? | CATALOGO-LARGO-2 `1ecab6f1` partió las líneas. El arnés y el código son iguales en `4db641b0` y en el merge |
 
 **Base (dev-tecnica, antes del merge)**
 
-| Arnés | Qué dio | Causa |
-|---|---|---|
-| destino1, foco_cliente1, despacho1a (y cliente1, de la vuelta 1) | La BASE da rojo con `page.fill` o `locator.click: Timeout 30000ms exceeded.` | Bisección de destino1: `30533fe4` malo, `ebe7b97a` bueno, primer malo `36aba873` (ORDEN-1, mío). El arranque espera al usuario (`ESPERA_USUARIO_MS` 4000) y después hace `goTo('review'/'upload')`, que pisa el `goTo` de la pantalla. Con 6 s de espera, despacho1a da «OK 1280 px» y «OK 390 px», y destino1 da «OK: pantalla DESTINO-1». BORRADOR-1 los tiene que dejar verdes. D143/D144 |
-| cobro_mp1 entero | rc=1, 4718 s: 144 ROJO + 1 VERDE esperado + 1 ROTO | ROTO «g: Listo guarda la operación sin el archivo del MARIA»: el patrón dice `.catch(err => {` y hoy la línea es `.then(r => {`, por COBRO-CORTE-1 `1fea5ba5`. Es un arnés mío. D149 |
-| rendimiento1b | rc=1, 6 ROJO + 1 ROJO? | El ROJO? salió con código 137: dmesg dice «Memory cgroup out of memory». El defecto saboteado (memoria) se ve; el texto esperado no llega a imprimirse. El arnés es frágil frente al OOM. No lo repetí |
+| Arnés | Tanda | Qué dio | Causa |
+|---|---|---|---|
+| destino1, foco_cliente1, despacho1a (y cliente1, de la vuelta 1) | destino1 lab5rep y lab6, foco_cliente1 lab5, despacho1a lab14, cliente1 sab_lab | La BASE da rojo con `page.fill` o `locator.click: Timeout 30000ms exceeded.` | Bisección de destino1: `30533fe4` malo, `ebe7b97a` bueno, primer malo `36aba873` (ORDEN-1, mío). El arranque espera al usuario (`ESPERA_USUARIO_MS` 4000) y después hace `goTo('review'/'upload')`, que pisa el `goTo` de la pantalla. Con 6 s de espera, despacho1a da «OK 1280 px» y «OK 390 px», y destino1 da «OK: pantalla DESTINO-1». BORRADOR-1 los tiene que dejar verdes. D143/D144 |
+| cobro_mp1 entero | lab5rep | rc=1, 4718 s: 144 ROJO + 1 VERDE esperado + 1 ROTO | ROTO «g: Listo guarda la operación sin el archivo del MARIA»: el patrón dice `.catch(err => {` y hoy la línea es `.then(r => {`, por COBRO-CORTE-1 `1fea5ba5`. Es un arnés mío. D149 |
+| rendimiento1b | lab5rep | rc=1, 6 ROJO + 1 ROJO? | El ROJO? salió con código 137: dmesg dice «Memory cgroup out of memory». El defecto saboteado (memoria) se ve; el texto esperado no llega a imprimirse. El arnés es frágil frente al OOM. No lo repetí |
 
 **Entorno**
 - La primera corrida de rendimiento1c dio VERDE en «un tope propio de pypdf vuelve a ser un PDF inválido».
@@ -201,15 +206,18 @@ Están los 57 nombres de la lista «No corrido» de la vuelta 1 (decía «56», 
 
 **`/code-review` del merge `b9db0ad3`**
 
-| Fila | Clase | Nota |
-|---|---|---|
-| 1 | falso positivo | `efaef2b6` sacó `message` a propósito. El `detail` como dict está sólo en el 403 del login y en el 402 de clientes |
-| 2 | falso positivo | quien lo usa compara `err.code` |
-| 3, 4 | míos, anteriores (`efaef2b6`) | ya estaban antes del merge |
-| 5 | anterior en los dos padres | — |
-| 6 | mío, después del merge (`68e77ed6`) | es fragilidad, no un verde falso |
-| 7, 8, 9 | de MARIA (`a3abd929`, `ce7cd9dd`) | — |
-| 10 | del merge, `b9db0ad3` | menor: la lista se arma dos veces |
+| Fila | Hallazgo | Clase | Nota |
+|---|---|---|---|
+| 1 | `finalize.js:766`: se fue el respaldo de `detail.message`, y un `detail` objeto da `new Error(obj)` | falso positivo | `efaef2b6` sacó `message` a propósito. El `detail` como dict está sólo en el 403 del login y en el 402 de clientes |
+| 2 | `app_v2.js:83`: el 402 deja 'payment_required' sólo en `err.code` | falso positivo | quien lo usa compara `err.code` |
+| 3 | `main.py:8114`: `save_client_operation` confía en un `operacion_id` propio y le pisa `client_id` e ítems | mío, anterior (`efaef2b6`) | ya estaba antes del merge |
+| 4 | `main.py:7733`: `delete_cliente` deja `generated_file` y el TXT se sigue bajando | mío, anterior (`efaef2b6`) | ya estaba antes del merge |
+| 5 | `finalize.js:1210`: el reintento guarda sin carga ni foto | anterior en los dos padres | — |
+| 6 | `test_cobro_corte1.py:830`: comparar `co_filename` con `main.__file__` es frágil | mío, después del merge (`68e77ed6`) | es fragilidad, no un verde falso |
+| 7 | `main.py:3385`: el `or` corta antes y no suma al contador diario | de MARIA (`a3abd929`) | — |
+| 8 | `main.py:3397`: `if request.email:` siempre es verdadero | de MARIA (`dea64a7c`, ENTRADAS-1) | `_email_valido` ya devuelve el email o da 400, así que la guarda quedó de más |
+| 9 | `main.py:3381`: el comentario «ABUSO-1, C9» rompe §6 | de MARIA (`a3abd929`) | — |
+| 10 | `main.py:7737`: la lista de ids se arma dos veces | del merge, `b9db0ad3` | menor |
 
 **`/code-review` de esta vuelta**
 
@@ -227,26 +235,57 @@ Están los 57 nombres de la lista «No corrido» de la vuelta 1 (decía «56», 
 
 ## chequeo-6
 
-- **Esta vuelta (`19036a2..4899fc51`):** producto +0/−2, 0 avisos.
-- **Contra MARIA (`4db641b0..4899fc51`):** da 7 AVISOs. Los siete vienen de piezas de dev-tecnica que ya entregué antes de esta vuelta:
+- **Esta vuelta (`19036a2..cbbd37b2`):** producto +0/−2, 0 avisos.
+- **Contra MARIA (`4db641b0..cbbd37b2`):** da 7 AVISOs. Los siete vienen de piezas de dev-tecnica que ya entregué antes de esta vuelta (el `git blame` de la línea de cada aviso y el `git log -L` de las dos funciones que crecieron caen en commits de `0d829b8a`):
   - el producto suma 286 líneas netas;
   - `try_extract_with_mapping` pasa de 309 a 312;
   - hay dos comentarios de 4 líneas;
   - la función anónima de `finalize.js:9` pasa de 1436 a 1469;
   - `_instalar` tiene 96 líneas;
   - `casosTardios` tiene 67 líneas.
-- Ninguno es de esta vuelta.
+- Ninguno es de esta vuelta. Quedan porque partir o achicar código ya entregado va a `COLA-LIMPIEZA.md`, no dentro de una integración (§6).
+- Después de `cbbd37b2` sólo va el commit de este informe, que toca sólo `PARA-PM.md`.
 
 <details><summary>Salida entera, esta vuelta</summary>
 
 ```
-chequeo-6 19036a2..4899fc51: avisos para mirar, no un veredicto
+chequeo-6 19036a2..cbbd37b2: avisos para mirar, no un veredicto
 producto +0/−2
 arnés +49/−26
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
   proyecto_maria/main.py: 12213 → 12211
 avisos: 0
+```
+
+</details>
+
+<details><summary>Salida entera, contra MARIA</summary>
+
+```
+chequeo-6 4db641b0..cbbd37b2: avisos para mirar, no un veredicto
+producto +727/−441
+  AVISO producto suma 286 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +5814/−1044
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/auth/roles.py: 27 → 26
+  proyecto_maria/database/models.py: 614 → 617
+  proyecto_maria/main.py: 12078 → 12211
+  AVISO creció una función de más de 150: proyecto_maria/main.py:5588 try_extract_with_mapping 309 → 312, 3 en su propio cuerpo (§6: lo nuevo va aparte)
+  AVISO comentario nuevo de 4 líneas: proyecto_maria/main.py:2143 (§6: una o dos)
+  proyecto_maria/security/file_security.py: 693 → 798
+  AVISO comentario nuevo de 4 líneas: proyecto_maria/security/file_security.py:363 (§6: una o dos)
+  proyecto_maria/services/billing_service.py: 407 → 418
+  proyecto_maria/static/v2/app_v2.js: 1199 → 1201
+  proyecto_maria/static/v2/screens/clientes.js: 2211 → 2211
+  proyecto_maria/static/v2/screens/finalize.js: 1444 → 1477
+  AVISO creció una función de más de 150: proyecto_maria/static/v2/screens/finalize.js:9 <anónima> 1436 → 1469, 6 en su propio cuerpo (§6: lo nuevo va aparte)
+  proyecto_maria/static/v2/screens/profile.js: 613 → 613
+  proyecto_maria/static/v2/screens/upload.js: 718 → 718
+  AVISO función nueva de 96 líneas: scripts/testing/conexiones1_sonda.py:59 _instalar (§6: ~60)
+  AVISO función nueva de 67 líneas: scripts/testing/pantalla_cobro_corte1.js:33 casosTardios (§6: ~60)
+avisos: 7
 ```
 
 </details>
