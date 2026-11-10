@@ -122,19 +122,19 @@ sabotaje $M "otro dueño puede borrar el cliente" \
 
 # --- D141 (a): pasar una operación compartida a otro cliente
 P="FAILED $T::test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto"
-BORRA=$'            if operation.client_id not in (None, client_id):\n'
+BORRA=$'    if operation.client_id not in (None, client_id):\n'
 sabotaje $M "pasada a otro cliente, el link sigue andando" \
-  "$BORRA" $'            if False:\n' \
+  "$BORRA" $'    if False:\n' \
   "$P" "AssertionError: (True, 200)" "assert 200 == 404"
 sabotaje $M "se borra aunque siga en el mismo cliente" \
-  "$BORRA" $'            if True:\n' \
+  "$BORRA" $'    if True:\n' \
   "$P" "AssertionError: (False, 200)" "assert 404 == 200"
 sabotaje $M "se borra al recibir cliente por primera vez" \
-  "$BORRA" $'            if operation.client_id != client_id:\n' \
+  "$BORRA" $'    if operation.client_id != client_id:\n' \
   "$P" "AssertionError: sin cliente antes" "assert 404 == 200"
 sabotaje $M "el borrado queda aunque el guardado falle" \
-  $'PublicQuoteModel.operation_id == operation.id)\n                )\n' \
-  $'PublicQuoteModel.operation_id == operation.id)\n                )\n                await db.commit()\n' \
+  $'PublicQuoteModel.operation_id == operation.id)\n        )\n' \
+  $'PublicQuoteModel.operation_id == operation.id)\n        )\n        await db.commit()\n' \
   "$P" "AssertionError: (True, 400)" "assert 404 == 200"
 sabotaje $M "el guardado encuentra la operación de otro dueño" \
   $'            OperationModel.owner_username == owner_username,\n            OperationModel.generated_file == archivo,\n' \
