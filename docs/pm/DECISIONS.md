@@ -702,7 +702,7 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - Retiro de la PM: el rojo de «`descontar` con su propia conexión» que le
   pasé a MARIA era `database is locked` en la preparación, no la condición.
 
-## 2026-11-10 13:49 UTC — PRUEBA-LIMPIAR-1 aceptada sobre `5dd9a6eb`, sin integrar (PM, con el consejero)
+## 2026-11-10 13:48 UTC — PRUEBA-LIMPIAR-1 aceptada sobre `5dd9a6eb`, sin integrar (PM, con el consejero)
 
 - Acta: `REPRODUCCION-PRUEBA-LIMPIAR-1-2026-11-10.md`. D164 (a). Reproducida
   en `c033db7` y sobre la unión. Entra con la reentrega de

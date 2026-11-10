@@ -39,7 +39,7 @@ terminan, sumá su salida al informe. Mientras tanto:
 
 1. D149 (a) y el ataque sin Postgres: sólo arnés, un commit, cada patrón
    nuevo con su rojo mostrado una vez. **Suman, decidido por la PM
-   (13:49 UTC), para que no toquen las dos el mismo archivo:** `estudio1b`
+   (13:48 UTC), para que no toquen las dos el mismo archivo:** `estudio1b`
    (la misma causa que el ROTO de `estudio1`) y D145 (a), cada sabotaje con
    su `X-Forwarded-For`, en `estudio1`, `estudio1b`, `orden1`, `cliente1`,
    `foco_cliente1`, `destino1` y `despacho1a`. MARIA no los toca.

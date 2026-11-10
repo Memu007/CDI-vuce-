@@ -3,7 +3,7 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Veredicto: PRUEBA-LIMPIAR-1 aceptada sobre `5dd9a6eb` (2026-11-10 13:49 UTC)
+## Veredicto: PRUEBA-LIMPIAR-1 aceptada sobre `5dd9a6eb` (2026-11-10 13:48 UTC)
 
 **Aceptada, con D164 (a).** Informe `2ed87f5e`. Acta:
 `REPRODUCCION-PRUEBA-LIMPIAR-1-2026-11-10.md`. No la integro aparte: entra
