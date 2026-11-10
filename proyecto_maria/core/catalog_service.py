@@ -119,12 +119,12 @@ def _normalize(text: str) -> str:
 
 
 def _sufijo(texto: str) -> str:
-    """Resumen de las letras y cifras que _normalize descarta (CJK, ancho
-    completo): sin él, «电线 2mm» y «钢管 2mm» comparten clave."""
+    """Resumen de las letras y cifras no latinas que _normalize descarta (CJK,
+    ancho completo); «º», «ª» y «µ» son de Latin-1 y no cuentan."""
     fuera = "".join(
         c for c in unicodedata.normalize("NFC", texto)
         if unicodedata.category(c)[0] == "L" or unicodedata.category(c) == "Nd"
-        if not _normalize(c) and not unicodedata.name(c, "").startswith("LATIN")
+        if not _normalize(c) and c > "\u024f" and not unicodedata.name(c, "").startswith("LATIN")
     )
     if not fuera:
         return ""

@@ -697,7 +697,7 @@ def codigos_tabla_oficial() -> frozenset:
 def _codigo_de_la_tabla(texto: str) -> bool:
     """Un código de país: sólo cifras 0-9 y en la tabla oficial («²», «٢٢٢» o
     «99999» no son países)."""
-    return bool(re.fullmatch(r"[0-9]+", texto)) and int(texto) in codigos_tabla_oficial()
+    return bool(re.fullmatch(r"[0-9]{1,4}", texto)) and int(texto) in codigos_tabla_oficial()
 
 
 def procedencia_de(item: dict) -> str:
@@ -763,8 +763,8 @@ def pais_reconocido(pais) -> bool:
 def origen_valido(texto) -> str | None:
     """El origen como se guarda si es un país de la tabla (nombre o código); si no, None.
     La forma se mira antes de normalizar: «ＢＲ» o «ÉS» pasarían como «BR» y «ES»."""
-    escrito = str(texto or "").strip()
-    if not escrito or unicodedata.normalize("NFKC", escrito) != unicodedata.normalize("NFC", escrito):
+    escrito = unicodedata.normalize("NFC", str(texto or "")).strip()
+    if not escrito or unicodedata.normalize("NFKC", escrito) != escrito:
         return None
     if len(escrito) <= 2 and not (escrito.isascii() and escrito.isalpha()):
         return None
