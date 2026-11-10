@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Negativos de DATOS-1: cada sabotaje deshace una regla (/health honesto,
-# los 500 sin detalle técnico, borrar un cliente con presupuesto compartido)
-# y tests/test_datos1.py tiene que fallar por ese motivo.
+# Negativos de DATOS-1 y PRESUPUESTO-CLIENTE-1: cada sabotaje deshace una
+# regla (/health honesto, los 500 sin detalle técnico, borrar un cliente con
+# presupuesto compartido, pasar una operación compartida a otro cliente) y
+# tests/test_datos1.py tiene que fallar por ese motivo.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/datos1.sh [SHA]
 # Trabaja en un worktree descartable con su propia SQLite y sin terceros: no
@@ -118,6 +119,27 @@ sabotaje $M "otro dueño puede borrar el cliente" \
   $'    username = user["username"]\n    client = await _get_owned_client(db, client_id, username)\n\n    try:\n        # CASCADE' \
   $'    username = user["username"]\n    client = await db.get(ClientModel, client_id)\n    username = client.owner_username\n\n    try:\n        # CASCADE' \
   "FAILED $T::test_otro_dueno_no_borra_el_cliente_ni_su_presupuesto" "assert 200 == 404"
+
+# --- D141 (a): pasar una operación compartida a otro cliente
+P="FAILED $T::test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto"
+BORRA=$'            if operation.client_id not in (None, client_id):\n'
+sabotaje $M "pasada a otro cliente, el link sigue andando" \
+  "$BORRA" $'            if False:\n' \
+  "$P" "AssertionError: (True, 200)" "assert 200 == 404"
+sabotaje $M "se borra aunque siga en el mismo cliente" \
+  "$BORRA" $'            if True:\n' \
+  "$P" "AssertionError: (False, 200)" "assert 404 == 200"
+sabotaje $M "se borra al recibir cliente por primera vez" \
+  "$BORRA" $'            if operation.client_id != client_id:\n' \
+  "$P" "AssertionError: sin cliente antes" "assert 404 == 200"
+sabotaje $M "el borrado queda aunque el guardado falle" \
+  $'PublicQuoteModel.operation_id == operation.id)\n                )\n' \
+  $'PublicQuoteModel.operation_id == operation.id)\n                )\n                await db.commit()\n' \
+  "$P" "AssertionError: (True, 400)" "assert 404 == 200"
+sabotaje $M "el guardado encuentra la operación de otro dueño" \
+  $'            OperationModel.owner_username == owner_username,\n            OperationModel.generated_file == archivo,\n' \
+  $'            OperationModel.generated_file == archivo,\n' \
+  "$P" "AssertionError: otro dueño" "assert 404 == 200"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

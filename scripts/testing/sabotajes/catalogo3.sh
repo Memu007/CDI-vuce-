@@ -123,7 +123,7 @@ sabotaje $G "«ÉS» vuelve a pasar como «ES»" \
   'if len(escrito) <= 2 and not (escrito.isascii() and escrito.isalpha()):' \
   'if False:' \
   "FAILED $B[acento]"
-sabotaje $G "«É» con el acento aparte vuelve a pasar" \
+sabotaje $G "«Ñ» con la tilde aparte vuelve a pasar" \
   'escrito = unicodedata.normalize("NFC", str(texto or "")).strip()' \
   'escrito = str(texto or "").strip()' \
   "FAILED $A[acento aparte]"

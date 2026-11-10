@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from proyecto_maria.database.connection import AsyncSessionLocal
-from proyecto_maria.database.models import PublicQuote
+from proyecto_maria.database.models import Operation, PublicQuote
 from proyecto_maria.main import app, get_current_user, get_db
 
 # El router de presupuestos se monta en el arranque (lifespan), que el
@@ -253,3 +253,82 @@ async def test_si_falla_a_mitad_no_se_borra_nada(dueno, cliente_http, creados):
     assert c.get(f"/api/clientes/{cid}").status_code == 200
     assert c.get(f"/api/quotes/public/{token}").status_code == 200
     assert await _presupuestos_de(op) == 1
+
+
+# --- D141 (a): pasar una operación a otro cliente -------------------------
+
+ITEM = {"pieza": "8471.30.12", "descripcion": "TABLETA SINTETICA", "origen": "CHN",
+        "cantidad": 1, "valor_unitario": 50, "peso_unitario": 0.5}
+
+
+def _cliente(c, creados):
+    r = c.post("/api/clientes", json={"nombre": f"PC1_{uuid.uuid4().hex[:8]}"})
+    assert r.status_code == 200, r.text
+    cid = r.json()["cliente"]["id"]
+    creados.append((app.dependency_overrides[get_current_user](), cid))
+    return cid
+
+
+def _guardar(c, cid, archivo, item=ITEM):
+    return c.post(f"/api/clientes/{cid}/operaciones",
+                  json={"operation_id": archivo, "items": [item]})
+
+
+def _compartir(c, op):
+    r = c.post("/api/quotes/share", json={"operation_id": op})
+    assert r.status_code == 200, r.text
+    return r.json()["token"]
+
+
+async def _cliente_de(op_id):
+    async with AsyncSessionLocal() as s:
+        return (await s.get(Operation, op_id)).client_id
+
+
+async def _operacion_sin_cliente(dueno, archivo):
+    async with AsyncSessionLocal() as s:
+        op = Operation(owner_username=dueno["username"], generated_file=archivo)
+        s.add(op)
+        await s.commit()
+        return op.id
+
+
+async def test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto(
+    dueno, otro_usuario, cliente_http, creados
+):
+    """El link compartido tiene los datos del cliente: pasada a otro, la
+    operación deja de mostrarse ahí. Quedarse en el mismo cliente, recibir
+    uno por primera vez o fallar a mitad no lo borra."""
+    c = cliente_http
+    _como(dueno)
+    a, b = _cliente(c, creados), _cliente(c, creados)
+    archivo, otro_archivo, suelto = (f"MARIA_{uuid.uuid4().hex}.TXT" for _ in range(3))
+    op = _guardar(c, a, archivo).json()["operation_id"]
+    token = _compartir(c, op)
+    otro_op = _guardar(c, a, otro_archivo).json()["operation_id"]
+    otro_token = _compartir(c, otro_op)
+    op_suelta = await _operacion_sin_cliente(dueno, suelto)
+    token_suelto = _compartir(c, op_suelta)
+
+    # (cliente, archivo, ítem, código, link que tiene que seguir andando)
+    pasos = [
+        (a, archivo, ITEM, 200, True),
+        (b, archivo, {**ITEM, "valor_unitario": "NaN"}, 400, True),
+        (a, suelto, ITEM, 200, True),
+        (b, archivo, ITEM, 200, False),
+    ]
+    for cid, arch, item, codigo, sigue in pasos:
+        r = _guardar(c, cid, arch, item)
+        assert r.status_code == codigo, (cid == b, arch == archivo, r.text)
+        esperado = 200 if sigue else 404
+        assert c.get(f"/api/quotes/public/{token}").status_code == esperado, (cid == b, codigo)
+    assert await _presupuestos_de(op) == 0
+    assert await _cliente_de(op) == b
+    assert c.get(f"/api/quotes/public/{token_suelto}").status_code == 200, "sin cliente antes"
+    assert await _cliente_de(op_suelta) == a
+
+    # Otro dueño con el mismo nombre de archivo tiene su propia operación.
+    _como(otro_usuario)
+    assert _guardar(c, _cliente(c, creados), otro_archivo).status_code == 200
+    _como(dueno)
+    assert c.get(f"/api/quotes/public/{otro_token}").status_code == 200, "otro dueño"
