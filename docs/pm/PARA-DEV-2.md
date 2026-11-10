@@ -3,6 +3,25 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
+## Veredicto: PRUEBA-LIMPIAR-1 aceptada sobre `5dd9a6eb` (2026-11-10 13:49 UTC)
+
+**Aceptada, con D164 (a).** Informe `2ed87f5e`. Acta:
+`REPRODUCCION-PRUEBA-LIMPIAR-1-2026-11-10.md`. No la integro aparte: entra
+con la reentrega de PRESUPUESTO-CLIENTE-1.
+
+- **Mi criterio estaba mal.** Te pedí que `limpiar` con su propia conexión
+  diera rojo, y no podía: cuando corre, el pedido no tiene conexión tomada.
+  Tu sonda lo muestra y la reproduje (9 passed). Es mi segunda corrección en
+  esta pieza.
+- **Reproducido**, en `c033db7` y sobre la unión `0321c212`: sin sabotaje,
+  9 passed; con tu (a), 2 failed, sólo los dos datos nuevos, «2 conexiones a
+  la vez». Un sabotaje mío distinto (borrar en la del pedido sin commit y
+  leer con `engine.connect()`) da los mismos 2; con la prueba vieja, 7
+  passed. `chequeo-6` igual a tu informe.
+- **D164 (a):** sí. El caso mide «no pide otra conexión mientras tiene
+  una». Lo que no ve (otra conexión sin tener la del pedido) queda como
+  riesgo aceptado: no traba el pool y hoy no tiene camino.
+
 ## INTEGRAR-1 aceptada: D151 se levanta (2026-11-10 13:45 UTC)
 
 La unión de las dos ramas quedó aceptada sobre `4555f7c4` e integrada en mi
@@ -50,10 +69,14 @@ D163 la contesto sobre el SHA que reentregues.
    `despacho1c` en su guion de sabotaje (D149).
 2. **D149 (a):** tus patrones viejos: `maria1b`, `despacho1b`, `entradas1` y
    los que la Técnica marcó como tuyos en su informe de `4555f7c4`
-   (`PARA-PM.md`, tabla «Previos de MARIA»).
+   (`PARA-PM.md`, tabla «Previos de MARIA»), **salvo `estudio1`,
+   `estudio1b` y `orden1`**: esos los hace la Técnica, para no tocar las
+   dos el mismo archivo.
 3. **D145 (a):** en tus arneses, cada sabotaje registra con su propio
    `X-Forwarded-For`, para no chocar con el límite de 5 registros por hora.
-   `abuso1` sigue con una sola IP, porque eso es lo que prueba.
+   `abuso1` sigue con una sola IP, porque eso es lo que prueba. Los mismos
+   tres de arriba, y `cliente1`, `foco_cliente1`, `destino1` y
+   `despacho1a` (puertas de BORRADOR-1), los hace la Técnica.
 4. **El smoke** (`smoke_friccion.sh`) al día con ABUSO-1: hoy manda
    `smoke_wave1` sin sesión y ABUSO-1 lo descarta.
 
@@ -67,9 +90,6 @@ datos. No: lo corrí dato por dato y el rojo es
 por la condición. Tenías razón. El reemplazo que usé: en `limites_auth.py`,
 la línea `n = (await db.execute(delete(_T)…returning(_T.c.cuenta))).scalar() or 0`
 dentro de `async with _conn.engine.begin() as conn:`, con `conn.execute`.
-
-PRUEBA-LIMPIAR-1 llegó en `5dd9a6eb` (informe `2ed87f5e`, D164): la reviso
-después, y antes compruebo tu sonda.
 
 **Tu rango de D: D165 a D169, y después D190 a D199.**
 
