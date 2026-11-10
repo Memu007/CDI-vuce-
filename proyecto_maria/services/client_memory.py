@@ -273,6 +273,10 @@ async def lookup_client_memory(
         return None
 
     clave = clave_de_producto(descripcion)
+    try:
+        tal_cual = descripcion_del_producto(descripcion)
+    except ValueError:
+        tal_cual = None
     q = sa_select(ClientProductHistory).where(
         ClientProductHistory.owner_username == owner_username,
         ClientProductHistory.client_id == client_id,
@@ -280,14 +284,14 @@ async def lookup_client_memory(
     result = await db.execute(q)
     candidates = result.scalars().all()
 
-    best_score = 0.0
-    best_row: Optional[ClientProductHistory] = None
-    for row in candidates:
-        score = parecido(clave, clave_de_producto(row.descripcion or ""))
-        if score > best_score:
-            best_score = score
-            best_row = row
+    # Ante un empate gana el texto idéntico y después la última confirmada,
+    # sin depender del orden en que la base devuelve las filas.
+    def orden(row):
+        return (parecido(clave, clave_de_producto(row.descripcion or "")), row.descripcion == tal_cual,
+                row.ultima_vez is not None, row.ultima_vez, row.id)
 
+    best_row = max(candidates, key=orden, default=None)
+    best_score = orden(best_row)[0] if best_row is not None else 0.0
     if best_row is None or best_score < FUZZY_THRESHOLD:
         return None
 

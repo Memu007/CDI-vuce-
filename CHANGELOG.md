@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-10 · fix: el NCM recordado de un cliente no depende del orden de las filas (CATALOGO-3)
+
+- Si dos productos guardados se parecen igual a lo que se busca, gana el que tiene el texto idéntico y, si no hay, el último confirmado; antes ganaba el que la base devolvía primero, el mismo para los dos textos.
+
 ## 2026-11-10 · perf: la memoria del cliente calcula la clave de cada fila una vez por pedido (CATALOGO-3)
 
 - Buscar diez productos contra cientos de filas guardadas con descripciones largas o en kana ya no recalcula la clave de cada fila para cada producto.
