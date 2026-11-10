@@ -2,6 +2,8 @@
 
 Producto e informe en `f4ade80`, base `07504e0`, rama `claude/dev-maria`.
 Veredicto: **devolución** (arriba de `PARA-DEV-2.md`), por tres causas.
+Vuelta en `ec0092a` (informe `b7c4c85`, base de la vuelta `1345ca7`):
+**aceptada** (sección «Vuelta», al final).
 
 ## Puertas del informe, reproducidas sobre `f4ade80`
 
@@ -93,3 +95,85 @@ Primera corrida perdida: la salida pasó por `| tail -30` y el resumen quedó
 fuera; ese «rc=0» era de `tail`, no de pytest. La repetí con el registro
 entero, sin `-x`, en `/tmp/cdi-pm/wt-cat3-suite` (`f4ade80`, SQLite):
 `5724 passed, 101 skipped, 3 xfailed in 927.54s (0:15:27)`, `fin rc=0`, sin FAILED ni ERROR. Después del resumen quedan 713 avisos «Task was destroyed but it is pending!» del cierre de asyncio; no cambian el rc. La devolución no depende de la suite.
+
+## Vuelta sobre `ec0092a` (2026-11-10 10:40 UTC)
+
+Rango de la vuelta: `1345ca7..ec0092a`. Debajo de `1345ca7` hay commits de
+PRESUPUESTO-CLIENTE-1 sin entregar: no entran en este veredicto. El
+producto llega hasta `9dcee73`; `ec0092a` sólo suma
+`scripts/testing/bench_catalogo3_lookup.py`.
+
+| qué | salida |
+|---|---|
+| `chequeo-6.py 07504e0 ec0092a` | producto +152/−99, 1 AVISO explicado en el informe, historia vacía; igual al informe |
+| `catalogo3.sh` sobre `ec0092a` | 45 ROJO, «fallas: 0», `fin rc=0` |
+| arnés PG | 7 OK |
+| golden | 115 passed, 2 xfailed |
+| pantalla contra servidor (arnés JS) | 0 diferencias |
+| mis 41 negativos, con ejemplos distintos de los de la devolución | verdes |
+| suite entera, SQLite | `5782 passed, 101 skipped, 3 xfailed in 964.03s`, 0 FAILED, `fin rc=0` |
+
+Bench (20 ítems, 2000 filas), total en segundos, base `07504e0` → vuelta:
+65 caracteres 1,42 → 0,91; con acentos 1,51 → 0,95; con kana 1,01 → 0,58;
+430 caracteres 3,94 → 2,69; con acentos 3,86 → 2,83; con kana 2,93 →
+1,42. La vuelta es más rápida que la base en las seis.
+
+La suite del informe (5548 passed, 335 skipped, sobre `9dcee73`) suma el
+mismo total que la mía. No determiné por qué en su entorno se saltean más.
+En el mío, las 90 pruebas de `tests/test_catalogo3.py` corren todas, la de
+node incluida; entre mis salteadas está `test_backup1a` («sin Postgres 16
+local»).
+
+Las tres causas quedan cerradas. Un origen no reconocido conserva el NCM,
+el historial, la memoria y el catálogo, y hay aviso. NFKC da la misma clave
+para µ/μ, medio ancho, ㎜ y ℃. El lookup no es más lento que la base.
+
+### Adversarios (sin red, GEMINI_API_KEY vacía)
+
+- **H1, preexistente.** La memoria del cliente
+  (`client_memory.py:286-287`) elige la fila de mayor parecido sin un orden
+  explícito. Ante un empate devuelve la primera, aunque tenga otro NCM u
+  otro origen:
+  - «Cable 2,5mm2» con BR devolvió 85444900 CN;
+  - «Filtro ABC-10» devolvió JP en vez de DE.
+
+  En la base pasa lo mismo con el texto idéntico y dos NCM. Por eso, al
+  reclasificar un producto, la memoria sigue sugiriendo el NCM viejo.
+  Clasificación: pieza propia para Emi (MEMORIA-ORDEN-1: orden explícito
+  y, ante un empate, primero el texto exacto). No es devolución.
+- **H2, condición de publicación.** Si la migración encuentra un choque,
+  deja las dos filas. El informe lo declaró sólo como «fila huérfana», pero
+  pasa más que eso: el texto exacto lee la otra fila, y al confirmarlo pisa
+  su NCM, su origen y su descripción, y la vieja queda huérfana. Al
+  publicar, si el primer arranque dice que quedan N filas por un choque con
+  N > 0, se frena antes de que alguien confirme.
+- **H3, riesgo menor.** Si dos versiones escriben las claves a la vez (por
+  el salteo del lock o porque queda una instancia vieja), la confirmación
+  queda varada. No verifiqué si Railway deja la instancia vieja sirviendo.
+- **H4, riesgo con seguimiento.** «Codo 1½ PVC» da `codo 11 2 pvc`, la misma
+  clave que «11/2». Contra «1 1/2» el parecido baja de 1,0 a 0,67, con un
+  umbral de 0,8; «2½"» contra «2 1/2"» da 0,5. La base acertaba de
+  casualidad, porque convertía «1½» en «1». Se pierde una sugerencia, pero
+  no entra un dato malo.
+- **El extractor acepta orígenes hechos de cifras.**
+  `_origen_desde_factura` ya no rechaza los orígenes hechos sólo de cifras.
+  «212» da US, «310» y «0310» dan CN, y «100», «12» y «2024» dan vacío. Es
+  lo que pide D158, y lo cubre un caso con su sabotaje. La columna del
+  Excel se elige por su encabezado (`main.py:5571`). Es un riesgo.
+- **Preexistente.** `main.py:8244` y `8844` guardan el origen crudo en
+  `origen_frecuente`. Va con D159 (ORIGEN-2).
+- **Menores, que son riesgo:**
+  - el recorte de espacios en JS es cuadrático;
+  - los avisos no tienen tope (119 KB en el peor caso);
+  - `get_pais_codigo` y `pais_origen` de `/generate_maria` ya estaban en
+    la base y no tienen pantalla.
+- **Verificado que está bien:**
+  - un origen no reconocido conserva el que ya estaba;
+  - `operation_items.origen` pasa a text en PG;
+  - una migración cortada no deja nada a medias;
+  - C.UTF-8 e ICU eligen las mismas filas;
+  - la migración se puede correr dos veces.
+
+**Corrección del informe:** SUR→SR es Surinam (232), no Sudáfrica (ZAF→159).
+Que SUR sea ambiguo sigue siendo un supuesto reversible.
+

@@ -3,79 +3,75 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Devolución: CATALOGO-3 sobre `f4ade80` (2026-11-10 PM)
+## Aceptada: CATALOGO-3 sobre `ec0092a` (2026-11-10 PM)
 
-Acta: `REPRODUCCION-CATALOGO-3-2026-11-10.md`. Tus puertas dan lo mismo que el
-informe: `catalogo3.sh` 25 rojos, arnés PG 7 OK en `f4ade80` y 5 fallas en la
-base, golden 115. Vuelve por tres causas. Para cada una, un caso con la
-familia como datos; al aceptar la vuelta pruebo con ejemplos distintos.
-Basate en `f4ade80`; D151 sigue. La devolución va antes de
-PRESUPUESTO-CLIENTE-1: dejala donde está.
+Acta: `REPRODUCCION-CATALOGO-3-2026-11-10.md`, sección «Vuelta».
 
-1. **Un origen que la tabla no reconoce hace perder toda la confirmación.**
-   - En la base, `POST /api/ncm/guardar-uso` con «CHN» daba 200 y sumaba en
-     `ncm_historial`. En `f4ade80` da 400 y no queda nada.
-   - Pasa lo mismo con ITA, «Hong Kong», «Viet Nam», «U.S.A.», PRC, Turkey y
-     MACAO.
-   - Camino de hoy: el Excel con texto libre y `saveNcmUsage` de `ncm.js`.
-   - El PUT del catálogo no deja cambiar sólo el NCM de una fila vieja con
-     «TAI», porque la pantalla manda el origen igual.
-   - **Pedido:** un origen no reconocido no hace perder el resto (NCM,
-     historial, memoria y catálogo), y la persona se entera de que el origen
-     no se tomó.
-   - **Un solo criterio** en el extractor, guardar-uso, el PUT del catálogo y
-     la pantalla del catálogo. Hoy `_origen_desde_factura` pasa CHN a CN y
-     `origen_valido` no. `paises_maria.js` resuelve «HONG KONG» y otros 157
-     nombres que el servidor rechaza, y el servidor acepta «0313», que la
-     pantalla rechaza.
-2. **La clave distingue textos que son el mismo.**
-   - En la base daban la misma clave y hoy no; el lookup y la memoria del
-     cliente pasan de exact a none:
-     - «Capacitor 10µF 50V» (micro, U+00B5) y «Capacitor 10μF 50V» (mu
-       griega);
-     - «Bolt ｶﾞｽ M8» (medio ancho) y «Bolt ガス M8».
-   - Camino de hoy: la misma factura de capacitores leída del PDF y tipeada
-     a mano.
-   - **Pedido:** dos textos iguales bajo NFKC dan la misma clave.
-   - Además, «Screw M8» sigue encontrando la guardada como «Screw M8 螺丝», y
-     al revés. Lo decidís vos, y lo decís en el informe, si la encuentra como
-     exacta o como parecida. D77 no pide perder eso.
-   - «电线 2mm» y «钢管 2mm» siguen sin encontrarse.
-3. **La clave nueva hace lento el lookup.**
-   - `/api/catalog/lookup` corre en el event loop. Con 20 ítems y 2000 filas
-     de ~430 caracteres pasa de 1,87 s a 19,44 s.
-   - `clave_de_producto` con 65 caracteres tarda 0,066 ms, y `_normalize`
-     0,006 ms.
-   - **Pedido:** con 20 ítems y 2000 filas de ~65 y de ~430 caracteres, el
-     lookup no tarda más del doble que la base. Medilo y ponelo en el
-     informe.
-   - Una prueba muestra que las claves son las mismas antes y después de
-     acelerarlo.
+**Lo que reproduje**
 
-**D158: (a), decidido por la PM.** «123» es LIBIA en `PAISES_INDEC`, así que
-pedirte que lo rechazaras fue un error mío.
+- Sabotajes: 45 rojos de 45.
+- Arnés PG: 7 OK.
+- Golden: 115.
+- Pantalla contra servidor: 0 diferencias.
+- Bench: más rápido que la base en las seis combinaciones.
+- `chequeo-6`: lo mismo que el informe.
+- Suite: 5782 passed, 0 failed.
+- 41 negativos míos, con ejemplos distintos de los de la devolución: verdes.
 
-**D159: (a) para lo de clientes, decidido por la PM.** Lo de `clientes.js`
-(maxlength), `clients.default_origin` VARCHAR(3) y los `[:3]` de
-main.py:7479/7557/9721 va como pieza aparte, que propongo a Emi. En cambio,
-el extractor (`pdf_extractor.py:575`), guardar-uso, el PUT y
-`catalogo.js:270` entran en la causa 1: esta pieza los cambió.
+Las tres causas quedan cerradas.
 
-**Riesgos que no se piden:**
-- una clave de más de 2000 caracteres no se edita ni se borra (no tiene
-  camino de hoy);
-- el primer arranque se detiene si hay una transacción abierta sobre
-  `operation_items` (va a la lista de publicar, con D156);
-- la migración parte en dos un proveedor cuyas filas se guardaron con el
-  nombre con y sin letras no latinas (es costo de D157);
-- simplificado contra tradicional, y Ø contra φ.
+**Qué entra y qué no.** Acepto el rango `1345ca7..ec0092a`. Los commits de
+PRESUPUESTO-CLIENTE-1 que están debajo no entran, y no integro tu rama: la
+integra INTEGRAR-1. D151 sigue.
 
-**Corregí el informe:** `/generate_maria` frena «TAI» con «Origen no
-reconocido», no lo saca como 310.
+**Mi suite no salteó lo mismo que la tuya.** El total es el mismo, pero vos
+salteaste 335 y yo 101. En mi máquina, las 90 pruebas de `test_catalogo3.py`
+corren todas. Para tu próximo informe, mirá por qué en tu entorno se saltean
+más.
 
-D155, D156 y D157 siguen como se decidieron (están en Git). RESET-3,
-SMOKE-1, OBSERVABILIDAD-1, ORG-1+D40, D139 y D102 (`af924ea`) están
-aceptadas sin integrar, y las integra INTEGRAR-1. Próxima D libre: D160.
+**D160, D161 y D162: (a), decidido por la PM.**
+
+- D160: las formas que no están en la tabla quedan sin origen y con aviso.
+- D161: se mantiene la excepción a NFKC para «ºª№™℠».
+- D162: los 22 alias que no son países quedan fuera.
+
+**Corregí el informe:** SUR→SR es Surinam (232), no Sudáfrica (ZAF→159).
+
+**Riesgo que corrijo.** Con un choque en la migración no queda sólo una
+«fila huérfana». El texto exacto lee la otra fila, y al confirmarlo pisa su
+NCM, su origen y su descripción. Va a la lista de publicar: si el primer
+arranque dice que N filas quedan por un choque y N es mayor que 0, se frena
+antes de que alguien confirme.
+
+**Riesgos que no te pido arreglar:**
+
+- Al empatar, la memoria del cliente devuelve la primera fila
+  (`client_memory.py:286`). Ya pasaba en la base. Se lo propongo a Emi como
+  pieza aparte, MEMORIA-ORDEN-1. No la empieces.
+- «1½» contra «1 1/2» pierde la sugerencia, porque el parecido da 0,67.
+- El extractor acepta orígenes hechos de cifras («212» da US), como pide
+  D158.
+- Si dos versiones escriben las claves a la vez, la confirmación puede
+  quedar trabada.
+- El recorte de espacios en JS es cuadrático, y los avisos no tienen tope.
+- `main.py:8244` y `8844` guardan el origen crudo en `origen_frecuente`. Va
+  con ORIGEN-2.
+
+**Sigue PRESUPUESTO-CLIENTE-1 (D141 a).** Te faltan las puertas, los
+sabotajes, el informe y el hallazgo 8. Basate en tu rama.
+
+D155-D159 siguen como se decidieron (están en Git). Aceptadas sin integrar,
+que integra INTEGRAR-1:
+
+- RESET-3;
+- SMOKE-1;
+- OBSERVABILIDAD-1;
+- ORG-1+D40;
+- D139;
+- D102 (`af924ea`);
+- CATALOGO-3.
+
+Próxima D libre: D163.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 

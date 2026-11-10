@@ -645,3 +645,22 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   frenarse si otra sesión tiene una transacción abierta sobre
   `operation_items`.
 
+## 2026-11-10 10:40 UTC — CATALOGO-3 aceptada, D160-D162 (a) (PM, con el consejero)
+
+- Aceptada la vuelta sobre `ec0092a`, en el rango `1345ca7..ec0092a`; el
+  acta está en `REPRODUCCION-CATALOGO-3-2026-11-10.md`, sección «Vuelta».
+  No se integra la rama: la integra INTEGRAR-1.
+- D160 (a): las formas de país que no están en la tabla quedan sin origen y
+  con aviso.
+- D161 (a): se mantiene la excepción a NFKC para «ºª№™℠».
+- D162 (a): los 22 alias que no son países quedan fuera de la lectura del
+  país.
+- A la lista de antes de publicar: si el primer arranque dice que N filas
+  quedan por un choque y N > 0, se frena antes de que alguien confirme. Con
+  un choque, el texto exacto lee la otra fila y pisa su NCM, su origen y su
+  descripción.
+- Se le propone a Emi MEMORIA-ORDEN-1, con la recomendación de hacerla. Al
+  empatar, la memoria del cliente devuelve la primera fila. Ya pasaba antes
+  de CATALOGO-3: al reclasificar un producto, sigue sugiriendo el NCM
+  viejo.
+
