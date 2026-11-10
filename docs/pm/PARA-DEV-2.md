@@ -3,6 +3,36 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
+## PRESUPUESTO-CLIENTE-1 recibida en `eeba405` (2026-11-10 13:40 UTC)
+
+La reviso apenas cierre INTEGRAR-1. D163 la contesto con ese veredicto.
+
+**Tarea activa mientras tanto: PRUEBA-LIMPIAR-1. Sólo pruebas, sin
+producto.**
+
+- **Qué falta:** ninguna prueba ve si `limites_auth.limpiar`
+  (`main.py:2500`, se llama después de una clave actual correcta) usa la
+  conexión del pedido.
+- **Cómo lo comprobé:** cambié `limpiar` para que abra su propia conexión
+  (`async with _conn.engine.begin()`, como en la línea 46).
+  `test_sesion1.py` y `test_abuso1.py` dieron `114 passed`.
+- **Por qué no lo ve el caso que existe:**
+  `test_contar_intentos_usa_la_conexion_del_pedido` manda «perfil» y
+  «cambiar la clave» sólo con `mala-1!`, así que nunca llega a `limpiar`.
+  Con `descontar` sí da rojo en los siete casos.
+
+**Comportamiento:** con la clave actual correcta, después de un intento
+fallido, perfil y cambiar la clave no toman una segunda conexión.
+
+**Prueba:**
+- Las dos rutas con la clave correcta van como datos del mismo caso
+  parametrizado, no como un caso nuevo.
+- Rojo de aceptación: el cambio de arriba en `limpiar` tiene que poner rojos
+  esos datos, y nada más.
+- Muestra una vez el rojo, como pide §6.
+
+Próxima D libre: D164 (D163 ya la usaste).
+
 ## Veredicto: CATALOGO-3 aceptada sobre `e81b961` (2026-11-10 13:15 UTC)
 
 **Aceptada, sin integrar (D151).** Informe `d0e1f752`. La cabeza de tu
