@@ -9,7 +9,9 @@ Comprueba:
    andando;
 3. otro dueño no puede borrarlo (404) y el presupuesto sigue andando;
 4. un cliente sin presupuesto se sigue borrando;
-5. si el borrado falla a mitad, no se borra nada (ni cliente ni presupuesto).
+5. si el borrado falla a mitad, no se borra nada (ni cliente ni presupuesto);
+6. una operación guardada en otro cliente pierde su link; si ese guardado
+   falla (400), el link sigue.
 
 uso (con un Postgres local y descartable, nunca el de producción):
   python scripts/testing/datos1_postgres.py postgresql://cdi@127.0.0.1:55432/<base>
@@ -148,6 +150,29 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
     r = c.delete(f"/api/clientes/{cid2}")
     chequear(r.status_code == 200 and contar("clients", "id", cid2) == 0,
              f"un cliente sin presupuesto se sigue borrando ({r.status_code})")
+
+    # --- 6. la operación pasa a otro cliente
+    a.activo()
+    x = c.post("/api/clientes", json={"nombre": "Cliente DATOS1 X"}).json()["cliente"]["id"]
+    y = c.post("/api/clientes", json={"nombre": "Cliente DATOS1 Y"}).json()["cliente"]["id"]
+    archivo = f"MARIA_{uuid.uuid4().hex}.TXT"
+    item = {"pieza": "8471.30.12", "descripcion": "TABLETA SINTETICA", "origen": "CHN",
+            "cantidad": 1, "valor_unitario": 50, "peso_unitario": 0.5}
+
+    def guardar(cid, valor=50):
+        return c.post(f"/api/clientes/{cid}/operaciones",
+                      json={"operation_id": archivo, "items": [{**item, "valor_unitario": valor}]})
+
+    op6 = guardar(x).json()["operation_id"]
+    token6 = c.post("/api/quotes/share", json={"operation_id": op6}).json()["token"]
+    r = guardar(y, "NaN")
+    chequear(r.status_code == 400 and link(token6) == 200
+             and sql("select client_id from operations where id=%s", op6)[0][0] == x,
+             f"si el guardado en otro cliente falla, el link sigue ({r.status_code})")
+    r = guardar(y)
+    chequear(r.status_code == 200 and link(token6) == 404 and contar("public_quotes", "operation_id", op6) == 0
+             and sql("select client_id from operations where id=%s", op6)[0][0] == y,
+             f"guardada en otro cliente, la operación pierde su link ({r.status_code})")
 
 print(f"fallas: {len(FALLAS)}")
 sys.exit(1 if FALLAS else 0)
