@@ -677,3 +677,14 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - MEMORIA-ORDEN-1 se retira: entra en esta devolución.
 - Siguen D160-D162 (a), la condición de publicar sobre los choques de la
   migración, los riesgos menores y la corrección de SUR.
+
+## 2026-11-10 13:15 UTC — CATALOGO-3 aceptada sobre `e81b961`, sin integrar (PM, con el consejero)
+
+- Acta: `REPRODUCCION-CATALOGO-3-2026-11-10.md`, «Vuelta sobre `e81b961`».
+  Ejemplos propios, distintos de los de la devolución: 72 OK en SQLite y en
+  PG; la base sin el arreglo da 33 y 43 FALLA. Sabotajes 50 de 50.
+  Adversario: sin defectos.
+- Decidido por la PM: el mismo desempate en el catálogo del proveedor
+  (`catalog_service.py:381-402`) queda fuera de CATALOGO-3. Se le propone a
+  Emi como pieza aparte. El caso de `ultima_vez` nula va a la cola de
+  limpieza.

@@ -3,89 +3,56 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Devolución: CATALOGO-3 sobre `ec0092a` (2026-11-10 PM)
+## Veredicto: CATALOGO-3 aceptada sobre `e81b961` (2026-11-10 13:15 UTC)
 
-**La aceptación anterior de esta misma vuelta queda sin efecto.** No la
-tomes. Me equivoqué yo: llamé preexistente a H1 sin correr la base.
+**Aceptada, sin integrar (D151).** Informe `d0e1f752`. La cabeza de tu
+rama sólo suma `PARA-PM-2.md` sobre `e81b961`. Acta:
+`REPRODUCCION-CATALOGO-3-2026-11-10.md`, «Vuelta sobre `e81b961`».
 
-Acta: `REPRODUCCION-CATALOGO-3-2026-11-10.md`, sección «Retiro de la
-aceptación», con la salida entera.
+**Lo reproducido:**
 
-**Causa.** La memoria del cliente (`lookup_client_memory`) trae las filas
-del cliente sin orden y se queda con la primera de mayor parecido. El mismo
-texto con otro NCM es otra fila, y confirmar suma a su propia fila sin
-cambiar cuál gana. Ante un empate gana la que la base devuelva primero. En
-las pruebas, SQLite usa uno de dos índices y el resultado cambia entre
-corridas; en PG no lo corrí. El NFKC que te pedí en la causa 2 sumó a los
-empates ² contra 2 y el ancho completo, que la base distinguía: la parte
-de esto que es mía, como pasó con D158.
+- `chequeo-6` igual al informe;
+- `test_catalogo3.py` 104 passed;
+- arnés PG 10 OK;
+- 50 de 50 sabotajes en rojo.
 
-**Camino de hoy.** La misma factura leída del PDF («Cable 2,5mm²»,
-85444900 CN) y tipeada a mano («Cable 2,5mm2», 85444200 BR). Buscando
-«Cable 2,5mm2», la base da BR en 4 de 4 corridas; la vuelta da CN en 3 de
-4, también después de confirmar BR tres veces.
+Probé con ejemplos míos, distintos de los de la devolución: m³/m3, ancho
+completo, ㎜, números romanos, ⑤, el mismo texto con espacio duro y con
+«ﬂ», misma hora y fila sin fecha. Dieron 72 OK en SQLite y en PG. Sin el
+arreglo dieron 33 fallas en SQLite y 43 en PG. Un adversario no encontró
+defectos. La suite entera es mía sobre `ec0092a` (5782 passed). Desde ahí
+el producto cambia en una sola función.
 
-**Lo que pido (comportamiento), en este orden:**
+**Lo que contestás, cerrado:**
 
-1. Si una fila guardada tiene el texto idéntico al que se busca, gana esa.
-   Si hay varias (el mismo texto con dos NCM), gana la última confirmada.
-   «Idéntico» es lo que ya compara la clave guardada (`clave_del_producto`:
-   NFC y sin distinguir mayúsculas): «CABLE 2,5MM2» es idéntico a «Cable
-   2,5mm2»; «2,5mm²» no.
-2. Si ninguna tiene el texto idéntico y varias empatan en parecido, gana la
-   última confirmada.
-3. El mismo resultado en cada corrida, en SQLite y en PG, sin importar qué
-   fila devuelva primero la base, también si dos confirmaciones quedan con
-   la misma hora.
+- Sin D nuevas.
+- La explicación de 335 contra 101 (los 234 de `test_excel3` sin `xlwt`)
+  alcanza.
+- D160–D162 siguen en (a).
 
-**Prueba, que no dependa de qué fila llega primero.** Un caso con la
-familia como datos (²/2, ancho completo, µ/μ):
+**Tus riesgos:**
 
-- se guardan las dos filas y se busca cada texto: cada uno devuelve la
-  suya;
-- se repite con el orden de guardado invertido.
+- **El catálogo del proveedor.** `catalog_service.py:381-402` trae las
+  filas sin orden y se queda con la primera de mayor parecido. Es el mismo
+  patrón y hoy se llega cuando dos productos del catálogo empatan. Queda
+  fuera de lo que Emi aprobó para CATALOGO-3: se lo propongo a ella como
+  pieza aparte. No lo toques.
+- **Relojes desparejos.** «La última» con relojes distintos queda como
+  riesgo aceptado. Es determinista.
+- **Clave NULL.** Una fila con clave NULL nunca es idéntica, igual que
+  antes. La migración la completa.
+- **Fila sin fecha.** La suite no tiene un caso de `ultima_vez` nula. Va a
+  `COLA-LIMPIEZA.md`; no lo hagas ahora.
 
-Otro caso, para el texto idéntico con dos NCM: se confirma A y se espera A;
-se confirma B y se espera B; se confirma A y se espera A. Un tercero, para
-la regla 2: con el par guardado, se busca una forma que no está guardada y
-empata con las dos; se confirma una y se espera esa, se confirma la otra y
-se espera la otra. Cada confirmación, en su propio pedido. Con el arreglo
-revertido, alguna falla siempre, en SQLite y en PG. Mostrá ese rojo. Al
-aceptar, pruebo con ejemplos distintos.
+**Orden.** Sigue PRESUPUESTO-CLIENTE-1 (D141 a). Te faltan las puertas,
+los sabotajes, el informe y el hallazgo 8.
 
-**Lo demás queda como estaba en mi veredicto anterior:**
+D151 sigue: no traigas mi rama hasta que acepte INTEGRAR-1. Esto lo leés
+desde mi rama, sin integrarla.
 
-- Lo reproducido: 45 rojos de 45, arnés PG 7 OK, golden 115, pantalla 0
-  diferencias, bench más rápido que la base en las seis, `chequeo-6` igual
-  al informe y suite 5782 passed, 0 failed. Las tres causas de `f4ade80`
-  quedan cerradas.
-- **D160, D161 y D162: (a), decidido por la PM.** D160: las formas fuera
-  de la tabla quedan sin origen y con aviso. D161: sigue la excepción a
-  NFKC para «ºª№™℠». D162: los 22 alias que no son países quedan fuera.
-- **Corregí el informe:** SUR→SR es Surinam (232), no Sudáfrica (ZAF→159).
-- **Riesgo que corrijo.** Con un choque en la migración no queda sólo una
-  «fila huérfana»: el texto exacto lee la otra fila, y al confirmarlo pisa
-  su NCM, su origen y su descripción. Va a la lista de publicar: si el
-  primer arranque dice que N filas quedan por un choque y N es mayor que 0,
-  se frena antes de que alguien confirme.
-- **Mi suite no salteó lo mismo que la tuya** (335 contra 101, con el
-  mismo total). En tu próximo informe, decí por qué.
-- **Riesgos que no te pido arreglar:** «1½» contra «1 1/2» pierde la
-  sugerencia (0,67); el extractor acepta orígenes hechos de cifras («212»
-  da US), como pide D158; dos versiones escribiendo las claves a la vez
-  pueden trabar la confirmación; el recorte de espacios en JS es
-  cuadrático y los avisos no tienen tope; `main.py:8244` y `8844` guardan
-  el origen crudo (va con ORIGEN-2); una descripción larga que difiere en
-  potencia y modelo sugiere el mismo NCM, como en la base.
-
-**Orden.** Esta devolución va primero; después, PRESUPUESTO-CLIENTE-1
-(D141 a): te faltan las puertas, los sabotajes, el informe y el hallazgo
-8. D151 sigue: no traigas mi rama hasta que acepte INTEGRAR-1; esto lo
-leés desde mi rama sin integrarla.
-
-D155-D159 siguen como se decidieron (están en Git). Aceptadas sin integrar,
-que integra INTEGRAR-1: RESET-3, SMOKE-1, OBSERVABILIDAD-1, ORG-1+D40,
-D139 y D102 (`af924ea`).
+Aceptadas sin integrar, que integra INTEGRAR-1: RESET-3, SMOKE-1,
+OBSERVABILIDAD-1, ORG-1+D40, D139, D102 (`af924ea`) y CATALOGO-3
+(`e81b961`).
 
 Próxima D libre: D163.
 

@@ -290,3 +290,195 @@ La otra fila de cada caso es «Cable 2,5mm²» 85444900 CN, «Filtro ＡＢＣ-1
 Lo demás de la vuelta queda como está arriba: las tres causas de
 `f4ade80`, H2 como condición de publicación, H3 y H4, los menores y la
 corrección de SUR.
+
+## Vuelta sobre `e81b961` (devolución `973c489`), 2026-11-10 13:05 UTC
+
+Producto de la vuelta: sólo `lookup_client_memory`
+(`client_memory.py`, +12/−9). Base para el rojo: `b7c4c85`.
+
+**Lo del informe, reproducido**
+
+| Qué | Salida |
+|---|---|
+| `chequeo-6 b7c4c854 e81b961b` | `producto +12/−9`, `arnés +166/−4`, historia vacío, `avisos: 0`: igual al informe |
+| `tests/test_catalogo3.py` (SQLite) | `104 passed, 3 warnings in 26.94s` |
+| arnés PG 16 (`catalogo3_postgres.py`), mi PG en 127.0.0.1:55432 | 10 OK, `todo OK`, salida=0 |
+| `sabotajes/catalogo3.sh e81b961b` | 50 líneas ROJO, `fallas: 0`, salida=0 |
+
+Mi primera corrida del arnés PG cayó en el arranque: le faltó
+`ENVIRONMENT=test` en mi entorno («DATABASE_URL no está definida y
+ENVIRONMENT no es de desarrollo»). Es mío, no del arnés: con las variables
+del informe dio lo de arriba.
+
+**Mi prueba, con ejemplos propios** (no los de la devolución). El script
+llama a `upsert_client_product_history` y `lookup_client_memory`, cada
+guardado y cada búsqueda en su propia sesión y commit, contra SQLite o PG
+(base propia `pm_e81` / `pm_b7c`, sin FK). Pares que empatan en parecido
+1.000 y tienen otra clave guardada:
+
+- «Tubo 20m³» / «Tubo 20m3», buscando además «Tubo 20m₃»;
+- «Válvula ＸＹ-5» / «Válvula XY-5», y «Válvula XY－5»;
+- «Sensor 5㎜ inductivo» / «Sensor 5mm inductivo», y «Sensor ５mm inductivo»;
+- «Motor Ⅳ trifásico» / «Motor IV trifásico», y «Motor ⅠV trifásico»;
+- «Arandela ⑤mm plana» / «Arandela 5mm plana», y «Arandela ５mm plana».
+
+Por cada par: regla 1 en los dos órdenes de guardado, y sigue ganando el
+idéntico después de confirmar dos veces la otra; regla 2 con A/B/A/B y el
+tercer texto; regla 3 con las dos filas a la misma hora, cuatro corridas
+en los dos órdenes; una fila sin fecha pierde contra una fecha de hace 400
+días, en los dos órdenes. Además, dos pares que para la regla son el mismo
+texto (espacio duro, «Perno M8 zincado», y ligadura, «Junta ﬂexible»):
+A/B/A, gana la última confirmada buscando cualquiera de los dos.
+
+| Producto | SQLite | PG 16 |
+|---|---|---|
+| `e81b961` | 72 OK, `fallas: 0` | 72 OK, `fallas: 0` |
+| `b7c4c85` (sin el arreglo) | 39 OK, 33 FALLA (15 idéntico, 14 tercer texto, 4 mismo texto) | 29 OK, 43 FALLA (19, 18, 6) |
+
+Ejemplo del rojo, SQLite en `b7c4c85`: «FALLA identico B, guardado
+'Tubo 20m³' primero -> ('73063000', 'CN') (esperaba ('73064000', 'IT'))»;
+«FALLA C con A sin fecha, guardado 'Tubo 20m³' primero -> ('73063000',
+'CN') (esperaba ('73064000', 'IT'))».
+
+Un error mío en la primera versión del script: esperaba que «Perno M8»
+y «Junta ﬂexible» ganaran como idénticos contra «Perno M8» y «Junta
+flexible». Para la regla acordada (NFC, sin mayúsculas y con los espacios
+normalizados) son el mismo texto, y la vuelta da la última confirmada, que
+es lo pedido. Los pasé a su propio grupo; no es un defecto de la Dev.
+
+**Adversario** (Sonnet alto, contexto nuevo, sin red, sin clave de
+Gemini): ningún defecto reproducible. Probó 300 conjuntos al azar en 4
+órdenes de inserción (`nondet= 0 exc= 0`), un oráculo propio (`checked 196
+mismatch 0`), `ultima_vez` nula en una o las dos filas y contra fecha con
+zona horaria, en SQLite y en tres casos de PG 16 (sin excepción, la fila sin
+fecha pierde), búsquedas de 5000 caracteres, vacías, con medio par UTF-16,
+NUL y emoji, y 3000 filas empatadas (0,141 s por consulta). No corrió el
+barajado al azar en PG ni la suite completa. La regla 1 no hace ganar a una fila con menos parecido: el
+desempate corre sólo entre las del puntaje máximo. Observación baja: una
+fila sin `clave` nunca es idéntica (ya era así; la migración la completa
+salvo en filas que no son producto). Hueco: la suite no tiene caso de
+`ultima_vez` nula; lo cubre mi prueba, en los dos motores.
+
+**No corrido por mí:** la suite completa (la Dev: «5562 passed, 335
+skipped, 3 xfailed» sobre `e81b961`; el cambio es una función), `golden`,
+`smoke_friccion.sh` y `ataque_aislamiento.sh` (el cambio no toca rutas,
+sesión ni permisos).
+
+<details><summary>Script de la PM (`pm_empates.py`)</summary>
+
+```python
+"""PM: empates de lookup_client_memory con ejemplos propios, en SQLite o PG.
+uso: PYTHONPATH=<worktree> python -I pm_empates.py <url async>
+"""
+import asyncio, sys, uuid
+from datetime import datetime, timezone, timedelta
+from sqlalchemy import text, update
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from proyecto_maria.database.models import Base, ClientProductHistory
+from proyecto_maria.services.client_memory import (
+    upsert_client_product_history as up, lookup_client_memory as look, clave_de_producto, parecido)
+
+# (A, B, C): A y B son dos filas; C empata con las dos y no es idéntico a ninguna
+CASOS = [
+    (("Tubo 20m³", "73063000", "CN"), ("Tubo 20m3", "73064000", "IT"), "Tubo 20m₃"),
+    (("Válvula ＸＹ-5", "84818099", "JP"), ("Válvula XY-5", "84813000", "DE"), "Válvula XY－5"),
+    (("Sensor 5㎜ inductivo", "85365090", "CN"), ("Sensor 5mm inductivo", "90318099", "DE"), "Sensor ５mm inductivo"),
+    (("Motor Ⅳ trifásico", "85015200", "BR"), ("Motor IV trifásico", "85015300", "CN"), "Motor ⅠV trifásico"),
+    (("Arandela ⑤mm plana", "73182200", "CN"), ("Arandela 5mm plana", "73182100", "KR"), "Arandela ５mm plana"),
+]
+# el mismo texto para la regla acordada (NFC, sin mayúsculas ni espacios de más): decide la última confirmada
+MISMOS = [(("Perno\u00a0M8 zincado", "73181400", "CN"), ("Perno M8 zincado", "73181300", "TW")),
+          (("Junta ﬂexible", "40169300", "CN"), ("Junta flexible", "40169990", "KR"))]
+FALLAS = []
+
+
+def chk(nombre, got, want):
+    ok = got == want
+    print(("OK   " if ok else "FALLA"), nombre, "->", got, "" if ok else f"(esperaba {want})")
+    if not ok:
+        FALLAS.append(nombre)
+
+
+async def main(url):
+    eng = create_async_engine(url)
+    async with eng.begin() as c:
+        await c.run_sync(Base.metadata.drop_all)
+        await c.run_sync(Base.metadata.create_all)
+    S = async_sessionmaker(eng, expire_on_commit=False)
+    pg = eng.dialect.name == "postgresql"
+
+    async def nueva():
+        db = S()
+        if pg:
+            await db.execute(text("SET session_replication_role = replica"))  # sin FK: usuario/cliente ficticios
+        return db
+
+    async def guardar(cid, fila):
+        async with await nueva() as db:
+            r = await up(db, "u_pm", cid, fila[1], fila[0], origen=fila[2])
+            await db.commit()
+            assert r is not None, fila
+
+    async def buscar(cid, t):
+        async with await nueva() as db:
+            r = await look(db, "u_pm", cid, t)
+            return r and (r["ncm"], r["origen"])
+
+    for A, B, C in CASOS:
+        ka, kb, kc = (clave_de_producto(x) for x in (A[0], B[0], C))
+        print(f"\n== {A[0]!r} / {B[0]!r} / C={C!r}  parecido A-B={parecido(ka, kb):.3f} C-A={parecido(kc, ka):.3f} C-B={parecido(kc, kb):.3f}")
+        # regla 1 en los dos órdenes, y sigue ganando aunque la otra sea más nueva
+        for orden in ((A, B), (B, A)):
+            cid = "c" + uuid.uuid4().hex[:8]
+            for f in orden:
+                await guardar(cid, f)
+            chk(f"identico A, guardado {orden[0][0]!r} primero", await buscar(cid, A[0]), (A[1], A[2]))
+            chk(f"identico B, guardado {orden[0][0]!r} primero", await buscar(cid, B[0]), (B[1], B[2]))
+            await guardar(cid, orden[0])
+            await guardar(cid, orden[0])
+            otro = B if orden[0] is A else A
+            chk(f"identico {otro[0]!r} tras confirmar dos veces la otra", await buscar(cid, otro[0]), (otro[1], otro[2]))
+        # regla 2: A/B/A con un texto que no es idéntico a ninguna
+        cid = "c" + uuid.uuid4().hex[:8]
+        for i, f in enumerate((A, B, A, B)):
+            await guardar(cid, f)
+            if i:
+                chk(f"C tras confirmar {f[0]!r} ({i+1}.ª)", await buscar(cid, C), (f[1], f[2]))
+        # regla 3: a la misma hora, el mismo resultado en los dos órdenes
+        hora = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+        res = []
+        for orden in ((A, B), (B, A), (A, B), (B, A)):
+            cid = "c" + uuid.uuid4().hex[:8]
+            for f in orden:
+                await guardar(cid, f)
+            async with await nueva() as db:
+                await db.execute(update(ClientProductHistory).where(ClientProductHistory.client_id == cid).values(ultima_vez=hora))
+                await db.commit()
+            res.append(await buscar(cid, C))
+        chk("C a la misma hora, cuatro corridas", len(set(res)), 1)
+        # sin fecha pierde contra con fecha, en los dos órdenes
+        for orden in ((A, B), (B, A)):
+            cid = "c" + uuid.uuid4().hex[:8]
+            for f in orden:
+                await guardar(cid, f)
+            async with await nueva() as db:
+                q = update(ClientProductHistory).where(ClientProductHistory.client_id == cid)
+                await db.execute(q.where(ClientProductHistory.ncm == A[1]).values(ultima_vez=None))
+                await db.execute(q.where(ClientProductHistory.ncm == B[1]).values(ultima_vez=hora - timedelta(days=400)))
+                await db.commit()
+            chk(f"C con A sin fecha, guardado {orden[0][0]!r} primero", await buscar(cid, C), (B[1], B[2]))
+    for A, B in MISMOS:
+        cid = "c" + uuid.uuid4().hex[:8]
+        for f in (A, B, A):
+            await guardar(cid, f)
+            for t in (A[0], B[0]):
+                chk(f"mismo texto {t!r} tras confirmar {f[0]!r}", await buscar(cid, t), (f[1], f[2]))
+    await eng.dispose()
+    print(f"\nfallas: {len(FALLAS)}")
+    sys.exit(1 if FALLAS else 0)
+
+
+asyncio.run(main(sys.argv[1]))
+```
+
+</details>

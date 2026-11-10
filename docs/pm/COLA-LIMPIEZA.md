@@ -139,3 +139,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `proyecto_maria/main.py:166` `pwd_context` de passlib: el producto no lo usa
   (el hash va directo con `bcrypt`), pero `tests/test_password_recovery_manual.py:5`
   lo importa. Sacarlo con ese import, y `passlib[bcrypt]` de `requirements.txt` (D153).
+- `tests/test_catalogo3.py`: ningún caso de la memoria del cliente con
+  `ultima_vez` nula («sin fecha pierde» sólo lo prueba el acta de la PM):
+  un caso con la fila sin fecha en los dos órdenes, con su rojo.
