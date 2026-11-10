@@ -450,9 +450,10 @@ def test_el_tope_de_la_clave_actual_vale_para_pedidos_a_la_vez():
 
 
 @pytest.mark.parametrize("ruta", ["ver el perfil", "perfil", "cambiar la clave", "login sin usuario",
-                                  "login con clave mala", "login", "pedir el reset"])
+                                  "login con clave mala", "login", "pedir el reset",
+                                  "perfil con la clave buena", "cambiar la clave con la clave buena"])
 def test_contar_intentos_usa_la_conexion_del_pedido(ruta):
-    """Contar o mirar el tope no toma otra conexión del pool mientras el
+    """Contar, mirar o limpiar el tope no toma otra conexión del pool mientras el
     pedido tiene la suya: con más pedidos que conexiones, se trabaría. Vale
     también para la sesión de get_current_user, que es aparte de la de la ruta."""
     u, mail = _usuario()
@@ -465,8 +466,15 @@ def test_contar_intentos_usa_la_conexion_del_pedido(ruta):
         "login con clave mala": ("POST", "/auth/login", {"username": u, "password": "mala-1!"}, None),
         "login": ("POST", "/auth/login", {"username": u, "password": CLAVE}, None),
         "pedir el reset": ("POST", "/auth/request-password-reset", {"email": mail}, None),
+        "perfil con la clave buena": ("PUT", "/api/user/profile", {"email": f"otro-{u}@example.com", "current_password": CLAVE}, t),
+        "cambiar la clave con la clave buena": ("POST", "/api/user/change-password", {"current_password": CLAVE, "new_password": CLAVE2}, t),
     }
     metodo, url, cuerpo, token = pedidos[ruta]
+    buena = bool(cuerpo) and cuerpo.get("current_password") == CLAVE
+    if buena:
+        # Con un fallo ya contado, la clave buena tiene algo que limpiar.
+        r = _http().request(metodo, url, json={**cuerpo, "current_password": "mala-1!"}, headers=_bearer(token))
+        assert r.status_code == 400, r.text
     tomadas, maximo = 0, 0
 
     def tomar(*_):
@@ -486,7 +494,7 @@ def test_contar_intentos_usa_la_conexion_del_pedido(ruta):
     finally:
         event.remove(pool, "checkout", tomar)
         event.remove(pool, "checkin", devolver)
-    assert r.status_code < 500, r.text
+    assert r.status_code == 200 if buena else r.status_code < 500, r.text
     assert maximo == 1, f"{ruta}: {maximo} conexiones a la vez"
 
 
