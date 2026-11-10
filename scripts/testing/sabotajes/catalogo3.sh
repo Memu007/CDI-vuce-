@@ -130,6 +130,10 @@ sabotaje $G "un código de miles de cifras vuelve a dar 500" \
   're.fullmatch(r"[0-9]{1,4}", texto)' \
   're.fullmatch(r"[0-9]+", texto)' \
   "FAILED $B[cifras de mas]"
+sabotaje $G "get_pais_codigo vuelve a hacer int() de cualquier tira de cifras" \
+  're.fullmatch(r"[0-9]{1,4}", str(pais).strip())' \
+  're.fullmatch(r"[0-9]+", str(pais).strip())' \
+  "FAILED $T::test_un_origen_de_miles_de_cifras_no_rompe_los_avisos_ni_el_txt"
 sabotaje proyecto_maria/pdf_extractor.py "el extractor vuelve a recortar a 3" \
   "origen = origen_valido(str(it.get('origen') or '')) or 'XX'" \
   "origen = str(it.get('origen') or '').strip().upper()[:3] or 'XX'" \
