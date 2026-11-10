@@ -10,7 +10,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - Guardar un uso o cambiar el NCM de una fila con un origen viejo o no reconocido guarda el NCM y avisa que el origen quedó sin cambiar.
 - Dos descripciones que se leen igual (µ/μ, ｶﾞｽ/ガス, ², ﬁ) dan la misma clave; «123» se lee como LIBIA.
-- Al finalizar, un producto con un origen que no reconoce se aprende igual, sin origen, y la pantalla lo nombra; importación, exportación, la pantalla y el extractor leen el país con el mismo criterio.
+- Al finalizar, un producto con un origen que no reconoce se aprende igual, sin origen, y la pantalla lo nombra; importación, exportación, la pantalla y el extractor leen el país con el mismo criterio, también con espacios raros (BOM, \x85) o letras fuera del plano básico.
 
 ## 2026-11-10 · fix: pasar una operación a otro cliente da de baja su presupuesto compartido (PRESUPUESTO-CLIENTE-1)
 
