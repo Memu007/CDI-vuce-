@@ -9,6 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-10 · fix: recuperar la operación de antes no saca a la usuaria de la pantalla a la que fue (BORRADOR-1)
 
 - **fix:** si mientras la página arranca la usuaria ya fue a otra pantalla (por ejemplo Clientes), el arranque la deja ahí: la operación de antes queda guardada y se avisa, en vez de llevarla a la revisión o a la carga.
+- **fix:** si a la carga la llevó el tour de bienvenida, la operación de antes se recupera igual aunque haya tocado la página.
 
 ## 2026-11-08 · fix: un nombre de usuario que ya existe con otras mayúsculas no se registra (NOMBRES-1)
 

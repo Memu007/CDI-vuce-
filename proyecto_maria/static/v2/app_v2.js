@@ -917,12 +917,14 @@
                     return null;
                 }
                 // Se decide al tenerlo, sin esperar más: si ya fue a otra pantalla, no se la saca de ahí.
-                return buscarBorrador().then(b => (!b ? null : currentScreen ? adoptarTarde(b) : adoptarBorrador(b)));
+                // A la carga la puede haber llevado el tour, no ella: ahí se recupera igual.
+                return buscarBorrador().then(b => (!b ? null
+                    : currentScreen && currentScreen !== 'upload' ? adoptarTarde(b) : adoptarBorrador(b)));
             })
             .catch(e => { console.warn('[app_v2] failed to restore state', e); return null; })
             .then(parsed => {
                 if (parsed) recuperada(parsed);
-                if (currentScreen) return;
+                if (currentScreen && !parsed) return;
                 // Con la operación recuperada se va a review; si no, a upload.
                 if (CDI.state && CDI.state.items && CDI.state.items.length > 0) {
                     goTo('review');
