@@ -22,17 +22,21 @@ de esto que es mía, como pasó con D158.
 
 **Camino de hoy.** La misma factura leída del PDF («Cable 2,5mm²»,
 85444900 CN) y tipeada a mano («Cable 2,5mm2», 85444200 BR). Buscando
-«Cable 2,5mm2», la base da BR; la vuelta da CN, también después de
-confirmar BR tres veces.
+«Cable 2,5mm2», la base da BR en 4 de 4 corridas; la vuelta da CN en 3 de
+4, también después de confirmar BR tres veces.
 
 **Lo que pido (comportamiento), en este orden:**
 
 1. Si una fila guardada tiene el texto idéntico al que se busca, gana esa.
    Si hay varias (el mismo texto con dos NCM), gana la última confirmada.
+   «Idéntico» es lo que ya compara la clave guardada (`clave_del_producto`:
+   NFC y sin distinguir mayúsculas): «CABLE 2,5MM2» es idéntico a «Cable
+   2,5mm2»; «2,5mm²» no.
 2. Si ninguna tiene el texto idéntico y varias empatan en parecido, gana la
    última confirmada.
 3. El mismo resultado en cada corrida, en SQLite y en PG, sin importar qué
-   fila devuelva primero la base.
+   fila devuelva primero la base, también si dos confirmaciones quedan con
+   la misma hora.
 
 **Prueba, que no dependa de qué fila llega primero.** Un caso con la
 familia como datos (²/2, ancho completo, µ/μ):
@@ -42,7 +46,10 @@ familia como datos (²/2, ancho completo, µ/μ):
 - se repite con el orden de guardado invertido.
 
 Otro caso, para el texto idéntico con dos NCM: se confirma A y se espera A;
-se confirma B y se espera B; se confirma A y se espera A. Con el arreglo
+se confirma B y se espera B; se confirma A y se espera A. Un tercero, para
+la regla 2: con el par guardado, se busca una forma que no está guardada y
+empata con las dos; se confirma una y se espera esa, se confirma la otra y
+se espera la otra. Cada confirmación, en su propio pedido. Con el arreglo
 revertido, alguna falla siempre, en SQLite y en PG. Mostrá ese rojo. Al
 aceptar, pruebo con ejemplos distintos.
 
