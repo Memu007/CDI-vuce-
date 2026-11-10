@@ -91,3 +91,14 @@ Sabotaje de la tarea: `======================= 9 passed, 35 deselected in 9.32s 
 | subagentes y `/code-review` | no corridos: diff de prueba de 11 líneas, sin producto |
 
 Archivos de producto tocados: ninguno.
+
+## chequeo-6 c033db7 5dd9a6e
+
+```
+chequeo-6 c033db7..5dd9a6e: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +11/−3
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+avisos: 0
+```
