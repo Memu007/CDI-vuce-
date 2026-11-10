@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-10 · fix: la posición SIM con la letra separada por un espacio vuelve a alimentar la memoria del cliente (MEMORIA-E2E)
+
+- «8471.30.00.900 R», como la arma la pantalla, se aprende al confirmar, al guardar la operación, en learn y al editar el producto.
+
 ## 2026-11-10 · fix: en la memoria del cliente el texto idéntico no distingue mayúsculas y la misma hora no la decide la base (CATALOGO-3)
 
 - «CABLE 2,5MM2» cuenta como el mismo texto que «Cable 2,5mm2»; con el mismo texto y dos NCM gana el último confirmado.
