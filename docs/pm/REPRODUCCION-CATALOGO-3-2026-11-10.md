@@ -92,4 +92,4 @@ Estimado, no medido de punta a punta: 20 ítems × 2000 filas de 65 caracteres,
 Primera corrida perdida: la salida pasó por `| tail -30` y el resumen quedó
 fuera; ese «rc=0» era de `tail`, no de pytest. La repetí con el registro
 entero, sin `-x`, en `/tmp/cdi-pm/wt-cat3-suite` (`f4ade80`, SQLite):
-en curso a las 02:36 UTC (iba por el 75 %, sin rojos hasta ahí); el resultado se suma acá al terminar. La devolución no depende de la suite.
+`5724 passed, 101 skipped, 3 xfailed in 927.54s (0:15:27)`, `fin rc=0`, sin FAILED ni ERROR. Después del resumen quedan 713 avisos «Task was destroyed but it is pending!» del cierre de asyncio; no cambian el rc. La devolución no depende de la suite.
