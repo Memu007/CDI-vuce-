@@ -21,7 +21,8 @@ Comprueba:
 - que un worker arranca aunque otro tenga tomada más de 5 s la migración
   de las claves;
 - que ante dos productos que empatan en parecido gana el texto idéntico y
-  después el último confirmado, guardados en cualquier orden.
+  después el último confirmado, guardados en cualquier orden, y que a la
+  misma hora no decide el id de la fila.
 
 uso (con un Postgres local y descartable, nunca el de producción; el usuario
 tiene que poder crear bases):
@@ -97,17 +98,25 @@ with TestClient(m.app, raise_server_exceptions=False) as c:
 print("GUARDADO " + json.dumps(out))
 '''
 
-# Dos textos que empatan en parecido, guardados en un orden y en el otro, y el
-# mismo texto con dos NCM confirmados A, B, A: imprime qué NCM sugiere cada vez.
+# Dos textos que empatan en parecido, guardados en un orden y en el otro; el
+# mismo texto o uno parecido, confirmados A, B, A, B; y dos filas a la misma
+# hora con los id cruzados: imprime qué NCM sugiere cada vez.
 EMPATAR = r'''
 import json, sys
+import psycopg2
 from fastapi.testclient import TestClient
 import proyecto_maria.main as m
 from proyecto_maria.core.rate_limit import limiter
 limiter.enabled = False
-usuario, clave, a, b = json.loads(sys.argv[1])
-pares = [("Cable 2,5mm²", "Cable 2,5mm2"), ("Bolt Ｍ８", "Bolt M8"), ("Capacitor 10µF", "Capacitor 10μF")]
-out = {"identico": [], "ultima": []}
+usuario, clave, a, b, url = json.loads(sys.argv[1])
+pares = [("Cable 2,5mm²", "Cable 2,5mm2", None), ("Bolt Ｍ８", "Bolt M8", None),
+         ("Cable 2,5mm²", "Cable 2,5mm2", ("CABLE 2,5MM²", "CABLE 2,5MM2"))]
+ultimas = [("Cable 2,5mm2", "Cable 2,5mm2", "Cable 2,5mm2"), ("Cable 2,5mm2", "CABLE 2,5MM2", "cable 2,5mm2"),
+           ("Cable 2,5mm²", "Cable 2,5mm2", "Cable 2,5mm₂"), ("Bolt Ｍ８", "Bolt M8", "BOLT M８"),
+           ("Capacitor 10µF", "Capacitor 10μF", "Capacitor 10µF")]
+out = {"identico": [], "ultima": [], "misma_hora": []}
+base = psycopg2.connect(url)
+base.autocommit = True
 with TestClient(m.app, raise_server_exceptions=False) as c:
     assert c.post("/auth/login", json={"username": usuario, "password": clave}).status_code == 200
     def cliente():
@@ -117,19 +126,29 @@ with TestClient(m.app, raise_server_exceptions=False) as c:
     def sugiere(cid, desc):
         r = c.post("/api/catalog/lookup", json={"items": [{"descripcion": desc}], "vendor_name": "Otro", "client_id": cid})
         return r.json()["items"][0]["ncm"]
-    for x, y in pares:
+    for x, y, buscados in pares:
         for guardados in ([(x, a), (y, b)], [(y, b), (x, a)]):
             cid = cliente()
             for desc, ncm in guardados:
                 confirmar(cid, desc, ncm)
-            out["identico"].append([sugiere(cid, x), sugiere(cid, y)])
-    for x, y, buscado in [("Cable 2,5mm2",) * 3, ("Cable 2,5mm²", "Cable 2,5mm2", "CABLE 2,5MM2")]:
+            out["identico"].append([sugiere(cid, d) for d in buscados or (x, y)])
+    for x, y, buscado in ultimas:
         cid = cliente()
         vistos = []
-        for desc, ncm in [(x, a), (y, b), (x, a)]:
+        for desc, ncm in [(x, a), (y, b), (x, a), (y, b)]:
             confirmar(cid, desc, ncm)
             vistos.append(sugiere(cid, buscado))
         out["ultima"].append(vistos)
+    for ids in (("0", "z"), ("z", "0")):
+        cid = cliente()
+        cur = base.cursor()
+        for (desc, ncm), primero in zip([("Cable 2,5mm²", a), ("Cable 2,5mm2", b)], ids):
+            confirmar(cid, desc, ncm)
+            cur.execute("update client_product_history set id=%s where client_id=%s and ncm=%s",
+                        (f"{primero}-{cid}", cid, ncm))
+        cur.execute("update client_product_history set ultima_vez=(select max(ultima_vez) from "
+                    "client_product_history where client_id=%s) where client_id=%s", (cid, cid))
+        out["misma_hora"].append(sugiere(cid, "Cable 2,5mm₂"))
 print("EMPATES " + json.dumps(out))
 '''
 
@@ -266,12 +285,14 @@ try:
 
     # --- 6. un empate no depende del orden de las filas
     OTRO = "84714900"
-    s, e = correr(NUEVA, EMPATAR, json.dumps([USUARIO, CLAVE, NCM, OTRO])).communicate(timeout=600)
+    s, e = correr(NUEVA, EMPATAR, json.dumps([USUARIO, CLAVE, NCM, OTRO, URL_BASE])).communicate(timeout=600)
     empates = json.loads(s.split("EMPATES ")[1].splitlines()[0]) if "EMPATES " in s else e[-1500:]
     chequear(isinstance(empates, dict) and empates["identico"] == [[NCM, OTRO]] * 6,
              f"ante un empate gana el texto idéntico, en los dos órdenes de guardado: {empates}")
-    chequear(isinstance(empates, dict) and empates["ultima"] == [[NCM, OTRO, NCM]] * 2,
-             f"ante un empate sin texto idéntico gana la última confirmada: {empates}")
+    chequear(isinstance(empates, dict) and empates["ultima"] == [[NCM, OTRO, NCM, OTRO]] * 5,
+             f"ante un empate gana la última confirmada: {empates}")
+    chequear(isinstance(empates, dict) and set(empates["misma_hora"]) in ({NCM}, {OTRO}),
+             f"un empate a la misma hora no depende del id de la fila: {empates}")
 finally:
     with contextlib.suppress(Exception):
         con = psycopg2.connect(URL)

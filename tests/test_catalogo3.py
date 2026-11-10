@@ -180,27 +180,46 @@ def _recordado(client, cid, desc):
 
 
 @pytest.mark.parametrize("invertido", [False, True])
-@pytest.mark.parametrize("a, b", [("Cable 2,5mm²", "Cable 2,5mm2"), ("Bolt Ｍ８", "Bolt M8"),
-                                  ("Capacitor 10µF", "Capacitor 10μF")])
-def test_ante_un_empate_gana_el_texto_identico(client, a, b, invertido):
+@pytest.mark.parametrize("a, b, buscados", [
+    ("Cable 2,5mm²", "Cable 2,5mm2", None), ("Bolt Ｍ８", "Bolt M8", None),
+    ("Cable 2,5mm²", "Cable 2,5mm2", ("CABLE 2,5MM²", "CABLE 2,5MM2")),
+])
+def test_ante_un_empate_gana_el_texto_identico(client, a, b, buscados, invertido):
     cid = _cliente(client)
     guardados = [(a, NCM), (b, "84714900")]
     for desc, ncm in reversed(guardados) if invertido else guardados:
         _confirmar(client, cid, desc, ncm)
-    assert [_recordado(client, cid, desc) for desc, _ in guardados] == [NCM, "84714900"]
+    assert [_recordado(client, cid, desc) for desc in buscados or (a, b)] == [NCM, "84714900"]
 
 
 @pytest.mark.parametrize("a, b, buscado", [
     ("Cable 2,5mm2", "Cable 2,5mm2", "Cable 2,5mm2"),
-    ("Cable 2,5mm²", "Cable 2,5mm2", "CABLE 2,5MM2"),
+    ("Cable 2,5mm2", "CABLE 2,5MM2", "cable 2,5mm2"),
+    ("Cable 2,5mm²", "Cable 2,5mm2", "Cable 2,5mm₂"),
+    ("Bolt Ｍ８", "Bolt M8", "BOLT M８"),
+    ("Capacitor 10µF", "Capacitor 10μF", "Capacitor 10µF"),
 ])
 def test_ante_un_empate_gana_la_ultima_confirmada(client, a, b, buscado):
     cid = _cliente(client)
     vistos = []
-    for desc, ncm in [(a, NCM), (b, "84714900"), (a, NCM)]:
+    for desc, ncm in [(a, NCM), (b, "84714900"), (a, NCM), (b, "84714900")]:
         _confirmar(client, cid, desc, ncm)
         vistos.append(_recordado(client, cid, buscado))
-    assert vistos == [NCM, "84714900", NCM]
+    assert vistos == [NCM, "84714900", NCM, "84714900"]
+
+
+def test_un_empate_a_la_misma_hora_no_depende_del_id(client):
+    vistos = set()
+    for ids in (("0", "z"), ("z", "0")):
+        cid = _cliente(client)
+        for (desc, ncm), primero in zip([("Cable 2,5mm²", NCM), ("Cable 2,5mm2", "84714900")], ids):
+            _confirmar(client, cid, desc, ncm)
+            _escribir("update client_product_history set id=:i where client_id=:c and ncm=:n",
+                      i=f"{primero}-{cid}", c=cid, n=ncm)
+        _escribir("update client_product_history set ultima_vez=(select max(ultima_vez) from "
+                  "client_product_history where client_id=:c) where client_id=:c", c=cid)
+        vistos.add(_recordado(client, cid, "Cable 2,5mm₂"))
+    assert vistos in ({NCM}, {"84714900"}), vistos
 
 
 @pytest.mark.parametrize("recordado, del_proveedor, sale", [
