@@ -3,85 +3,79 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Tarea activa: CATALOGO-3 (2026-11-09 PM, sí de Emi)
+## Devolución: CATALOGO-3 sobre `f4ade80` (2026-11-10 PM)
 
-**D155: (a), decidido por la PM (20:20 UTC).** Origen válido es lo que
-reconoce `pais_reconocido`, nombre o código, y se guarda tal cual; el
-extractor deja de recortar a 3 y usa ese mismo criterio. Cambiá
-`test_despacho1b` para la nueva conducta. Que siga rechazando «XYZ», «ZZ»,
-«123», «ＢＲ» y «ÉS», y que nombre en el informe qué casos de esa prueba
-cambiaron. **Corrección de la PM (20:45 UTC):** la prueba va sobre la familia y no sobre el
-ejemplo. Para cada país de la tabla, su nombre y su código tienen que dar el
-mismo código MARIA en el TXT. Va además la corrida del golden. «PAISES BAJOS» sí entra en esta pieza: con (a), ese camino llega al
-TXT. En `maria_generator.py:129` y `:134` la clave «NL» está dos veces, y gana
-la segunda. **NL queda pendiente (corrección de las 21:00 UTC; retiro lo de
-las 20:55).** Las tablas oficiales traen dos entradas, 423 PAISES BAJOS y 434
-HOLANDA, y `paises_maria.js` también. Ningún país cambia de valor: «PAISES
-BAJOS» da 423, «HOLANDA» da 434, y «NL» sigue como hoy (434, en el back y en
-el front) hasta que decida Emi. El chequeo de claves repetidas lee el código
-fuente del literal (`ast` o F601 de pyflakes): en el dict ya cargado no se ve
-la clave perdida. En la prueba de la familia, cada código ISO dice con qué
-nombre va. Las entradas dobles (NL, CHIPRE 311/435, TURQUIA 336/436, ALEMANIA
-402/438) van como D, sin arreglarlas.
-Antes de cerrar, buscá quién compara el origen por igualdad o supone que tiene
-dos letras: ancho de columna, listas ISO2, claves. Con (a), un mismo país puede
-aparecer escrito de dos formas.
+Acta: `REPRODUCCION-CATALOGO-3-2026-11-10.md`. Tus puertas dan lo mismo que el
+informe: `catalogo3.sh` 25 rojos, arnés PG 7 OK en `f4ade80` y 5 fallas en la
+base, golden 115. Vuelve por tres causas. Para cada una, un caso con la
+familia como datos; al aceptar la vuelta pruebo con ejemplos distintos.
+Basate en `f4ade80`; D151 sigue. La devolución va antes de
+PRESUPUESTO-CLIENTE-1: dejala donde está.
 
-Emi dijo que sí el 09/11. Tu rutina vuelve a estar prendida. Comportamiento
-pedido, con un caso por causa y la familia como datos:
+1. **Un origen que la tabla no reconoce hace perder toda la confirmación.**
+   - En la base, `POST /api/ncm/guardar-uso` con «CHN» daba 200 y sumaba en
+     `ncm_historial`. En `f4ade80` da 400 y no queda nada.
+   - Pasa lo mismo con ITA, «Hong Kong», «Viet Nam», «U.S.A.», PRC, Turkey y
+     MACAO.
+   - Camino de hoy: el Excel con texto libre y `saveNcmUsage` de `ncm.js`.
+   - El PUT del catálogo no deja cambiar sólo el NCM de una fila vieja con
+     «TAI», porque la pantalla manda el origen igual.
+   - **Pedido:** un origen no reconocido no hace perder el resto (NCM,
+     historial, memoria y catálogo), y la persona se entera de que el origen
+     no se tomó.
+   - **Un solo criterio** en el extractor, guardar-uso, el PUT del catálogo y
+     la pantalla del catálogo. Hoy `_origen_desde_factura` pasa CHN a CN y
+     `origen_valido` no. `paises_maria.js` resuelve «HONG KONG» y otros 157
+     nombres que el servidor rechaza, y el servidor acepta «0313», que la
+     pantalla rechaza.
+2. **La clave distingue textos que son el mismo.**
+   - En la base daban la misma clave y hoy no; el lookup y la memoria del
+     cliente pasan de exact a none:
+     - «Capacitor 10µF 50V» (micro, U+00B5) y «Capacitor 10μF 50V» (mu
+       griega);
+     - «Bolt ｶﾞｽ M8» (medio ancho) y «Bolt ガス M8».
+   - Camino de hoy: la misma factura de capacitores leída del PDF y tipeada
+     a mano.
+   - **Pedido:** dos textos iguales bajo NFKC dan la misma clave.
+   - Además, «Screw M8» sigue encontrando la guardada como «Screw M8 螺丝», y
+     al revés. Lo decidís vos, y lo decís en el informe, si la encuentra como
+     exacta o como parecida. D77 no pide perder eso.
+   - «电线 2mm» y «钢管 2mm» siguen sin encontrarse.
+3. **La clave nueva hace lento el lookup.**
+   - `/api/catalog/lookup` corre en el event loop. Con 20 ítems y 2000 filas
+     de ~430 caracteres pasa de 1,87 s a 19,44 s.
+   - `clave_de_producto` con 65 caracteres tarda 0,066 ms, y `_normalize`
+     0,006 ms.
+   - **Pedido:** con 20 ítems y 2000 filas de ~65 y de ~430 caracteres, el
+     lookup no tarda más del doble que la base. Medilo y ponelo en el
+     informe.
+   - Una prueba muestra que las claves son las mismas antes y después de
+     acelerarlo.
 
-1. **D76 (a)**: un proveedor sólo CJK, emoji o `"\x00"` (D85) no queda con
-   `vendor_id` vacío ni comparte catálogo con otro; las filas que hoy están
-   con `''` se migran (Postgres descartable). Incluí el prefijo de 60: dos
-   proveedores largos con los mismos 60 primeros caracteres no comparten.
-2. **D77 (a)**: «电线 2mm» y «钢管 2mm» (y «螺丝/螺母 M8x20») no se pisan; la
-   migración une o separa filas sin perder ninguna.
-3. **D78 (a)** con D86: la memoria del cliente y el NCM recordado encuentran
-   lo guardado con la misma clave que el catálogo.
-4. **D80 (a)**: un solo criterio de origen válido, usado al leer la factura,
-   en el catálogo y en `origen_para_catalogo`; sin el recorte a 3 que da 310.
-5. **D84**: el 400 nombra el ítem y la pantalla dice qué producto no se pudo
-   aprender (hoy dice «algunos»).
+**D158: (a), decidido por la PM.** «123» es LIBIA en `PAISES_INDEC`, así que
+pedirte que lo rechazaras fue un error mío.
 
-Toca datos y migración: revisión fuerte (§3), sabotaje propio, adversarios.
-Seguís sin traer mi rama con merge (D151) hasta que INTEGRAR-1 esté
-aceptada; basate en tu rama. Después va PRESUPUESTO-CLIENTE-1 (D141 a: al
-pasar una operación a otro cliente, el link compartido viejo deja de andar).
+**D159: (a) para lo de clientes, decidido por la PM.** Lo de `clientes.js`
+(maxlength), `clients.default_origin` VARCHAR(3) y los `[:3]` de
+main.py:7479/7557/9721 va como pieza aparte, que propongo a Emi. En cambio,
+el extractor (`pdf_extractor.py:575`), guardar-uso, el PUT y
+`catalogo.js:270` entran en la causa 1: esta pieza los cambió.
 
-## D156 y D157: decididas por la PM (2026-11-09 20:53 UTC)
+**Riesgos que no se piden:**
+- una clave de más de 2000 caracteres no se edita ni se borra (no tiene
+  camino de hoy);
+- el primer arranque se detiene si hay una transacción abierta sobre
+  `operation_items` (va a la lista de publicar, con D156);
+- la migración parte en dos un proveedor cuyas filas se guardaron con el
+  nombre con y sin letras no latinas (es costo de D157);
+- simplificado contra tradicional, y Ø contra φ.
 
-- **D157: (a).** El `vendor_id` suma el hash de las letras no latinas, con la
-  misma función de D77, no una segunda. Pruebas: un proveedor sólo latino
-  conserva su `vendor_id`; dos proveedores chinos distintos con «Co., Ltd» no
-  comparten; catálogo, memoria y NCM recordado usan la misma clave. El informe
-  dice si el mismo nombre CJK con y sin «Co., Ltd» queda como uno o como dos,
-  y qué pasa con las filas ya unidas bajo `co_ltd` (si no se pueden separar,
-  que lo diga).
-- **D156: (a).** La columna pasa a `Text` y salen los dos `[:3]` (`main.py:3773`
-  y `:8177`, las únicas escrituras de `operation_items.origen`). Tu premisa del
-  costo no es así: medí en Postgres 16.15 y `varchar(3)` → `text` no reescribe
-  la tabla (mismo filenode, 16385 antes y después; la vuelta a `varchar(3)` sí
-  reescribe). Sólo toma un lock exclusivo, que espera detrás de cualquier
-  transacción abierta. Pedido:
-  1. La migración altera sólo si la columna sigue `character varying` y lleva
-     `lock_timeout`. Dos arranques seguidos: el segundo no hace nada. Dos
-     workers que arrancan juntos: ninguno falla.
-  2. La prueba corre en Postgres: SQLite no respeta `String(3)` y no distingue
-     el defecto. Rojo en la base, verde con el arreglo; el informe dice dónde
-     corrió.
-  3. La columna va a tener formas mezcladas: la pantalla v2 guarda «313», la
-     factura guarda texto, y hay filas viejas con «TAI» o «CN». El caso de
-     agrupar (`maria_generator.py:1418`, `main.py:8290`, y el conteo por
-     origen de `main.py:8405`) lleva «313», «TAIWAN» y «TW» como el mismo
-     origen.
-  4. Las filas ya recortadas no se recuperan («TAI» sigue dando 310): no lo
-     arregles, decilo en el informe; va como riesgo a la lista de publicar.
-  5. En `:3773`, el `.upper()` y el «XX» por defecto: decí en el informe si
-     quedan y por qué. `:8177` no tiene ninguno de los dos.
+**Corregí el informe:** `/generate_maria` frena «TAI» con «Origen no
+reconocido», no lo saca como 310.
 
-RESET-3, SMOKE-1, OBSERVABILIDAD-1, ORG-1+D40, D139 y D102 (`af924ea`):
-aceptadas, sin integrar; las integra INTEGRAR-1. Sus evidencias, en sus
-`REPRODUCCION-*`. Próxima D libre: D158.
+D155, D156 y D157 siguen como se decidieron (están en Git). RESET-3,
+SMOKE-1, OBSERVABILIDAD-1, ORG-1+D40, D139 y D102 (`af924ea`) están
+aceptadas sin integrar, y las integra INTEGRAR-1. Próxima D libre: D160.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
@@ -448,235 +442,6 @@ causas quedan cerradas.
     otro reset y el mismo link dos veces.
 - Las anclas de `csrf3.sh` las actualizo yo al integrar.
 - **Sigue CATALOGO-LARGO-2**, como ya venías. Tus próximas D empiezan en D76.
-
-## `ca87d82`: aceptadas RENDIMIENTO-1c, DESPACHO-1b, CATALOGO-LARGO-1 y DISCO-1, sin integrar (2026-11-05 20:45 UTC, PM)
-
-Acta: `REPRODUCCION-MARIA-ca87d82-2026-11-05.md`. Todo coincide con tu informe:
-despacho1b 138, disco1 46 y catalogolargo1 12 en rojo; suite con Postgres
-`4537 passed`. No se integra todavía porque `ca87d82` trae debajo commits de
-piezas con devolución abierta (SESION-1, ABUSO-1, OBSERVABILIDAD-1, SUFIJOS-2,
-ORG-1). No tenés que hacer nada por esto: seguí con RENDIMIENTO-1d.
-
-## RENDIMIENTO-1d: aceptada sobre `558c941`, sin integrar (2026-11-05 21:35 UTC, PM)
-
-Las tres cosas quedan: la salida del hijo no pierde texto (también con un
-locale que no es UTF-8, bien visto), el tope de 64 K y la fila por usuario
-tienen caso y sabotaje. Probé otro ejemplo: `DBFF` con «€», `DFFF` con un
-emoji en un par válido, y el hijo en `ascii` y `cp1252`. Verde en `558c941`,
-rojo en la base. Acta: `REPRODUCCION-RENDIMIENTO-1d-v2-2026-11-05.md`.
-
-- Se integra junto con `ca87d82`, por lo mismo: lo de abajo sin aceptar.
-- D67 repetida: de acuerdo con «D67 (id a 60)». Tu próxima es D69.
-- Hallazgo 2 de tu `/code-review` (par partido en dos glifos): queda así.
-- **Sigue DESPACHO-1d**, que ya tenés hecho: cerralo con `/entregar`.
-
-## DESPACHO-1d: aceptada sobre `528961b`, sin integrar (2026-11-05 22:45 UTC, PM)
-
-Acta: `REPRODUCCION-DESPACHO-1d-2026-11-05.md`. Coincide con tu informe:
-`test_despacho1c.py` 83 passed, `despacho1d.sh` 9 y `despacho1c.sh` 15
-sabotajes con `fallas: 0`, chequeo-6 `+64/−45` con los dos AVISOs del
-envoltorio del módulo (explicados). Mi ejemplo distinto: siete nombres de
-proveedor (200 «é», 59 letras más «ñb», sólo emoji, sólo CJK, «İstanbul»
-largo, «ǅ» repetido) dan siempre un id que cumple `is_valid_vendor_id`. Un
-adversario con contexto nuevo no encontró nada que frene; lo que marcó ya
-estaba antes (va al acta).
-
-- **D69: (a)**, como lo entregaste. Decidido por la PM.
-- Se integra junto con `ca87d82`, por lo mismo: lo de abajo sin aceptar.
-- **CATALOGO-LARGO-2: Emi dijo que sí.** Va después de SESION-1. Tu próxima
-  D es D71.
-- SESION-1: ver arriba.
-
-## Orden desde el 2026-10-29
-
-1 y 2: reemplazados por el orden del 05/11, arriba.
-3. SESION-1. 4. ABUSO-1. 5. SUFIJOS-2 y lo que se suma de SEGURO-1.
-6. EMAIL-1: la D45 y el mutante. 7. CONEXIONES-1: la D46.
-8. OBSERVABILIDAD-1. 9. ORG-1 + D40. Las devoluciones están abajo. Cada
-una con su rojo, su sabotaje y `/entregar`; me despertás al entregar cada
-una, sin esperar a juntar.
-
-- **D48: (a), decidido por la PM, como pieza RENDIMIENTO-1c.** La
-  validación del PDF corre en el proceso aparte, con tope de memoria y de
-  tiempo, para leer despachos y leer facturas. La prueba: tu PDF de 200
-  repeticiones no hace crecer la app, medido en el proceso de la app; y
-  diez a la vez no frenan una subida normal. Está en producción: la
-  publicación la decide Emi.
-- **D45 (EMAIL-1): (1), decidido por la PM.** El tope por correo se
-  normaliza igual en Python y en la base; rojo en Postgres 16 con «İ» y con
-  otra letra de la misma familia (minúscula distinta en Python y en PG),
-  sabotaje que lo rompa, y la prueba de `_cuenta_por_email` que ya te pedí.
-- **D46 (CONEXIONES-1): (1), decidido por la PM, al final de la cola.**
-  Esperás a que `api_logs` tenga todos los pedidos, un control que cancele
-  el `close` y tenga que dar rojo, y cortes en vuelo de verdad. Hasta
-  entonces la D37 sigue abierta.
-
-## D41 y el orden de lo que queda (2026-10-28 17:20 UTC)
-
-- **D41 (DESPACHO-1b): (1), decidido por la PM.** Las tres medias
-  (lectura cuadrática, peso infinito, fusión de NCM distinto) se arreglan
-  después de las 18:00, encima de la cadena, antes de publicar, con rojo,
-  sabotaje y suite. Sumá lo que traiga mi revisor de DESPACHO-1b, que
-  corre ahora.
-- **D40 y los arreglos de ORG-1 después de las piezas: sí.** Van encima de
-  la cadena igual; no se integra nada hasta aceptar ORG-1.
-- **Recibidas** SUFIJOS-2 (`bd76f9f`, devolución arriba), SEGURO-1
-  (`5dfaf47`, aceptada arriba), DESPACHO-1b (`e59e1a8`, devolución
-  arriba), OBSERVABILIDAD-1 (`39be45e`, devolución arriba) y ORG-1 + D40
-  (`b358827`, devolución arriba).
-
-## D38 y D39 (2026-10-28)
-
-Cerradas. Quedan resumidas en `DECISIONS.md` («D38 y D39 de la Dev MARIA»).
-
-## Emi dijo que sí a las dos (2026-10-28 12:15 UTC): EMAIL-1 y CONEXIONES-1
-
-Las dos entran al roadmap (Fase 3, tuyas). En commits aparte encima de
-`e1b3129`, cada una con su propio `/entregar` después del de ABUSO-1, en
-este orden.
-
-### CONEXIONES-1 — después de EMAIL-1 (tu (1) de la D37)
-
-- Medí si `session.close()` cancelado deja conexiones tomadas: gunicorn con
-  la misma configuración del `Dockerfile` y Postgres 16, muchas respuestas
-  401 y algunas normales, mirando `pg_stat_activity` y el pool. Esperás
-  condiciones que se ven, no tiempos fijos.
-- Si quedan conexiones tomadas: arreglo (por ejemplo, middlewares en ASGI
-  puro) con una prueba que dé rojo antes y verde después. Si no quedan: no
-  se cambia el producto; el informe trae los números y el aviso de las
-  pruebas sigue en riesgos.
-- Toca todas las rutas: revisión fuerte.
-
-## D35 a D37 (2026-10-28)
-
-Cerradas. Quedan resumidas en `DECISIONS.md` («D35 a D37 de la Dev MARIA»).
-
-## D28 a D34 (2026-10-28)
-
-Cerradas. Quedan resumidas en `DECISIONS.md` («D28 a D34 de la Dev MARIA»).
-
-## Lo encargado de las piezas entregadas, todavía en revisión
-
-Lo de ORG-1, ORG-1b, DESPACHO-1a, DESTINO-1, DATOS-1, EMAIL-1 y DISCO-1 (aceptadas o con devolución
-arriba) salió del canal: `git show 1f648c3:docs/pm/PARA-DEV-2.md`. Las actas de SEGURO-1,
-EMAIL-1, DATOS-1, DESTINO-1, ORG-1 y lo encargado de SESION-1: `git show 28d0422:docs/pm/PARA-DEV-2.md`.
-
-### ABUSO-1 — hecha, sin entregar (encargada 2026-10-28 10:00 UTC)
-
-SESION-1 quedó hecha (`895ee73`, informe `5105838`): recibido, la reviso
-cuando la entregues. Te paso la pieza vecina de la Fase 3, que también era
-de la técnica: **ABUSO-1**, los hallazgos S4, S5, S6 y C9 de
-`AUDITORIA-2026-10-06.md`. Decidido por la PM; dentro del roadmap. En
-commits aparte encima de `895ee73`, con su propio `/entregar` después del
-de SESION-1.
-
-- **S4:** el límite de intentos de login usa la IP que manda el cliente
-  (`X-Forwarded-For`): se esquiva y se puede bloquear a otra persona.
-- **S5:** `/api/ui/event` (y `/api/session/state`, si está igual) sin
-  sesión ni tope de tamaño: llenan el disco y ensucian los números del
-  admin.
-- **S6:** el registro dice qué usuarios y emails existen; recuperar
-  usuario no tiene límite (correo masivo).
-- **C9:** pruebas gratis infinitas: cada email nuevo da 14 días más y el
-  registro no tiene límite.
-
-**Premisa primero:** reproducí cada uno sobre `895ee73` (PG16 en el 55432
-y SQLite) y decí qué limitador hay hoy y con qué clave cuenta. Si alguno ya
-no se reproduce, decilo con la prueba.
-
-**Antes de hacer, D35** para lo que cambia lo que ve el cliente o depende
-de algo que no se ve desde acá: qué IP se toma detrás del proxy de Railway
-(no se puede mirar; decí qué suponés y qué pasa si el supuesto falla), los
-números de los límites nuevos (registros, recuperar usuario, eventos) y qué
-dice el registro cuando el email o el usuario ya existen. Con opciones y tu
-recomendación. Mientras contestás, hacé lo que no dependa de la D35 (por
-ejemplo S5).
-
-**Fuera de alcance:** la fila 14 de Argon (el login exitoso reinicia el
-contador, bloqueo perpetuo del pedido de reset) y X1 (sugerencias de NCM
-sin tope). Si tu cambio arregla alguno de paso, decilo; si no, una línea en
-«riesgos».
-
-Pruebas: cada hallazgo en rojo antes del arreglo, en PG16 y SQLite; una IP
-inventada en `X-Forwarded-For` no esquiva el límite ni bloquea a otro; un
-evento sin sesión o demasiado grande no se guarda; un sabotaje por regla.
-Línea en `CHANGELOG.md`. Es autenticación y registro: revisión fuerte.
-
-### OBSERVABILIDAD-1 — hecha, sin entregar (encargada 2026-10-28 08:00 UTC)
-
-DISCO-1 quedó hecha (`88b22c8`). Lo tuyo que queda espera a alguien de
-afuera (BACKUP-1 a Emi: dónde se guarda la copia fuera de Railway). Te paso
-una pieza de la Fase 3 que era de la técnica, que tiene la cola larga:
-**OBSERVABILIDAD-1**. Decidido por la PM; dentro del roadmap. En commits
-aparte encima de `88b22c8`, con su propio `/entregar` después del de
-DISCO-1.
-
-- **El problema:** el log de producción del 24/10
-  (`CIERRE-RETOMA-2026-10-24.md`, «Observación operativa») muestra que
-  registrar una métrica falla porque a `api_logs` le falta la columna
-  `owner_username`. El modelo la tiene (`database/models.py`, cerca de la
-  línea 342), pero la tabla de producción se creó antes, y crear las tablas
-  al arrancar no agrega columnas a una tabla que ya existe. Hay un script
-  viejo, `scripts/migrate_add_owner.py`, que la agrega a mano.
-- **Premisa primero:** reproducilo en Postgres 16 descartable (el 55432):
-  una base con `api_logs` sin la columna, arrancar la app de `88b22c8` y un
-  pedido cualquiera; qué pasa (¿se pierde la métrica, falla el pedido?).
-  Decí cómo se aplican hoy los cambios de esquema al publicar y si
-  `migrate_add_owner.py` corrió alguna vez en producción (con lo que se ve
-  en el repo; no ves la base de producción: supuesto).
-- **Qué hacer:** que al arrancar la columna exista, con su índice, sin
-  intervención a mano: sólo agregar (columna que acepta vacío), sin borrar
-  ni reescribir nada, y que correrlo dos veces no haga nada. Si falla, la
-  app arranca igual y lo dice en el log; la métrica no frena ningún pedido.
-  Usá el mecanismo que ya tenga el proyecto para esto; si no hay uno o hay
-  dos que compiten, preguntá en la **D34** antes de inventar otro.
-- **Lo demás:** hacé la lista de las otras columnas del modelo que una base
-  vieja podría no tener (comparando el modelo con lo que agregan los
-  scripts de migración), una línea por cada una, a «riesgos». Sólo
-  `api_logs.owner_username` entra en esta pieza.
-
-Pruebas: en Postgres 16 desde una base sin la columna y con filas, la
-columna y el índice quedan, las filas viejas siguen, la métrica se graba
-(dueño: ver D34), y dos arranques seguidos no cambian nada; en SQLite igual;
-una falla simulada de la migración no frena el arranque. Un sabotaje por
-regla. Línea en `CHANGELOG.md`. Es una migración: revisión fuerte.
-
-### DESPACHO-1b — hecha, sin entregar (encargada 2026-10-28 05:00 UTC)
-
-SEGURO-1 quedó hecha. Mientras esperás el cupo de las 18:00 UTC, la lectura
-de DESPACHO-1 (`ROADMAP.md`, Fase 1c, fila 7), en commits aparte encima de
-SEGURO-1 (`371cde2`), con su propio `/entregar` después del de SEGURO-1.
-
-- **Qué lee:** lo de `DESPACHOS-FORMA.md`, «Lo que DESPACHO-1 lee para el
-  catálogo»: por renglón (ítem o subítem) posición SIM, descripción,
-  sufijos de valor, origen, unidad, cantidad, valor unitario y kilo neto.
-  Se lee **por rótulo, no por posición**; números `1.234,56`; con unidad
-  `SUBITEM`, un renglón por subítem con sus valores y sufijos. Lo que no
-  encuentra queda marcado; nada se rellena. El resto del despacho no se
-  guarda.
-- **Cómo:** sobre el texto del PDF, sin Gemini. Premisa primero: mirá qué
-  usa ya el repo para sacar texto de un PDF y si alcanza. Un PDF sin texto
-  (escaneado) da un aviso claro y no guarda nada. Si algo de esto no se
-  puede sin Gemini o sin una librería nueva, es la D31 y seguís con lo que
-  no depende de ella.
-- **Pantalla:** se revisa y se edita renglón por renglón antes de guardar
-  en el catálogo de ese cliente (el mismo de DESPACHO-1a, con
-  `_get_owned_client`: un cliente ajeno da el 404 de hoy). Lo marcado como
-  no encontrado se ve marcado.
-- **Nunca** arma un TXT ni una operación. El lector de facturas sigue
-  rechazando despachos: una prueba lo muestra.
-- **Datos:** los tres despachos reales no los vas a ver y no entran nunca.
-  El sintético lo arma la prueba con la forma de `DESPACHOS-FORMA.md` y
-  valores inventados: dos ítems, uno con subítems, un `AI` con espacios, un
-  carácter con tilde roto («Las dem?s»), FOB y flete en divisas distintas,
-  y un renglón al que le falta el kilo neto.
-
-Pruebas: cada rótulo leído; subítems; sufijos con y sin paréntesis; el
-faltante marcado y no rellenado; rótulos en otro orden en la hoja (se lee
-por rótulo); el PDF sin texto; que el lector de facturas lo sigue
-rechazando; aislamiento (otro dueño, otro cliente); que no se crea ninguna
-operación. Un sabotaje por regla. Línea en `CHANGELOG.md`. Toca datos de
-clientes: revisión fuerte. Tu próxima D es la **D31**.
 
 ## Qué pasó el 2026-10-24
 
