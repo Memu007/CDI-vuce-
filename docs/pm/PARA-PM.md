@@ -10,7 +10,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 | Merge de INTEGRAR-1 | `b9db0ad3` (^1 `0d829b8a` dev-tecnica, ^2 `4db641b0` dev-maria, base `30533fe4`) |
 | Producto de esta vuelta | `d26d477b`: `main.py` −2. `register` ya no importa `re` |
 | Pruebas y sabotajes de esta vuelta | `e2f923fe` y `2e775aa4` (D140 a), `56756f84`, `f614bafb`, `9b639146`, `6d6efb86`, `ed8d9769`, `1c36ef2a` |
-| Suite completa | `f7a45660`: `git diff f7a45660 HEAD -- proyecto_maria tests scripts` da vacío |
+| Suite completa | `cbbd37b2`, con pypdf 6.21.4: `git diff cbbd37b2 HEAD -- proyecto_maria tests scripts` da vacío |
 
 **Resultado**
 - Del merge vienen tres ROTO: patrones de arnés que quedaron viejos, con el comportamiento igual. Ningún control se perdió:
@@ -23,7 +23,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
   - de entorno: pypdf.
 
 **Puertas en verde**
-- Suite completa: 5907 passed.
+- Suite completa sobre `cbbd37b2`, con pypdf 6.21.4: 5907 passed.
 - Ataques sobre Postgres real: 47 OK, 0 FUGA.
 - D140 (a) hecha.
 
@@ -182,8 +182,9 @@ Están los 56 nombres de la lista «No corrido» de la vuelta 1, más `cobro_mp1
 
 | Puerta | Salida |
 |---|---|
-| Suite completa, worktree limpio, `f7a45660` | `5907 passed, 110 skipped, 3 xfailed in 1446.16s (0:24:06)` |
-| `compileall -q proyecto_maria` | rc=0 |
+| Suite completa, worktree limpio, `cbbd37b2`, pypdf 6.21.4 | `5907 passed, 110 skipped, 3 xfailed in 1371.30s (0:22:51)` |
+| `compileall -q proyecto_maria`, `cbbd37b2` | rc=0 |
+| Suite completa, worktree limpio, `f7a45660` (corrida anterior) | `5907 passed, 110 skipped, 3 xfailed in 1446.16s (0:24:06)` |
 | Pruebas de PDF con pypdf 6.21.4, `4899fc51` | `530 passed in 225.79s` |
 | `ataque_aislamiento.sh`, `TMPDIR=/tmp`, Postgres real, `4899fc51` | «✅ Postgres listo», OK=47, FUGA=0, rc=0 |
 | `aislamiento2.sh ataque`, Postgres real, `4899fc51` | «sabotajes con falla: 0», 18 ROJO, rc=0 |
@@ -244,7 +245,7 @@ Están los 56 nombres de la lista «No corrido» de la vuelta 1, más `cobro_mp1
   - `_instalar` tiene 96 líneas;
   - `casosTardios` tiene 67 líneas.
 - Ninguno es de esta vuelta. Quedan porque partir o achicar código ya entregado va a `COLA-LIMPIEZA.md`, no dentro de una integración (§6).
-- Después de `cbbd37b2` sólo va el commit de este informe, que toca sólo `PARA-PM.md`.
+- Después de `cbbd37b2` sólo van los commits de este informe, que tocan sólo `PARA-PM.md`.
 
 <details><summary>Salida entera, esta vuelta</summary>
 
@@ -295,7 +296,7 @@ avisos: 7
 ## Comandos para reproducir
 
 ```bash
-git diff f7a45660 HEAD -- proyecto_maria tests scripts        # vacío: la suite vale para el SHA final
+git diff cbbd37b2 HEAD -- proyecto_maria tests scripts        # vacío: la suite vale para el SHA final
 git diff 19036a2 HEAD --stat -- proyecto_maria/               # sólo main.py, 2 líneas menos
 git show d26d477b -- proyecto_maria/main.py                   # se va el import re de register
 git log --oneline 30533fe4..4db641b0 -- proyecto_maria/config.py   # c8afa6ff: el chequeo de entorno de cobro_mp2 se mudó en MARIA
@@ -310,6 +311,5 @@ TMPDIR=/tmp PUERTO=8791 ./scripts/testing/ataque_aislamiento.sh   # «✅ Postgr
 - **rendimiento1b:** no repetí la corrida que murió por OOM.
 - **El código que el merge juntó solo** (sin conflicto) no lo leí línea por línea. Lo cubren la suite y los arneses.
 - **cobro_mp1:** no verifiqué si otro sabotaje cubre lo mismo que el ROTO (g).
-- **pypdf:** la suite completa no la repetí con 6.21.4; sólo el subconjunto de pruebas de PDF.
 
 /compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. INTEGRAR-1 vuelta 2 entregada con este informe, encima de f9ec94e0; D144-D149 abiertas; pedí un rango de D nuevo. Sigue BORRADOR-1 (D143 a: el goTo tardío del arranque, 36aba873, pisa la navegación; tienen que quedar verdes cliente1, foco_cliente1, destino1 y despacho1a) y después CONEXIONES-1 parte B (lo que tenía a medio hacer está en el parche conexiones1_b_wip.patch del scratchpad). No integrar 0231eee. Rutina trig_011UpBfwEu9TUzoNUrviqoP5 /respondio cada 2 h, minuto 15.
