@@ -146,7 +146,7 @@ def test_el_aviso_del_catalogo_nombra_el_producto_que_no_se_aprendio():
 def test_los_productos_sin_origen_se_avisan():
     aviso = "Producto 2 («TUERCA»): No reconozco el origen «XYZ»: usá el nombre o el código del país."
     vista = pantalla("listo-con-vendedor", True, {"catalogo": {"success": True, "avisos": [aviso]}})
-    assert vista["toasts"][-1] == {"titulo": "Origen no reconocido", "detalle": aviso + " Se guardaron sin origen.",
+    assert vista["toasts"][-1] == {"titulo": "Origen no reconocido", "detalle": aviso + " No se guardó su origen.",
                                    "tipo": "warning"}, vista
 
 

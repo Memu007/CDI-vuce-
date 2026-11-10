@@ -272,6 +272,17 @@ def test_guardar_uso_no_pierde_el_ncm_por_un_origen_que_no_reconoce(client, orig
         assert "aviso" not in r.json() and get_pais_codigo(cat[0]) == codigo == get_pais_codigo(hist[0]), (hist, cat)
 
 
+def test_el_aviso_no_dice_sin_origen_si_el_producto_conserva_el_suyo(client):
+    cid = _cliente(client)
+    uso = {"descripcion": "TORNILLO", "ncm": NCM, "vendor_name": VENDOR, "client_id": cid}
+    assert client.post("/api/ncm/guardar-uso", json={**uso, "origen": "CHN"}).status_code == 200
+    r = client.post("/api/ncm/guardar-uso", json={**uso, "origen": "TAI"})
+    assert r.status_code == 200 and r.json()["aviso"].startswith("No se guardó el origen."), r.text
+    (hist,), (cat,) = (_sql("select origen_frecuente from client_product_history where client_id=:c", c=cid),
+                       _sql("select origen from vendor_catalog_products where owner_username=:o", o=_dueno(cid)))
+    assert get_pais_codigo(hist[0]) == get_pais_codigo(cat[0]) == 310, (hist, cat)
+
+
 def test_el_error_del_catalogo_nombra_el_producto(client):
     _cliente(client)
     r = client.post("/api/catalog/proveedor/productos", json={
@@ -421,10 +432,10 @@ def test_un_origen_de_miles_de_cifras_no_rompe_los_avisos_ni_el_txt(client):
 
 
 @pytest.mark.parametrize("escenario", ["confirmar-ncm", "asignar-ncm"])
-def test_la_pantalla_avisa_que_se_guardo_sin_origen(escenario):
+def test_la_pantalla_avisa_que_no_se_guardo_el_origen(escenario):
     from tests.test_despacho1c import pantalla
 
-    aviso = "Se guardó sin origen. Origen sintético no reconocido."
+    aviso = "No se guardó el origen. Origen sintético no reconocido."
     vista = pantalla(escenario, {"success": True, "historial_guardado": True, "aviso": aviso})
     assert vista["toasts"] and vista["toasts"][-1]["tipo"] == "warning", vista
     assert vista["toasts"][-1]["detalle"] == aviso, vista
