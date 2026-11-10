@@ -58,6 +58,7 @@ python -m pytest -q --no-cov --timeout=120    # base 2026-10-06 en e8344d0: 680 
 python -m compileall -q proyecto_maria
 BASE_URL=http://127.0.0.1:<puerto> ./scripts/testing/smoke_friccion.sh   # si tocaste backend
 PUERTO=<puerto libre> ./scripts/testing/ataque_aislamiento.sh             # si tocaste datos, sesión o permisos
+./scripts/testing/e2e_maria.sh   # si tocaste el recorrido MARIA o static/v2 (cómo, en ONBOARDING-DEV.md)
 ```
 
 - Un rojo se diagnostica; no se repite hasta que pase. Los rojos de entorno
