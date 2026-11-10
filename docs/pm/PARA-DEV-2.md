@@ -14,8 +14,9 @@ aceptación», con la salida entera.
 **Causa.** La memoria del cliente (`lookup_client_memory`) trae las filas
 del cliente sin orden y se queda con la primera de mayor parecido. El mismo
 texto con otro NCM es otra fila, y confirmar suma a su propia fila sin
-cambiar cuál gana. Ante un empate gana una fila cualquiera, y cambia hasta
-entre dos corridas iguales. El NFKC que te pedí en la causa 2 sumó a los
+cambiar cuál gana. Ante un empate gana la que la base devuelva primero. En
+las pruebas, SQLite usa uno de dos índices y el resultado cambia entre
+corridas; en PG no lo corrí. El NFKC que te pedí en la causa 2 sumó a los
 empates ² contra 2 y el ancho completo, que la base distinguía: la parte
 de esto que es mía, como pasó con D158.
 
@@ -24,16 +25,26 @@ de esto que es mía, como pasó con D158.
 «Cable 2,5mm2», la base da BR; la vuelta da CN, también después de
 confirmar BR tres veces.
 
-**Lo que pido (comportamiento):**
+**Lo que pido (comportamiento), en este orden:**
 
-- el texto tal como se guardó devuelve su propia fila;
-- el resultado no depende del orden en que se guardaron las filas;
-- ante textos que empatan, se sugiere lo último confirmado.
+1. Si una fila guardada tiene el texto idéntico al que se busca, gana esa.
+   Si hay varias (el mismo texto con dos NCM), gana la última confirmada.
+2. Si ninguna tiene el texto idéntico y varias empatan en parecido, gana la
+   última confirmada.
+3. El mismo resultado en cada corrida, en SQLite y en PG, sin importar qué
+   fila devuelva primero la base.
 
-**Prueba.** Los dos órdenes de guardado, en SQLite y en PG, con un sabotaje
-que dé rojo en los dos. La familia va como datos dentro de un caso: ²/2,
-ancho completo, µ/μ y el texto idéntico con otro NCM. Al aceptar, pruebo
-con ejemplos distintos.
+**Prueba, que no dependa de qué fila llega primero.** Un caso con la
+familia como datos (²/2, ancho completo, µ/μ):
+
+- se guardan las dos filas y se busca cada texto: cada uno devuelve la
+  suya;
+- se repite con el orden de guardado invertido.
+
+Otro caso, para el texto idéntico con dos NCM: se confirma A y se espera A;
+se confirma B y se espera B; se confirma A y se espera A. Con el arreglo
+revertido, alguna falla siempre, en SQLite y en PG. Mostrá ese rojo. Al
+aceptar, pruebo con ejemplos distintos.
 
 **Lo demás queda como estaba en mi veredicto anterior:**
 

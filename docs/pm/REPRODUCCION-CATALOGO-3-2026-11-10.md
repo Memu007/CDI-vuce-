@@ -188,10 +188,19 @@ aceptó sin reproducir en la base lo que llamó «ya pasaba antes».
 filas del cliente sin orden y se queda con la primera de mayor parecido.
 La clave única incluye el NCM, así que el mismo texto con otro NCM es
 otra fila, y confirmar suma a su propia fila sin cambiar cuál gana. Ante
-un empate gana una fila cualquiera: cambia hasta entre dos corridas
-iguales. El NFKC que pidió la PM en la causa 2 sumó a los empates ² contra
+un empate gana la que la base devuelva primero. El NFKC que pidió la PM en la causa 2 sumó a los empates ² contra
 2 y el ancho completo, que la base distinguía. **Camino de hoy:** la misma
 factura leída del PDF («2,5mm²») y tipeada a mano («2,5mm2»), con dos NCM.
+
+**Por qué cambia entre corridas.** La consulta no tiene orden, y en SQLite
+hay dos índices que la sirven (`ix_cph_owner_client` y
+`ux_cph_owner_client_clave`). Con `EXPLAIN QUERY PLAN`, en tres corridas
+SQLite usó uno, el otro y el primero. Con el primero las filas salen en el
+orden de guardado; con el segundo, en el orden de la clave (un hash). No
+determiné qué decide el índice: no es `PYTHONHASHSEED`, porque con la misma
+semilla salió cada uno. En PG la consulta no corrió: **H1B y H1C, en PG no
+corridos.** En el producto, el resultado depende de un orden que nadie
+fijó.
 
 **Por qué no lo vieron mis 41 negativos.** Cubrían orígenes nuevos en
 guardar, PUT y lote (7 × 3), claves que NFKC iguala (8) y que no (4), y
@@ -267,6 +276,9 @@ La otra fila de cada caso es «Cable 2,5mm²» 85444900 CN, «Filtro ＡＢＣ-1
   fallan en 6 de 8: es la regresión.
 - µ/μ y el texto idéntico con otro NCM fallan también en la base, y el
   resultado cambia entre corridas. Confirmar no lo arregla nunca.
+- **Tuerca M6 (texto idéntico): lo esperado antes de confirmar es lo
+  último guardado.** En H1B es TW; en H1C es CN. El TW de H1C antes de
+  confirmar no es un acierto: salió la primera fila guardada.
 - **Prueba larga (LG).** Se guardó un motor de 5,5 kW, modelo 132S, con
   NCM 85015220. Al pedir uno de 0,75 kW (80A) o de 75 kW (280S), las dos
   versiones sugieren el mismo NCM: la base con 1.0 y la vuelta con 0.919.
