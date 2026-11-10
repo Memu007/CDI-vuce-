@@ -2,160 +2,219 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CATALOGO-3 entregada en f4ade80 (base 07504e0)
+## CATALOGO-3 (vuelta) entregada en ec0092a (base 1345ca7)
+
+Para ver sólo la vuelta: `git diff 1345ca7..ec0092a`. Debajo de 1345ca7 quedan
+de176b1, f9d4c76, db0f25a y 1345ca7, que son de PRESUPUESTO-CLIENTE-1 (sin
+entregar, no son de esta pieza), y 2fbfea9 (el informe anterior).
 
 | SHA | Qué |
 |---|---|
-| 6cbd192 | fix: vendor_id y clave con el hash de las letras no latinas; el proveedor de más de 60 caracteres con el hash del nombre entero; memoria y NCM recordado con la misma clave; migración que recalcula sin borrar; origen a text con candado; origen válido = `pais_reconocido`, guardado tal cual; nada recorta; agrupar, métricas y TXT tratan 313, TAIWAN y TW igual; tarifar ya no supone dos letras; el 400 nombra el producto |
-| 910e1d7 | fix: NFC en el origen; un código son 1 a 4 cifras; el resumen no latino deja afuera Latin-1 y Latin extendido (ª, º, µ) |
-| e53aa5e | test: pruebas, arnés PG y sabotajes |
-| 54a450c | test: paso 5 del arnés (un worker arranca aunque otro tenga el candado) — rojo |
-| 08cc02c | fix: el candado ya no aborta el arranque |
-| 43e825e | fix: un origen de miles de cifras no rompe los avisos (+ CHANGELOG) |
-| d401b72 | test: el caso de miles de cifras |
-| 208d814 | test: sabotaje 25 (`get_pais_codigo` con cualquier tira de cifras) |
-| f4ade80 | test: los datos que distinguen los sabotajes 7, 13 y 15 («螺丝 3mm» en la migración, «ＣＨＩＮＡ», «ESPAN\u0303A» guardado como «ESPAÑA»); id del 24 corregido |
+| 7624e4e | fix: el catálogo no pierde el NCM por un origen que no reconoce |
+| a4181a6 · 506991a · 97e3f4f | test: origen no reconocido, NFKC, Bolt™, sabotajes |
+| 210a53f · bc046ae | refactor: docstrings en dos líneas |
+| 2e411b6 | fix: el lote no se pierde por un origen; el país se lee con un solo criterio |
+| df84ad0 · 6638f5a · 3747e47 · 2c36f62 | test: lote, una lectura del país, sabotajes apuntados |
+| 466f8ab | fix: la pantalla recorta los mismos espacios que el servidor |
+| e1ae1fd · a54e182 | test: pantalla y servidor leen igual el país con espacios raros |
+| 4e85706 | fix: ㎜ o ℃ dan la misma clave que mm o °C |
+| 8ccd004 · a92bddd | test: ㎜, ℃, ㎖ y su sabotaje |
+| 8924ebe | perf: la clave de producto se calcula una vez por descripción |
+| ce155dc · 389a366 | test: una clave por fila por pedido y su sabotaje |
+| bb855e0 | fix: el aviso no dice «sin origen» si el producto conserva el suyo |
+| 9dcee73 | test: ese aviso |
+| ec0092a | test: el bench del lookup (`scripts/testing/bench_catalogo3_lookup.py`) |
 | (siguiente) | docs: este informe |
 
-**Resultado:** D76, D77, D78/D86, D80 y D84 hechos con D155 (a), D156 (a) y D157 (a). Golden sin cambios. Puertas abajo. Hay una D nueva (D159) y queda abierta D158.
+**Resultado.** Las tres causas de la devolución quedan resueltas; D158 (a) y
+D159 (a) aplicadas; el golden no cambia (115 passed, 2 xfailed).
+
+- **Causa 1:** un origen no reconocido no hace perder NCM, historial, memoria
+  ni catálogo, y la persona se entera. Un solo criterio (`origen_para_guardar`,
+  catalog_service.py:84) en el extractor, guardar-uso, el PUT, el lote y
+  catalogo.js. Guardar-uso responde `aviso` «No se guardó el origen. …» y la
+  pantalla lo muestra; al finalizar, el producto se aprende sin ese origen,
+  conserva el que tenía y la pantalla lo nombra.
+- **Causa 2:** NFKC con µ/μ, ｶﾞｽ/ガス, ², ﬁ, ㎜, ℃, ㎖ dan `exact`. Screw M8
+  contra «Screw M8 螺丝» queda **fuzzy en los dos sentidos** (lo decido yo,
+  como pediste). «电线 2mm» y «钢管 2mm» siguen sin encontrarse (`none`).
+- **Causa 3:** el lookup tarda menos que la base en las 6 combinaciones
+  (tabla abajo), con 65 y con 430 caracteres. `test_acelerar_no_cambia_ninguna_clave`
+  prueba que las claves no cambian.
+- **Corrijo el informe anterior:** `/generate_maria` con «TAI» frena con
+  «Origen no reconocido»; no lo saca como 310.
 
 ## Decisiones
 
-- **D158 (abierta, sigue de antes): «123» es LIBIA.** D155 pedía rechazar «123», pero `pais_reconocido` lo reconoce como código de Libia.
-  - (a) aceptarlo como código válido. **Recomiendo (a)**: es lo que dice la tabla de países y rechazarlo obliga a un caso especial contra el criterio único de D80. Ya está implementado así como supuesto reversible; la prueba de rechazo usa «99999».
-  - (b) rechazarlo igual, con una excepción explícita.
-- **D159: lo que el criterio nuevo deja afuera en otras puertas de entrada.** Con D155 el origen válido es nombre o código de país; quedan lugares que todavía piensan en dos o tres letras:
-  - `pdf_extractor.py:575` pasa CHN, TWN, DEU, KOR y «Hong Kong» a XX;
-  - `maxlength` 3 en `catalogo.js:270` y `clientes.js:1427`, y 2 en `clientes.js:1692`;
-  - `clients.default_origin` VARCHAR(3) y los `[:3]` de main.py:7479/7557/9721.
-  - (a) pieza aparte que los alinee con `pais_reconocido`. **Recomiendo (a)**: son otras pantallas y otra columna; meterlos acá agranda una pieza de revisión fuerte.
-  - (b) dejarlos como están.
-- **Entradas dobles de la tabla de países** (sin cambio; las nombro para que no se pierdan): NL (PAISES BAJOS→423, HOLANDA→434, NL→434), CHIPRE 311/435, TURQUIA 336/436, ALEMANIA 402/438. La prueba con ast acepta sólo NL repetida.
+- **D160. Formas de país que no están en la tabla** (U.S.A., Viet Nam, PRC,
+  Turkey, TAI): hoy quedan sin origen y con aviso. (a) dejarlas así;
+  (b) agregarlas como alias. Recomiendo (a): cada alias nuevo es un código que
+  sale en el TXT, y el aviso ya evita la pérdida silenciosa.
+- **D161. Excepción a NFKC para «ºª№™℠»** (catalog_service.py:136-141): NFKC
+  literal convierte º en «o», № en «No» y ™ en «TM», que cambia claves ya
+  guardadas («Nº 5» dejaría de encontrar lo de antes). (a) mantener la
+  excepción; (b) NFKC literal. Recomiendo (a).
+- **D162. 22 alias que no son países** (AFRICA, OCEANIA, provincias
+  argentinas y otros) quedaron fuera de la lectura del país: con ellos, un
+  origen «AFRICA» salía con un código que no es de un país. (a) dejarlos
+  fuera, que da «origen no reconocido» y aviso; (b) restaurarlos. Recomiendo (a).
+- Próxima D libre: **D163**.
+
+Para tener en cuenta, sin D: el proveedor también pasa por NFKC (sus ids no
+cambian, lo prueba `test_acelerar_no_cambia_ninguna_clave`); el parecido se mide
+de un solo lado; el tope de parecido coincide con el umbral (por eso Screw M8
+cae en fuzzy y no en exact).
 
 ## Supuestos reversibles
 
-- «123» se acepta (D158).
-- `get_pais_codigo` toma como código sólo 1 a 4 cifras (`re.fullmatch(r"[0-9]{1,4}")`). Antes hacía `int()` de cualquier tira: con 5000 cifras, `/avisos` daba 500 (`ValueError: Exceeds the limit (4300 digits) for integer string conversion`). Era preexistente; lo arreglé porque D80 pasa por esa función. Efecto: «99999» en el TXT pasa al default (310), como ya pasaba con «XX».
-- En la operación manual (main.py:3777) quedan el `.upper()` y el «XX» por defecto: es lo que ya hacía, y sacarlos cambia lo que guarda una operación manual, fuera de la tarea. En main.py:8184 no hay ninguno de los dos.
+- Sumé 193 alias ISO3 (de la tabla oficial). Dos chocan con otra lectura
+  posible: SUR=232 (Sudáfrica) y CAN=204 (Canadá).
+- ＣＨＩＮＡ (ancho completo) y ÉSP se reconocen, pero el texto se guarda
+  tal cual vino.
 
 ## Lo que cambió para quien usa
 
-- «china», «China» y «CHINA» ahora valen como origen (antes sólo «CN»), y se guardan tal cual. «0310» vale y da 310; «0000310» no (más de 4 cifras).
-- Casos de `test_despacho1b` que cambiaron:
-  - `test_guardar_es_todo_o_nada`: se sacó `{"origen":"CHINA"}` (ahora es válido); «origen numero» dice «El origen tiene que ser el nombre o el código del país.».
-  - `test_cambiar_el_origen_valida_igual_que_guardar`: «usá el código de dos letras.» → «usá el nombre o el código del país.»; «123» → «99999» (id «numeros», D158); se sacó «china» (id «nombre»); se sumaron «acento aparte» (ÉS) y «cifras de mas» ("1"*5000). Siguen rechazados ＢＲ, ÉS, XYZ, ZZ, ıt, ﬁ, ß, la lista y 12.
-- D157: el mismo nombre CJK con y sin «Co., Ltd» queda como dos proveedores; las filas que ya estaban unidas por «co_ltd» no se separan.
-- D156: «TAI» se rechaza al guardar, pero las filas viejas con «TAI» (o «CHI») en el TXT salen con 310 (China), porque `get_pais_codigo` cae al default. Va como riesgo.
+- Guardar un uso o cambiar el NCM de una fila con un origen viejo o raro
+  guarda el NCM y avisa que el origen quedó sin cambiar.
+- Productos que se escriben distinto pero se leen igual se encuentran.
+- Buscar en el catálogo con descripciones largas o en kana es más rápido.
 
 ## Archivos de producto
 
-proyecto_maria/core/catalog_service.py, core/despacho_lector.py, core/maria_generator.py, core/tarifar_connector.py, database/models.py, main.py, pdf_extractor.py, services/client_memory.py, static/v2/screens/finalize.js. Más CHANGELOG.md.
+`proyecto_maria/core/catalog_service.py`, `core/maria_generator.py`,
+`core/maria_generator_export.py`, `main.py`, `pdf_extractor.py`,
+`static/v2/paises_maria.js`, `static/v2/screens/catalogo.js`,
+`static/v2/screens/finalize.js`, `static/v2/screens/ncm.js`, y `CHANGELOG.md`.
 
 ## Comandos copiables
 
+Desde un worktree en ec0092a, con su venv y las variables de las pruebas
+(`DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares`):
+
 ```bash
-git fetch origin claude/dev-maria && git checkout f4ade80
-source <venv>; export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-python -m pytest -q --no-cov tests/test_catalogo3.py tests/test_despacho1b.py tests/test_despacho1c.py   # todo passed
+PY=$(which python) scripts/testing/sabotajes/catalogo3.sh          # 45 ROJO, «fallas: 0»
+python -m pytest -q --no-cov tests/test_catalogo3.py tests/test_despacho1b.py tests/test_despacho1c.py   # 0 failed
 timeout 500 python -m pytest -q --no-cov -p no:warnings tests/test_generar_maria_txt.py tests/test_excel1_txt.py tests/test_punta_a_punta1.py tests/test_maria_subitems.py tests/test_maria1b_controles.py   # 115 passed, 2 xfailed
-PY=$(which python) scripts/testing/sabotajes/catalogo3.sh   # «fallas: 0», 25 sabotajes
-unset DATABASE_URL; python scripts/testing/catalogo3_postgres.py postgresql://<usuario>@127.0.0.1:<puerto>/postgres   # «todo OK»
-python scripts/testing/catalogo3_postgres.py <URL> 07504e0 <worktree en 07504e0>   # la base: 5 fallas
+(unset DATABASE_URL; python scripts/testing/catalogo3_postgres.py postgresql://<usuario>@127.0.0.1:<puerto>/postgres)   # 7 OK, «todo OK»
+KANA=1 python scripts/testing/bench_catalogo3_lookup.py 430      # y 65, y ACENTOS=1; repetir en 07504e0 y comparar «total=»
 ```
 
-## Rojos copiados
+## Bench del lookup
 
-- C8, sobre 08cc02c, `test_un_origen_de_miles_de_cifras_no_rompe_los_avisos_ni_el_txt`:
-  ```
-  E   ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 5000 digits; use sys.set_int_max_str_digits() to increase the limit
-  1 failed, 33 deselected
-  ```
-- Paso 5 del arnés, sobre 54a450c: «FALLA | un worker arranca mientras otro tiene tomada la migración de claves»; en el log de PG: «canceling statement due to lock timeout / STATEMENT: SELECT pg_advisory_xact_lock(7302551)».
-- Arnés sobre la base 07504e0 («5 fallas»):
-  - «FALLA | dos workers esperan juntos la migración y arrancan los dos»
-  - «FALLA | operation_items.origen pasa a text y la fila vieja queda igual»
-  - «FALLA | la migración da el proveedor y la clave de hoy sin perder filas»
-  - «FALLA | la operación manual y la del historial guardan «TAIWAN» entero»
-  - «FALLA | «电线 2mm» y «钢管 2mm» del proveedor CJK quedan en dos filas»
-- Los datos de f4ade80, con el arreglo revertido por el script de sabotajes (sabotajes 7, 13 y 15):
-  - la migración no le da la clave de hoy al producto: dice «FAILED tests/test_catalogo3.py::test_la_migracion_separa_los_proveedores_y_los_productos_mezclados»
-  - el ancho completo vuelve a pasar: dice «FAILED tests/test_despacho1b.py::test_cambiar_el_origen_valida_igual_que_guardar[nombre ancho completo]»
-  - «É» con el acento aparte vuelve a pasar: dice «FAILED tests/test_despacho1b.py::test_cambiar_el_origen_guarda_el_codigo_en_mayusculas[acento aparte]» (el caso es «ESPAN» con la tilde aparte, que guarda «ESPAÑA»: el título del sabotaje dice «É» y debería decir «Ñ»; lo corrijo en el próximo commit de pruebas)
+`bench_catalogo3_lookup.py`: 2000 productos del proveedor, 2000 filas de
+memoria del cliente, 20 ítems (10 existentes, 10 nuevos), mejor de 3. Total en
+segundos (misma máquina, uno tras otro):
+
+| Combinación | Base cddf7de | ec0092a (producto = 9dcee73) |
+|---|---|---|
+| kana, 65 | 1,39 | 0,75 |
+| kana, 430 | 3,97 | 2,01 |
+| sin acentos, 65 | 2,06 | 1,31 |
+| sin acentos, 430 | 5,04 | 3,76 |
+| con acentos, 65 | 2,17 | 1,53 |
+| con acentos, 430 | 5,23 | 4,13 |
+
+- cddf7de tiene el mismo producto que 07504e0 (`git diff --stat 07504e0 cddf7de -- proyecto_maria` vacío).
+- Sin el caché (a92bddd) kana 430 daba 21,48 s. El perfil: `_normalize` con 49 M
+  de llamadas y `_sufijo` con 27 s acumulados, porque la clave de cada fila se
+  recalculaba para cada ítem. Por eso `lru_cache(maxsize=4096)` sobre
+  `clave_de_producto` (catalog_service.py:147) y no reescribir la normalización:
+  la clave es pura y se calcula una vez por descripción.
+- La prueba de equivalencia de la entrega anterior pasaba por casualidad; ahora
+  `test_un_pedido_calcula_la_clave_de_cada_fila_una_sola_vez` cuenta llamadas, y
+  el sabotaje con `maxsize=0` da rojo («assert 141 <= ((12 + 10) + 1)»).
+- matches_cli a 430 (sin y con acentos): la base da 13 y la vuelta 20. Viene de
+  6cbd192 (primera vuelta), que puso la memoria con el mismo criterio que el
+  proveedor; el vocabulario del bench es de 18 palabras, y a 430 caracteres las
+  descripciones se parecen y dan fuzzy. matches_prov da 20 en las dos.
+
+## Rojos copiados (con el arreglo revertido)
+
+- e1ae1fd: «Left contains 7 more items, first extra item: ('𝐁𝐑', '203', '') 1 failed»
+- 8ccd004: «assert ('none', False) == ('exact', True)» (Tubo 10㎜, Frasco 500㎖), «('fuzzy', True) == ('exact', True)» (Sensor 120℃), «3 failed, 11 passed»
+- ce155dc: «E   assert 141 <= ((12 + 10) + 1)  1 failed, 88 deselected» (maxsize=0)
+- 9dcee73: «E   AssertionError: {"success":true,"historial_guardado":true,"aviso":"Se guardó sin origen. No reconozco el origen «TAI»: usá el nombre o el código del país."}  1 failed, 89 deselected»
+- 3747e47: «FAILED …test_cada_forma_del_pais_da_el_mismo_codigo_al_importar_y_exportar[HONG KONG]  7 failed, 11 passed»
+- 2c36f62: «FAILED tests/test_despacho1b.py::test_cambiar_el_origen_valida_igual_que_guardar[acento aparte] assert 200 == 400»
 
 ## Puertas
 
+Corridas sobre 9dcee73; ec0092a sólo suma el script del bench (el producto es
+idéntico), así que no las repetí sobre ec0092a.
+
 | Puerta | SHA | Salida |
 |---|---|---|
-| suite completa | f4ade80 | «5490 passed, 335 skipped, 3 xfailed in 1165.73s (0:19:25)», rc=0 (los 2 casos más que en 208d814 son los parámetros que suma f4ade80) |
-| golden | f4ade80 | «115 passed, 2 xfailed in 18.42s» |
-| compileall | f4ade80 | rc=0 |
-| sabotajes catalogo3.sh | f4ade80 | 25 ROJO, «fallas: 0» |
-| arnés PG 16 | f4ade80 | 7 pasos OK, «todo OK» |
-| smoke_friccion | f4ade80 | «OK · telemetría y alias session/state rechazan sin sesión + by-cuit protegido», rc=0 |
-| ataque_aislamiento | f4ade80 | «Bloqueado: 47 · Fugas: 0 · Sin probar: 0», «PUERTA G3 PASADA» |
-| revisión de seguridad (acotada: adversario-sonnet-alto sobre `git diff 07504e0..f4ade80 -- proyecto_maria/`, sólo lectura, no el /security-review de la rama entera) | 07504e0..f4ade80 | sin hallazgos de confianza ≥8 |
+| Suite completa | 9dcee73 | «5548 passed, 335 skipped, 3 xfailed in 1136.18s (0:18:56)» |
+| Golden | 9dcee73 | «115 passed, 2 xfailed in 17.68s» |
+| compileall | 9dcee73 | rc 0 |
+| sabotaje_maria1a.sh | 9dcee73 | «OK: los 10 sabotajes dan rojo por la razón esperada» |
+| sabotajes/catalogo3.sh | 9dcee73 | 45 ROJO, «fallas: 0» |
+| catalogo3_postgres.py (PG 16) | 9dcee73 | 7 OK, «todo OK» |
+| smoke_friccion.sh | 9dcee73 | «OK · telemetría y alias session/state rechazan sin sesión + by-cuit protegido» |
+| ataque_aislamiento.sh | 9dcee73 | «Bloqueado: 47 · Fugas: 0 · Sin probar: 0», «PUERTA G3 PASADA» |
 
-Producto igual desde 43e825e: 208d814 y f4ade80 sólo tocan pruebas y el script de sabotajes. La suite, el golden y compileall corrieron sobre f4ade80.
-
-## chequeo-6
+### chequeo-6
 
 ```
-chequeo-6 07504e0..f4ade80: avisos para mirar, no un veredicto
-producto +166/−66
-  AVISO producto suma 100 líneas netas: el informe dice por qué (§6: más de 20)
-arnés +715/−26
+chequeo-6 1345ca7..ec0092a: avisos para mirar, no un veredicto
+producto +152/−99
+  AVISO producto suma 53 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +414/−44
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/core/catalog_service.py: 636 → 702
-  proyecto_maria/core/despacho_lector.py: 902 → 900
-  proyecto_maria/core/maria_generator.py: 2347 → 2368
-  proyecto_maria/core/tarifar_connector.py: 525 → 526
-  proyecto_maria/database/models.py: 614 → 614
-  proyecto_maria/main.py: 12111 → 12124
-  proyecto_maria/pdf_extractor.py: 2893 → 2893
-  proyecto_maria/services/client_memory.py: 305 → 305
-  proyecto_maria/static/v2/screens/finalize.js: 1444 → 1445
+  proyecto_maria/core/catalog_service.py: 702 → 732
+  proyecto_maria/core/maria_generator.py: 2368 → 2391
+  proyecto_maria/core/maria_generator_export.py: 320 → 298
+  proyecto_maria/main.py: 12134 → 12137
+  proyecto_maria/pdf_extractor.py: 2893 → 2890
+  proyecto_maria/static/v2/paises_maria.js: 33 → 47
+  proyecto_maria/static/v2/screens/catalogo.js: 402 → 403
+  proyecto_maria/static/v2/screens/finalize.js: 1445 → 1451
+  proyecto_maria/static/v2/screens/ncm.js: 2350 → 2351
 avisos: 1
 ```
 
-Por qué suma 100 líneas netas: el criterio único de origen (`origen_para_catalogo`, `origen_para_guardar`, `clave_de_origen`), el sufijo hash para CJK y para proveedores de más de 60 caracteres, la migración de vendor_id y product_key y el ALTER con candado. Lo que se pudo restar se restó: los `[:3]`, la validación de dos letras de despacho_lector y la normalización propia de tarifar.
+**Por qué suma 53 netas:** los alias son datos (ISO3 y formas del país en
+maria_generator.py y paises_maria.js), NFKC con su excepción, el `lru_cache` y
+el criterio único `origen_para_guardar`. Se restaron 22 líneas en la
+exportación (que ahora usa la misma lectura) y 3 en el extractor.
 
 ## Hallazgos
 
 | Quién | # | Sev. | Hallazgo | Qué hice |
 |---|---|---|---|---|
-| A, adversario-sonnet-alto, «origen y pantalla» | — | — | export CSV, `esArgentino`, validations.py:62, `_detect_default_origin`, slug del JS, filas TAI, emoji con Co., Ltd, filas co_ltd, latinos de más de 60, fuzzy CJK, `default_origin` VARCHAR(3), ancho completo, `.toUpperCase()`, «0310»/«00310», Ω, maxlength | Riesgos o D159 (abajo) |
-| B, adversario-sonnet-alto, «claves y migración» | 1 | Media | ª, º y µ cambiaban el id latino | Arreglado en 910e1d7. Ω todavía lo cambia: riesgo |
-| B | 2 | Media | Un worker abortaba por lock_timeout | Arreglado en 08cc02c, con el rojo del paso 5 |
-| B | 3 | Media | `lookup_client_memory` (client_memory.py:286) unas 5 veces más lento | Riesgo |
-| B | 4 | Media/baja | Un origen no reconocido rechaza todo el pedido en guardar_uso_ncm | Riesgo, por D155 |
-| B | 5 | Baja | «Nº 5»/«No 5» y «10µF»/«10uF» ya no se parecen | Riesgo |
-| B | 6 | Baja | Con un choque en la migración queda una fila huérfana | Riesgo (el log lo cuenta) |
-| B | 7 | Baja | La clave puede pasar 2000 caracteres y el PUT/DELETE da 400 | Riesgo |
-| B | 8 | Baja | La clave pierde la posición de las letras no latinas, marcas combinantes y emoji | Riesgo |
-| B | 9 | — | Origen sin tope de largo en main.py:3780/8184 | Riesgo |
-| C, /code-review high | 5 | Baja | Preexistente: «Køle»/«Kæle» dan 'k le 2mm'; «m²»/«m³» dan 'panel 3 m'; «Straße»/«Strasse» distintas | Riesgo |
-| C | 6 | — | Comentarios del candado engañosos | Arreglado en 08cc02c |
-| C | 8 | Media | Origen de miles de cifras: 500 en /avisos | Arreglado en 43e825e, rojo arriba |
-| C | resto | — | guardar_uso_ncm da 400 con CHN, TWN, «Hong Kong» o «-»; save_products rechaza el lote entero; update_product no deja editar filas CHI/TAI; pdf_extractor.py:575; maxlength; client_memory.py:286; migración O(filas) en cada arranque | Riesgos o D159 |
+| /code-review high | 1 | baja | El tope de parecido igual al umbral deja Screw M8 en fuzzy | Queda así; nota arriba |
+| /code-review high | 2 | baja | ISO3 SUR y CAN ambiguos | Supuesto reversible |
+| /code-review high | 3 | baja | `_origen_desde_factura` (pdf_extractor.py:2084) devuelve el nombre entero si el país está en la tabla y no tiene ISO2 («Alemania Federal», 402); llega a vendedor_pais, al origen del ítem y al origen del Excel (main.py:5898) | Deliberado: antes ese origen se perdía; ahora el TXT lo lee como 402 (test_catalogo3, `LECTURA_PAIS`). Queda como riesgo: la pantalla muestra el nombre donde espera dos letras |
+| /code-review high | 4 | media | El aviso decía «sin origen» aunque el producto conservaba el suyo | Arreglado en bb855e0, rojo en 9dcee73 |
+| /code-review high | 5 | baja | finalize.js: el texto del hallazgo no lo recuperé tras compactar | Riesgo bajo, sin verificar |
+| /code-review high | 6 | baja | ＣＨＩＮＡ y ÉSP se guardan tal cual | Supuesto reversible |
+| /code-review high | 7 | — | La exportación lee distinto | No es defecto: usa la misma lectura |
+| /code-review high | 8 | — | Cambio de cliente de una operación compartida | Es de PRESUPUESTO-CLIENTE-1, va con esa pieza |
+| /code-review high | 9 | — | `codigos_tabla_oficial` sin caché | 5 µs por llamada: no vale el código |
+| /code-review high | 10 | baja | La migración de claves corre en cada arranque | Riesgo (abajo); el tercer arranque no cambia nada (arnés PG) |
+| adversario-opus-alto, alto (seguridad) | — | — | Sin hallazgos de confianza ≥ 8 sobre 1345ca7..9dcee73 | No ejecutó catalog_service ni la migración (le faltaba sqlalchemy) |
 
 ## Riesgos y lo no corrido
 
-- **«TAI» y «CHI» en el TXT salen como 310 (China).** Filas viejas con «TAI» (Taiwán) se generan con el código de China. No es nuevo (`get_pais_codigo` ya caía al default), pero ahora no se pueden corregir editando: «TAI» no es un país y update_product lo rechaza.
-- Un origen no reconocido (CHN, TWN, «Hong Kong», «-») rechaza el pedido entero en guardar_uso_ncm y el lote entero en save_products.
-- La migración de claves recorre en cada arranque las filas con letras no latinas, vendor vacío o de 60+ caracteres: con decenas de miles puede demorar el arranque; con el candado, el segundo worker la saltea después de 5 s.
-- Un choque en la migración deja la fila vieja sin mover; el log dice cuántas.
-- `lookup_client_memory` más lento (unas 5 veces, medido por B).
-- Ω y otras letras griegas cambian el id de un proveedor latino.
-- Similitud: «Nº 5»/«No 5», «10µF»/«10uF»; preexistente: «Køle»/«Kæle», «m²»/«m³».
-- Clave de más de 2000 caracteres: PUT/DELETE dan 400.
-- Origen sin tope de largo ni validación en la operación manual (main.py:3780) y en la del historial (main.py:8184): se guarda lo que llegue, igual que la descripción. Antes se recortaba a 3. En el TXT un origen no reconocido sale con el default 310 (caso de miles de cifras, C8).
-- No corrido: el /security-review de la rama entera (corrió sólo la revisión acotada al producto de esta pieza) y la CI de GitHub (no la puedo disparar; además deselecciona los tests de presupuestos compartidos).
+- El caché es global pero la función es pura; ocupa de 16 a 32 MB. Con más de
+  4096 filas distintas por pedido el LRU deja de acertar y vuelve a la
+  velocidad sin caché.
+- Riesgos que no pediste: una clave de más de 2000 caracteres, una transacción
+  abierta en el primer arranque, la migración que parte en dos al proveedor
+  (D157), simplificado contra tradicional y Ø contra φ: no los cubrí.
+- La pantalla quita sólo las marcas U+0300 a U+036F; el servidor, todas las
+  combinantes.
+- Descripciones largas con vocabulario compartido dan fuzzy (ver bench).
+- Sin diagnosticar: «Task was destroyed but it is pending» al final de la suite
+  (no falla nada), la línea «DATABASE_URL not set, using SQLite» en el arnés de
+  PG y el WARNING de DISCO-1 en su paso 7.
+- No corrido: `/security-review` completo de la rama (corrí el adversario de
+  seguridad sobre la vuelta), la CI de GitHub, y las puertas sobre ec0092a.
 
 ## Sigue
 
-PRESUPUESTO-CLIENTE-1 (D141 a).
+PRESUPUESTO-CLIENTE-1 (D141 a): faltan sus puertas, sabotajes, informe y el
+hallazgo 8.
 
-## /compact conservar
-
-«Dev 2 (MARIA), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (rama claude/practical-shannon-szpwkn), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. CATALOGO-3 entregada en f4ade80, esperando veredicto. Sigue PRESUPUESTO-CLIENTE-1. D158 y D159 abiertas; próxima D libre: D160. D151 sigue. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos.»
+/compact conservar: Dev 2 (MARIA), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (rama claude/practical-shannon-szpwkn), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. CATALOGO-3 (vuelta) entregada en ec0092a (informe en el commit siguiente), esperando veredicto. Sigue PRESUPUESTO-CLIENTE-1. D160, D161 y D162 abiertas; próxima D libre: D163. D151 sigue. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos.
