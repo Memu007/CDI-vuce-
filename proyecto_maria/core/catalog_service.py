@@ -81,9 +81,8 @@ def ncm_para_guardar(valor) -> str:
 
 
 def origen_para_guardar(valor) -> tuple[str, str]:
-    """(origen como se guarda, aviso): ("", "") si no hay, ("", aviso) si no es
-    un país de la tabla. «XX» es el «sin origen» de la factura. ValueError si
-    no se puede guardar como texto."""
+    """(origen, aviso): ("", aviso) si no es un país de la tabla; «XX» es el
+    «sin origen» de la factura. ValueError si no se puede guardar como texto."""
     origen = texto_para_guardar(valor, "El origen")
     if not origen or origen.upper() == "XX":
         return "", ""

@@ -705,10 +705,8 @@ def _nombres_de_pais() -> dict:
 
 
 def codigo_de_pais(texto) -> int | None:
-    """El código del país si se reconoce con certeza (código de la tabla, «0313»,
-    «313 · TAIWAN» o un nombre conocido); si no, None. Es el criterio de
-    `resolve` en paises_maria.js: la pantalla y el servidor aceptan lo mismo.
-    La forma se mira antes de normalizar: «ＢＲ» o «ÉS» pasarían como «BR» y «ES»."""
+    """El código del país si se reconoce con certeza; si no, None. Mismo criterio
+    que `resolve` en paises_maria.js; la forma se mira antes de normalizar («ＢＲ», «ÉS»)."""
     escrito = unicodedata.normalize("NFC", str(texto or "")).strip()
     if not escrito or unicodedata.normalize("NFKC", escrito) != escrito:
         return None
