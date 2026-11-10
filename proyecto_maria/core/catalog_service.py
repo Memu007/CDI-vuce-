@@ -21,6 +21,7 @@ on-demand al construir get_vendor/get_vendor_by_id.
 """
 
 from __future__ import annotations
+import functools
 import hashlib
 import math
 import re
@@ -142,6 +143,8 @@ def _compatible(texto: str) -> str:
     ))
 
 
+# La memoria del cliente la pide para cada fila guardada, una vez por ítem del pedido.
+@functools.lru_cache(maxsize=4096)
 def clave_de_producto(descripcion: str) -> str:
     """Clave del producto en el catálogo: lo que se lee igual da la misma."""
     return _clave(_compatible(descripcion))

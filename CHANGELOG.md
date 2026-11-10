@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-10 · perf: la memoria del cliente calcula la clave de cada fila una vez por pedido (CATALOGO-3)
+
+- Buscar diez productos contra cientos de filas guardadas con descripciones largas o en kana ya no recalcula la clave de cada fila para cada producto.
+
 ## 2026-11-10 · fix: el catálogo no pierde el NCM por un origen que no reconoce y encuentra lo que se lee igual (CATALOGO-3)
 
 - Guardar un uso o cambiar el NCM de una fila con un origen viejo o no reconocido guarda el NCM y avisa que el origen quedó sin cambiar.
