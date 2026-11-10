@@ -286,7 +286,9 @@ def test_cada_forma_del_pais_da_el_mismo_codigo_al_importar_y_exportar(escrito):
     from proyecto_maria.core import maria_generator_export
     codigo = LECTURA_PAIS[escrito]
     assert maria_generator.codigo_de_pais(escrito) == codigo
-    assert (maria_generator.origen_valido(escrito) is None) == (codigo is None)
+    guardado = maria_generator.origen_valido(escrito)
+    assert (guardado is None) == (codigo is None)
+    assert guardado is None or guardado == " ".join(guardado.split()), repr(guardado)
     importa, exporta = get_pais_codigo(escrito), maria_generator_export.get_pais_codigo(escrito)
     if codigo is None:
         assert (importa, exporta) == (maria_generator.PAIS_DEFAULT_IMPORT, maria_generator_export.PAIS_DEFAULT_EXPORT)
