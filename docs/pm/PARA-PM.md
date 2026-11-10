@@ -6,7 +6,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 
 | Qué | SHA |
 |---|---|
-| Entrega (este informe) | el commit de este informe, encima de `f9ec94e0` |
+| Entrega (este informe) | los commits de este informe, encima de `f9ec94e0` |
 | Merge de INTEGRAR-1 | `b9db0ad3` (^1 `0d829b8a` dev-tecnica, ^2 `4db641b0` dev-maria, base `30533fe4`) |
 | Producto de esta vuelta | `d26d477b`: `main.py` −2. `register` ya no importa `re` |
 | Pruebas y sabotajes de esta vuelta | `e2f923fe` y `2e775aa4` (D140 a), `56756f84`, `f614bafb`, `9b639146`, `6d6efb86`, `ed8d9769`, `1c36ef2a` |
@@ -21,6 +21,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
   - previos de MARIA: patrones viejos, 429 del límite de registro y el smoke;
   - de la base: los arneses de navegador y un patrón mío de `cobro_mp1`;
   - de entorno: pypdf.
+- Sin resultado completo: un sabotaje de `rendimiento1b` murió por OOM (código 137) y no lo repetí; está en «No corrido».
 
 **Puertas en verde**
 - Suite completa sobre `cbbd37b2`, con pypdf 6.21.4: 5907 passed.
@@ -182,7 +183,7 @@ Están los 56 nombres de la lista «No corrido» de la vuelta 1, más `cobro_mp1
 
 | Puerta | Salida |
 |---|---|
-| Suite completa, worktree limpio, `cbbd37b2`, pypdf 6.21.4 | `5907 passed, 110 skipped, 3 xfailed in 1371.30s (0:22:51)` |
+| Suite completa, worktree limpio, `cbbd37b2`, pypdf 6.21.4 | `5907 passed, 110 skipped, 3 xfailed in 1371.30s (0:22:51)`; después del resumen, asyncio imprime «Task was destroyed but it is pending!» al cerrar, con rc=0 |
 | `compileall -q proyecto_maria`, `cbbd37b2` | rc=0 |
 | Suite completa, worktree limpio, `f7a45660` (corrida anterior) | `5907 passed, 110 skipped, 3 xfailed in 1446.16s (0:24:06)` |
 | Pruebas de PDF con pypdf 6.21.4, `4899fc51` | `530 passed in 225.79s` |
