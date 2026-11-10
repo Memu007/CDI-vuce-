@@ -164,7 +164,7 @@ sabotaje $G "un espacio raro en el medio vuelve a quedar" \
 sabotaje $E "la exportación vuelve a tener su propio criterio" \
   '    return get_pais_codigo_import(pais, PAIS_DEFAULT_EXPORT)' \
   '    return PAISES_INDEC.get(str(pais).strip().upper(), PAIS_DEFAULT_EXPORT)' \
-  'FAILED '"$CF"'[CHINA\xa0]'
+  'FAILED '"$CF"'[HONG\u2009KONG]'
 sabotaje $G "«ÉS» vuelve a pasar como «ES»" \
   'if len(escrito) <= 2 and not (escrito.isascii() and escrito.isalpha()):' \
   'if False:' \
