@@ -2,245 +2,275 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## INTEGRAR-1: el merge está subido; D140, D141 y D143 las decidís vos
-
-Base común `30533fe`. Padres: mi rama en `0d829b8` (trae la tuya) y `claude/dev-maria` en `4db641b`.
+## INTEGRAR-1 vuelta 2: todo lo que no se había corrido ya está corrido. Ningún rojo viene del merge; D145 a D149 las decidís vos
 
 | Qué | SHA |
 |---|---|
-| Merge, resolución de los cinco choques | `b9db0ad` |
-| Pruebas y patrones de sabotaje al día con el merge (11 archivos, +51/−25, sin producto) | `68e77ed` (mismo árbol que `80c1afb`, donde corrí los arneses) |
-| Mis pruebas de NOMBRES-1 con IP propia (1 archivo de pruebas) | `39a9f80` (mismo árbol que `a4c97b4`, donde corrí la suite) |
-| El sabotaje del login de NOMBRES-1 ancla en la búsqueda del merge | `0e51313` |
-| `cobro_corte1`: dos anclas del guardado y el surrogate de Postgres al día con el merge (2 archivos de pruebas) | `6d13b43` |
-| Este informe | el commit de arriba |
+| Entrega (este informe) | el commit de este informe, encima de `f9ec94e0` |
+| Merge de INTEGRAR-1 | `b9db0ad3` (^1 `0d829b8a` dev-tecnica, ^2 `4db641b0` dev-maria, base `30533fe4`) |
+| Producto de esta vuelta | `d26d477b`: `main.py` −2. `register` ya no importa `re` |
+| Pruebas y sabotajes de esta vuelta | `e2f923fe` y `2e775aa4` (D140 a), `56756f84`, `f614bafb`, `9b639146`, `6d6efb86`, `ed8d9769`, `1c36ef2a` |
+| Suite completa | `f7a45660`: `git diff f7a45660 HEAD -- proyecto_maria tests scripts` da vacío |
 
-En D140 el merge quedó con (a), lo que ya estaba aceptado en COBRO-MP-3; por eso el único rojo de la suite es el caso de MARIA que espera (b).
+**Resultado**
+- Ningún rojo nuevo viene del merge. Los únicos que tocan el merge son tres patrones de arnés que quedaron viejos, y el comportamiento es el mismo:
+  - `despacho1c`;
+  - `despacho1d`;
+  - uno de `estudio1`.
+- Los demás rojos se reparten así:
+  - previos de MARIA: patrones viejos, 429 del límite de registro y el smoke;
+  - de la base: los arneses de navegador y un patrón mío de `cobro_mp1`;
+  - de entorno: pypdf.
 
-El merge es contra `4db641b`, como dice la tarea. `claude/dev-maria` siguió después (`0231eee`, con RESET-3, AVISOS-2b y SMOKE-1: 12 archivos, +394/−136). Eso no está en el merge; lo traigo cuando lo aceptes y me lo pidas.
+**Puertas en verde**
+- Suite completa: 5907 passed.
+- Ataques sobre Postgres real: 47 OK, 0 FUGA.
+- D140 (a) hecha.
+
+**Mi pedido**
+- Necesito un rango de D nuevo. Usé de D144 a D149. Revisé que ninguna de esas aparece en `docs/pm` fuera de este canal y de la línea «Próxima D tuya: D144».
+
+`0231eee` de dev-maria sigue fuera del merge, como dice la tarea.
 
 ## Decisiones
 
-**D140. Webhook de MP sin `MP_WEBHOOK_SECRET` en desarrollo.** Choque de fondo entre dos piezas aceptadas.
-- (a) Rechaza en cualquier entorno. Es COBRO-MP-3 (mía, `1f50328`): «sin firma no se atiende». Es lo que dejé en el merge (`main.py:11481`, `if not MP_WEBHOOK_SECRET: return False`).
-- (b) Acepta en desarrollo explícito y rechaza fuera. Es ENTORNO-1 (MARIA, `118447a`): `return _es_desarrollo()`.
+**D144. `despacho1a` da rojo en la BASE**
+- Es la misma causa que D143 (`36aba873`): la llamada a `goTo` que hace el arranque llega tarde y pisa la navegación de la pantalla.
+- Ya tenés tu respuesta en D143 (a) / BORRADOR-1. No hay nada nuevo que decidir. La numero sólo para que quede contestada.
 
-Recomiendo (a). El webhook cambia el plan de una cuenta: una puerta de desarrollo ahí es la única de ENTORNO-1 que mueve plata si `ENVIRONMENT` queda mal puesto en un despliegue. Las pruebas firman con un secreto de prueba (`tests/mp_firma.py`), así que en desarrollo no hace falta la puerta.
-Con (a) hay que cambiar dos cosas de MARIA, que hoy dan rojo sobre el merge: `tests/test_entorno1.py:96` (`webhook_sin_secreto` espera «abierta» en desarrollo) y los dos sabotajes de `scripts/testing/sabotajes/entorno1.sh` que la nombran (líneas 23-26 y 44-46). Con (b) se vuelve a abrir lo que cerró COBRO-MP-3 y hay que cambiar sus casos.
-El cambio de esos casos de MARIA no está subido: lo hago cuando decidas.
+**D145. Los arneses de MARIA chocan con el límite de registro (429)**
+- **Qué pasa:**
+  - `orden1` y `orden1b` dan 429 en la BASE;
+  - `org1b` tiene 2 ROJO?, `validacion1` 3 y `estudio1` 9 de 9;
+  - en todos aparece `registro: 429 {"detail":"Demasiados registros desde esta conexión. Intente más tarde."}`.
+- **Por qué:**
+  - el límite es `registro:h:{ip}` (más de 5 por hora) o `registro:d:{ip}` (más de 20 por día), en `main.py:3385`;
+  - todos los sabotajes registran desde 127.0.0.1;
+  - dentro del proceso, conftest y datos1 apagan el limitador; con uvicorn aparte, el arnés no puede hacerlo sin un interruptor en el producto, y ese interruptor no va.
+- **Opciones:**
+  - (a) Que cada sabotaje del arnés mande su propio `X-Forwarded-For`. `get_client_ip` (`core/rate_limit.py:47`) toma la última entrada cuando `TRUSTED_PROXY_HOPS` es 1, que es el valor por defecto. No hay cambio de producto.
+  - (b) Que el arnés reuse una cuenta que ya registró.
+  - (c) Dejar esos 429 como ROJO?.
+- **Recomiendo (a):** es lo más chico, deja el control de producción igual y cada sabotaje vuelve a mostrar su rojo propio.
+- Los arneses son de MARIA: la decisión es a quién se la das.
 
-**D141. Una operación movida a otro cliente conserva su presupuesto compartido con los datos del cliente viejo.** No es del merge: está en las dos ramas (las dos le cambian `client_id` a una operación existente, `0d829b8:main.py:7600` y `4db641b:main.py:8095`, `client_id=client_id` dentro de `campos`), y la revisión adversarial lo encontró.
-- Borrar un cliente quedó sumado: sus operaciones quedan «Sin cliente» (mía, COBRO-CORTE-1, para que regenerar no vuelva a contar) y sus presupuestos compartidos se borran (MARIA, DATOS-1, D32 (a), porque la copia tiene datos del cliente).
-- Pero guardar una operación existente desde otro cliente le cambia `client_id` (`main.py:8115-8129`). Su `PublicQuote` queda con la copia del cliente viejo, y al borrar ese cliente no se borra, porque el borrado busca por el `client_id` actual. El aviso de `clientes.js:1821` («dejan de andar los links de presupuestos que compartiste») queda falso para ese presupuesto.
-- (a) Al guardar una operación con otro cliente, borrar su presupuesto compartido (el link deja de andar, como al borrar).
-- (b) Dejarlo y corregir el aviso.
-- (c) Dejarlo como está y anotarlo como límite conocido.
+**D146. El límite de login cuenta después de bcrypt**
+- Viene del code-review de esta vuelta, fila 1.
+- El login entra en `main.py:3197` y `verify_password` corre en `:3238`, antes de sumar al límite.
+- Con una clave mala, cada intento paga bcrypt antes de que el límite lo frene. El costo es de CPU, no de acceso: el límite sigue cortando.
+- **Opciones:**
+  - (a) contar antes de verificar, en una pieza propia con su rojo;
+  - (b) dejarlo y anotarlo en la cola de limpieza.
+- **Recomiendo (b)** hasta que CONEXIONES-1 mida bcrypt bajo carga. Si la medida muestra que pesa, (a).
 
-Recomiendo (a): es la misma regla de DATOS-1 (la copia del cliente se va con el cliente) aplicada al único otro camino por el que la operación deja de ser suya. Es una pieza nueva de datos, con su caso y su sabotaje: no la meto en el merge. La decisión es si va a la cola y con qué opción.
+**D147. `_LIMITE_AVISOS_MP` vive en cada worker**
+- Está en `main.py:11520`, `parse_limite("60/minute")`, y se usa en `:11529` con `limiter.limiter.hit`.
+- Sin `REDIS_URL`, `core/rate_limit.py` usa `MemoryStorage`, uno por worker: con N workers el tope real es N×60.
+- **Opciones:**
+  - (a) dejarlo así y anotar que el tope es por worker;
+  - (b) exigir `REDIS_URL` en producción para este límite.
+- **Recomiendo (a):** el webhook sin firma ya no cambia nada (COBRO-MP-3), así que el tope sólo protege CPU. Si Railway corre con Redis, ni hace falta.
 
-**D143. Al abrir la app, la recuperación del borrador te saca de la pantalla a la que fuiste.** No es del merge: es mía, de ORDEN-1 (`36aba87`), y está igual en `0d829b8`, en `4db641b` y en el merge. La encontró el arnés `cliente1`, que da rojo sin sabotaje en los tres (`locator.click: Timeout 30000ms exceeded`).
-- El arranque de `app_v2.js` espera al usuario hasta 4 s (`Promise.race([usuarioListo, espera(4000)])`), recupera el borrador y hace `goTo('review')` o `goTo('upload')`. Si en ese rato la usuaria ya fue a Clientes, la devuelve a la carga.
-- Con el arnés esperando a que haya una pantalla activa antes de navegar, `cliente1` da verde sobre `80c1afb`. Buscando el primer commit malo da `36aba87`.
-- (a) Pieza de producto: el arranque sólo va a la carga o a la revisión si la usuaria todavía no fue a ninguna pantalla, con su caso y su sabotaje.
-- (b) Cambiar el arnés para que espere la primera pantalla. Esconde lo que le pasa a la usuaria.
-- (c) Las dos.
+**D148. `sesion1` es previo de MARIA**
+- Es un arnés de MARIA (SESION-1: `539b55b9`, `ce7cd9dd`, `2e62761c`; los tres están sólo en `4db641b0`). En lab3 sobre `56756f84` dio rc=1 en 1845 s.
+- **Los dos ROTO y el ROJO? son patrones viejos; los controles siguen en el producto:**
+  - ROTO «resetear la clave vuelve a poner active_jti en NULL»: RESET-1 `816eab90` cambió `revocar_sesiones(user)` por `guardar_si_la_clave_sigue(..., active_jti=uuid.uuid4().hex)`.
+  - ROJO? «revocar escribe NULL y resucita las viejas»: es la misma causa.
+  - ROTO «un email mal escrito»: ENTRADAS-1 `5001831f` llevó el chequeo a `_email_valido(raw_email)`.
+- **El VERDE es un hueco del arnés:**
+  - «limpiar abre su propia conexión» da VERDE porque ABUSO-2 `1f0bfb04` cambió `limpiar` por `descontar` en el login, así que el sabotaje apunta a un camino por el que ningún caso pasa.
+  - No medí si otro caso lo ve.
+- Sólo te pido que confirmes la clasificación. Arreglar el arnés le toca a MARIA.
 
-Recomiendo (a): el rojo describe algo que le pasa a quien abre la app y va rápido a Clientes. No lo arreglo dentro de INTEGRAR-1.
+**D149. Patrones de sabotaje que quedaron viejos**
+- **Qué abarca.** Son dos grupos:
+  - patrones de arneses de MARIA que su propia rama ya había movido;
+  - patrones que el merge dejó equivalentes.
+- **Causa.** En todos los casos el control sigue en el producto y lo que quedó viejo es la línea que busca el sabotaje. La lista está en la tabla de arneses, con la marca «D149».
+- **Opciones:**
+  - (a) que cada dueña ponga al día sus patrones: MARIA los suyos, y yo `cobro_mp1` (g) y los tres que el merge dejó equivalentes;
+  - (b) que se anoten en la cola de limpieza.
+- **Recomiendo (a) para los míos:** son 4 líneas de arnés, y las hago apenas me lo digas.
 
-## Lo que se sumó sin decisión
+## D140 (a): hecha
 
-| Choque | Cómo quedó |
+- `e2f923fe` (prueba): el webhook sin `MP_WEBHOOK_SECRET` queda cerrado también en desarrollo.
+- `2e775aa4` (sabotajes): los sabotajes del webhook siguen al rechazo en cualquier entorno.
+- El producto ya rechazaba así en el merge. En esta pieza no hubo commit de producto.
+
+## Arneses
+
+Están los 57 nombres de la lista «No corrido» de la vuelta 1 (decía «56», pero son 57) más `cobro_mp1` y `cobro_corte1` enteros.
+
+**Dónde corrió cada tanda**
+
+| Tanda | SHA |
 |---|---|
-| Borrar un cliente | Las dos: operaciones «Sin cliente» y sin detalle, y se borran sus presupuestos compartidos. Responde `operaciones_sin_cliente`. El texto de `clientes.js:1821` dice las dos cosas |
-| Registro | Las dos: tope por IP (más de 5 por hora o 20 por día, `main.py:3387`) y `_exigir_username_libre` (`main.py:3392`, y en crear estudio `main.py:10659`) |
-| `finalize.js`, guardado al historial | Sin pérdida. Lo que `4db641b` tiene de más en `generateMaria` (la rama `detail.message` y `err.motivo`) es código mío viejo (`704df60`) que saqué en `efaef2b` junto con el 409, que ya no existe. El toast del historial sigue en `finalize.js:1340` |
-| `file_security.py` | Las dos: `import logging` y `import math`, y `PDF_DEMASIADO_PESADO` |
-| `CHANGELOG.md` | Las entradas de las dos ramas, por fecha |
-| `tests/conftest.py` | Cambia sólo por la resolución: `cuenta_de_prueba` con try/finally, `auth_override` la usa, y el limitador apagado de MARIA |
+| lab3 | `56756f84` |
+| lab5 y lab5rep | `c9e9a69c` |
+| sab_lab | `80c1afbc` |
+| lab15 | `4899fc51` |
 
-## Los 429 de la suite eran de mis pruebas de NOMBRES-1
+**Por qué valen sobre el SHA final**
+- De `56756f84` a `c9e9a69c`, en scripts y tests sólo cambiaron excel1, observabilidad1 y punta_a_punta1, y los tres se volvieron a correr.
+- En el producto sólo cambió `d26d477b`.
+- Ninguno de esos arneses cambió después.
 
-Sobre `80c1afb` la suite dio 10 rojos, los mismos en dos corridas: D140 y nueve con `assert 429 == 200` (los 8 de `test_punta_a_punta1.py` y `test_prelaunch_block3.py::TestJWTSecretUnificado::test_token_generado_por_login_es_verificable_por_datos_del_token`). El log dice `429 login bloqueado: ip=testclient`.
+**Cómo leer las marcas**
+- «ROTO»: el sabotaje no encontró su patrón.
+- «ROJO?»: dio rojo, pero no con el texto esperado.
 
-Causa, medida leyendo `limites_auth` después de cada prueba: `test_nombres1.py::test_dos_cuentas_viejas_que_difieren_en_mayusculas_siguen_entrando` (mía, sólo de mi rama) deja tres logins fallidos en la IP `testclient`, que comparten todas las pruebas; los dos 401 de `test_prelaunch_block1.py` suman el cuarto y el quinto, y la IP queda bloqueada 15 minutos para las que vienen después. Es un choque que sólo existe en el merge: el bloqueo guardado en `limites_auth` es de la rama de MARIA (`1f0bfb0`, ABUSO-2) y no está en `0d829b8`; esa prueba es de mi rama y no está en `4db641b`.
+**Limpios (rc=0, ningún sabotaje con falla)**
 
-Arreglo (`a4c97b4`, sólo pruebas): esa prueba entra desde una IP propia del rango de documentación (`2001:db8::…`, por `X-Forwarded-For`) y borra sus intentos al terminar. No cambia ningún assert.
-
-| Orden mínimo (`test_nombres1`, `test_prelaunch_block1`, `test_prelaunch_block3`, `test_punta_a_punta1`, `-p no:randomly`) | Resultado |
-|---|---|
-| `80c1afb`, sin el arreglo | `9 failed, 123 passed, 2 xfailed in 22.20s` |
-| `a4c97b4`, con el arreglo | `132 passed, 2 xfailed in 27.57s` |
-
-`test_excel2d.py` (`[9995 combinadas en 19 990 filas]`) dio una vez `assert 0.5157383030000346 < 0.5`, con los arneses corriendo en paralelo; pasó en las otras dos suites y solo pasó (`7 passed in 3.12s`). Lo informo como carga del contenedor, no lo repetí para buscar verde.
-
-Suite completa sobre `a4c97b4`: `1 failed, 5906 passed, 110 skipped, 3 xfailed in 1227.54s (0:20:27)`. El único rojo es el de D140: `test_entorno1.py::test_puerta_abierta_en_desarrollo[webhook_sin_secreto]`, con `AssertionError: webhook_sin_secreto no queda abierta: {'development': 'cerrada', 'test': 'cerrada', 'testing': 'cerrada'}`.
-
-## Arneses de las dos ramas
-
-Corrí todos los sabotajes (`scripts/testing/sabotajes/*.sh` y `scripts/testing/sabotaje_*.sh`) uno por uno sobre `80c1afb`, que tiene el mismo árbol que `68e77ed`. `nombres1.sh` lo corrí aparte sobre `0e51313`.
-
-El único rojo que causa el merge es el de `cobro_corte1`, y es de pruebas. Para los demás corrí el mismo script, o busqué su patrón, en los dos padres.
-
-| Arnés | Resultado en el merge | En los padres | Qué es |
-|---|---|---|---|
-| `sabotaje_maria1d`, `maria3`, `maria5`, `maria7`, `maria8`, `maria9`, `sabotaje_valor1` | `PATRON NO ENCONTRADO (0 veces)` | 0 veces en `4db641b` y en `0d829b8`; los scripts no cambian entre `4db641b` y `80c1afb` | Patrones que quedaron viejos en la rama de MARIA (por ejemplo `maria1d`: el endpoint cambió en `67d5688`) |
-| `sabotaje_valor1b` | `PATRON NO ENCONTRADO (2 veces)` | 2 veces en `4db641b`; 1 en `0d829b8` | Previo de la rama de MARIA |
-| `abuso1`, `catalogolargo1` | `ROTO`: `el sabotaje no encontró su patrón`. En `abuso1` es uno solo, «vencido el bloqueo, la cuenta sigue»: busca `nueva = case((vencido, tope), …)` y el producto dice `nueva = _T.c.cuenta + 1 if exacta else case(...)` desde ABUSO-2; los otros dan ROJO | 0 veces en `4db641b`; los dos son sólo de MARIA | Patrones viejos de la rama de MARIA |
-| `sabotaje_sufijos1` | `FALLA  codigo_vacio_cargado: quedó verde` | Igual en `4db641b` | Previo de la rama de MARIA |
-| `sabotaje_subitems1` | `FALLA  forma_500: quedó verde` y `FALLA  controles_500: quedó verde` | Igual en `4db641b`: `41 passed, 2 xfailed`, `SABOTAJES CON FALLA: 2` | Previo de la rama de MARIA |
-| `cobro_corte1` | rc=1. Dos `ROTO`: «v2: generar guarda con la carga de la pantalla» y «v2: el guardado toma los valores de la pantalla al responder», `el sabotaje no encontró su patrón`. Y la base del lock: «el lock ya está en rojo sin sabotaje: no se puede medir nada», por «id con surrogate al guardar: una operación nueva y contada (400, 0, 0 operaciones)». Los otros dan ROJO | Los dos ROTO anclan en `saveOperationToHistory(items, data, carga, foto).catch(`, que está en `0d829b8`; en el merge sigue `.then(`. El 400 es la validación de MARIA, que ya espera `tests/test_cobro_corte1.py` | Del merge, sólo en pruebas. Arreglado en `6d13b43`. Sobre ese SHA, la base del lock sola (`cobro_corte1_postgres.py` en un PG16 propio) da `fallas: 0` con 18 OK, entre ellos «id con surrogate al guardar: rechazado sin contar (400, 0, 0 operaciones)». La corrida entera del arnés no entró antes del corte: va en «No corrido» |
-| `cliente1` | «la prueba ya está en rojo sin sabotaje» | Igual en `0d829b8` y en `4db641b` | D143, mía |
-| `aislamiento2` | rc=2: el runner lo llamó sin argumento (pide `prueba`, `ataque` o `todo`) | | Falta correrlo con Postgres; va en «No corrido» |
-| `nombres1` (sobre `0e51313`) | base en verde (`40 passed`), siete ROJO, `sabotajes con falla: 0` | | Verde |
-
-Verdes (rc=0): `sabotaje_catalogo_ncm1`, `maria1a`, `maria1c`, `maria2`, `maria2b`, `maria4`, `maria5d`, `maria7_devolucion`, `sabotaje_org1`, `sabotaje_separadores1`, `separadores1b`, `separadores1c`, `separadores1d`, `valor1c`, `abuso2`, `admin1`, `admin2`, `avisos1`, `avisos2`, `backup1a`, `catalogo_largo2`, `cliente1b`, `cliente1c`.
-
-Los patrones viejos de MARIA no los toqué: son scripts de su rama y no los cambia el merge. Los anoto para que la PM decida si vuelven a ella.
-
-`test_rendimiento1c.py` dio una vez 2 rojos (`no such table: users`) en el worktree del merge antes de `68e77ed`. `68e77ed` envuelve el subproceso con `cuenta_de_prueba("a")` y `cuenta_de_prueba("b")`. Con eso, solo: `15 passed in 49.65s`; en la suite sobre `a4c97b4` pasa.
-
-## Revisión adversarial
-
-Un revisor, `adversario-opus-alto` (Opus, esfuerzo alto), sobre `5068254`. Corrió la suite ahí: `87 failed, 3559 passed, 34 skipped in 991.75s`. Los que arreglé los reproduje antes (rojo en `5068254`, verde en `80c1afb`); el 11 lo verifiqué leyendo el código de los dos padres y del merge, sin correrlo.
-
-| # | Hallazgo | Cómo quedó |
+| Arnés | Dónde | Nota |
 |---|---|---|
-| 1 | Un presupuesto compartido sigue andando después de borrar el cliente, si la operación se había movido a otro | D141 |
-| 2 | `test_cobro_corte1`: 4 casos «al confirmar» fallan porque el `db.commit` de `auth/dependencies.py:159` (MARIA) también cae en el commit que la prueba hace fallar | Arreglado en `80c1afb` (sólo prueba) |
-| 3 | `surrogate` al guardar: la rama de MARIA ya rechaza con 400 «Hay un carácter que no se puede guardar.» y mi caso esperaba 200 | Me quedo con el 400 (más estricto, no cobra). Supuesto reversible: el caso lo espera así |
-| 4 | `test_despacho1c`: 55 rojos porque el arnés ponía el cliente por un camino que el merge ya no usa | Arreglado: el arnés usa `CDI.state.clienteActivo` |
-| 5 | `buildMariaRequest` y `fotoDeLaPantalla` quedan fuera del `try` de `generateMaria` | Previo (está igual en las dos ramas). Va abajo |
-| 6 | `test_avisos1_seguro` arma `generateMaria` con stubs y le faltaban `fotoDeLaPantalla`, `pedidaMientrasOtra` y `lastValidation`, que `generateMaria` usa en el merge | Arreglado en `80c1afb`: el arnés los agrega |
-| 7 | `test_datos1` y `test_avisos2` daban 401 en el merge | Arreglado: usan `cuenta_de_prueba` y `auth_override` |
-| 8 | `test_admin_bootstrap`: en el merge cambiar el email pide la contraseña actual | Arreglado: la cuenta tiene un hash real y la prueba manda `current_password` |
-| 9 | `test_nombres1` apagaba `login_attempts`, que en el merge ya no es el limitador | Arreglado: se sacó ese `monkeypatch` |
-| 10 | Webhook sin secreto en desarrollo | D140 |
-| 11 | `finalize.js`: un 402 de una carga ajena, `lastValidation`, y `total_items` después del borrado | Ninguno es del merge. El 402: `CDI.api` lo tira con la razón en `err.message` (mía, `efaef2b`; MARIA usa `err.motivo` de mi `704df60` viejo), y el `catch` de `generateMaria` la muestra aunque la carga ya no esté en pantalla; es la cuenta la que no paga, así que el texto es cierto. Igual en `0d829b8`. `lastValidation`: lo saqué de `onLeave` en VALIDACION-1 (`db31e0e`), atado a `lastValidationPedido`. `total_items`: una operación que quedó «Sin cliente» conserva su `total_items` sin detalle; las métricas filtran por `client_id`, así que no la cuentan. Igual en `0d829b8` (COBRO-CORTE-1) |
-| 12 | `logger` sin definir en `main.py:8160` | Previo: pyflakes lo marca en `0d829b8:7639` y en `4db641b:8137` |
+| datos1, csrf1, csrf2, csrf3, org1, pa1, permisos1, permisos2, reset1, seguro1, seguro2, sufijos2, excel2, excel2b, excel2c, excel2d, excel3 | lab3 | 17 de 17 |
+| front422, guardar2, limpieza1, disco1, email1, entorno1, entorno2, entorno3, entorno4, entradas2, entradas3, entradas4, cobro_mp3, cobro_mp4 | lab5 | entorno2 se volvió a lanzar después de un reinicio del contenedor |
+| cobro_corte1 entero | lab5rep | 5271 s, 88 ROJO, BASE, pantalla y lock en verde |
+| rendimiento1, rendimiento1d | lab5rep | 11 y 12 ROJO |
+| rendimiento1c | lab6 | 18 ROJO con pypdf 6.21.4 (ver Entorno) |
+| conexiones1 | `c9e9a69c` | close_cancelado y close_cancelado_suelto: 1 cada uno |
+| observabilidad1, excel1 | `6d6efb86` | «sabotajes sin rojo: 0; no corridos: 0» y «sabotajes con falla: 0» |
+| punta_a_punta1 | `ed8d9769` o posterior | «sabotajes con falla: 0» |
+| guardar1 | `c9e9a69c` | «sabotajes con falla: 0» después de arreglar el arnés en `1c36ef2a` (ver merge) |
 
-Lo que el revisor confirmó como bien: el webhook sin firma da 401 (`main.py:11481` y `11530`); el registro tiene las dos conductas (`3392`, `10659-10660`); no se perdió código en silencio al resolver; la única advertencia nueva de pyflakes es `uuid` importado dos veces.
+**Merge: el patrón del arnés quedó viejo y el comportamiento es el mismo**
 
-## Arreglos de pruebas sobre el merge (`80c1afb`, subido como `68e77ed`, sin producto)
+| Arnés | Qué dio | Causa |
+|---|---|---|
+| despacho1c | 1 ROTO «el plan vencido no avisa que no se guardó» | MARIA tiraba `Error('payment_required')` con `err.motivo`. El merge quedó con la forma de dev-tecnica, `err.code='payment_required'`, y `finalize.js:1338-1341` y `upload.js:438` la leen igual. D149 |
+| despacho1d | 1 ROTO «la operación vuelve a esperar al catálogo» | Es la misma llamada con más argumentos: `saveOperationToHistory(items, data, carga, foto).then(r => {` en `finalize.js:779`. D149 |
+| estudio1 | 1 de sus 2 ROTO «generar no espera la lista de estudios» | El patrón incluye el comentario `// ESTUDIO-1`, que el merge sacó (§6). La línea `if (CDI.estudios) await CDI.estudios.listo();` es igual. D149 |
+| guardar1 | 1 ROTO «el NUL vuelve a llegar a la base» | Es un arnés mío: ENTRADAS-2 (`a91c7b8f`) cambió `data = _sin_nul(await request.json())` por `data = _sin_nul(data)`. Ya lo arreglé en `1c36ef2a` y quedó limpio |
 
-| Archivo | Qué cambió |
+**Previos de MARIA: el arnés o el comportamiento ya estaban así en `4db641b0`**
+
+| Arnés | Qué dio | Causa |
+|---|---|---|
+| maria1b | rc=4, 4 ROTO | SEGURO-1 `4e4a58ba` pasó el saneo a una función. ENTRADAS-2 `28c72f84` pasó los números a `_numero_de_afuera`. D149 |
+| despacho1b | rc=1, 6815 s: 8 ROTO + 2 VACÍO + 3 ROJO? | Los 8 patrones tampoco están en `4db641b0` (ENTRADAS-2: `_entero_de_afuera`, `_cuerpo_guardable`). Los 2 VACÍO vienen detrás de su ROTO. D149. Los 3 ROJO? de CPU están en «No corrido» |
+| entradas1 | 1 ROTO «los ítems de agrupar sin validar» | En `4db641b0` ya es `Field(default=[], max_length=10000)`, en `main.py:8216`. D149 |
+| estudio1 | 26 ROJO, 1 ROTO, 9 ROJO? | Los 9 ROJO? son 429 del registro (D145). El ROTO «los avisos anotan el uso» espera `_items_con_procedencia`, que en `4db641b0` ya es `_textos_como_van_al_txt` (`main.py:4910`). D149 |
+| estudio1b | 19 ROJO + 1 ROTO | Es la misma causa que el ROTO de estudio1. D149 |
+| cobro_mp2 entero | rc=1, 11791 s, 86 ROJO + 1 ROTO | ROTO «sin la variable de entorno hay demo»: ENTORNO-2 `c8afa6ff` llevó el chequeo a `config.py:15`. BASE y cruces de Postgres en verde. D149 |
+| orden1, orden1b, org1b, validacion1 | 429 del registro | D145. orden1b da verde en `0d829b8a` y 429 en la BASE de `4db641b0` |
+| sesion1 | 2 ROTO + 1 ROJO? + 1 VERDE | D148 |
+| abuso1 | 1 ROTO «vencido el bloqueo…» | ABUSO-2 `59778f92` cambió la línea de `case(...)`. El arnés y el código son iguales en `4db641b0` y en el merge |
+| catalogolargo1 | 4 ROTO + 1 ROJO? | CATALOGO-LARGO-2 `1ecab6f1` partió las líneas. El arnés y el código son iguales en `4db641b0` y en el merge |
+
+**Base (dev-tecnica, antes del merge)**
+
+| Arnés | Qué dio | Causa |
+|---|---|---|
+| destino1, foco_cliente1, despacho1a (y cliente1, de la vuelta 1) | La BASE da rojo con `page.fill` o `locator.click: Timeout 30000ms exceeded.` | Bisección de destino1: `30533fe4` malo, `ebe7b97a` bueno, primer malo `36aba873` (ORDEN-1, mío). El arranque espera al usuario (`ESPERA_USUARIO_MS` 4000) y después hace `goTo('review'/'upload')`, que pisa el `goTo` de la pantalla. Con 6 s de espera, despacho1a da «OK 1280 px» y «OK 390 px», y destino1 da «OK: pantalla DESTINO-1». BORRADOR-1 los tiene que dejar verdes. D143/D144 |
+| cobro_mp1 entero | rc=1, 4718 s: 144 ROJO + 1 VERDE esperado + 1 ROTO | ROTO «g: Listo guarda la operación sin el archivo del MARIA»: el patrón dice `.catch(err => {` y hoy la línea es `.then(r => {`, por COBRO-CORTE-1 `1fea5ba5`. Es un arnés mío. D149 |
+| rendimiento1b | rc=1, 6 ROJO + 1 ROJO? | El ROJO? salió con código 137: dmesg dice «Memory cgroup out of memory». El defecto saboteado (memoria) se ve; el texto esperado no llega a imprimirse. El arnés es frágil frente al OOM. No lo repetí |
+
+**Entorno**
+- La primera corrida de rendimiento1c dio VERDE en «un tope propio de pypdf vuelve a ser un PDF inválido».
+- **Causa:** la venv del laboratorio tenía pypdf 6.21.2, y `requirements.txt` pide `>=6.21.4`. Con 6.21.2 la bomba la frena el tope de memoria, con el mismo 400.
+- **Con 6.21.4:**
+  - 18 ROJO y rc=0, tanto en `c9e9a69c` como con el mismo resultado sobre `4db641b0`;
+  - el subconjunto de pruebas de PDF da «530 passed in 225.79s».
+
+## Suite, ataques y smoke
+
+| Puerta | Salida |
 |---|---|
-| `tests/test_cobro_corte1.py` | El caso de `surrogate` al guardar espera 400 y 0 operaciones. El commit que falla sólo falla si lo llama `main.py`: los commits de otros módulos pasan |
-| `tests/test_rendimiento1c.py`, `tests/test_rendimiento1d.py` | El `subprocess` corre con `cuenta_de_prueba("a")` y `cuenta_de_prueba("b")`, porque en el merge la ruta pide sesión |
-| `tests/test_datos1.py`, `tests/test_avisos2.py`, `tests/test_avisos1_seguro.py`, `tests/test_admin_bootstrap.py`, `tests/test_nombres1.py` | Como dicen las filas 6 a 9 de arriba |
-| `scripts/testing/sabotaje_org1.sh`, `scripts/testing/sabotaje_separadores1.sh` | El patrón sigue a `billing_service.plan_de_la_cuenta(org)["users"]` |
-| `tests/despacho1c_pantalla.js` | `getClienteActivo` y `setClienteActivo` usan `CDI.state.clienteActivo`; la falla sintética va en el getter de `banco_bcra` |
+| Suite completa, worktree limpio, `f7a45660` | `5907 passed, 110 skipped, 3 xfailed in 1446.16s (0:24:06)` |
+| `compileall -q proyecto_maria` | rc=0 |
+| Pruebas de PDF con pypdf 6.21.4, `4899fc51` | `530 passed in 225.79s` |
+| `ataque_aislamiento.sh`, `TMPDIR=/tmp`, Postgres real, `4899fc51` | «✅ Postgres listo», OK=47, FUGA=0, rc=0 |
+| `aislamiento2.sh ataque`, Postgres real, `4899fc51` | «sabotajes con falla: 0», 18 ROJO, rc=0 |
+| `smoke_friccion.sh`, `4899fc51` | `[FAIL] POST /api/ui/event`, rc=1. Es previo de MARIA (ver abajo) |
 
-Sobre `a4c97b4`, `nombres1.sh` dio ROTO en «el login prueba exacto y si no hay, sin distinguir mayúsculas»: `patrón no encontrado una sola vez (0)`. El login del merge viene de ABUSO-2 (MARIA), que sacó el comentario que usaba de ancla. En `0e51313` (sólo `scripts/testing/sabotajes/nombres1.sh`, +2/−4) el ancla es la línea siguiente del merge, `if not user and "@" in (username or ""):`. El sabotaje es el mismo. Da `sabotajes con falla: 0`, con los siete ROJO.
+**Hallazgo en los ataques**
+- Con `TMPDIR=/tmp/cdi-s1` el ataque no encuentra Postgres y pasa a SQLite sin fallar. Lo único que muestra es «⚠️ Sin Postgres: se usa SQLite temporal.».
+- El ataque de la vuelta 1 corrió así, sobre SQLite.
+- **Propuesta:** que el ataque falle cuando no hay Postgres, en lugar de seguir. No lo hice porque está fuera de la tarea.
 
-El de `test_cobro_corte1` mira quién llama al commit (`sys._getframe(1)`): es frágil si el commit se mueve de archivo, pero es sólo de pruebas y falla en rojo, no en verde.
+**El smoke**
+- ABUSO-1, de MARIA, descarta los eventos sin sesión que no están en la lista («Evento sin sesión no admitido» existe en `4db641b0`, no en `0d829b8a`). El smoke manda `smoke_wave1` sin sesión.
+- A mano, con `hero_cta_clicked`:
+  - `/api/ui/event` da `{"ok":true}`;
+  - `/api/session/state` da `{"ok":true}`;
+  - by-cuit da 401.
+- El smoke quedó viejo.
 
-## Previos (están igual en una de las ramas, no los trae el merge)
+## Revisiones
 
-Los arneses previos están en «Arneses de las dos ramas».
+**`/code-review` del merge `b9db0ad3`**
 
-| Qué | Dónde |
-|---|---|
-| `logger` sin definir | `main.py:8160` |
-| `uuid` importado dos veces | pyflakes, del merge de imports; no cambia conducta |
-| `buildMariaRequest` y `fotoDeLaPantalla` fuera del `try` | `finalize.js:716-717` |
-| `/api/organizations/create` sin tope por IP | el tope del registro no lo cubre |
-| Chequeo sin mayúsculas y unicidad de la base pueden correr a la vez | carrera conocida de NOMBRES-1 |
-| `tests/conftest.py` pone `ENVIRONMENT=testing` | no lo toco |
-| El repo es shallow | `git log` corta antes de la base en algunos archivos |
+| Fila | Clase | Nota |
+|---|---|---|
+| 1 | falso positivo | `efaef2b6` sacó `message` a propósito. El `detail` como dict está sólo en el 403 del login y en el 402 de clientes |
+| 2 | falso positivo | quien lo usa compara `err.code` |
+| 3, 4 | míos, anteriores (`efaef2b6`) | ya estaban antes del merge |
+| 5 | anterior en los dos padres | — |
+| 6 | mío, después del merge (`68e77ed6`) | es fragilidad, no un verde falso |
+| 7, 8, 9 | de MARIA (`a3abd929`, `ce7cd9dd`) | — |
+| 10 | del merge, `b9db0ad3` | menor: la lista se arma dos veces |
+
+**`/code-review` de esta vuelta**
+
+| Fila | Hallazgo | Estado |
+|---|---|---|
+| 1 | el login cuenta después de bcrypt | D146 |
+| 2 | `_commit_que_falla` | no es un defecto |
+| 3 | `_LIMITE_AVISOS_MP` es por worker | D147 |
+| 4 | `finalize.js` | riesgo bajo |
+| 5 | `import re` sin uso | arreglado en `d26d477b` |
+
+**`/security-review`**
+- Ningún hallazgo con confianza ≥ 8.
+- Lo que señaló lo verifiqué en el código: `main.py:11479`, `:2138` y `:2142`.
 
 ## chequeo-6
 
-El merge no suma avisos propios. Contra `4db641b` (lo que mi lado agrega encima de MARIA) da los mismos 7 avisos que mi rama sola contra la base (`30533fe..0d829b8`), y el neto de producto baja de 292 a 288. Esas líneas son las de mi rama (que trae la tuya), ya aceptadas pieza por pieza; el merge no agrega producto nuevo fuera de la resolución de los cinco choques. Los avisos de función y de comentario son los de esas piezas, ya informados en su entrega.
+- **Esta vuelta (`19036a2..4899fc51`):** producto +0/−2, 0 avisos.
+- **Contra MARIA (`4db641b0..4899fc51`):** da 7 AVISOs. Los siete vienen de piezas de dev-tecnica que ya entregué antes de esta vuelta:
+  - el producto suma 286 líneas netas;
+  - `try_extract_with_mapping` pasa de 309 a 312;
+  - hay dos comentarios de 4 líneas;
+  - la función anónima de `finalize.js:9` pasa de 1436 a 1469;
+  - `_instalar` tiene 96 líneas;
+  - `casosTardios` tiene 67 líneas.
+- Ninguno es de esta vuelta.
 
-Contra `0d829b8` da 109 avisos y +3825/−1077: es la rama de MARIA entera, no lo que hice yo, y no la copio acá.
-
-<details><summary>chequeo-6 4db641b..0e51313, el SHA subido (entero)</summary>
+<details><summary>Salida entera, esta vuelta</summary>
 
 ```
-chequeo-6 4db641b..0e51313: avisos para mirar, no un veredicto
-producto +727/−439
-  AVISO producto suma 288 líneas netas: el informe dice por qué (§6: más de 20)
-arnés +5761/−1018
+chequeo-6 19036a2..4899fc51: avisos para mirar, no un veredicto
+producto +0/−2
+arnés +49/−26
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/auth/roles.py: 27 → 26
-  proyecto_maria/database/models.py: 614 → 617
-  proyecto_maria/main.py: 12078 → 12213
-  AVISO creció una función de más de 150: proyecto_maria/main.py:5590 try_extract_with_mapping 309 → 312, 3 en su propio cuerpo (§6: lo nuevo va aparte)
-  AVISO comentario nuevo de 4 líneas: proyecto_maria/main.py:2143 (§6: una o dos)
-  proyecto_maria/security/file_security.py: 693 → 798
-  AVISO comentario nuevo de 4 líneas: proyecto_maria/security/file_security.py:363 (§6: una o dos)
-  proyecto_maria/services/billing_service.py: 407 → 418
-  proyecto_maria/static/v2/app_v2.js: 1199 → 1201
-  proyecto_maria/static/v2/screens/clientes.js: 2211 → 2211
-  proyecto_maria/static/v2/screens/finalize.js: 1444 → 1477
-  AVISO creció una función de más de 150: proyecto_maria/static/v2/screens/finalize.js:9 <anónima> 1436 → 1469, 6 en su propio cuerpo (§6: lo nuevo va aparte)
-  proyecto_maria/static/v2/screens/profile.js: 613 → 613
-  proyecto_maria/static/v2/screens/upload.js: 718 → 718
-  AVISO función nueva de 96 líneas: scripts/testing/conexiones1_sonda.py:59 _instalar (§6: ~60)
-  AVISO función nueva de 67 líneas: scripts/testing/pantalla_cobro_corte1.js:33 casosTardios (§6: ~60)
-avisos: 7
+  proyecto_maria/main.py: 12213 → 12211
+avisos: 0
 ```
 
 </details>
 
-<details><summary>chequeo-6 30533fe..0d829b8, mi rama sola, para comparar (entero)</summary>
+**Archivo de producto que toqué en esta vuelta:** `proyecto_maria/main.py`, en `d26d477b`.
 
-```
-chequeo-6 30533fe..0d829b8: avisos para mirar, no un veredicto
-producto +723/−431
-  AVISO producto suma 292 líneas netas: el informe dice por qué (§6: más de 20)
-arnés +5860/−669
-historia (grep de §6, sin líneas movidas): vacío
-archivos de producto:
-  proyecto_maria/auth/roles.py: 27 → 26
-  proyecto_maria/database/models.py: 570 → 573
-  proyecto_maria/main.py: 11237 → 11375
-  AVISO creció una función de más de 150: proyecto_maria/main.py:5161 try_extract_with_mapping 309 → 312, 3 en su propio cuerpo (§6: lo nuevo va aparte)
-  AVISO comentario nuevo de 4 líneas: proyecto_maria/main.py:1749 (§6: una o dos)
-  proyecto_maria/security/file_security.py: 691 → 796
-  AVISO comentario nuevo de 4 líneas: proyecto_maria/security/file_security.py:369 (§6: una o dos)
-  proyecto_maria/services/billing_service.py: 412 → 423
-  proyecto_maria/static/v2/app_v2.js: 1190 → 1192
-  proyecto_maria/static/v2/screens/clientes.js: 1984 → 1984
-  proyecto_maria/static/v2/screens/finalize.js: 1357 → 1391
-  AVISO creció una función de más de 150: proyecto_maria/static/v2/screens/finalize.js:9 <anónima> 1349 → 1383, 7 en su propio cuerpo (§6: lo nuevo va aparte)
-  proyecto_maria/static/v2/screens/profile.js: 587 → 587
-  proyecto_maria/static/v2/screens/upload.js: 718 → 718
-  AVISO función nueva de 96 líneas: scripts/testing/conexiones1_sonda.py:59 _instalar (§6: ~60)
-  AVISO función nueva de 67 líneas: scripts/testing/pantalla_cobro_corte1.js:33 casosTardios (§6: ~60)
-avisos: 7
-```
-
-</details>
-
-## Comandos para comprobarlo
-
-Sobre lo subido (`0e51313`; el informe no cambia código):
+## Comandos para reproducir
 
 ```bash
-git fetch origin claude/dev-tecnica && git checkout 0e51313
-# D140: el merge quedó con (a); cada padre hace una cosa distinta
-for s in 0e51313 0d829b8 4db641b; do git show $s:proyecto_maria/main.py | grep -A1 'if not MP_WEBHOOK_SECRET:' | tail -1; done
-#   return False / return False / return _es_desarrollo()
-# D141: las dos ramas le cambian client_id a una operación existente
-git show 0d829b8:proyecto_maria/main.py | sed -n 7600p; git show 4db641b:proyecto_maria/main.py | sed -n 8095p
-#   las dos:             client_id=client_id,
-python -m pytest -q --no-cov --timeout=120 -p no:cacheprovider -W ignore
-#   1 failed: test_entorno1.py::test_puerta_abierta_en_desarrollo[webhook_sin_secreto] (D140)
-python -m pytest -q --no-cov -p no:randomly tests/test_nombres1.py tests/test_prelaunch_block1.py tests/test_prelaunch_block3.py tests/test_punta_a_punta1.py
-#   132 passed, 2 xfailed
-python docs/pm/herramientas/chequeo-6.py 4db641b 0e51313
-#   avisos: 7, historia vacía, producto +727/−439
+git diff f7a45660 HEAD -- proyecto_maria tests scripts        # vacío: la suite vale para el SHA final
+git diff 19036a2 HEAD --stat -- proyecto_maria/               # sólo main.py, 2 líneas menos
+git show d26d477b -- proyecto_maria/main.py                   # se va el import re de register
+git log --oneline 30533fe4..4db641b0 -- proyecto_maria/config.py   # c8afa6ff: el chequeo de entorno de cobro_mp2 se mudó en MARIA
+grep -n "_textos_como_van_al_txt(request)" proyecto_maria/main.py  # el patrón nuevo de estudio1 y estudio1b
+TMPDIR=/tmp PUERTO=8791 ./scripts/testing/ataque_aislamiento.sh   # «✅ Postgres listo» y FUGA=0; con otro TMPDIR mirar que no diga «Sin Postgres»
 ```
 
-## No corrido
+## No corrido o sin cerrar
 
-- Sabotajes que el corredor no alcanzó: lo cortó el límite de 30 minutos de las tareas en segundo plano, y no entraban antes del corte. `cobro_mp1` quedó a medias: hasta donde llegó, la base dio verde, 107 ROJO y ningún ROTO ni FALLA. Los otros 56 no se corrieron: `cobro_mp2`, `cobro_mp3`, `cobro_mp4`, `conexiones1`, `csrf1`, `csrf2`, `csrf3`, `datos1`, `despacho1a`, `despacho1b`, `despacho1c`, `despacho1d`, `destino1`, `disco1`, `email1`, `entorno1`, `entorno2`, `entorno3`, `entorno4`, `entradas1`, `entradas2`, `entradas3`, `entradas4`, `estudio1`, `estudio1b`, `excel1`, `excel2`, `excel2b`, `excel2c`, `excel2d`, `excel3`, `foco_cliente1`, `front422`, `guardar1`, `guardar2`, `limpieza1`, `maria1b`, `observabilidad1`, `orden1`, `orden1b`, `org1`, `org1b`, `pa1`, `permisos1`, `permisos2`, `punta_a_punta1`, `rendimiento1`, `rendimiento1b`, `rendimiento1c`, `rendimiento1d`, `reset1`, `seguro1`, `seguro2`, `sesion1`, `sufijos2`, `validacion1`. Entre ellos están los de las piezas que el merge tocó en los dos lados (`entorno1`, `datos1`, `csrf1`, `csrf2`, `csrf3`, `permisos2`, `validacion1`). D140 ya dice que `entorno1` va a dar rojo en sus dos sabotajes del webhook.
-- `cobro_corte1.sh` entero sobre `6d13b43`: lo corté a los 30 minutos (la base y los sabotajes de pytest ya habían dado verde y ROJO). No llegó a los dos sabotajes de pantalla que estaban ROTO ni a los sabotajes del lock. Su patrón ahora aparece una vez en `finalize.js`.
-- `aislamiento2.sh ataque` y `ataque_aislamiento.sh`: usan el Postgres compartido, que tenían ocupado los arneses de cobro. No los corrí.
-- `smoke_friccion.sh`: no levanté el servidor para esta entrega.
-- `/code-review` y `/security-review` sobre el merge: no los corrí en esta vuelta. La revisión adversarial es la de arriba.
-- `claude/dev-maria` después de `4db641b` (`0231eee`): fuera del merge, como dice la tarea.
+- **despacho1b:** los 3 ROJO? de CPU no los reproduje. El arnés borra su tmp y no deja un log por sabotaje, y esa corrida fue en paralelo con cobro_mp2.
+- **sesion1:** no lo corrí sobre `4db641b0` solo. La clasificación sale de comparar el código, no de una corrida.
+- **rendimiento1b:** no repetí la corrida que murió por OOM.
+- **El código que el merge juntó solo** (sin conflicto) no lo leí línea por línea. Lo cubren la suite y los arneses.
+- **cobro_mp1:** no verifiqué si otro sabotaje cubre lo mismo que el ROTO (g).
+- **pypdf:** la suite completa no la repetí con 6.21.4; sólo el subconjunto de pruebas de PDF.
 
-/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. Dónde quedé al corte: INTEGRAR-1 entregada en 19036a2, sin aceptar (la PM la revisa después del corte). D140 (a): en la próxima vuelta cambio tests/test_entorno1.py y sabotajes/entorno1.sh, en commits separados. D141 y D143 son piezas para Emi: no las hago. No integro 0231eee hasta que la PM lo pida. Pendiente de INTEGRAR-1: los 56 arneses de «No corrido», cobro_mp1 entero y cobro_corte1.sh entero. Después, CONEXIONES-1 parte B, sin empezar. Corte 2026-11-09 05:00 UTC. Mis D van de la D140 a la D149, sin la D142; la próxima es la D144. Reglas de Emi: sólo la PM y Emi me piden, nada se publica sin su «dale» para el SHA, nunca main, sin secretos.
+/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. INTEGRAR-1 vuelta 2 entregada con este informe, encima de f9ec94e0; D144-D149 abiertas; pedí un rango de D nuevo. Sigue BORRADOR-1 (D143 a: el goTo tardío del arranque, 36aba873, pisa la navegación; tienen que quedar verdes cliente1, foco_cliente1, destino1 y despacho1a) y después CONEXIONES-1 parte B (lo que tenía a medio hacer está en el parche conexiones1_b_wip.patch del scratchpad). No integrar 0231eee. Rutina trig_011UpBfwEu9TUzoNUrviqoP5 /respondio cada 2 h, minuto 15.
