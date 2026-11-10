@@ -344,7 +344,8 @@ class TarifarClient:
             warnings.append("NCM no especificado")
         if valor_total_fob == 0:
             warnings.append("Valor FOB es cero")
-        if item.origen.upper() not in ["AR", "BR", "PY", "UY", "CN", "US", "DE", "IT", "ES"]:
+        from proyecto_maria.core.maria_generator import pais_reconocido
+        if not pais_reconocido(item.origen):
             warnings.append(f"País de origen '{item.origen}' no reconocido")
         if len(ncm_data.get("licencias", [])) > 0:
             licencias = [lic.get("codigo") for lic in ncm_data.get("licencias", [])]

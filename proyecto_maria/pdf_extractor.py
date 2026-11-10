@@ -542,6 +542,8 @@ def _llm_extract_pdf_items(text: str) -> list[dict]:
             print(f"⚠️ LLM devolvió {len(items_raw)} items, truncando a 2000")
             items_raw = items_raw[:2000]
 
+        from proyecto_maria.core.maria_generator import origen_valido
+
         out = []
         for it in items_raw:
             if not isinstance(it, dict):
@@ -570,9 +572,7 @@ def _llm_extract_pdf_items(text: str) -> list[dict]:
             cantidad = cantidad if cantidad > 0 else 1.0
             peso_unitario = peso_unitario if peso_unitario > 0 else 0.1
 
-            # origen: solo letras ISO, max 3
-            origen_raw = re.sub(r'[^A-Za-z]', '', str(it.get('origen') or ''))
-            origen = (origen_raw[:3] or 'XX').upper()
+            origen = origen_valido(str(it.get('origen') or '')) or 'XX'
 
             item = {
                 # Campos básicos

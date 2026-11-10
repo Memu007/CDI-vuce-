@@ -760,6 +760,26 @@ def pais_reconocido(pais) -> bool:
     return _normalizar_pais(pais) in _PAISES_NORM
 
 
+def origen_valido(texto) -> str | None:
+    """El origen como se guarda si es un país de la tabla (nombre o código); si no, None.
+    La forma se mira antes de normalizar: «ＢＲ» o «ÉS» pasarían como «BR» y «ES»."""
+    escrito = str(texto or "").strip()
+    if not escrito or unicodedata.normalize("NFKC", escrito) != unicodedata.normalize("NFC", escrito):
+        return None
+    if len(escrito) <= 2 and not (escrito.isascii() and escrito.isalpha()):
+        return None
+    if not pais_reconocido(escrito):
+        return None
+    return escrito.upper() if len(escrito) == 2 else escrito
+
+
+def clave_de_origen(origen) -> str:
+    """Con qué se comparan dos orígenes: «313», «TAIWAN» y «TW» son el mismo."""
+    if pais_reconocido(origen):
+        return str(get_pais_codigo(origen))
+    return str(origen or "").strip().upper()
+
+
 def pais_de_la_tabla(pais) -> bool:
     """Como `pais_reconocido`, pero un código numérico tiene que estar en la
     tabla oficial de la pantalla (MARIA-3, procedencia: «99999» no es un país)."""
@@ -1415,7 +1435,7 @@ def generate_maria_txt(operation_id: str, items: list,
         # Defensa en profundidad: el frontend lo valida, pero el endpoint de
         # generación también puede llamarse directamente.
         ncms = {str(it.get('ncm') or it.get('pieza') or '').replace('.', '').replace(' ', '').upper() for it in grupo_items}
-        origenes = {str(it.get('pais_origen') or it.get('origen') or '').strip().upper() for it in grupo_items}
+        origenes = {clave_de_origen(it.get('pais_origen') or it.get('origen')) for it in grupo_items}
         # Las unidades, por su código: «kg» y «KGS», o «1» y «01», son la misma.
         unidades = {get_unidad_codigo(it.get('unidad') or it.get('unidad_medida') or it.get('um')) for it in grupo_items}
         if any(it.get('subitems') for it in grupo_items):

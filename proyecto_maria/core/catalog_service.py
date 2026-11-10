@@ -80,8 +80,21 @@ def ncm_para_guardar(valor) -> str:
     return ncm
 
 
+def origen_para_guardar(valor) -> str:
+    """El origen como se guarda; "" si no hay. «XX» es el «sin origen» de la factura."""
+    origen = texto_para_guardar(valor, "El origen")
+    if not origen or origen.upper() == "XX":
+        return ""
+    # Import local: despacho_lector importa de este módulo.
+    from proyecto_maria.core.despacho_lector import origen_para_catalogo
+    guardado, problema = origen_para_catalogo(origen)
+    if problema:
+        raise ValueError(problema)
+    return guardado or ""
+
+
 # Patron valido para vendor_id (slug generado por _vendor_key).
-_VENDOR_ID_RE = re.compile(r"^[a-z0-9_]{1,60}$")
+_VENDOR_ID_RE = re.compile(r"^[a-z0-9_~]{1,60}$")
 
 
 def is_valid_vendor_id(vendor_id: str) -> bool:
@@ -105,19 +118,55 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _sufijo(texto: str) -> str:
+    """Resumen de las letras y cifras que _normalize descarta (CJK, ancho
+    completo): sin él, «电线 2mm» y «钢管 2mm» comparten clave."""
+    fuera = "".join(
+        c for c in unicodedata.normalize("NFC", texto)
+        if unicodedata.category(c)[0] == "L" or unicodedata.category(c) == "Nd"
+        if not _normalize(c) and not unicodedata.name(c, "").startswith("LATIN")
+    )
+    if not fuera:
+        return ""
+    return hashlib.sha256(fuera.casefold().encode("utf-8", "surrogatepass")).hexdigest()[:16]
+
+
 def clave_de_producto(descripcion: str) -> str:
     """Clave del producto en el catálogo. Lo que normaliza a vacío (CJK, emoji) usa
     un resumen del texto: entra en el índice único y «~» no sale de _normalize."""
     clave = _normalize(descripcion)
+    sufijo = _sufijo(descripcion) if clave else ""
     if clave:
-        return clave
+        return f"{clave}~{sufijo}" if sufijo else clave
     texto = " ".join(unicodedata.normalize("NFC", descripcion).lower().split())
     return "~" + hashlib.sha256(texto.encode("utf-8", "surrogatepass")).hexdigest()[:40]
 
 
+def parecido(clave_a: str, clave_b: str) -> float:
+    """Parecido entre dos claves de producto: con letras no latinas distintas
+    no se parecen, aunque compartan el resto."""
+    if clave_a == clave_b:
+        return 1.0
+    base_a, _, sufijo_a = clave_a.partition("~")
+    base_b, _, sufijo_b = clave_b.partition("~")
+    if sufijo_a != sufijo_b:
+        return 0.0
+    return _similarity(base_a, base_b)
+
+
+_MAX_VENDOR_ID = 60
+
+
 def _vendor_key(vendor_name: str) -> str:
-    """Genera la clave del proveedor (slug)."""
-    return re.sub(r"\s+", "_", _normalize(vendor_name))[:60]
+    """Clave del proveedor; "" si el nombre no tiene nada. Si no entra en 60,
+    el final es un resumen del total: dos nombres largos parecidos no se pisan."""
+    nombre = (vendor_name or "").replace("\x00", "").strip()
+    if not nombre:
+        return ""
+    clave = clave_de_producto(nombre).replace(" ", "_")
+    if len(clave) <= _MAX_VENDOR_ID:
+        return clave
+    return clave[:39] + "~" + hashlib.sha256(clave.encode("utf-8")).hexdigest()[:20]
 
 
 # Stop-words minimas (ES + EN + PT)
@@ -217,7 +266,7 @@ async def get_vendor(
 ) -> Optional[dict]:
     """Retorna el catalogo del proveedor por nombre (slug por dentro)."""
     vendor_id = _vendor_key(vendor_name)
-    rows = await _fetch_vendor_rows(db, owner_username, vendor_id)
+    rows = await _fetch_vendor_rows(db, owner_username, vendor_id) if vendor_id else []
     if not rows:
         return None
     nombre = rows[0].vendor_nombre or vendor_name
@@ -284,7 +333,7 @@ async def match_items(
     vendor_nombre, items_matched, tasa_reconocimiento, items_nuevos.
     """
     vendor_id = _vendor_key(vendor_name)
-    rows = await _fetch_vendor_rows(db, owner_username, vendor_id)
+    rows = await _fetch_vendor_rows(db, owner_username, vendor_id) if vendor_id else []
 
     vendor_known = bool(rows)
     vendor_nombre = (rows[0].vendor_nombre if rows else vendor_name) or vendor_name
@@ -324,7 +373,7 @@ async def match_items(
             best_score = 0.0
             best_key = None
             for prod_key in productos.keys():
-                score = _similarity(desc, prod_key)
+                score = parecido(desc_key, prod_key)
                 if score > best_score:
                     best_score = score
                     best_key = prod_key
@@ -369,9 +418,22 @@ def _producto_valido(prod) -> Optional[tuple]:
     if not desc:
         return None
     ncm = ncm_para_guardar(prod.get("ncm")) or ncm_para_guardar(prod.get("pieza"))
-    origen = texto_para_guardar(prod.get("origen"), "El origen")
+    origen = origen_para_guardar(prod.get("origen"))
     unidad = texto_para_guardar(prod.get("unidad_medida"), "La unidad")
     return desc, ncm, origen, unidad, _precio(prod.get("valor_unitario"))
+
+
+def _producto_del_lote(numerado: tuple) -> Optional[tuple]:
+    """_producto_valido con el número y la descripción en el error, para que la
+    pantalla diga qué producto no se pudo aprender."""
+    n, prod = numerado
+    try:
+        return _producto_valido(prod)
+    except ValueError as e:
+        desc = prod.get("descripcion") if isinstance(prod, dict) else None
+        desc = desc.replace("\x00", "").strip() if isinstance(desc, str) else ""
+        cual = f" («{desc[:60]}»)" if desc and not _MEDIO_PAR.search(desc) else ""
+        raise ValueError(f"Producto {n}{cual}: {e}") from None
 
 
 def _precio(valor) -> Optional[float]:
@@ -407,8 +469,10 @@ async def save_products(
 
     vendor_name = texto_para_guardar(vendor_name, "El proveedor")
     vendor_id = _vendor_key(vendor_name)
+    if not vendor_id:
+        raise ValueError("Falta el nombre del proveedor.")
     # Todo el lote se valida antes de escribir: uno malo no deja la mitad guardada.
-    validos = [p for p in map(_producto_valido, productos_in) if p]
+    validos = [p for p in map(_producto_del_lote, enumerate(productos_in, 1)) if p]
 
     saved = 0
     updated = 0
@@ -512,8 +576,10 @@ async def update_product(
     # None es «no cambia»; todos los textos se validan antes de tocar la fila.
     textos = {campo: texto_para_guardar(updates.get(campo), que) for campo, que in (
         ("descripcion_original", "La descripción"),
-        ("origen", "El origen"), ("unidad_medida", "La unidad"),
+        ("unidad_medida", "La unidad"),
     ) if updates.get(campo) is not None}
+    if updates.get("origen") is not None:
+        textos["origen"] = origen_para_guardar(updates["origen"])
     if updates.get("ncm") is not None:
         textos["ncm"] = ncm_para_guardar(updates["ncm"])
 

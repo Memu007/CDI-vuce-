@@ -1305,7 +1305,7 @@ async def _migrate_widen_pieza_column():
 
 
 async def _migrate_catalogo_sin_tope():
-    """Lleva a text las columnas del catálogo y el origen de la memoria del cliente. Si falla, el
+    """Lleva a text las columnas del catálogo y los orígenes de la memoria y de los ítems. Si falla, el
     arranque se detiene: con el tope viejo, guardar-uso respondería sin guardar."""
     from proyecto_maria.database.connection import engine, IS_SQLITE
 
@@ -1314,11 +1314,14 @@ async def _migrate_catalogo_sin_tope():
     # Una tabla por transacción: guardar-uso escribe las dos en el orden
     # contrario, y tomarlas juntas puede trabarse con él.
     for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "origen", "vendor_nombre")),
-                            ("client_product_history", ("origen_frecuente",))):
+                            ("client_product_history", ("origen_frecuente",)),
+                            ("operation_items", ("origen",))):
         async with engine.begin() as conn:
             # Si otra conexión tiene tomada la tabla, falla rápido y el reinicio
             # lo vuelve a intentar, en vez de colgar el arranque.
             await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
+            # Con dos workers a la vez, el segundo espera y ya no encuentra nada que cambiar.
+            await conn.exec_driver_sql("SELECT pg_advisory_xact_lock(7302551)")
             res = await conn.exec_driver_sql(
                 "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() "
                 f"AND table_name = '{tabla}' AND column_name IN ({', '.join(repr(c) for c in columnas)}) "
@@ -1332,39 +1335,45 @@ async def _migrate_catalogo_sin_tope():
 
 
 async def _migrate_catalogo_claves():
-    """Da la clave de hoy a las filas sin letras ni números latinos que tienen
-    otra: guardarlas de nuevo buscaría por la de hoy y armaría una segunda fila."""
+    """Da el proveedor y la clave de hoy a las filas que tienen otros: guardarlas
+    de nuevo buscaría por los de hoy y armaría una segunda fila."""
     from sqlalchemy import text
     from proyecto_maria.core import catalog_service as catalog_svc
     from proyecto_maria.database.connection import engine, IS_SQLITE
 
-    sin_latinas = "NOT GLOB '*[A-Za-z0-9]*'" if IS_SQLITE else "!~ '[A-Za-z0-9]'"
+    # Sólo cambian las filas con algo fuera de ASCII, sin proveedor o con el
+    # proveedor recortado a 60.
+    no_ascii = "GLOB '*[^ -~]*'" if IS_SQLITE else "~ '[^ -~]'"
     try:
         async with engine.begin() as conn:
             if not IS_SQLITE:
                 await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
+                # Dos workers que arrancan juntos: el segundo espera y no encuentra nada.
+                await conn.exec_driver_sql("SELECT pg_advisory_xact_lock(7302551)")
             res = await conn.execute(text(
-                "SELECT id, descripcion, product_key FROM vendor_catalog_products "
-                f"WHERE descripcion {sin_latinas} AND descripcion <> '' AND product_key NOT LIKE '~%'"
+                "SELECT id, vendor_id, vendor_nombre, product_key, descripcion FROM vendor_catalog_products "
+                f"WHERE descripcion {no_ascii} OR COALESCE(vendor_nombre, '') {no_ascii} "
+                "OR vendor_id = '' OR length(vendor_id) >= 60 ORDER BY id"
             ))
             movidas = choques = 0
-            for fila_id, descripcion, clave in res.fetchall():
-                nueva = catalog_svc.clave_de_producto(descripcion)
-                if nueva == clave or not nueva.startswith("~"):
+            for fila_id, vendor_id, nombre, clave, descripcion in res.fetchall():
+                nuevo = catalog_svc._vendor_key(nombre or "") or vendor_id or "~sin_nombre"
+                nueva = catalog_svc.clave_de_producto(descripcion) if descripcion else clave
+                if (nuevo, nueva) == (vendor_id, clave):
                     continue
-                # Si la clave nueva ya es de otra fila del mismo proveedor, quedan las dos.
+                # Si ya hay otra fila con ese proveedor y esa clave, quedan las dos.
                 hecho = await conn.execute(text(
-                    "UPDATE vendor_catalog_products SET product_key = :nueva WHERE id = :id AND NOT EXISTS ("
-                    "SELECT 1 FROM vendor_catalog_products o WHERE o.owner_username = "
-                    "vendor_catalog_products.owner_username AND o.vendor_id = vendor_catalog_products.vendor_id "
-                    "AND o.product_key = :nueva)"
-                ), {"nueva": nueva, "id": fila_id})
+                    "UPDATE vendor_catalog_products SET vendor_id = :nuevo, product_key = :nueva "
+                    "WHERE id = :id AND NOT EXISTS (SELECT 1 FROM vendor_catalog_products o "
+                    "WHERE o.owner_username = vendor_catalog_products.owner_username "
+                    "AND o.vendor_id = :nuevo AND o.product_key = :nueva AND o.id <> :id)"
+                ), {"nuevo": nuevo, "nueva": nueva, "id": fila_id})
                 if hecho.rowcount:
                     movidas += 1
                 else:
                     choques += 1
         if movidas or choques:
-            print(f"✅ Migracion: {movidas} claves del catálogo al día, {choques} quedan por un choque")
+            print(f"✅ Migracion: {movidas} filas del catálogo al día, {choques} quedan por un choque")
     except Exception as mig_err:
         print(f"⚠️ Migracion claves del catálogo (no critica): {mig_err!r}")
 
@@ -3770,7 +3779,7 @@ async def create_manual_operation(
     items = [dict(
         pieza=_guardable_en_pg(str(it.get("pieza", "") or ""))[:20],
         descripcion=_guardable_en_pg(str(it.get("descripcion", "") or "")),
-        origen=_guardable_en_pg(str(it.get("origen", "") or "XX")).upper()[:3],
+        origen=_guardable_en_pg(str(it.get("origen", "") or "XX")).upper(),
         cantidad=_numero_de_afuera(it.get("cantidad"), "La cantidad"),
         valor_unitario=_numero_de_afuera(it.get("valor_unitario"), "El valor unitario"),
         peso_unitario=_numero_de_afuera(it.get("peso_unitario"), "El peso unitario"),
@@ -8174,7 +8183,7 @@ async def save_client_operation(
                     descripcion=str(item.get("descripcion") or ""),
                     # Lo que falta queda vacío (0 o ""): nada de cantidad 1,
                     # peso 0,5 ni origen «XX» inventados (MARIA-1b, D6 Dev 2).
-                    origen=str(item.get("origen") or "")[:3],
+                    origen=str(item.get("origen") or ""),
                     cantidad=_numero_de_afuera(item.get("cantidad"), "La cantidad"),
                     valor_unitario=_numero_de_afuera(item.get("valor_unitario"), "El valor unitario"),
                     peso_unitario=_numero_de_afuera(item.get("peso_unitario"), "El peso unitario"),
@@ -8287,7 +8296,8 @@ async def agrupar_items(
 
     # Validar mismo NCM, origen y unidad
     ncms = {it.pieza for it in items}
-    origenes = {it.origen for it in items}
+    from proyecto_maria.core.maria_generator import clave_de_origen
+    origenes = {clave_de_origen(it.origen) for it in items}
     unidades = {(it.unidad if hasattr(it, 'unidad') else None) for it in items}
 
     if len(ncms) > 1:
@@ -8298,7 +8308,7 @@ async def agrupar_items(
     if len(origenes) > 1:
         raise HTTPException(
             status_code=400,
-            detail=f"Los ítems tienen orígenes distintos: {', '.join(sorted(origenes))}. Todos deben tener el mismo origen.",
+            detail=f"Los ítems tienen orígenes distintos: {', '.join(sorted({it.origen or '' for it in items}))}. Todos deben tener el mismo origen.",
         )
     if len(unidades) > 1:
         raise HTTPException(
@@ -8413,12 +8423,17 @@ async def get_client_metrics(
                 OperationItemModel.origen != "",
             )
             .group_by(OperationItemModel.origen)
-            .order_by(sa_desc("n"))
-            .limit(1)
+            .order_by(sa_func.count(OperationItemModel.id).desc(), OperationItemModel.origen)
         )
-        top = orig_rows.first()
-        if top:
-            origen_frecuente = str(top.origen or "-")
+        # «CHINA» y «CN» son el mismo país: se suman antes de elegir, y lo
+        # nombra la forma más usada (el orden de la consulta la pone primero).
+        from proyecto_maria.core.maria_generator import clave_de_origen
+        por_pais: dict[str, list] = {}
+        for origen, n in orig_rows.all():
+            cuenta = por_pais.setdefault(clave_de_origen(origen), [0, origen])
+            cuenta[0] += n
+        if por_pais:
+            origen_frecuente = str(max(por_pais.values(), key=lambda c: c[0])[1] or "-")
 
     return {
         "total_operaciones": total_ops,
@@ -10128,7 +10143,7 @@ def _ncm_recordado_con_sim_del_proveedor(recordado: dict, del_proveedor) -> str:
     de la factura (cada memoria busca por parecido por su lado)."""
     from proyecto_maria.core import catalog_service as catalog_svc
     if (not del_proveedor or not del_proveedor.get("producto_key")
-            or del_proveedor["producto_key"] != catalog_svc._normalize(recordado.get("descripcion") or "")):
+            or del_proveedor["producto_key"] != catalog_svc.clave_de_producto(recordado.get("descripcion") or "")):
         return recordado["ncm"]
     return _ncm_del_cliente_o_sim_del_proveedor(recordado["ncm"], del_proveedor.get("ncm"))
 
@@ -10443,7 +10458,7 @@ async def guardar_uso_ncm(
         descripcion = catalog_svc.texto_para_guardar(data.get("descripcion"))
         ncm = catalog_svc.texto_para_guardar(data.get("ncm"), "El NCM")
         vendor_name = catalog_svc.texto_para_guardar(data.get("vendor_name"), "El proveedor")
-        origin = catalog_svc.texto_para_guardar(data.get("origen"), "El origen")
+        origin = catalog_svc.origen_para_guardar(data.get("origen"))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not descripcion or not ncm:

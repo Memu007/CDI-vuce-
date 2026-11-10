@@ -280,7 +280,7 @@ class OperationItem(Base):
 
     pieza = Column(String(20), nullable=False)  # NCM code (8 digitos + 3 SIM + letra)
     descripcion = Column(Text, nullable=False)
-    origen = Column(String(3), nullable=False)
+    origen = Column(Text, nullable=False)
     cantidad = Column(Float, nullable=False)
     valor_unitario = Column(Float, nullable=False)
     peso_unitario = Column(Float, nullable=False)

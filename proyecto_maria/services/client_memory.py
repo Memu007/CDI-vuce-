@@ -32,7 +32,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database.models import ClientProductHistory
-from ..core.catalog_service import _MEDIO_PAR, AVISO_MEDIO_PAR, _normalize, _similarity, validar_largo  # reuso de normalizador
+from ..core.catalog_service import _MEDIO_PAR, AVISO_MEDIO_PAR, _normalize, clave_de_producto, parecido, validar_largo
 
 FUZZY_THRESHOLD = 0.80
 # Lo que se guarda como promedio: más grande no es un valor de verdad.
@@ -272,7 +272,7 @@ async def lookup_client_memory(
     if not client_id or not owner_username or not descripcion:
         return None
 
-    desc_norm = _norm_desc(descripcion)
+    clave = clave_de_producto(descripcion)
     q = sa_select(ClientProductHistory).where(
         ClientProductHistory.owner_username == owner_username,
         ClientProductHistory.client_id == client_id,
@@ -283,7 +283,7 @@ async def lookup_client_memory(
     best_score = 0.0
     best_row: Optional[ClientProductHistory] = None
     for row in candidates:
-        score = _similarity(desc_norm, row.descripcion_normalizada or "")
+        score = parecido(clave, clave_de_producto(row.descripcion or ""))
         if score > best_score:
             best_score = score
             best_row = row

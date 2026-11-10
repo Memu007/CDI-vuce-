@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-09 · fix: el catálogo y la memoria no mezclan proveedores ni productos en chino, y el origen se guarda entero (CATALOGO-3)
+
+- Un proveedor con nombre sólo en chino, emoji o con los mismos 60 primeros caracteres que otro ya no comparte catálogo; «电线 2mm» y «钢管 2mm» son dos productos. Las filas viejas se migran al arrancar sin perder ninguna.
+- El origen vale si es un país reconocido, por nombre o código, y se guarda tal cual: «TAIWAN» ya no queda como «TAI» (310). Cuando el catálogo rechaza un producto, la pantalla dice cuál.
+
 ## 2026-11-09 · chore: bcrypt queda fijado en 5.0.0 (D102)
 
 - Una instalación nueva no puede traer una bcrypt 4.x, que compara sólo los primeros 72 bytes de la clave: con ella, en el login entraría una clave más larga que empieza igual que la verdadera.
