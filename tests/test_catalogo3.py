@@ -10,6 +10,7 @@ import hashlib
 import inspect
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -116,6 +117,23 @@ def test_la_memoria_del_cliente_usa_la_misma_clave(client):
     assert (_lookup("电线 2mm")["source"], _lookup("电线 2mm")["ncm"]) == ("cliente", NCM)
     otro = _lookup("钢管 2mm")
     assert (otro["source"], otro["ncm"]) == ("ninguno", None), otro
+
+
+def test_un_pedido_calcula_la_clave_de_cada_fila_una_sola_vez(client):
+    cid = _cliente(client)
+    filas = [f"Cable 电线 {i}mm" for i in range(12)]
+    for desc in filas:
+        r = client.post("/api/ncm/guardar-uso", json={
+            "descripcion": desc, "ncm": NCM, "vendor_name": VENDOR, "client_id": cid})
+        assert r.status_code == 200, r.text
+    catalog_service.clave_de_producto.cache_clear()
+    items = [{"descripcion": f"Tubo 钢管 {i}"} for i in range(10)]
+    with patch.object(catalog_service, "_clave", wraps=catalog_service._clave) as clave:
+        r = client.post("/api/catalog/lookup", json={
+            "items": items, "vendor_name": VENDOR, "client_id": cid})
+    assert r.status_code == 200, r.text
+    # Más uno por el nombre del proveedor.
+    assert clave.call_count <= len(filas) + len(items) + 1
 
 
 @pytest.mark.parametrize("guardado, buscado, como", [
@@ -430,15 +448,24 @@ def _sufijo_lento(texto):
 
 def _compatible_lento(texto):
     return unicodedata.normalize("NFC", "".join(
-        c if c in "ºª" or unicodedata.category(c)[0] == "S" else unicodedata.normalize("NFKC", c)
-        for c in texto))
+        c if c in "ºª№™℠" else unicodedata.normalize("NFKC", c) for c in texto))
+
+
+def _al_azar(cuantos):
+    azar = random.Random(7)
+    tramos = [(0x20, 0x7e), (0xa0, 0x24f), (0x300, 0x36f), (0x370, 0x3ff), (0x2100, 0x218f),
+              (0x3040, 0x30ff), (0x3300, 0x33ff), (0x4e00, 0x4e40), (0xff01, 0xffef)]
+    extra = "ºª№™℠㎜℃㎖"
+    return ["".join(azar.choice(extra) if azar.random() < 0.1 else chr(azar.randint(*azar.choice(tramos)))
+                    for _ in range(azar.randint(1, 40))) for _ in range(cuantos)]
 
 
 def test_acelerar_no_cambia_ninguna_clave():
     textos = ["", " ", "TORNILLO M8 x 20", "Tornillo  m8\tx20", "Ñandú ÉSPÁRRAGO çà", "Nº1 ª º µ ß ÿ",
               "螺丝 M8", "电线", "Ｂｏｌｔ １２", "ｶﾞｽ", "🔩 bolt", "Bolt™ ©", "ǅ ǈ Ⅻ ①", "Ωmega Σ", "ɐ ʼn",
-              "á̧", "\ud800x", "x" * 2000, "Tornillo acero inoxidable " * 20, "螺丝" * 300]
-    for t in textos:
+              "á̧", "\ud800x", "x" * 2000, "Tornillo acero inoxidable " * 20, "螺丝" * 300,
+              "Tubo 10㎜ 5℃", "N№º\u0301 ™℠ ﾈｼﾞ ｶﾞｽ" * 50, "º\u0301ª\u0327", "e℠\u0301"]
+    for t in textos + _al_azar(3000):
         assert catalog_service._normalize(t) == _normalize_lento(t), t
         assert catalog_service._sufijo(t) == _sufijo_lento(t), t
         assert catalog_service._compatible(t) == _compatible_lento(t), t
