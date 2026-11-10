@@ -246,3 +246,15 @@ def test_el_estimador_de_tarifar_reconoce_el_pais_igual_que_el_catalogo(origen, 
     r = CLIENT._calcular_item_individual({"ncm": NCM, "descripcion": "Tornillo", "cantidad": 1,
                                           "valor_unitario": 1, "peso_unitario": 1, "origen": origen})
     assert any("no reconocido" in w for w in r.warnings) is avisa, r.warnings
+
+
+def test_un_origen_de_miles_de_cifras_no_rompe_los_avisos_ni_el_txt(client):
+    from tests.test_maria7_rechazos_24_10 import LONA, _registrar_con_cuit
+    from tests.test_valor1 import _pedido_con
+    _registrar_con_cuit(client, "catalogo3_cifras")
+    pedido = _pedido_con([LONA])
+    pedido["items"][0]["origen"] = "1" * 5000
+    r = client.post("/generate_maria/avisos", json=pedido)
+    assert r.status_code == 200, r.text[:300]
+    r = client.post("/generate_maria", json=pedido)
+    assert r.status_code == 400 and "Origen no reconocido" in r.text, r.text[:300]
