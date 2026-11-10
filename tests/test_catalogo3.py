@@ -131,11 +131,12 @@ def test_la_migracion_separa_los_proveedores_y_los_productos_mezclados(client):
     owner = _dueno(_cliente(client))
     filas = [("深圳甲有限公司 Co., Ltd", "TORNILLO"), ("广州乙有限公司 Co., Ltd", "TUERCA"),
              ("深圳甲", "ARANDELA"), ("Proveedor sintetico", "电线 2mm"),
-             ("Proveedor sintetico", "钢管 2mm")]
+             ("Proveedor sintetico", "螺丝 3mm"), ("Proveedor sintetico", "钢管 2mm")]
     for vendor, desc in filas:
         assert _guardar(client, vendor, desc).status_code == 200
     viejo = {"TORNILLO": ("co_ltd", "tornillo"), "TUERCA": ("co_ltd", "tuerca"),
-             "ARANDELA": ("", "arandela"), "电线 2mm": ("proveedor_sintetico", "2mm")}
+             "ARANDELA": ("", "arandela"), "电线 2mm": ("proveedor_sintetico", "2mm"),
+             "螺丝 3mm": ("proveedor_sintetico", "3mm")}
     for desc, (vid, key) in viejo.items():
         _escribir("update vendor_catalog_products set vendor_id=:v, product_key=:k "
                   "where owner_username=:o and descripcion=:d", v=vid, k=key, o=owner, d=desc)
@@ -150,7 +151,7 @@ def test_la_migracion_separa_los_proveedores_y_los_productos_mezclados(client):
     primera = _ids(owner)
     _migrar()
     assert _ids(owner) == primera
-    esperado = {d: (catalog_service._vendor_key(v), catalog_service.clave_de_producto(d)) for v, d in filas[:4]}
+    esperado = {d: (catalog_service._vendor_key(v), catalog_service.clave_de_producto(d)) for v, d in filas[:-1]}
     esperado["SIN NOMBRE"] = ("~sin_nombre", "sin nombre")
     hechas = {d: (v, k) for v, k, d in primera if k != "2mm"}
     assert hechas == esperado

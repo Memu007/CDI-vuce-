@@ -22,8 +22,9 @@ export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
 FALLAS=0
 T=tests/test_catalogo3.py
 B=tests/test_despacho1b.py::test_cambiar_el_origen_valida_igual_que_guardar
+A=tests/test_despacho1b.py::test_cambiar_el_origen_guarda_el_codigo_en_mayusculas
 D=tests/test_despacho1c.py::test_el_aviso_del_catalogo_nombra_el_producto_que_no_se_aprendio
-PRUEBA=("$PY" -m pytest -q --no-cov -p no:cacheprovider "$T" "$B" "$D")
+PRUEBA=("$PY" -m pytest -q --no-cov -p no:cacheprovider "$T" "$B" "$A" "$D")
 
 # sabotaje <archivo> <nombre> <texto original> <texto saboteado> <lo que el rojo tiene que decir>
 sabotaje() {
@@ -117,7 +118,7 @@ sabotaje $G "el criterio vuelve a recortar a 3" \
 sabotaje $G "el ancho completo vuelve a pasar" \
   'if not escrito or unicodedata.normalize("NFKC", escrito) != escrito:' \
   'if not escrito:' \
-  "FAILED $B[ancho completo]"
+  "FAILED $B[nombre ancho completo]"
 sabotaje $G "«ÉS» vuelve a pasar como «ES»" \
   'if len(escrito) <= 2 and not (escrito.isascii() and escrito.isalpha()):' \
   'if False:' \
@@ -125,7 +126,7 @@ sabotaje $G "«ÉS» vuelve a pasar como «ES»" \
 sabotaje $G "«É» con el acento aparte vuelve a pasar" \
   'escrito = unicodedata.normalize("NFC", str(texto or "")).strip()' \
   'escrito = str(texto or "").strip()' \
-  "FAILED $B[acento aparte]"
+  "FAILED $A[acento aparte]"
 sabotaje $G "un código de miles de cifras vuelve a dar 500" \
   're.fullmatch(r"[0-9]{1,4}", texto)' \
   're.fullmatch(r"[0-9]+", texto)' \
@@ -157,7 +158,7 @@ sabotaje $M "el origen frecuente vuelve a contar la forma" \
 sabotaje proyecto_maria/core/tarifar_connector.py "el estimador vuelve a pedir dos letras" \
   'if not pais_reconocido(item.origen):' \
   'if len(item.origen or "") != 2:' \
-  "FAILED $T::test_el_estimador_de_tarifar_reconoce_el_pais_igual_que_el_catalogo[TAIWAN]"
+  "FAILED $T::test_el_estimador_de_tarifar_reconoce_el_pais_igual_que_el_catalogo[TAIWAN-False]"
 # D84: el error nombra el producto
 sabotaje $C "el 400 vuelve a no nombrar el producto" \
   'raise ValueError(f"Producto {n}{cual}: {e}") from None' \

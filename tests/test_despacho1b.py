@@ -2170,6 +2170,7 @@ def test_confirmar_algo_que_no_es_un_ncm_da_400_y_no_guarda_nada(auth_override, 
     (["a"], "El origen tiene que ser el nombre o el código del país."),
     (12, "El origen tiene que ser el nombre o el código del país."),
     ("ＢＲ", "No reconozco el origen «ＢＲ»: usá el nombre o el código del país."),
+    ("ＣＨＩＮＡ", "No reconozco el origen «ＣＨＩＮＡ»: usá el nombre o el código del país."),
     ("ÉS", "No reconozco el origen «ÉS»: usá el nombre o el código del país."),
     ("XYZ", "No reconozco el origen «XYZ»: usá el nombre o el código del país."),
     ("99999", "No reconozco el origen «99999»: usá el nombre o el código del país."),
@@ -2180,7 +2181,7 @@ def test_confirmar_algo_que_no_es_un_ncm_da_400_y_no_guarda_nada(auth_override, 
     ("ß", "No reconozco el origen «ß»: usá el nombre o el código del país."),
     ("E\u0301S", "No reconozco el origen «E\u0301S»: usá el nombre o el código del país."),
     ("1" * 5000, "No reconozco el origen «" + "1" * 5000 + "»: usá el nombre o el código del país."),
-], ids=["lista", "numero", "ancho completo", "acento", "tres letras", "numeros", "pais que no existe",
+], ids=["lista", "numero", "ancho completo", "nombre ancho completo", "acento", "tres letras", "numeros", "pais que no existe",
         "i sin punto", "ligadura", "ese aguda", "acento aparte", "cifras de mas"])
 def test_cambiar_el_origen_valida_igual_que_guardar(auth_override, client, origen, detalle):
     cid = _crear_cliente(client)
@@ -2192,8 +2193,9 @@ def test_cambiar_el_origen_valida_igual_que_guardar(auth_override, client, orige
     assert _catalogo(client, cid) == antes
 
 
-@pytest.mark.parametrize("origen, guardado", [(" br ", "BR"), ("B\x00R", "BR"), ("", "XX"), (None, "XX")],
-                         ids=["minusculas", "nul", "vacio", "nulo"])
+@pytest.mark.parametrize("origen, guardado", [(" br ", "BR"), ("B\x00R", "BR"), ("", "XX"), (None, "XX"),
+                                               ("ESPAN\u0303A", "ESPAÑA")],
+                         ids=["minusculas", "nul", "vacio", "nulo", "acento aparte"])
 def test_cambiar_el_origen_guarda_el_codigo_en_mayusculas(auth_override, client, origen, guardado):
     cid = _crear_cliente(client)
     pid = _provisorio(client, cid)
