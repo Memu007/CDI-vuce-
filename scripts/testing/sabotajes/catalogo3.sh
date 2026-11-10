@@ -144,8 +144,8 @@ sabotaje $G "«Ñ» con la tilde aparte vuelve a pasar" \
   'escrito = str(texto or "").strip()' \
   "FAILED $A[acento aparte]"
 sabotaje $G "un código de miles de cifras vuelve a dar 500" \
-  're.fullmatch(r"[0-9]{1,4}", texto)' \
-  're.fullmatch(r"[0-9]+", texto)' \
+  'm = re.fullmatch(r"0?([0-9]{3})(?:' \
+  'm = re.fullmatch(r"0?([0-9]+)(?:' \
   "FAILED $B[cifras de mas]"
 sabotaje $G "get_pais_codigo vuelve a hacer int() de cualquier tira de cifras" \
   're.fullmatch(r"[0-9]{1,4}", str(pais).strip())' \
