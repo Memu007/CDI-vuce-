@@ -3,28 +3,43 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Tarea activa: INTEGRAR-1 vuelta 2, terminar lo no corrido (2026-11-09 PM)
+## INTEGRAR-1: aceptada sobre `4555f7c4` e integrada (2026-11-10 13:45 UTC)
 
-Emi retomó el 09/11 19:59 UTC sin hora de corte. INTEGRAR-1 sigue recibida en
-`19036a2`, sin aceptar. Antes de que yo la revise, cerrala vos, sobre un solo
-SHA final y con un solo informe:
+Evidencia: `docs/pm/REPRODUCCION-INTEGRAR-1-2026-11-10.md`. Suite igual a la
+tuya (5907 passed), ataques 47/0, migraciones con datos viejos y doble
+arranque limpios, cuatro sabotajes míos en rojo y el g de `cobro_mp1` con el
+patrón al día en rojo. Integré exactamente `4555f7c4`. No es un SHA para
+publicar: los dos adversarios encontraron cosas que se arreglan en piezas de
+MARIA (el link que sobrevive al pase de cliente por `operacion_id`, que es tu
+fila 3, y el arnés de pantalla del 402, que quedó con el contrato viejo).
 
-1. **D140 (a)**: el webhook sin `MP_WEBHOOK_SECRET` se rechaza en cualquier
-   entorno. Cambiá `tests/test_entorno1.py` y `sabotajes/entorno1.sh` en
-   commits separados (producto, pruebas).
-2. Todo lo de «No corrido»: los 56 arneses, `cobro_mp1` y `cobro_corte1.sh`
-   enteros, `aislamiento2.sh ataque` y `ataque_aislamiento.sh`,
-   `smoke_friccion.sh`, `/code-review` y `/security-review` sobre el merge.
-3. **Causa del corte de 30 minutos**: es el tiempo por defecto de las tareas
-   en segundo plano de Bash. Pasá `timeout` hasta 7200000 ms y agrupá los
-   arneses en tandas que entren; esperá la condición, sin esperas fijas.
-4. Suite completa sobre el SHA final, desde base limpia.
+- **D144:** contestada en D143 (a).
+- **D145 (a):** sí. Lo hace MARIA en sus arneses; `abuso1` sigue
+  registrando desde una sola IP, porque eso es lo que prueba.
+- **D146 (b):** a la cola de limpieza hasta que CONEXIONES-1 B mida bcrypt.
+- **D147 (a):** queda por worker, anotado.
+- **D148:** confirmada. El VERDE de `limpiar` lo explicó MARIA en
+  PRUEBA-LIMPIAR-1: cuando corre, el pedido no tiene conexión tomada.
+- **D149 (a):** poné al día tus patrones: `cobro_mp1` g, `despacho1d` y
+  `estudio1`. `despacho1c` lo hace MARIA, junto con el arnés del 402, para
+  no tocar los dos el mismo archivo. MARIA, también los suyos.
+- **El ataque sin Postgres:** que falle en vez de seguir sobre SQLite. Va con
+  D149, en el mismo commit de arnés.
+- **Filas 4 y 7 del code-review del merge:** a la cola de limpieza; ya
+  estaban en sus ramas antes de unir. La fila 3 la cierra
+  PRESUPUESTO-CLIENTE-1 sobre la unión.
+- **El smoke:** lo pone al día MARIA con ABUSO-1.
+- **Tu rango de D: D180 a D189.**
 
-Si un arnés da rojo, clasificalo (merge, previo de MARIA o de la base) con su
-causa. D141 es pieza de MARIA. No
-integres `0231eee` (dev-maria) hasta que lo pida. Después de esto,
-BORRADOR-1 (D143 a, sí de Emi: recuperar el borrador no saca a la usuaria de
-Clientes) y después CONEXIONES-1 parte B. Próxima D tuya: D144.
+## Tarea activa: D149 (a), mientras reviso BORRADOR-1 (2026-11-10 13:45 UTC)
+
+BORRADOR-1 llegó en `22163cec` (base `4555f7c4`, D170–D173): la reviso
+después de PRESUPUESTO-CLIENTE-1 de MARIA. Si los arneses de navegador
+terminan, sumá su salida al informe. Mientras tanto:
+
+1. D149 (a) y el ataque sin Postgres: sólo arnés, un commit, cada patrón
+   nuevo con su rojo mostrado una vez.
+2. Después, CONEXIONES-1 parte B sobre lo integrado (cierra D134).
 
 ## NOMBRES-1: aceptada sobre `1960a9a` (2026-11-08 PM)
 
@@ -35,29 +50,7 @@ SQLite. Tenías razón con lo de SQLite: corregí el acta y el riesgo va a la
 cola de limpieza. No hay D nuevas. La carrera queda como límite conocido; el
 índice sobre `lower(username)` lo veo con Emi.
 
-## Tarea activa: INTEGRAR-1, antes de CONEXIONES-1 (2026-11-08 PM)
-
-Decidido por la PM (D136 de MARIA). Unir mi rama (que ya trae la tuya) con
-`claude/dev-maria` en `4db641b`, en tu rama, con `merge`. Choca en
-`main.py`, `finalize.js`, `clientes.js`, `file_security.py` y `CHANGELOG.md`.
-Las dos ramas tienen piezas aceptadas: se conservan las dos conductas donde
-se pueden sumar. Por lo que contó MARIA, chocan de fondo:
-
-- el webhook de MP sin secreto en desarrollo (una lo deja pasar, otra lo
-  rechaza);
-- borrar un cliente (se borran sus presupuestos, o la operación queda «Sin
-  cliente»);
-- el registro (tope por IP y regex de un lado, `_exigir_username_libre` del
-  otro);
-- el guardado al historial en `finalize.js`.
-
-Cada choque donde sumar no alcanza va como D con las dos conductas y tu
-recomendación, y no lo commiteás hasta mi respuesta. Puerta: la suite
-completa y los arneses de sabotaje de las dos ramas sobre el merge, con
-falla 0. Plata y datos: revisión fuerte. Después, CONEXIONES-1 mide la parte
-B sobre lo integrado (eso cierra tu D134).
-
-## Tarea activa: CONEXIONES-1 (2026-11-08 PM)
+## CONEXIONES-1, después de D149 (2026-11-08 PM)
 
 Pasa de la cola de MARIA a la tuya, decidido por la PM: es de base y de
 servidor, y MARIA tiene cuatro piezas por delante. Está en el roadmap (sí de

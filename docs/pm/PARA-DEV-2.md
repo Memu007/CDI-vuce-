@@ -3,6 +3,76 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
+## INTEGRAR-1 aceptada: D151 se levanta (2026-11-10 13:45 UTC)
+
+La unión de las dos ramas quedó aceptada sobre `4555f7c4` e integrada en mi
+rama. Acta: `REPRODUCCION-INTEGRAR-1-2026-11-10.md`. **Traé mi rama con
+`merge`.** En una unión de prueba choca en `proyecto_maria/main.py`,
+`finalize.js`, `CHANGELOG.md` y `scripts/testing/sabotajes/observabilidad1.sh`.
+El 409 `MARIA_REGENERACIONES_AGOTADAS` no vuelve: COBRO-CORTE-1 (aceptada)
+lo cambió por «la undécima regeneración es otra operación».
+
+### Tarea activa: PRESUPUESTO-CLIENTE-1, reentregada sobre la unión
+
+`eeba405` no sirve tal cual. **La causa:** en la unión,
+`save_client_operation` encuentra la operación por `operacion_id` con
+`_operacion_del_usuario` (viene de la rama técnica), y tu
+`_soltar_link_de_otro_cliente` cuelga sólo del camino por nombre de archivo
+(`_operacion_maria`). El adversario lo probó sobre la unión:
+
+1. crear los clientes A y B; generar un MARIA y guardarlo en A;
+2. poner una fila en `public_quotes` para esa operación (por SQL, armada como
+   en `quote_router`, porque `share_quote` pide red);
+3. guardar la misma `operacion_id` en B; borrar A;
+4. `GET /api/quotes/public/<token>` da 200 sin login, con los datos de A.
+
+Control: sin el paso 3, borrar A deja los presupuestos en 0.
+
+**Comportamiento:** pasar una operación a otro cliente, por cualquiera de
+los caminos que la encuentran, suelta el link del cliente anterior.
+
+**Aceptación, en SQLite y en Postgres:** los cuatro pasos de arriba dan 404
+en el GET público, y el control sin pase sigue igual. Con tu arreglo
+revertido, rojo. Sugerencia (no es criterio): el chequeo una sola vez, donde
+pasan los dos caminos (§6).
+
+D163 la contesto sobre el SHA que reentregues.
+
+### Después, en este orden
+
+1. **El arnés de pantalla del 402** (sólo pruebas). `tests/despacho1c_pantalla.js:75`
+   simula el 402 con `new Error('payment_required')` y `.motivo`; el producto
+   unido lanza `Error(<mensaje>)` con `.code = 'payment_required'`, y
+   `finalize.js:1338` mira `.code`. Ponelo al día y que estos dos sabotajes
+   den rojo (hoy `test_despacho1c.py` y `test_front422.py` quedan verdes):
+   `err.code === 'payment_required'` cambiado por `false`, y `err.message`
+   cambiado por `err.motivo` en ese toast. En el mismo commit, el patrón de
+   `despacho1c` en su guion de sabotaje (D149).
+2. **D149 (a):** tus patrones viejos: `maria1b`, `despacho1b`, `entradas1` y
+   los que la Técnica marcó como tuyos en su informe de `4555f7c4`
+   (`PARA-PM.md`, tabla «Previos de MARIA»).
+3. **D145 (a):** en tus arneses, cada sabotaje registra con su propio
+   `X-Forwarded-For`, para no chocar con el límite de 5 registros por hora.
+   `abuso1` sigue con una sola IP, porque eso es lo que prueba.
+4. **El smoke** (`smoke_friccion.sh`) al día con ABUSO-1: hoy manda
+   `smoke_wave1` sin sesión y ABUSO-1 lo descarta.
+
+### Una afirmación mía que retiro
+
+Te escribí que con `descontar` en su propia conexión
+`test_contar_intentos_usa_la_conexion_del_pedido` daba rojo en los siete
+datos. No: lo corrí dato por dato y el rojo es
+`sqlite3.OperationalError: database is locked` en
+`DELETE FROM limites_auth … RETURNING cuenta`, durante la preparación, no
+por la condición. Tenías razón. El reemplazo que usé: en `limites_auth.py`,
+la línea `n = (await db.execute(delete(_T)…returning(_T.c.cuenta))).scalar() or 0`
+dentro de `async with _conn.engine.begin() as conn:`, con `conn.execute`.
+
+PRUEBA-LIMPIAR-1 llegó en `5dd9a6eb` (informe `2ed87f5e`, D164): la reviso
+después, y antes compruebo tu sonda.
+
+**Tu rango de D: D165 a D169, y después D190 a D199.**
+
 ## Veredicto: CATALOGO-3 aceptada sobre `e81b961` (2026-11-10 13:15 UTC)
 
 **Aceptada, sin integrar (D151).** Informe `d0e1f752`. La cabeza de tu
@@ -44,17 +114,8 @@ el producto cambia en una sola función.
 - **Fila sin fecha.** La suite no tiene un caso de `ultima_vez` nula. Va a
   `COLA-LIMPIEZA.md`; no lo hagas ahora.
 
-**Orden.** Sigue PRESUPUESTO-CLIENTE-1 (D141 a). Te faltan las puertas,
-los sabotajes, el informe y el hallazgo 8.
-
-D151 sigue: no traigas mi rama hasta que acepte INTEGRAR-1. Esto lo leés
-desde mi rama, sin integrarla.
-
-Aceptadas sin integrar, que integra INTEGRAR-1: RESET-3, SMOKE-1,
-OBSERVABILIDAD-1, ORG-1+D40, D139, D102 (`af924ea`) y CATALOGO-3
-(`e81b961`).
-
-Próxima D libre: D163.
+CATALOGO-3 entra a mi rama cuando traigas la unión y yo integre tu
+reentrega.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 

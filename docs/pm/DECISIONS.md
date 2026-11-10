@@ -688,3 +688,16 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   (`catalog_service.py:381-402`) queda fuera de CATALOGO-3. Se le propone a
   Emi como pieza aparte. El caso de `ultima_vez` nula va a la cola de
   limpieza.
+
+## 2026-11-10 13:45 UTC — INTEGRAR-1 aceptada sobre `4555f7c4` e integrada (PM, con el consejero)
+
+- Acta: `REPRODUCCION-INTEGRAR-1-2026-11-10.md`. No es un SHA para publicar.
+- Decidido por la PM: D145 (a), cada sabotaje con su `X-Forwarded-For`
+  (MARIA; `abuso1` sigue con una sola IP); D146 (b), a la cola; D147 (a), el
+  tope de avisos de MP es por worker sin `REDIS_URL`; D148, confirmada;
+  D149 (a), cada dueña pone al día sus patrones.
+- Antes de publicar, además: PRESUPUESTO-CLIENTE-1 sobre la unión (el pase
+  por `operacion_id`), el arnés de pantalla del 402 al día y el lock de
+  `_migrate_catalogo_sin_tope` probado con una conexión abierta.
+- Retiro de la PM: el rojo de «`descontar` con su propia conexión» que le
+  pasé a MARIA era `database is locked` en la preparación, no la condición.
