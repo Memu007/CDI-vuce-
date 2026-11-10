@@ -3,79 +3,91 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Devolución: CATALOGO-3 sobre `f4ade80` (2026-11-10 PM)
+## Devolución: CATALOGO-3 sobre `ec0092a` (2026-11-10 PM)
 
-Acta: `REPRODUCCION-CATALOGO-3-2026-11-10.md`. Tus puertas dan lo mismo que el
-informe: `catalogo3.sh` 25 rojos, arnés PG 7 OK en `f4ade80` y 5 fallas en la
-base, golden 115. Vuelve por tres causas. Para cada una, un caso con la
-familia como datos; al aceptar la vuelta pruebo con ejemplos distintos.
-Basate en `f4ade80`; D151 sigue. La devolución va antes de
-PRESUPUESTO-CLIENTE-1: dejala donde está.
+**La aceptación anterior de esta misma vuelta queda sin efecto.** No la
+tomes. Me equivoqué yo: llamé preexistente a H1 sin correr la base.
 
-1. **Un origen que la tabla no reconoce hace perder toda la confirmación.**
-   - En la base, `POST /api/ncm/guardar-uso` con «CHN» daba 200 y sumaba en
-     `ncm_historial`. En `f4ade80` da 400 y no queda nada.
-   - Pasa lo mismo con ITA, «Hong Kong», «Viet Nam», «U.S.A.», PRC, Turkey y
-     MACAO.
-   - Camino de hoy: el Excel con texto libre y `saveNcmUsage` de `ncm.js`.
-   - El PUT del catálogo no deja cambiar sólo el NCM de una fila vieja con
-     «TAI», porque la pantalla manda el origen igual.
-   - **Pedido:** un origen no reconocido no hace perder el resto (NCM,
-     historial, memoria y catálogo), y la persona se entera de que el origen
-     no se tomó.
-   - **Un solo criterio** en el extractor, guardar-uso, el PUT del catálogo y
-     la pantalla del catálogo. Hoy `_origen_desde_factura` pasa CHN a CN y
-     `origen_valido` no. `paises_maria.js` resuelve «HONG KONG» y otros 157
-     nombres que el servidor rechaza, y el servidor acepta «0313», que la
-     pantalla rechaza.
-2. **La clave distingue textos que son el mismo.**
-   - En la base daban la misma clave y hoy no; el lookup y la memoria del
-     cliente pasan de exact a none:
-     - «Capacitor 10µF 50V» (micro, U+00B5) y «Capacitor 10μF 50V» (mu
-       griega);
-     - «Bolt ｶﾞｽ M8» (medio ancho) y «Bolt ガス M8».
-   - Camino de hoy: la misma factura de capacitores leída del PDF y tipeada
-     a mano.
-   - **Pedido:** dos textos iguales bajo NFKC dan la misma clave.
-   - Además, «Screw M8» sigue encontrando la guardada como «Screw M8 螺丝», y
-     al revés. Lo decidís vos, y lo decís en el informe, si la encuentra como
-     exacta o como parecida. D77 no pide perder eso.
-   - «电线 2mm» y «钢管 2mm» siguen sin encontrarse.
-3. **La clave nueva hace lento el lookup.**
-   - `/api/catalog/lookup` corre en el event loop. Con 20 ítems y 2000 filas
-     de ~430 caracteres pasa de 1,87 s a 19,44 s.
-   - `clave_de_producto` con 65 caracteres tarda 0,066 ms, y `_normalize`
-     0,006 ms.
-   - **Pedido:** con 20 ítems y 2000 filas de ~65 y de ~430 caracteres, el
-     lookup no tarda más del doble que la base. Medilo y ponelo en el
-     informe.
-   - Una prueba muestra que las claves son las mismas antes y después de
-     acelerarlo.
+Acta: `REPRODUCCION-CATALOGO-3-2026-11-10.md`, sección «Retiro de la
+aceptación», con la salida entera.
 
-**D158: (a), decidido por la PM.** «123» es LIBIA en `PAISES_INDEC`, así que
-pedirte que lo rechazaras fue un error mío.
+**Causa.** La memoria del cliente (`lookup_client_memory`) trae las filas
+del cliente sin orden y se queda con la primera de mayor parecido. El mismo
+texto con otro NCM es otra fila, y confirmar suma a su propia fila sin
+cambiar cuál gana. Ante un empate gana la que la base devuelva primero. En
+las pruebas, SQLite usa uno de dos índices y el resultado cambia entre
+corridas; en PG no lo corrí. El NFKC que te pedí en la causa 2 sumó a los
+empates ² contra 2 y el ancho completo, que la base distinguía: la parte
+de esto que es mía, como pasó con D158.
 
-**D159: (a) para lo de clientes, decidido por la PM.** Lo de `clientes.js`
-(maxlength), `clients.default_origin` VARCHAR(3) y los `[:3]` de
-main.py:7479/7557/9721 va como pieza aparte, que propongo a Emi. En cambio,
-el extractor (`pdf_extractor.py:575`), guardar-uso, el PUT y
-`catalogo.js:270` entran en la causa 1: esta pieza los cambió.
+**Camino de hoy.** La misma factura leída del PDF («Cable 2,5mm²»,
+85444900 CN) y tipeada a mano («Cable 2,5mm2», 85444200 BR). Buscando
+«Cable 2,5mm2», la base da BR en 4 de 4 corridas; la vuelta da CN en 3 de
+4, también después de confirmar BR tres veces.
 
-**Riesgos que no se piden:**
-- una clave de más de 2000 caracteres no se edita ni se borra (no tiene
-  camino de hoy);
-- el primer arranque se detiene si hay una transacción abierta sobre
-  `operation_items` (va a la lista de publicar, con D156);
-- la migración parte en dos un proveedor cuyas filas se guardaron con el
-  nombre con y sin letras no latinas (es costo de D157);
-- simplificado contra tradicional, y Ø contra φ.
+**Lo que pido (comportamiento), en este orden:**
 
-**Corregí el informe:** `/generate_maria` frena «TAI» con «Origen no
-reconocido», no lo saca como 310.
+1. Si una fila guardada tiene el texto idéntico al que se busca, gana esa.
+   Si hay varias (el mismo texto con dos NCM), gana la última confirmada.
+   «Idéntico» es lo que ya compara la clave guardada (`clave_del_producto`:
+   NFC y sin distinguir mayúsculas): «CABLE 2,5MM2» es idéntico a «Cable
+   2,5mm2»; «2,5mm²» no.
+2. Si ninguna tiene el texto idéntico y varias empatan en parecido, gana la
+   última confirmada.
+3. El mismo resultado en cada corrida, en SQLite y en PG, sin importar qué
+   fila devuelva primero la base, también si dos confirmaciones quedan con
+   la misma hora.
 
-D155, D156 y D157 siguen como se decidieron (están en Git). RESET-3,
-SMOKE-1, OBSERVABILIDAD-1, ORG-1+D40, D139 y D102 (`af924ea`) están
-aceptadas sin integrar, y las integra INTEGRAR-1. Próxima D libre: D160.
+**Prueba, que no dependa de qué fila llega primero.** Un caso con la
+familia como datos (²/2, ancho completo, µ/μ):
+
+- se guardan las dos filas y se busca cada texto: cada uno devuelve la
+  suya;
+- se repite con el orden de guardado invertido.
+
+Otro caso, para el texto idéntico con dos NCM: se confirma A y se espera A;
+se confirma B y se espera B; se confirma A y se espera A. Un tercero, para
+la regla 2: con el par guardado, se busca una forma que no está guardada y
+empata con las dos; se confirma una y se espera esa, se confirma la otra y
+se espera la otra. Cada confirmación, en su propio pedido. Con el arreglo
+revertido, alguna falla siempre, en SQLite y en PG. Mostrá ese rojo. Al
+aceptar, pruebo con ejemplos distintos.
+
+**Lo demás queda como estaba en mi veredicto anterior:**
+
+- Lo reproducido: 45 rojos de 45, arnés PG 7 OK, golden 115, pantalla 0
+  diferencias, bench más rápido que la base en las seis, `chequeo-6` igual
+  al informe y suite 5782 passed, 0 failed. Las tres causas de `f4ade80`
+  quedan cerradas.
+- **D160, D161 y D162: (a), decidido por la PM.** D160: las formas fuera
+  de la tabla quedan sin origen y con aviso. D161: sigue la excepción a
+  NFKC para «ºª№™℠». D162: los 22 alias que no son países quedan fuera.
+- **Corregí el informe:** SUR→SR es Surinam (232), no Sudáfrica (ZAF→159).
+- **Riesgo que corrijo.** Con un choque en la migración no queda sólo una
+  «fila huérfana»: el texto exacto lee la otra fila, y al confirmarlo pisa
+  su NCM, su origen y su descripción. Va a la lista de publicar: si el
+  primer arranque dice que N filas quedan por un choque y N es mayor que 0,
+  se frena antes de que alguien confirme.
+- **Mi suite no salteó lo mismo que la tuya** (335 contra 101, con el
+  mismo total). En tu próximo informe, decí por qué.
+- **Riesgos que no te pido arreglar:** «1½» contra «1 1/2» pierde la
+  sugerencia (0,67); el extractor acepta orígenes hechos de cifras («212»
+  da US), como pide D158; dos versiones escribiendo las claves a la vez
+  pueden trabar la confirmación; el recorte de espacios en JS es
+  cuadrático y los avisos no tienen tope; `main.py:8244` y `8844` guardan
+  el origen crudo (va con ORIGEN-2); una descripción larga que difiere en
+  potencia y modelo sugiere el mismo NCM, como en la base.
+
+**Orden.** Esta devolución va primero; después, PRESUPUESTO-CLIENTE-1
+(D141 a): te faltan las puertas, los sabotajes, el informe y el hallazgo
+8. D151 sigue: no traigas mi rama hasta que acepte INTEGRAR-1; esto lo
+leés desde mi rama sin integrarla.
+
+D155-D159 siguen como se decidieron (están en Git). Aceptadas sin integrar,
+que integra INTEGRAR-1: RESET-3, SMOKE-1, OBSERVABILIDAD-1, ORG-1+D40,
+D139 y D102 (`af924ea`).
+
+Próxima D libre: D163.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 

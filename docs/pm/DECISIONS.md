@@ -645,3 +645,35 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   frenarse si otra sesión tiene una transacción abierta sobre
   `operation_items`.
 
+## 2026-11-10 10:40 UTC — CATALOGO-3 aceptada, D160-D162 (a) (PM, con el consejero)
+
+- Aceptada la vuelta sobre `ec0092a`, en el rango `1345ca7..ec0092a`; el
+  acta está en `REPRODUCCION-CATALOGO-3-2026-11-10.md`, sección «Vuelta».
+  No se integra la rama: la integra INTEGRAR-1.
+- D160 (a): las formas de país que no están en la tabla quedan sin origen y
+  con aviso.
+- D161 (a): se mantiene la excepción a NFKC para «ºª№™℠».
+- D162 (a): los 22 alias que no son países quedan fuera de la lectura del
+  país.
+- A la lista de antes de publicar: si el primer arranque dice que N filas
+  quedan por un choque y N > 0, se frena antes de que alguien confirme. Con
+  un choque, el texto exacto lee la otra fila y pisa su NCM, su origen y su
+  descripción.
+- Se le propone a Emi MEMORIA-ORDEN-1, con la recomendación de hacerla. Al
+  empatar, la memoria del cliente devuelve la primera fila. Ya pasaba antes
+  de CATALOGO-3: al reclasificar un producto, sigue sugiriendo el NCM
+  viejo.
+
+## 2026-11-10 10:45 UTC — CATALOGO-3 vuelve sobre `ec0092a`; queda sin efecto la aceptación de las 10:40 (PM, con el consejero)
+
+- Escape de la PM: se aceptó llamando preexistente a H1 sin correr la base.
+  En la base, ²/2 y el ancho completo aciertan; en la vuelta empatan, porque
+  NFKC (pedido por la PM en la causa 2) iguala esos textos.
+- Causa de la devolución: ante un empate, la memoria del cliente se queda
+  con la fila que la base devuelva primero, y confirmar no lo corrige.
+  Camino de hoy: la misma factura leída del PDF y tipeada a mano. Pedido,
+  en orden: gana el texto idéntico al guardado; entre iguales o empatadas,
+  la última confirmada; el mismo resultado en cada corrida, en SQLite y PG.
+- MEMORIA-ORDEN-1 se retira: entra en esta devolución.
+- Siguen D160-D162 (a), la condición de publicar sobre los choques de la
+  migración, los riesgos menores y la corrección de SUR.
