@@ -21,7 +21,7 @@ from tests.test_guardar1 import _cliente, _sql
 from tests.test_prelaunch_block2 import client  # noqa: F401
 
 VENDOR_LARGO = "Proveedor sintetico " + "x" * 200
-VENDOR_LARGO_ID = ("proveedor_sintetico_" + "x" * 200)[:60]
+VENDOR_LARGO_ID = catalog_service._vendor_key(VENDOR_LARGO)
 VENDOR = "Proveedor sintetico"
 VENDOR_ID = "proveedor_sintetico"
 NCM = "73181500"
@@ -164,6 +164,8 @@ def test_un_texto_de_mas_da_400_sin_guardar(client, via, campo):
             "descripcion": "TORNILLO", "ncm": ncm, "vendor_name": vendor, "origen": origen})
 
     motivo = DE_MAS[campo][via == "guardar-uso"]
+    if via == "catalogo" and campo != "proveedor":
+        motivo = "Producto 1 («TORNILLO»): " + motivo
     assert (r.status_code, r.json().get("detail")) == (400, motivo), r.text
     esperado = [(VENDOR, "TORNILLO", NCM, "CN")] if via == "cambiar" else []
     assert _filas(owner) == esperado
@@ -220,7 +222,8 @@ def test_una_entrada_mala_da_400_o_se_limpia_sin_perder_el_lote(client, via, cam
         malo = volver_malo(BUENOS[campo])
         if via == "cambio":
             # La fila arranca con otro valor en el campo, para ver si el cambio se aplicó.
-            client.post(url, json={"vendor_name": VENDOR, "productos": [{**cuerpo, CLAVES[campo]: "73181500"}]})
+            otro = "CN" if campo == "origen" else "73181500"
+            client.post(url, json={"vendor_name": VENDOR, "productos": [{**cuerpo, CLAVES[campo]: otro}]})
             antes = _filas(owner)
             clave = _sql("select product_key from vendor_catalog_products where owner_username=:o", o=owner)[0][0]
             r = _mandar(client, "PUT", f"{url}/{clave}",
@@ -246,6 +249,8 @@ def test_una_entrada_mala_da_400_o_se_limpia_sin_perder_el_lote(client, via, cam
         else:
             motivo = "Hay un carácter que no se puede guardar." if nombre == "medio par" \
                 else f"{QUE[campo]} tiene que ser texto."
+            if via == "lote" and campo != "proveedor":
+                motivo = ("Producto 2: " if campo == "descripción" else "Producto 2 («TUERCA»): ") + motivo
             sin_historial = _sql("select count(*) from ncm_historial where owner_username=:o", o=owner) == [(0,)]
             ok = (r.status_code, r.json().get("detail")) == (400, motivo) and filas == antes \
                 and (via == "cambio" or sin_historial)

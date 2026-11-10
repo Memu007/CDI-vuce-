@@ -457,7 +457,6 @@ def test_guardar_sin_kilo_no_inventa_el_peso(auth_override, client):
     ({"posicion_sim": None}, "Falta la posición SIM"),
     ({"posicion_sim": "8471"}, "Falta la posición SIM"),
     ({"origen": "ZZ"}, "No reconozco el origen"),
-    ({"origen": "CHINA"}, "No reconozco el origen"),
     pytest.param({"origen": "ＢＲ"}, "No reconozco el origen", id="ancho completo"),
     pytest.param({"origen": "ÉS"}, "No reconozco el origen", id="acento"),
     ({"cantidad": "10"}, "La cantidad no es un número."),
@@ -465,7 +464,7 @@ def test_guardar_sin_kilo_no_inventa_el_peso(auth_override, client):
     ({"kilo_neto": True}, "El kilo neto no es un número."),
     pytest.param({"origen": "ıt"}, "No reconozco el origen", id="i sin punto"),
     pytest.param({"origen": "ﬁ"}, "No reconozco el origen", id="ligadura"),
-    pytest.param({"origen": 12}, "El origen tiene que ser el código de dos letras.", id="origen numero"),
+    pytest.param({"origen": 12}, "El origen tiene que ser el nombre o el código del país.", id="origen numero"),
 ])
 def test_guardar_es_todo_o_nada(auth_override, client, cambio, problema):
     cid = _crear_cliente(client)
@@ -2168,20 +2167,21 @@ def test_confirmar_algo_que_no_es_un_ncm_da_400_y_no_guarda_nada(auth_override, 
 
 
 @pytest.mark.parametrize("origen, detalle", [
-    (["a"], "El origen tiene que ser el código de dos letras."),
-    (12, "El origen tiene que ser el código de dos letras."),
-    ("ＢＲ", "No reconozco el origen «ＢＲ»: usá el código de dos letras."),
-    ("ÉS", "No reconozco el origen «ÉS»: usá el código de dos letras."),
-    ("XYZ", "No reconozco el origen «XYZ»: usá el código de dos letras."),
-    ("123", "No reconozco el origen «123»: usá el código de dos letras."),
-    ("ZZ", "No reconozco el origen «ZZ»: usá el código de dos letras."),
-    ("china", "No reconozco el origen «china»: usá el código de dos letras."),
+    (["a"], "El origen tiene que ser el nombre o el código del país."),
+    (12, "El origen tiene que ser el nombre o el código del país."),
+    ("ＢＲ", "No reconozco el origen «ＢＲ»: usá el nombre o el código del país."),
+    ("ÉS", "No reconozco el origen «ÉS»: usá el nombre o el código del país."),
+    ("XYZ", "No reconozco el origen «XYZ»: usá el nombre o el código del país."),
+    ("99999", "No reconozco el origen «99999»: usá el nombre o el código del país."),
+    ("ZZ", "No reconozco el origen «ZZ»: usá el nombre o el código del país."),
     # En mayúsculas serían «IT», «FI» y «SS»: el código se mira como se escribió.
-    ("ıt", "No reconozco el origen «ıt»: usá el código de dos letras."),
-    ("ﬁ", "No reconozco el origen «ﬁ»: usá el código de dos letras."),
-    ("ß", "No reconozco el origen «ß»: usá el código de dos letras."),
-], ids=["lista", "numero", "ancho completo", "acento", "tres letras", "numeros", "pais que no existe", "nombre",
-        "i sin punto", "ligadura", "ese aguda"])
+    ("ıt", "No reconozco el origen «ıt»: usá el nombre o el código del país."),
+    ("ﬁ", "No reconozco el origen «ﬁ»: usá el nombre o el código del país."),
+    ("ß", "No reconozco el origen «ß»: usá el nombre o el código del país."),
+    ("E\u0301S", "No reconozco el origen «E\u0301S»: usá el nombre o el código del país."),
+    ("1" * 5000, "No reconozco el origen «" + "1" * 5000 + "»: usá el nombre o el código del país."),
+], ids=["lista", "numero", "ancho completo", "acento", "tres letras", "numeros", "pais que no existe",
+        "i sin punto", "ligadura", "ese aguda", "acento aparte", "cifras de mas"])
 def test_cambiar_el_origen_valida_igual_que_guardar(auth_override, client, origen, detalle):
     cid = _crear_cliente(client)
     pid = _provisorio(client, cid)

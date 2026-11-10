@@ -102,12 +102,12 @@ sabotaje $F "la caja no dice lo que no quedó en la memoria" \
   "            'Operación asociada a ' + nombre + (false" \
   "FAILED $T::$X[asignar-cliente-no-guardado]"
 sabotaje $F "aprender el catálogo no avisa un 400" \
-  '            return res.ok;' \
-  '            return true;' \
+  "            return { ok: res.ok, detail: res.ok ? '' : textoDeError(data && data.detail, '') };" \
+  "            return { ok: true, detail: '' };" \
   "FAILED $T::$X[aprender-400]"
 sabotaje $F "guardar y aprender a la vez: el aviso del catálogo tapa el error" \
-  'if (!aprendido && !avisoDeLaOperacion && CDI.toast) {' \
-  'if (!aprendido && CDI.toast) {' \
+  'if (!r.ok && !avisoDeLaOperacion && CDI.toast) {' \
+  'if (!r.ok && CDI.toast) {' \
   "FAILED $T::$X[listo-con-vendedor-500]"
 sabotaje $F "reintentar después de crear el cliente lo crea otra vez" \
   '            if (clienteCreadoAca) {' \

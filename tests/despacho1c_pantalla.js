@@ -74,7 +74,7 @@ function armar(fuente, extraCDI) {
       if (cuerpo === 'colgado') return new Promise(() => {});
       if (cuerpo === 'red') throw new TypeError('Failed to fetch');
       if (cuerpo === 402) throw Object.assign(new Error('payment_required'), { motivo: 'Tu plan venció' });
-      if (cuerpo.status) return { ok: false, status: cuerpo.status, json: async () => ({ detail: 'falla sintética' }) };
+      if (cuerpo.status) return { ok: false, status: cuerpo.status, json: async () => ({ detail: cuerpo.detail || 'falla sintética' }) };
       return { ok: true, status: 200, json: async () => cuerpo };
     },
   }, extraCDI);
@@ -88,6 +88,9 @@ function armar(fuente, extraCDI) {
     setTimeout: () => 1, clearTimeout() {}, URLSearchParams, location: { search: '' },
     requestAnimationFrame: f => f(), navigator: {},
   });
+  // errores.js cuelga textoDeError de window; en la página window es el global.
+  vm.runInContext(fs.readFileSync(path.join(V2, '..', 'errores.js'), 'utf8'), contexto);
+  contexto.textoDeError = contexto.window.textoDeError;
   for (const archivo of ['montos_ar.js', 'screens/' + fuente]) {
     vm.runInContext(fs.readFileSync(path.join(V2, archivo), 'utf8'), contexto);
   }
