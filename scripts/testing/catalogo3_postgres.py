@@ -22,7 +22,7 @@ Comprueba:
   de las claves;
 - que ante dos productos que empatan en parecido gana el texto idéntico y
   después el último confirmado, guardados en cualquier orden, y que a la
-  misma hora no decide el id de la fila.
+  misma hora no deciden el orden de guardado ni el id de la fila.
 
 uso (con un Postgres local y descartable, nunca el de producción; el usuario
 tiene que poder crear bases):
@@ -98,9 +98,10 @@ with TestClient(m.app, raise_server_exceptions=False) as c:
 print("GUARDADO " + json.dumps(out))
 '''
 
-# Dos textos que empatan en parecido, guardados en un orden y en el otro; el
-# mismo texto o uno parecido, confirmados A, B, A, B; y dos filas a la misma
-# hora con los id cruzados: imprime qué NCM sugiere cada vez.
+# Dos textos que empatan en parecido, guardados en un orden y en el otro (uno,
+# con el texto que guardaba una versión anterior); el mismo texto o uno parecido,
+# confirmados A, B, A, B; y dos filas a la misma hora, guardadas en los dos
+# órdenes y con los id cruzados: imprime qué NCM sugiere cada vez.
 EMPATAR = r'''
 import json, sys
 import psycopg2
@@ -109,28 +110,34 @@ import proyecto_maria.main as m
 from proyecto_maria.core.rate_limit import limiter
 limiter.enabled = False
 usuario, clave, a, b, url = json.loads(sys.argv[1])
-pares = [("Cable 2,5mm²", "Cable 2,5mm2", None), ("Bolt Ｍ８", "Bolt M8", None),
-         ("Cable 2,5mm²", "Cable 2,5mm2", ("CABLE 2,5MM²", "CABLE 2,5MM2"))]
+pares = [("Cable 2,5mm²", "Cable 2,5mm2", None, None), ("Bolt Ｍ８", "Bolt M8", None, None),
+         ("Cable 2,5mm²", "Cable 2,5mm2", ("CABLE 2,5MM²", "CABLE 2,5MM2"), None),
+         ("Cable 2,5mm2", "Cable 2,5mm²", None, "Cable  2,5mm2")]
 ultimas = [("Cable 2,5mm2", "Cable 2,5mm2", "Cable 2,5mm2"), ("Cable 2,5mm2", "CABLE 2,5MM2", "cable 2,5mm2"),
            ("Cable 2,5mm²", "Cable 2,5mm2", "Cable 2,5mm₂"), ("Bolt Ｍ８", "Bolt M8", "BOLT M８"),
            ("Capacitor 10µF", "Capacitor 10μF", "Capacitor 10µF")]
 out = {"identico": [], "ultima": [], "misma_hora": []}
 base = psycopg2.connect(url)
 base.autocommit = True
+cur = base.cursor()
 with TestClient(m.app, raise_server_exceptions=False) as c:
     assert c.post("/auth/login", json={"username": usuario, "password": clave}).status_code == 200
     def cliente():
         return c.post("/api/clientes", json={"nombre": "Cliente sintetico"}).json()["cliente"]["id"]
     def confirmar(cid, desc, ncm):
-        c.post("/api/ncm/guardar-uso", json={"descripcion": desc, "ncm": ncm, "vendor_name": "P", "client_id": cid})
+        r = c.post("/api/ncm/guardar-uso", json={"descripcion": desc, "ncm": ncm, "vendor_name": "P", "client_id": cid})
+        assert r.json().get("historial_guardado") is True, r.text
     def sugiere(cid, desc):
         r = c.post("/api/catalog/lookup", json={"items": [{"descripcion": desc}], "vendor_name": "Otro", "client_id": cid})
         return r.json()["items"][0]["ncm"]
-    for x, y, buscados in pares:
+    for x, y, buscados, viejo in pares:
         for guardados in ([(x, a), (y, b)], [(y, b), (x, a)]):
             cid = cliente()
             for desc, ncm in guardados:
                 confirmar(cid, desc, ncm)
+            if viejo:
+                cur.execute("update client_product_history set descripcion=%s where client_id=%s and ncm=%s",
+                            (viejo, cid, a))
             out["identico"].append([sugiere(cid, d) for d in buscados or (x, y)])
     for x, y, buscado in ultimas:
         cid = cliente()
@@ -139,16 +146,18 @@ with TestClient(m.app, raise_server_exceptions=False) as c:
             confirmar(cid, desc, ncm)
             vistos.append(sugiere(cid, buscado))
         out["ultima"].append(vistos)
-    for ids in (("0", "z"), ("z", "0")):
-        cid = cliente()
-        cur = base.cursor()
-        for (desc, ncm), primero in zip([("Cable 2,5mm²", a), ("Cable 2,5mm2", b)], ids):
-            confirmar(cid, desc, ncm)
-            cur.execute("update client_product_history set id=%s where client_id=%s and ncm=%s",
-                        (f"{primero}-{cid}", cid, ncm))
-        cur.execute("update client_product_history set ultima_vez=(select max(ultima_vez) from "
-                    "client_product_history where client_id=%s) where client_id=%s", (cid, cid))
-        out["misma_hora"].append(sugiere(cid, "Cable 2,5mm₂"))
+    filas = [("Cable 2,5mm²", a), ("Cable 2,5mm2", b)]
+    for guardadas in (filas, filas[::-1]):
+        for ids in (("0", "z"), ("z", "0")):
+            cid = cliente()
+            for (desc, ncm), primero in zip(guardadas, ids):
+                confirmar(cid, desc, ncm)
+                cur.execute("update client_product_history set id=%s where client_id=%s and ncm=%s",
+                            (f"{primero}-{cid}", cid, ncm))
+            cur.execute("update client_product_history set ultima_vez=(select max(ultima_vez) from "
+                        "client_product_history where client_id=%s) where client_id=%s", (cid, cid))
+            out["misma_hora"].append(sugiere(cid, "Cable 2,5mm₂"))
+base.close()
 print("EMPATES " + json.dumps(out))
 '''
 
@@ -287,12 +296,12 @@ try:
     OTRO = "84714900"
     s, e = correr(NUEVA, EMPATAR, json.dumps([USUARIO, CLAVE, NCM, OTRO, URL_BASE])).communicate(timeout=600)
     empates = json.loads(s.split("EMPATES ")[1].splitlines()[0]) if "EMPATES " in s else e[-1500:]
-    chequear(isinstance(empates, dict) and empates["identico"] == [[NCM, OTRO]] * 6,
+    chequear(isinstance(empates, dict) and empates["identico"] == [[NCM, OTRO]] * 8,
              f"ante un empate gana el texto idéntico, en los dos órdenes de guardado: {empates}")
     chequear(isinstance(empates, dict) and empates["ultima"] == [[NCM, OTRO, NCM, OTRO]] * 5,
              f"ante un empate gana la última confirmada: {empates}")
     chequear(isinstance(empates, dict) and set(empates["misma_hora"]) in ({NCM}, {OTRO}),
-             f"un empate a la misma hora no depende del id de la fila: {empates}")
+             f"un empate a la misma hora no depende del orden ni del id de las filas: {empates}")
 finally:
     with contextlib.suppress(Exception):
         con = psycopg2.connect(URL)

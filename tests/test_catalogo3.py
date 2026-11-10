@@ -180,15 +180,20 @@ def _recordado(client, cid, desc):
 
 
 @pytest.mark.parametrize("invertido", [False, True])
-@pytest.mark.parametrize("a, b, buscados", [
-    ("Cable 2,5mm²", "Cable 2,5mm2", None), ("Bolt Ｍ８", "Bolt M8", None),
-    ("Cable 2,5mm²", "Cable 2,5mm2", ("CABLE 2,5MM²", "CABLE 2,5MM2")),
+@pytest.mark.parametrize("a, b, buscados, viejo", [
+    ("Cable 2,5mm²", "Cable 2,5mm2", None, None), ("Bolt Ｍ８", "Bolt M8", None, None),
+    ("Cable 2,5mm²", "Cable 2,5mm2", ("CABLE 2,5MM²", "CABLE 2,5MM2"), None),
+    ("Cable 2,5mm2", "Cable 2,5mm²", None, "Cable  2,5mm2"),
 ])
-def test_ante_un_empate_gana_el_texto_identico(client, a, b, buscados, invertido):
+def test_ante_un_empate_gana_el_texto_identico(client, a, b, buscados, viejo, invertido):
+    """`viejo`: el texto de `a` como lo guardaba una versión anterior, con su clave de hoy."""
     cid = _cliente(client)
     guardados = [(a, NCM), (b, "84714900")]
     for desc, ncm in reversed(guardados) if invertido else guardados:
         _confirmar(client, cid, desc, ncm)
+    if viejo:
+        _escribir("update client_product_history set descripcion=:d where client_id=:c and ncm=:n",
+                  d=viejo, c=cid, n=NCM)
     assert [_recordado(client, cid, desc) for desc in buscados or (a, b)] == [NCM, "84714900"]
 
 
@@ -208,17 +213,20 @@ def test_ante_un_empate_gana_la_ultima_confirmada(client, a, b, buscado):
     assert vistos == [NCM, "84714900", NCM, "84714900"]
 
 
-def test_un_empate_a_la_misma_hora_no_depende_del_id(client):
+def test_un_empate_a_la_misma_hora_no_depende_del_orden(client):
+    """Las dos filas, guardadas en los dos órdenes y con los id cruzados."""
     vistos = set()
-    for ids in (("0", "z"), ("z", "0")):
-        cid = _cliente(client)
-        for (desc, ncm), primero in zip([("Cable 2,5mm²", NCM), ("Cable 2,5mm2", "84714900")], ids):
-            _confirmar(client, cid, desc, ncm)
-            _escribir("update client_product_history set id=:i where client_id=:c and ncm=:n",
-                      i=f"{primero}-{cid}", c=cid, n=ncm)
-        _escribir("update client_product_history set ultima_vez=(select max(ultima_vez) from "
-                  "client_product_history where client_id=:c) where client_id=:c", c=cid)
-        vistos.add(_recordado(client, cid, "Cable 2,5mm₂"))
+    filas = [("Cable 2,5mm²", NCM), ("Cable 2,5mm2", "84714900")]
+    for guardadas in (filas, filas[::-1]):
+        for ids in (("0", "z"), ("z", "0")):
+            cid = _cliente(client)
+            for (desc, ncm), primero in zip(guardadas, ids):
+                _confirmar(client, cid, desc, ncm)
+                _escribir("update client_product_history set id=:i where client_id=:c and ncm=:n",
+                          i=f"{primero}-{cid}", c=cid, n=ncm)
+            _escribir("update client_product_history set ultima_vez=(select max(ultima_vez) from "
+                      "client_product_history where client_id=:c) where client_id=:c", c=cid)
+            vistos.add(_recordado(client, cid, "Cable 2,5mm₂"))
     assert vistos in ({NCM}, {"84714900"}), vistos
 
 
