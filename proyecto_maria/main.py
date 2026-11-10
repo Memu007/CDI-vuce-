@@ -6338,7 +6338,7 @@ async def _operacion_maria(db: AsyncSession, owner_username: str, archivo: str):
     return result.scalars().first()
 
 
-async def _soltar_link_de_otro_cliente(db: AsyncSession, operation, client_id: int) -> None:
+async def _soltar_link_de_otro_cliente(db: AsyncSession, operation, client_id: str) -> None:
     """Si la operación pasa a otro cliente, su link compartido se va, como al borrar el
     cliente: mostraba datos del anterior. Sin commit: cae con el resto si el guardado falla."""
     if operation.client_id not in (None, client_id):
