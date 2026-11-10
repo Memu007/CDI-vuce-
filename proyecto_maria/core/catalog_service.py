@@ -428,9 +428,8 @@ async def match_items(
 # -----------------------------------------------------------------
 
 def _producto_valido(prod) -> Optional[tuple]:
-    """(descripción, ncm, origen, unidad, precio, aviso) de un producto del lote,
-    o None si no tiene descripción. ValueError si un campo no se puede guardar;
-    un origen que no se reconoce se guarda vacío y deja el aviso."""
+    """(descripción, ncm, origen, unidad, precio, aviso), o None sin descripción.
+    ValueError si un campo no se guarda; un origen no reconocido va vacío con aviso."""
     if not isinstance(prod, dict):
         raise ValueError(AVISO_NO_ES_OBJETO)
     desc = texto_para_guardar(prod.get("descripcion"))
