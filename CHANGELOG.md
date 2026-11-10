@@ -10,6 +10,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - «CABLE 2,5MM2» cuenta como el mismo texto que «Cable 2,5mm2»; con el mismo texto y dos NCM gana el último confirmado.
 - Dos confirmaciones a la misma hora dan siempre el mismo NCM, en SQLite y en Postgres.
+- Un producto guardado por una versión anterior con otro espaciado («Cable  2,5mm2») también cuenta como el mismo texto: se compara la clave guardada.
 
 ## 2026-11-10 · fix: el NCM recordado de un cliente no depende del orden de las filas (CATALOGO-3)
 

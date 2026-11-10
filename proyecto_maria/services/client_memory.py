@@ -140,14 +140,10 @@ def descripcion_del_producto(descripcion) -> str:
     return texto
 
 
-def _misma_descripcion(descripcion: str) -> str:
-    """Dos descripciones que dan lo mismo son el mismo texto para la clave."""
-    return unicodedata.normalize("NFC", descripcion.casefold())
-
-
 def clave_del_producto(ncm8: str, descripcion: str) -> str:
     """Lo que identifica al producto en la base: el índice único la usa."""
-    return hashlib.sha256(f"{ncm8}\x1f{_misma_descripcion(descripcion)}".encode()).hexdigest()
+    misma = unicodedata.normalize("NFC", descripcion.casefold())
+    return hashlib.sha256(f"{ncm8}\x1f{misma}".encode()).hexdigest()
 
 
 def identidad_del_producto(ncm, descripcion) -> Optional[tuple[str, str, str]]:
@@ -277,10 +273,6 @@ async def lookup_client_memory(
         return None
 
     clave = clave_de_producto(descripcion)
-    try:
-        tal_cual = _misma_descripcion(descripcion_del_producto(descripcion))
-    except ValueError:
-        tal_cual = None
     q = sa_select(ClientProductHistory).where(
         ClientProductHistory.owner_username == owner_username,
         ClientProductHistory.client_id == client_id,
@@ -288,17 +280,19 @@ async def lookup_client_memory(
     result = await db.execute(q)
     candidates = result.scalars().all()
 
-    # Ante un empate gana el texto idéntico y después la última confirmada; a la
-    # misma hora decide el contenido de la fila, no su id al azar ni su orden.
-    def orden(row):
-        texto = row.descripcion or ""
-        return (parecido(clave, clave_de_producto(texto)), _misma_descripcion(texto) == tal_cual,
-                row.ultima_vez is not None, row.ultima_vez, row.ncm, texto, row.id)
-
-    best_row = max(candidates, key=orden, default=None)
-    best_score = orden(best_row)[0] if best_row is not None else 0.0
-    if best_row is None or best_score < FUZZY_THRESHOLD:
+    puntajes = [(parecido(clave, clave_de_producto(row.descripcion or "")), row) for row in candidates]
+    best_score = max((p for p, _ in puntajes), default=0.0)
+    if best_score < FUZZY_THRESHOLD:
         return None
+
+    # Ante un empate gana el texto idéntico (la misma clave guardada) y después la
+    # última confirmada; a la misma hora decide el contenido de la fila, no su orden.
+    def desempate(row):
+        propia = identidad_del_producto(row.ncm, descripcion)
+        return (propia is not None and propia[2] == row.clave, row.ultima_vez is not None,
+                row.ultima_vez, row.ncm, row.descripcion or "", row.id)
+
+    best_row = max((row for p, row in puntajes if p == best_score), key=desempate)
 
     return {
         "ncm": best_row.ncm,
