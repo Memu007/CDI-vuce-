@@ -782,7 +782,7 @@
                         (r.detail ? r.detail + ' ' : '') +
                         'La operación está lista, pero la próxima vez esos productos no se van a sugerir solos.', 'warning');
                 } else if (r.avisos && r.avisos.length && !avisoDeLaOperacion && CDI.toast) {
-                    CDI.toast('Origen no reconocido', r.avisos.join(' ') + ' Se guardaron sin origen.', 'warning');
+                    CDI.toast('Origen no reconocido', r.avisos.join(' ') + ' No se guardó su origen.', 'warning');
                 }
             });
         } catch (err) {

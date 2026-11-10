@@ -10523,7 +10523,7 @@ async def guardar_uso_ncm(
         historial_guardado = False
 
     respuesta = {"success": True, "historial_guardado": historial_guardado}
-    return {**respuesta, "aviso": f"Se guardó sin origen. {aviso_origen}"} if aviso_origen else respuesta
+    return {**respuesta, "aviso": f"No se guardó el origen. {aviso_origen}"} if aviso_origen else respuesta
 
 @app.post("/api/ncm/import-historial")
 async def import_ncm_historial(
