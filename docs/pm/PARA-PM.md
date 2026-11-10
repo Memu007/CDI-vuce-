@@ -101,8 +101,8 @@ El sabotaje es propio porque la pieza toca el borrador guardado de la usuaria, q
 | compileall | `d3dfc2e4` | rc=0 |
 | Los 6 archivos de pytest que leen `app_v2.js` | `b0d6c274` | 103 passed, 1 skipped, 2 xfailed |
 | `borrador1.sh` | `b0d6c274` | 5 ROJO bien, 0 inesperadas |
-| `cliente1.sh` | `b0d6c274` | PENDIENTE_CLIENTE1 |
-| `foco_cliente1.sh` | `b0d6c274` | PENDIENTE_FOCO |
+| `cliente1.sh` | `b0d6c274` | rc=1: 4 ROJO correcto, 30 ROJO? por 429 (D145, abajo) |
+| `foco_cliente1.sh` | `b0d6c274` | cortado por mí (rc=143): su API dio 5 registros con 200 y 42 con 429, D145 |
 | `destino1.sh` | `b0d6c274` | PENDIENTE_DESTINO |
 | `despacho1a.sh` | `b0d6c274` | PENDIENTE_DESPACHO |
 | `orden1.sh` | `b0d6c274` | «FALLA: no se pudo registrar el usuario de prueba: 429»: es D145 |
@@ -111,7 +111,7 @@ Los 6 archivos son `test_sufijos1`, `test_ncm_batch_frontend`, `test_punta_a_pun
 
 **Los ROJO? de `cliente1` son 429, no esta pieza**
 - El arnés usa una sola API y una sola base. Cada corrida de `pantalla_cliente1.js` registra un usuario nuevo y no mira el status (D173).
-- El log de la API de esa corrida, contando los `POST /auth/register`:
+- El log de la API a mitad de la corrida, contando los `POST /auth/register`:
   ```
         5 "POST /auth/register HTTP/1.1" 200
         6 "POST /auth/register HTTP/1.1" 429
