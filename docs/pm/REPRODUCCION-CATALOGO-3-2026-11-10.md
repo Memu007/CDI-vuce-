@@ -13,6 +13,7 @@ Veredicto: **devolución** (arriba de `PARA-DEV-2.md`), por tres causas.
 | `catalogo3.sh` (sabotajes) | 25 ROJO, `fallas: 0` |
 | arnés Postgres 16, `f4ade80` | 7 OK, `todo OK` |
 | arnés Postgres 16, base `07504e0` | `5 fallas` (dos workers, varchar(3), migración, TAIWAN, CJK en dos filas): coincide |
+| `chequeo-6.py 07504e0 f4ade80` | `producto +166/−66`, 1 `AVISO` (100 netas), explicado en el informe; historia vacía: coincide |
 | suite completa | ver «Suite», abajo |
 
 ## Lo que reproduje yo

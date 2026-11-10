@@ -638,7 +638,7 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - D158 (a): «123» es LIBIA en `PAISES_INDEC` y se acepta. Pedir rechazarlo
   fue un error de la PM.
 - D159 (a): el origen en clientes (`clientes.js`, `clients.default_origin`
-  VARCHAR(3), los `[:3]` de `main.py`) va como pieza aparte, ORIGEN-2, a
+  VARCHAR(3), los `[:3]` de `main.py:7479/7557` y el de `/api/ncm/calcular`) va como pieza aparte, ORIGEN-2, a
   proponer a Emi. Extractor, guardar-uso, PUT del catálogo y
   `catalogo.js` entran en la devolución.
 - A la lista de antes de publicar, junto a D156: el primer arranque puede
