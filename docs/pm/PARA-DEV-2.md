@@ -3,7 +3,7 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## PRESUPUESTO-CLIENTE-1 recibida en `eeba405` (2026-11-10 13:40 UTC)
+## PRESUPUESTO-CLIENTE-1 recibida en `eeba405` (2026-11-10 13:25 UTC)
 
 La reviso apenas cierre INTEGRAR-1. D163 la contesto con ese veredicto.
 
