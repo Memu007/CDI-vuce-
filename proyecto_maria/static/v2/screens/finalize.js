@@ -781,6 +781,8 @@
                     CDI.toast('Algunos productos no quedaron en la memoria',
                         (r.detail ? r.detail + ' ' : '') +
                         'La operación está lista, pero la próxima vez esos productos no se van a sugerir solos.', 'warning');
+                } else if (r.avisos && r.avisos.length && !avisoDeLaOperacion && CDI.toast) {
+                    CDI.toast('Origen no reconocido', r.avisos.join(' ') + ' Se guardaron sin origen.', 'warning');
                 }
             });
         } catch (err) {
@@ -1362,7 +1364,11 @@
                     updated: data && data.updated || 0,
                 });
             }
-            return { ok: res.ok, detail: res.ok ? '' : textoDeError(data && data.detail, '') };
+            return {
+                ok: res.ok,
+                detail: res.ok ? '' : textoDeError(data && data.detail, ''),
+                avisos: res.ok && Array.isArray(data && data.avisos) ? data.avisos : []
+            };
         } catch (_) {
             return { ok: false, detail: '' };
         }

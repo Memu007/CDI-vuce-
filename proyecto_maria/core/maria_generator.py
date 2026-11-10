@@ -684,14 +684,18 @@ _PAISES_PANTALLA = Path(__file__).resolve().parents[1] / "static" / "v2" / "pais
 
 
 @lru_cache(maxsize=1)
-def codigos_tabla_oficial() -> frozenset:
-    """Los códigos de país de la tabla oficial MARIA (TABLA PAISES V.0
+def _tabla_oficial() -> dict:
+    """Código -> nombre normalizado de la tabla oficial MARIA (TABLA PAISES V.0
     25082010.xlsx, 309 países). Una sola copia: la que usa la pantalla."""
     js = _PAISES_PANTALLA.read_text(encoding="utf-8")
     m = re.search(r"const COUNTRIES = (\[.*?\]);", js)
     if not m:
         raise RuntimeError(f"No se encontró la tabla de países (const COUNTRIES) en {_PAISES_PANTALLA}")
-    return frozenset(int(p["code"]) for p in json.loads(m.group(1)))
+    return {int(p["code"]): _normalizar_pais(p["name"]) for p in json.loads(m.group(1))}
+
+
+def codigos_tabla_oficial() -> frozenset:
+    return frozenset(_tabla_oficial())
 
 
 @lru_cache(maxsize=1)
@@ -706,16 +710,19 @@ def _nombres_de_pais() -> dict:
 
 def codigo_de_pais(texto) -> int | None:
     """El código del país si se reconoce con certeza; si no, None. Mismo criterio
-    que `resolve` en paises_maria.js; la forma se mira antes de normalizar («ＢＲ», «ÉS»)."""
+    que `resolve` en paises_maria.js; dos letras tienen que ser ASCII («ＢＲ», «ÉS»)."""
     escrito = unicodedata.normalize("NFC", str(texto or "")).strip()
-    if not escrito or unicodedata.normalize("NFKC", escrito) != escrito:
-        return None
     if len(escrito) <= 2 and not (escrito.isascii() and escrito.isalpha()):
         return None
-    m = re.fullmatch(r"0?([0-9]{3})(?:\s*[·-].*)?", escrito, flags=re.DOTALL)
-    if m and int(m.group(1)) in codigos_tabla_oficial():
-        return int(m.group(1))
-    return _nombres_de_pais().get(_normalizar_pais(escrito))
+    m = re.fullmatch(r"0?([0-9]{3})(?:\s*[·-]\s*(.+))?", escrito)
+    if not m:
+        return _nombres_de_pais().get(_normalizar_pais(escrito))
+    codigo, nombre = int(m.group(1)), m.group(2)
+    # «310 - Vietnam» o «203-ARG»: el nombre que contradice el código no se adivina.
+    if codigo in _tabla_oficial() and (nombre is None or _normalizar_pais(nombre) == _tabla_oficial()[codigo]
+                                       or _nombres_de_pais().get(_normalizar_pais(nombre)) == codigo):
+        return codigo
+    return None
 
 
 def _codigo_de_la_tabla(texto: str) -> bool:
@@ -783,7 +790,7 @@ def origen_valido(texto) -> str | None:
     """El origen como se guarda si es un país de la tabla (nombre o código); si no, None."""
     if codigo_de_pais(texto) is None:
         return None
-    escrito = unicodedata.normalize("NFC", str(texto)).strip()
+    escrito = " ".join(unicodedata.normalize("NFC", str(texto)).split())
     return escrito.upper() if len(escrito) == 2 else escrito
 
 
@@ -800,7 +807,7 @@ def pais_de_la_tabla(pais) -> bool:
     return pais_reconocido(pais)
 
 
-def get_pais_codigo(pais: str) -> int:
+def get_pais_codigo(pais: str, default: int = PAIS_DEFAULT_IMPORT) -> int:
     """Obtiene el código de país oficial MARIA para un nombre/código.
 
     Estrategia: normaliza (mayúsculas, sin acentos ni puntos) y busca match
@@ -810,7 +817,7 @@ def get_pais_codigo(pais: str) -> int:
     default; usar `pais_reconocido()` para detectar ese caso y avisar.
     """
     if not pais:
-        return PAIS_DEFAULT_IMPORT
+        return default
     codigo = codigo_de_pais(pais)
     if codigo is not None:
         return codigo
@@ -821,6 +828,8 @@ def get_pais_codigo(pais: str) -> int:
         return int(str(pais).strip())
 
     norm = _normalizar_pais(pais)
+    if norm in _PAISES_NORM:
+        return _PAISES_NORM[norm]
     # Fallback por prefijo estricto (>=4 chars) solo si no hubo exacto
     if len(norm) >= 4:
         prefijo = norm[:4]
@@ -828,7 +837,7 @@ def get_pais_codigo(pais: str) -> int:
             if key_norm.startswith(prefijo):
                 return code
 
-    return PAIS_DEFAULT_IMPORT
+    return default
 
 
 def _exacto(valor) -> Decimal:

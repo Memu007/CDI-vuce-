@@ -2075,7 +2075,7 @@ def _origen_desde_factura(raw) -> str:
 
     texto = str(raw or '').strip()
     # «NA» en una factura casi siempre es «no aplica», no Namibia.
-    if not texto or texto.isdigit() or texto.upper() in ('NA', 'N/A'):
+    if not texto or texto.upper() in ('NA', 'N/A'):
         return ''
     mayus = texto.upper()
     if len(mayus) == 2 and mayus.isalpha():

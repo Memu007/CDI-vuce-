@@ -428,8 +428,9 @@ async def match_items(
 # -----------------------------------------------------------------
 
 def _producto_valido(prod) -> Optional[tuple]:
-    """(descripción, ncm, origen, unidad, precio) de un producto del lote, o
-    None si no tiene descripción. ValueError si un campo no se puede guardar."""
+    """(descripción, ncm, origen, unidad, precio, aviso) de un producto del lote,
+    o None si no tiene descripción. ValueError si un campo no se puede guardar;
+    un origen que no se reconoce se guarda vacío y deja el aviso."""
     if not isinstance(prod, dict):
         raise ValueError(AVISO_NO_ES_OBJETO)
     desc = texto_para_guardar(prod.get("descripcion"))
@@ -437,23 +438,25 @@ def _producto_valido(prod) -> Optional[tuple]:
         return None
     ncm = ncm_para_guardar(prod.get("ncm")) or ncm_para_guardar(prod.get("pieza"))
     origen, aviso = origen_para_guardar(prod.get("origen"))
-    if aviso:
-        raise ValueError(aviso)
     unidad = texto_para_guardar(prod.get("unidad_medida"), "La unidad")
-    return desc, ncm, origen, unidad, _precio(prod.get("valor_unitario"))
+    return desc, ncm, origen, unidad, _precio(prod.get("valor_unitario")), aviso
 
 
 def _producto_del_lote(numerado: tuple) -> Optional[tuple]:
-    """_producto_valido con el número y la descripción en el error, para que la
-    pantalla diga qué producto no se pudo aprender."""
+    """_producto_valido con el número y la descripción en el error y en el aviso,
+    para que la pantalla diga qué producto no se aprendió entero."""
     n, prod = numerado
+    desc = prod.get("descripcion") if isinstance(prod, dict) else None
+    desc = desc.replace("\x00", "").strip() if isinstance(desc, str) else ""
+    cual = f"Producto {n}" + (f" («{desc[:60]}»)" if desc and not _MEDIO_PAR.search(desc) else "")
     try:
-        return _producto_valido(prod)
+        valido = _producto_valido(prod)
     except ValueError as e:
-        desc = prod.get("descripcion") if isinstance(prod, dict) else None
-        desc = desc.replace("\x00", "").strip() if isinstance(desc, str) else ""
-        cual = f" («{desc[:60]}»)" if desc and not _MEDIO_PAR.search(desc) else ""
-        raise ValueError(f"Producto {n}{cual}: {e}") from None
+        raise ValueError(f"{cual}: {e}") from None
+    if valido is None:
+        return None
+    *campos, aviso = valido
+    return (*campos, f"{cual}: {aviso}" if aviso else "")
 
 
 def _precio(valor) -> Optional[float]:
@@ -485,6 +488,7 @@ async def save_products(
             "productos_actualizados": 0,
             "total_en_catalogo": 0,
             "owner_username": owner_username,
+            "avisos": [],
         }
 
     vendor_name = texto_para_guardar(vendor_name, "El proveedor")
@@ -497,7 +501,7 @@ async def save_products(
     saved = 0
     updated = 0
 
-    for desc, ncm, origen, unidad, precio in validos:
+    for desc, ncm, origen, unidad, precio, _aviso in validos:
         product_key = clave_de_producto(desc)
         extra_blob = {"unidad_medida": unidad} if unidad else None
 
@@ -559,6 +563,7 @@ async def save_products(
         "productos_actualizados": updated,
         "total_en_catalogo": int(total),
         "owner_username": owner_username,
+        "avisos": [p[5] for p in validos if p[5]],
     }
 
 
