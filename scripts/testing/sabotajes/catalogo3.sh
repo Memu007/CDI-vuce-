@@ -100,13 +100,17 @@ sabotaje $C "la clave vuelve a distinguir lo que se lee igual" \
   'return _clave(descripcion)' \
   "FAILED $T::test_lo_que_se_lee_igual_se_encuentra"
 sabotaje $C "«Nº» vuelve a ser «No» y no «N°»" \
-  'c if c in "ºª" or ' \
-  'c if ' \
+  'c if c in "ºª№™℠"' \
+  'c if c in "№™℠"' \
   "FAILED $T::test_lo_que_se_lee_igual_se_encuentra[Tornillo N"
 sabotaje $C "«Bolt™» vuelve a ser «BoltTM» y no «Bolt»" \
-  ' or unicodedata.category(c)[0] == "S" else' \
-  ' else' \
+  'c if c in "ºª№™℠"' \
+  'c if c in "ºª№℠"' \
   "FAILED $T::test_lo_que_se_lee_igual_se_encuentra[Bolt"
+sabotaje $C "los símbolos de unidad vuelven a quedar sin NFKC" \
+  'c if c in "ºª№™℠" else' \
+  'c if c in "ºª№™℠" or unicodedata.category(c)[0] == "S" else' \
+  "FAILED $T::test_lo_que_se_lee_igual_se_encuentra[Tubo 10"
 sabotaje $C "lo latino y lo que tiene además letras no latinas vuelve a ser exacto" \
   'return min(_similarity(base_a, base_b), FUZZY_THRESHOLD)' \
   'return _similarity(base_a, base_b)' \
