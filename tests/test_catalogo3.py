@@ -312,6 +312,11 @@ def test_cambiar_el_ncm_de_una_fila_con_origen_viejo_guarda_el_ncm(client, orige
 NO_SON_PAISES = ("AFRICA", "AMERICA", "OCEANIA", "ISLAS", "(AAE)", "ESTADO ASOCIADO", "BUENOS AIRES", "CORDOBA")
 
 
+# Python y JavaScript no recortan los mismos espacios; «𝐁𝐑» son dos letras y cuatro unidades UTF-16.
+ESPACIOS_RAROS = ["𝐁𝐑", "\ufeffCHINA", "CHINA\ufeff", "CHINA\x85", "\x1cBR", "ARABIA\x1fSAUDITA",
+                  "302\u2028·\u2028ARABIA\u2028SAUDITA"]
+
+
 def _resolve_de_la_pantalla(valores):
     js = maria_generator._PAISES_PANTALLA
     codigo = (f"global.window = {{}}; require({str(js)!r}); const v = JSON.parse(require('fs')"
@@ -326,6 +331,7 @@ def test_la_pantalla_y_el_servidor_reconocen_los_mismos_paises():
     codigos = sorted(maria_generator.codigos_tabla_oficial())
     valores = [*FAMILIA_ORIGEN, *PAISES_INDEC, *ISO3_A_ISO2, *(f"0{c}" for c in codigos),
                *(f"{c} · X" for c in codigos), "0313", "123", "ÉS", "ＢＲ", "XYZ", "99999", "Türkiye", "",
+               *ESPACIOS_RAROS,
                *LECTURA_PAIS, *NO_SON_PAISES]
     servidor = [str(maria_generator.codigo_de_pais(v) or "") for v in valores]
     distintos = [(v, p, s) for v, p, s in zip(valores, _resolve_de_la_pantalla(valores), servidor) if p != s]
