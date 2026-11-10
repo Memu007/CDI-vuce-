@@ -274,9 +274,12 @@ def _cliente(c, creados):
     return cid
 
 
-def _guardar(c, cid, archivo, item=ITEM):
-    return c.post(f"/api/clientes/{cid}/operaciones",
-                  json={"operation_id": archivo, "items": [item]})
+def _guardar(c, cid, opid=None, item=ITEM):
+    """Sin `opid` crea una operación nueva; con él, guarda esa en el cliente."""
+    cuerpo = {"items": [item]}
+    if opid:
+        cuerpo["operacion_id"] = opid
+    return c.post(f"/api/clientes/{cid}/operaciones", json=cuerpo)
 
 
 def _compartir(c, op):
@@ -307,24 +310,24 @@ async def test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto(
     c = cliente_http
     _como(dueno)
     a, b = _cliente(c, creados), _cliente(c, creados)
-    archivo, otro_archivo, suelto = (f"MARIA_{uuid.uuid4().hex}.TXT" for _ in range(3))
-    op = _guardar(c, a, archivo).json()["operation_id"]
+    op = _guardar(c, a).json()["operation_id"]
     token = _compartir(c, op)
-    otro_op = _guardar(c, a, otro_archivo).json()["operation_id"]
+    otro_op = _guardar(c, a).json()["operation_id"]
     otro_token = _compartir(c, otro_op)
-    op_suelta = await _operacion_sin_cliente(dueno, suelto)
+    op_suelta = await _operacion_sin_cliente(dueno, f"MARIA_{uuid.uuid4().hex}.TXT")
     token_suelto = _compartir(c, op_suelta)
 
-    # (cliente, archivo, ítem, código, link que tiene que seguir andando)
+    # (cliente, operación, ítem, código, link que tiene que seguir andando)
     pasos = [
-        (a, archivo, ITEM, 200, True),
-        (b, archivo, {**ITEM, "valor_unitario": "NaN"}, 400, True),
-        (a, suelto, ITEM, 200, True),
-        (b, archivo, ITEM, 200, False),
+        (a, op, ITEM, 200, True),
+        (b, op, {**ITEM, "valor_unitario": "NaN"}, 400, True),
+        (a, op_suelta, ITEM, 200, True),
+        (b, op, ITEM, 200, False),
     ]
-    for cid, arch, item, codigo, sigue in pasos:
-        r = _guardar(c, cid, arch, item)
-        assert r.status_code == codigo, (cid == b, arch == archivo, r.text)
+    for cid, opid, item, codigo, sigue in pasos:
+        r = _guardar(c, cid, opid, item)
+        assert r.status_code == codigo, (cid == b, opid == op, r.text)
+        assert r.status_code != 200 or r.json()["operation_id"] == opid, "la misma operación"
         esperado = 200 if sigue else 404
         assert c.get(f"/api/quotes/public/{token}").status_code == esperado, (cid == b, codigo)
     assert c.get(f"/api/quotes/public/{otro_token}").status_code == 200, "otra operación del mismo cliente"
@@ -333,8 +336,30 @@ async def test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto(
     assert c.get(f"/api/quotes/public/{token_suelto}").status_code == 200, "sin cliente antes"
     assert await _cliente_de(op_suelta) == a
 
-    # Otro dueño con el mismo nombre de archivo tiene su propia operación.
+    # Una operación ajena no se encuentra: el otro dueño crea la suya.
     _como(otro_usuario)
-    assert _guardar(c, _cliente(c, creados), otro_archivo).status_code == 200
+    r = _guardar(c, _cliente(c, creados), otro_op)
+    assert r.status_code == 200, r.text
+    assert r.json()["operation_id"] != otro_op
     _como(dueno)
     assert c.get(f"/api/quotes/public/{otro_token}").status_code == 200, "otro dueño"
+    assert await _cliente_de(otro_op) == a
+
+
+@pytest.mark.parametrize("pasarla", [True, False])
+async def test_borrar_el_cliente_anterior_no_deja_el_link_de_la_operacion_pasada(
+    pasarla, dueno, cliente_http, creados
+):
+    """Pasada a B, la operación ya no es de A: borrar A no la toca y su link no
+    vuelve. Sin pasarla, borrar A se lleva el link."""
+    c = cliente_http
+    _como(dueno)
+    a, b = _cliente(c, creados), _cliente(c, creados)
+    op = _guardar(c, a).json()["operation_id"]
+    token = _compartir(c, op)
+    if pasarla:
+        assert _guardar(c, b, op).status_code == 200
+    assert c.delete(f"/api/clientes/{a}").status_code == 200
+    assert c.get(f"/api/quotes/public/{token}").status_code == 404
+    assert await _presupuestos_de(op) == 0
+    assert await _cliente_de(op) == (b if pasarla else None)
