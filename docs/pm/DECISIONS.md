@@ -664,3 +664,16 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   de CATALOGO-3: al reclasificar un producto, sigue sugiriendo el NCM
   viejo.
 
+## 2026-11-10 10:45 UTC — CATALOGO-3 vuelve sobre `ec0092a`; queda sin efecto la aceptación de las 10:40 (PM, con el consejero)
+
+- Escape de la PM: se aceptó llamando preexistente a H1 sin correr la base.
+  En la base, ²/2 y el ancho completo aciertan; en la vuelta empatan, porque
+  NFKC (pedido por la PM en la causa 2) iguala esos textos.
+- Causa de la devolución: la memoria del cliente se queda con una fila
+  cualquiera ante un empate, distinta entre corridas, y confirmar no lo
+  corrige. Camino de hoy: la misma factura leída del PDF y tipeada a mano.
+  Pedido: el texto tal como se guardó devuelve su fila, el resultado no
+  depende del orden de guardado y, ante un empate, gana lo último confirmado.
+- MEMORIA-ORDEN-1 se retira: entra en esta devolución.
+- Siguen D160-D162 (a), la condición de publicar sobre los choques de la
+  migración, los riesgos menores y la corrección de SUR.

@@ -3,73 +3,71 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Aceptada: CATALOGO-3 sobre `ec0092a` (2026-11-10 PM)
+## Devolución: CATALOGO-3 sobre `ec0092a` (2026-11-10 PM)
 
-Acta: `REPRODUCCION-CATALOGO-3-2026-11-10.md`, sección «Vuelta».
+**La aceptación anterior de esta misma vuelta queda sin efecto.** No la
+tomes. Me equivoqué yo: llamé preexistente a H1 sin correr la base.
 
-**Lo que reproduje**
+Acta: `REPRODUCCION-CATALOGO-3-2026-11-10.md`, sección «Retiro de la
+aceptación», con la salida entera.
 
-- Sabotajes: 45 rojos de 45.
-- Arnés PG: 7 OK.
-- Golden: 115.
-- Pantalla contra servidor: 0 diferencias.
-- Bench: más rápido que la base en las seis combinaciones.
-- `chequeo-6`: lo mismo que el informe.
-- Suite: 5782 passed, 0 failed.
-- 41 negativos míos, con ejemplos distintos de los de la devolución: verdes.
+**Causa.** La memoria del cliente (`lookup_client_memory`) trae las filas
+del cliente sin orden y se queda con la primera de mayor parecido. El mismo
+texto con otro NCM es otra fila, y confirmar suma a su propia fila sin
+cambiar cuál gana. Ante un empate gana una fila cualquiera, y cambia hasta
+entre dos corridas iguales. El NFKC que te pedí en la causa 2 sumó a los
+empates ² contra 2 y el ancho completo, que la base distinguía: la parte
+de esto que es mía, como pasó con D158.
 
-Las tres causas quedan cerradas.
+**Camino de hoy.** La misma factura leída del PDF («Cable 2,5mm²»,
+85444900 CN) y tipeada a mano («Cable 2,5mm2», 85444200 BR). Buscando
+«Cable 2,5mm2», la base da BR; la vuelta da CN, también después de
+confirmar BR tres veces.
 
-**Qué entra y qué no.** Acepto el rango `1345ca7..ec0092a`. Los commits de
-PRESUPUESTO-CLIENTE-1 que están debajo no entran, y no integro tu rama: la
-integra INTEGRAR-1. D151 sigue.
+**Lo que pido (comportamiento):**
 
-**Mi suite no salteó lo mismo que la tuya.** El total es el mismo, pero vos
-salteaste 335 y yo 101. En mi máquina, las 90 pruebas de `test_catalogo3.py`
-corren todas. Para tu próximo informe, mirá por qué en tu entorno se saltean
-más.
+- el texto tal como se guardó devuelve su propia fila;
+- el resultado no depende del orden en que se guardaron las filas;
+- ante textos que empatan, se sugiere lo último confirmado.
 
-**D160, D161 y D162: (a), decidido por la PM.**
+**Prueba.** Los dos órdenes de guardado, en SQLite y en PG, con un sabotaje
+que dé rojo en los dos. La familia va como datos dentro de un caso: ²/2,
+ancho completo, µ/μ y el texto idéntico con otro NCM. Al aceptar, pruebo
+con ejemplos distintos.
 
-- D160: las formas que no están en la tabla quedan sin origen y con aviso.
-- D161: se mantiene la excepción a NFKC para «ºª№™℠».
-- D162: los 22 alias que no son países quedan fuera.
+**Lo demás queda como estaba en mi veredicto anterior:**
 
-**Corregí el informe:** SUR→SR es Surinam (232), no Sudáfrica (ZAF→159).
+- Lo reproducido: 45 rojos de 45, arnés PG 7 OK, golden 115, pantalla 0
+  diferencias, bench más rápido que la base en las seis, `chequeo-6` igual
+  al informe y suite 5782 passed, 0 failed. Las tres causas de `f4ade80`
+  quedan cerradas.
+- **D160, D161 y D162: (a), decidido por la PM.** D160: las formas fuera
+  de la tabla quedan sin origen y con aviso. D161: sigue la excepción a
+  NFKC para «ºª№™℠». D162: los 22 alias que no son países quedan fuera.
+- **Corregí el informe:** SUR→SR es Surinam (232), no Sudáfrica (ZAF→159).
+- **Riesgo que corrijo.** Con un choque en la migración no queda sólo una
+  «fila huérfana»: el texto exacto lee la otra fila, y al confirmarlo pisa
+  su NCM, su origen y su descripción. Va a la lista de publicar: si el
+  primer arranque dice que N filas quedan por un choque y N es mayor que 0,
+  se frena antes de que alguien confirme.
+- **Mi suite no salteó lo mismo que la tuya** (335 contra 101, con el
+  mismo total). En tu próximo informe, decí por qué.
+- **Riesgos que no te pido arreglar:** «1½» contra «1 1/2» pierde la
+  sugerencia (0,67); el extractor acepta orígenes hechos de cifras («212»
+  da US), como pide D158; dos versiones escribiendo las claves a la vez
+  pueden trabar la confirmación; el recorte de espacios en JS es
+  cuadrático y los avisos no tienen tope; `main.py:8244` y `8844` guardan
+  el origen crudo (va con ORIGEN-2); una descripción larga que difiere en
+  potencia y modelo sugiere el mismo NCM, como en la base.
 
-**Riesgo que corrijo.** Con un choque en la migración no queda sólo una
-«fila huérfana». El texto exacto lee la otra fila, y al confirmarlo pisa su
-NCM, su origen y su descripción. Va a la lista de publicar: si el primer
-arranque dice que N filas quedan por un choque y N es mayor que 0, se frena
-antes de que alguien confirme.
-
-**Riesgos que no te pido arreglar:**
-
-- Al empatar, la memoria del cliente devuelve la primera fila
-  (`client_memory.py:286`). Ya pasaba en la base. Se lo propongo a Emi como
-  pieza aparte, MEMORIA-ORDEN-1. No la empieces.
-- «1½» contra «1 1/2» pierde la sugerencia, porque el parecido da 0,67.
-- El extractor acepta orígenes hechos de cifras («212» da US), como pide
-  D158.
-- Si dos versiones escriben las claves a la vez, la confirmación puede
-  quedar trabada.
-- El recorte de espacios en JS es cuadrático, y los avisos no tienen tope.
-- `main.py:8244` y `8844` guardan el origen crudo en `origen_frecuente`. Va
-  con ORIGEN-2.
-
-**Sigue PRESUPUESTO-CLIENTE-1 (D141 a).** Te faltan las puertas, los
-sabotajes, el informe y el hallazgo 8. Basate en tu rama.
+**Orden.** Esta devolución va primero; después, PRESUPUESTO-CLIENTE-1
+(D141 a): te faltan las puertas, los sabotajes, el informe y el hallazgo
+8. D151 sigue: no traigas mi rama hasta que acepte INTEGRAR-1; esto lo
+leés desde mi rama sin integrarla.
 
 D155-D159 siguen como se decidieron (están en Git). Aceptadas sin integrar,
-que integra INTEGRAR-1:
-
-- RESET-3;
-- SMOKE-1;
-- OBSERVABILIDAD-1;
-- ORG-1+D40;
-- D139;
-- D102 (`af924ea`);
-- CATALOGO-3.
+que integra INTEGRAR-1: RESET-3, SMOKE-1, OBSERVABILIDAD-1, ORG-1+D40,
+D139 y D102 (`af924ea`).
 
 Próxima D libre: D163.
 
