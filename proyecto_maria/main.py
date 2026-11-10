@@ -1320,8 +1320,6 @@ async def _migrate_catalogo_sin_tope():
             # Si otra conexión tiene tomada la tabla, falla rápido y el reinicio
             # lo vuelve a intentar, en vez de colgar el arranque.
             await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
-            # Con dos workers a la vez, el segundo espera y ya no encuentra nada que cambiar.
-            await conn.exec_driver_sql("SELECT pg_advisory_xact_lock(7302551)")
             res = await conn.exec_driver_sql(
                 "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() "
                 f"AND table_name = '{tabla}' AND column_name IN ({', '.join(repr(c) for c in columnas)}) "
@@ -1348,7 +1346,7 @@ async def _migrate_catalogo_claves():
         async with engine.begin() as conn:
             if not IS_SQLITE:
                 await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
-                # Dos workers que arrancan juntos: el segundo espera y no encuentra nada.
+                # Con dos workers, el segundo espera hasta 5 s; si no alcanza, la saltea y la hace el otro.
                 await conn.exec_driver_sql("SELECT pg_advisory_xact_lock(7302551)")
             res = await conn.execute(text(
                 "SELECT id, vendor_id, vendor_nombre, product_key, descripcion FROM vendor_catalog_products "
