@@ -163,8 +163,12 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
         return c.post(f"/api/clientes/{cid}/operaciones",
                       json={"operation_id": archivo, "items": [{**item, "valor_unitario": valor}]})
 
-    op6 = guardar(x).json()["operation_id"]
-    token6 = c.post("/api/quotes/share", json={"operation_id": op6}).json()["token"]
+    r = guardar(x)
+    assert r.status_code == 200, r.text
+    op6 = r.json()["operation_id"]
+    r = c.post("/api/quotes/share", json={"operation_id": op6})
+    assert r.status_code == 200, r.text
+    token6 = r.json()["token"]
     r = guardar(y, "NaN")
     chequear(r.status_code == 400 and link(token6) == 200
              and sql("select client_id from operations where id=%s", op6)[0][0] == x,

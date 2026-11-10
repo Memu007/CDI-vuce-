@@ -136,6 +136,10 @@ sabotaje $M "el borrado queda aunque el guardado falle" \
   $'PublicQuoteModel.operation_id == operation.id)\n        )\n' \
   $'PublicQuoteModel.operation_id == operation.id)\n        )\n        await db.commit()\n' \
   "$P" "AssertionError: (True, 400)" "assert 404 == 200"
+sabotaje $M "se borran también los links de otras operaciones" \
+  'sa_delete(PublicQuoteModel).where(PublicQuoteModel.operation_id == operation.id)' \
+  'sa_delete(PublicQuoteModel).where(PublicQuoteModel.operation_id.isnot(None))' \
+  "$P" "AssertionError: otra operación del mismo cliente" "assert 404 == 200"
 sabotaje $M "el guardado encuentra la operación de otro dueño" \
   $'            OperationModel.owner_username == owner_username,\n            OperationModel.generated_file == archivo,\n' \
   $'            OperationModel.generated_file == archivo,\n' \

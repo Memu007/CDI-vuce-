@@ -296,8 +296,8 @@ async def _operacion_sin_cliente(dueno, archivo):
 async def test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto(
     dueno, otro_usuario, cliente_http, creados
 ):
-    """El link compartido tiene los datos del cliente: pasada a otro, la
-    operación deja de mostrarse ahí. Quedarse en el mismo cliente, recibir
+    """El link compartido es el presupuesto armado para un cliente: pasada a
+    otro, la operación deja de mostrarse ahí. Quedarse en el mismo cliente, recibir
     uno por primera vez o fallar a mitad no lo borra."""
     c = cliente_http
     _como(dueno)
@@ -322,6 +322,7 @@ async def test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto(
         assert r.status_code == codigo, (cid == b, arch == archivo, r.text)
         esperado = 200 if sigue else 404
         assert c.get(f"/api/quotes/public/{token}").status_code == esperado, (cid == b, codigo)
+    assert c.get(f"/api/quotes/public/{otro_token}").status_code == 200, "otra operación del mismo cliente"
     assert await _presupuestos_de(op) == 0
     assert await _cliente_de(op) == b
     assert c.get(f"/api/quotes/public/{token_suelto}").status_code == 200, "sin cliente antes"
