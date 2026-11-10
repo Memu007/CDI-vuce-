@@ -38,7 +38,14 @@ después de PRESUPUESTO-CLIENTE-1 de MARIA. Si los arneses de navegador
 terminan, sumá su salida al informe. Mientras tanto:
 
 1. D149 (a) y el ataque sin Postgres: sólo arnés, un commit, cada patrón
-   nuevo con su rojo mostrado una vez.
+   nuevo con su rojo mostrado una vez. **Suman, decidido por la PM
+   (13:48 UTC), para que no toquen las dos el mismo archivo:** `estudio1b`
+   (la misma causa que el ROTO de `estudio1`) y D145 (a), cada sabotaje con
+   su `X-Forwarded-For`, en `estudio1`, `estudio1b`, `orden1`, `cliente1`,
+   `foco_cliente1`, `destino1` y `despacho1a`. MARIA no los toca.
+   **D173 (a):** sí, en ese mismo commit: `pantalla_cliente1.js:38` mira el
+   status del registro y falla con él. Así las puertas de BORRADOR-1 dan un
+   resultado y no un 429.
 2. Después, CONEXIONES-1 parte B sobre lo integrado (cierra D134).
 
 ## NOMBRES-1: aceptada sobre `1960a9a` (2026-11-08 PM)
