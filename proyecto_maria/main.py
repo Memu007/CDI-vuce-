@@ -6338,6 +6338,15 @@ async def _operacion_maria(db: AsyncSession, owner_username: str, archivo: str):
     return result.scalars().first()
 
 
+async def _soltar_link_de_otro_cliente(db: AsyncSession, operation, client_id: int) -> None:
+    """Si la operación pasa a otro cliente, su link compartido se va, como al borrar el
+    cliente: mostraba datos del anterior. Sin commit: cae con el resto si el guardado falla."""
+    if operation.client_id not in (None, client_id):
+        await db.execute(
+            sa_delete(PublicQuoteModel).where(PublicQuoteModel.operation_id == operation.id)
+        )
+
+
 async def _contar_maria(db: AsyncSession, username: str, archivo: str,
                         contenido: str, total_items: int) -> None:
     """Cuenta la operación la primera vez que se genera su MARIA; regenerarla sólo anota
@@ -8137,11 +8146,7 @@ async def save_client_operation(
         )
         if operation is not None:
             # Ya se contó al generar: se completa y sus ítems se reemplazan.
-            if operation.client_id not in (None, client_id):
-                # El link compartido muestra datos del cliente anterior: se va, como al borrarlo.
-                await db.execute(
-                    sa_delete(PublicQuoteModel).where(PublicQuoteModel.operation_id == operation.id)
-                )
+            await _soltar_link_de_otro_cliente(db, operation, client_id)
             for campo, valor in campos.items():
                 setattr(operation, campo, valor)
             operation.extra = {**(operation.extra or {}), "resumen": resumen}
