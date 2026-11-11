@@ -1,6 +1,7 @@
 """La posición como la arma la pantalla alimenta la memoria del cliente por
 cada entrada que la recibe: guardar-uso, la operación, learn y el PUT."""
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -18,14 +19,20 @@ PEDIDOS = {
     "sugerencia": ["formatNcm", "84713000900R"],
     "base": ["formatNcm", "84713000"],
 }
-POSICIONES = json.loads(subprocess.run(
-    ["node", str(PANTALLA), json.dumps(PEDIDOS)], capture_output=True, text=True, check=True,
-).stdout)
+
+
+@pytest.fixture(scope="module")
+def posiciones():
+    if not shutil.which("node"):
+        pytest.skip("sin node")
+    return json.loads(subprocess.run(
+        ["node", str(PANTALLA), json.dumps(PEDIDOS)], capture_output=True, text=True, check=True, timeout=30,
+    ).stdout)
 
 
 @pytest.mark.parametrize("forma", sorted(PEDIDOS))
-def test_la_posicion_de_la_pantalla_alimenta_la_memoria_por_las_cuatro_entradas(client, forma):
-    posicion = POSICIONES[forma]
+def test_pantalla_alimenta_memoria(client, posiciones, forma):
+    posicion = posiciones[forma]
     cid = _cliente(client)
     base = f"/api/clientes/{cid}/catalogo/productos"
 

@@ -8,7 +8,8 @@ function funcion(archivo, nombre) {
   const inicio = fuente.indexOf(`function ${nombre}(`);
   if (inicio < 0) throw new Error(`${nombre} no está en ${archivo}`);
   let i = fuente.indexOf('{', inicio), abiertas = 0;
-  do { abiertas += { '{': 1, '}': -1 }[fuente[i]] || 0; i++; } while (abiertas);
+  do { abiertas += { '{': 1, '}': -1 }[fuente[i]] || 0; i++; } while (abiertas && i < fuente.length);
+  if (abiertas) throw new Error(`${nombre} en ${archivo}: llaves sin cerrar`);
   return fuente.slice(inicio, i);
 }
 
