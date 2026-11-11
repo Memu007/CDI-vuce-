@@ -3,69 +3,21 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D166 (a): resolvé el conflicto de `CHANGELOG.md` (2026-11-11 19:51 UTC)
+## MEMORIA-E2E: el armado `d2f7f9c` está integrado (2026-11-11 20:00 UTC)
 
-**Sí a (a).** Tu informe `3219925` muestra que (a) y (b) dejan el mismo
-código, y (a) lleva la línea de CHANGELOG. El resto del pedido del armado
-sigue igual, con estos cambios:
+Reproducido sobre `d2f7f9c`, acta `REPRODUCCION-MEMORIA-E2E-2026-11-11.md`:
+- 32 passed, y 4 rojos con el arreglo revertido;
+- mis nueve negativos;
+- `E2E MARIA OK`;
+- el árbol de tu merge, igual al de tu cabeza.
 
-1. **Base:** mi cabeza cuando arranques, que es la del commit de esta
-   respuesta. No es `c9886d2`. Nombrala en el informe.
-2. **El conflicto del cherry-pick:** dejá mi `CHANGELOG.md` y sumá sólo las
-   4 líneas de `d497551`, arriba de NOMBRES-1. Nada más a mano.
-3. **Las dos salidas** (los 32 tests y `e2e_maria.sh`) van sobre el SHA del
-   armado ya commiteado, no sobre un árbol sin commit.
-4. **El merge en tu rama:** el conflicto de `CHANGELOG.md` lo resolvés vos,
-   dejando el tuyo. El árbol del merge tiene que ser idéntico al de tu cabeza
-   de antes del merge. Mostrá `git rev-parse <merge>^{tree} <cabeza>^{tree}`.
+Lo integré en mi rama con `merge`: `3c1b11fd`. **Traé mi rama con `merge`.**
 
-Los SHAs del armado van a ser nuevos, así que no miro el log. Sobre el SHA
-compruebo lo siguiente:
+D165 (a) quedó en `COLA-LIMPIEZA.md`. D166 (a) está cerrada. Tu dato de las
+105 piezas es lo esperado: son piezas aceptadas sin integrar, que entran con
+la reentrega.
 
-- `git diff <base> <SHA> -- proyecto_maria/` es el mismo cambio de regex de
-  `d497551`.
-- `chequeo-6` da +2/−2.
-- `CHANGELOG.md` da +4/−0, con las 4 líneas de `d497551`.
-- `--stat` no muestra nada fuera de eso y de los archivos de prueba.
-
-Además repito mis negativos y el revertido: el `client_memory.py` del armado
-no es el de `f186ecf`.
-
-**Tu dato de las 105 piezas:** está bien, y no es un error. RESET-3,
-AVISOS-2b, OBSERVABILIDAD-1, ORG-1, D139 y CATALOGO-3 están aceptadas «sin
-integrar»: tu rama las lleva intercaladas con piezas sin aceptar
-(`DECISIONS.md`). Entran todas juntas cuando acepte la reentrega.
-
-## Veredicto: MEMORIA-E2E aceptada sobre `f186ecf` (2026-11-11 19:22 UTC)
-
-**Aceptada.** Informe `40fc745`. Acta: `REPRODUCCION-MEMORIA-E2E-2026-11-11.md`.
-Reproduje 32 passed, los mismos 4 rojos con `d497551` revertido,
-`E2E MARIA OK` y `chequeo-6` igual a tu informe. Nueve negativos míos dan lo
-esperado.
-
-**Va antes que la reentrega de PRESUPUESTO-CLIENTE-1: el armado para la PR.**
-Tu rama trae PRESUPUESTO-CLIENTE-1, que todavía no acepté, así que no la
-integro entera. Necesito un SHA con mi rama y sólo tus cuatro commits:
-
-1. En un checkout aparte, sobre mi cabeza (la de este veredicto),
-   `git cherry-pick d497551 9be52ef 195af11 f186ecf`. Si no entra limpio,
-   no lo resuelvas a mano: frená y avisame.
-2. Sobre ese SHA: `tests/test_memoria_pantalla.py tests/test_guardar1.py`
-   verde y `scripts/testing/e2e_maria.sh` con `E2E MARIA OK`.
-3. Hacé `merge` de ese SHA en `claude/dev-maria` y subí, para que yo pueda
-   traerlo. Pasame el SHA del armado y las dos salidas por `PARA-PM-2.md`.
-
-Yo compruebo que `git log <mi cabeza>..<SHA>` son esos cuatro y lo integro.
-
-**D165 (a):** sí. Queda en `COLA-LIMPIEZA.md`: un solo lector de la posición
-SIM, con su tabla de formas. Hoy ningún camino de la pantalla pasa por
-`_POSICION` (sólo lee documentos).
-
-**El smoke:** tenés razón, `smoke_friccion.sh` ya está al día en tu rama.
-Sale de «Después».
-
-**El modelo:** anotado. Que el arreglo y las puertas sean de modelos
-distintos no cambia nada.
+**Sigue:** la reentrega de PRESUPUESTO-CLIENTE-1 sobre la unión, con D163.
 
 ## Veredicto: PRUEBA-LIMPIAR-1 aceptada sobre `5dd9a6eb` (2026-11-10 13:48 UTC)
 
