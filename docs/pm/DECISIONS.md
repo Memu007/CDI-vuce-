@@ -757,3 +757,16 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - Emi: «Continua», sobre la pregunta de retomar con la recomendación de hacerlo
   al ritmo de siempre. Tres rutinas prendidas otra vez con `update_trigger`
   y Devs avisadas. Si vuelve un rechazo por límite, se corta igual que antes.
+
+## 2026-11-11 18:54 UTC — MARIA pasa a Fable (Emi)
+
+- Emi: «Si, maria», sobre la recomendación de la PM de probar Fable en una
+  sola Dev, la de la carga más delicada. El cambio lo hace Emi con `/model`
+  en el chat de MARIA al borde de pieza: después de entregar MEMORIA-E2E,
+  antes de PRESUPUESTO-CLIENTE-1. Esfuerzo sigue en alto.
+- Cambia la regla del 2026-10-07 sólo para MARIA: los revisores de su
+  `/code-review` heredan Fable. Los `adversario-*` y `mecanico-haiku`
+  siguen con su modelo fijo; ningún otro subagente en Fable.
+- Vuelta atrás que propone la PM: si aparece el aviso de límite antes de lo
+  habitual, MARIA vuelve al modelo de antes. Que el uso de Fable se recupera
+  aparte es dicho de Emi; la PM no lo pudo comprobar.

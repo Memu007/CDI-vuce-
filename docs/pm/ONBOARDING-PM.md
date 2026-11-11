@@ -198,7 +198,9 @@ dos. En la primera entrega de la pieza, los dos.
   
   Sólo se lo saltea en una vuelta de rutina en la que no pasó nada.
 - **Ningún subagente usa Fable**, ni de la PM ni de las Devs (Emi,
-  2026-10-07). Fable es sólo el consejero de la PM principal.
+  2026-10-07). Fable es el consejero de la PM principal y, desde el
+  2026-11-11 (Emi), la sesión de la Dev MARIA: los revisores de su
+  `/code-review` heredan Fable; los `adversario-*` siguen con su modelo fijo.
 - **Las Devs, hasta esfuerzo alto** (Emi, 2026-10-07): su sesión y sus
   subagentes. Los `adversario-*-muy-alto` son sólo de la PM. Las Devs no usan
   el consejero.

@@ -240,7 +240,10 @@ pantallas. La Dev técnica trabaja en `claude/dev-tecnica`; no tocás su
 canal ni su rama.
 
 Esfuerzo alto (Emi, 2026-10-24). Herramientas: todas menos el consejero;
-tus subagentes hasta alto, nunca Fable.
+tus subagentes hasta alto. Desde que Emi te pase a Fable (2026-11-11, al
+borde de pieza): los revisores de `/code-review` heredan Fable y está
+permitido; los `adversario-*` y `mecanico-haiku` siguen con su modelo fijo;
+ningún otro subagente en Fable.
 
 **Timbres:** al entregar o al dejar una D que te frena, despertás a la PM
 principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
