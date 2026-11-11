@@ -93,17 +93,22 @@ sabotaje $F "una falla al guardar deja abierta la caja de éxito anterior" \
   "        hide(\$('readyClientSuccess'));" \
   '' \
   "FAILED $T::$X[listo-con-cliente-500]"
-sabotaje $F "el plan vencido no avisa que no se guardó" \
-  "                CDI.toast && CDI.toast('No se guardó al cliente', err.motivo || 'Plan vencido o límite alcanzado', 'error');" \
-  '' \
+TOAST_402="                CDI.toast && CDI.toast('No se guardó al cliente', err.message || 'Plan vencido o límite alcanzado', 'error');"
+sabotaje $F "el plan vencido no avisa que no se guardó" "$TOAST_402" '' \
   "FAILED $T::$X[listo-con-cliente-402]"
+sabotaje $F "el plan vencido se avisa como una falla de red" \
+  "            if (err && err.code === 'payment_required') {" \
+  "            if (false) {" \
+  "'detalle': 'Error de red al guardar la operación al historial. Volvé a Listo y reintentá.'"
+sabotaje $F "el plan vencido no dice el motivo del servidor" "$TOAST_402" "${TOAST_402/err.message/err.motivo}" \
+  "'detalle': 'Plan vencido o límite alcanzado'"
 sabotaje $F "la caja no dice lo que no quedó en la memoria" \
   "            'Operación asociada a ' + nombre + (sinMemoria" \
   "            'Operación asociada a ' + nombre + (false" \
   "FAILED $T::$X[asignar-cliente-no-guardado]"
 sabotaje $F "aprender el catálogo no avisa un 400" \
-  "            return { ok: res.ok, detail: res.ok ? '' : textoDeError(data && data.detail, '') };" \
-  "            return { ok: true, detail: '' };" \
+  '                ok: res.ok,' \
+  '                ok: true,' \
   "FAILED $T::$X[aprender-400]"
 sabotaje $F "guardar y aprender a la vez: el aviso del catálogo tapa el error" \
   'if (!r.ok && !avisoDeLaOperacion && CDI.toast) {' \

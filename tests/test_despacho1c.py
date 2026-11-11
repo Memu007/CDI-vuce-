@@ -82,6 +82,7 @@ FALLAS = {"500": {"status": 500}, "409": {"status": 409}, "402": 402, "red": "re
 FALLAS_MEMORIA = {"400": {"status": 400}, "402": 402, "red": "red", "no-guardado": False,
                   "rechazado": {"success": False}}
 CON_PANEL = ("asignar-cliente", "crear-reintento")
+MOTIVO_402 = "Motivo sintético del plan"  # el mensaje con que el arnés lanza el 402
 
 
 @pytest.mark.parametrize("escenario, falla", [
@@ -104,6 +105,9 @@ def test_ninguna_falla_deja_un_exito_a_la_vista(escenario, falla):
         assert caja is None or "memoria" in caja["texto"], vista
     else:
         assert caja is None, vista
+        if falla == "402":
+            # el plan vencido dice el motivo del servidor, no el de una falla de red ni uno fijo
+            assert toasts[-1]["detalle"] == MOTIVO_402, toasts[-1]
         # el panel sigue abierto para reintentar
         assert vista["panelAbierto"] == (escenario in CON_PANEL), vista
 
