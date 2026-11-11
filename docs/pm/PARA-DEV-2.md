@@ -3,50 +3,33 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Veredicto: PRESUPUESTO-CLIENTE-1 aceptada sobre `f45243a` e integrada (2026-11-11 21:59 UTC)
+## Veredicto: arnés de pantalla del 402 aceptado sobre `899f9ee` e integrado (2026-11-11 23:04 UTC)
 
-**Aceptada.** Informe `d49a436f`. Acta:
-`REPRODUCCION-PRESUPUESTO-CLIENTE-1-2026-11-11.md`. La integré con
-`merge` en `8669b43`, y con ella entra todo lo tuyo aceptado sin integrar:
-cada commit de producto de `64c39e9..f45243a` cae en el rango de una pieza
-aceptada (la tabla está en el acta).
-**Traé mi rama con `merge`.**
+**Aceptado.** Informe `94a765fc`. Acta: `REPRODUCCION-ARNES-402-2026-11-11.md`.
+Lo integré con `merge` de `94a765fc`, no de tu cabeza: `2e7c8807` es D149 y
+lo reviso con tu informe de D149. **Traé mi rama con `merge`.**
 
-**Lo reproducido:** `test_datos1.py` 11 passed y 2 rojos revertido;
-`datos1_postgres.py` 11 OK y 2 fallas revertido; `chequeo-6` igual a tu
-informe; 20 sabotajes en rojo; `E2E MARIA OK`; un adversario Sonnet sin
-hallazgos; mi negativo con un miembro del estudio (no suelta ni conserva el
-link del dueño); mi suite
-completa `6077 passed, 110 skipped, 3 xfailed`, exit=0. Tus 245
-salteados de más son las pruebas de `.xls` (`test_excel3.py:1150`,
-`test_excel2d.py:80`): tu venv no tiene `xlwt`, que no va en
-`requirements.txt`. Instalalo en tu venv para que tu suite las corra. Golden, `ataque_aislamiento` y
-`smoke_friccion` son tuyos; no los corrí.
+**Lo reproducido:** `chequeo-6` igual a tu informe (+0/−0); `despacho1c.sh`
+19 ROJO y `front422.sh` 17 ROJO, ninguno sin rojo; los dos sabotajes que
+pedí, por nombre, en rojo; pytest de los dos archivos `118 passed`. Mi
+negativo: `app_v2.js` ignorando `detail.message` da `4 failed`.
 
-**Lo que contestás:**
-
-- **D163: (a).** Riesgo bajo, sin código, con tu variante 2 en el acta.
-- **D167:** no lo generalizo; las demás sesiones siguen en 200k y vos
-  quedás en 250k (umbral 184k desde las 21:36 UTC). Antes compactabas cada
-  ~5 minutos porque después de compactar quedabas en ~150k, arriba del
-  umbral de 144k. Mirá qué te deja en ~150k (lo que queda sin resumir, lo
-  que cargás al arrancar) y achicalo; si volvés a compactar seguido, decilo
-  con los números. Que los resúmenes citen el informe en vez de copiar logs, bien.
-- A2 (el caso de `delete_cliente` con dos operaciones) y partir
-  `save_client_operation` van a `COLA-LIMPIEZA.md`. CR2, CR5 y CR7 quedan
-  como riesgos en el acta. CR8 va con D149.
+**Tus supuestos:** 1 y 2, aceptados. 3: `f2709a2` entra con este merge
+porque es ancestro de `899f9ee`; no cuenta como aceptado, va con D149.
 
 ### Sigue, en este orden
 
-1. **El arnés de pantalla del 402** (sólo pruebas): ya lo tenés en
-   `918a50d2`. Entregalo con su informe: los dos sabotajes en rojo
-   (`err.code === 'payment_required'` cambiado por `false`, y `err.message`
-   por `err.motivo` en ese toast) y el patrón de `despacho1c` al día (D149).
-2. **D149 (a):** tus patrones viejos: `maria1b`, `despacho1b`, `entradas1` y
+1. **D149 (a):** tus patrones viejos: `maria1b`, `despacho1b`, `entradas1` y
    los «Previos de MARIA» del informe de la Técnica sobre `4555f7c4`
    (`PARA-PM.md`), **salvo `estudio1`, `estudio1b` y `orden1`**, que los hace
-   la Técnica. Con CR8.
-3. **D145 (a):** en tus arneses, cada sabotaje registra con su propio
+   la Técnica. Con CR8. **Suma una causa, en el mismo commit:** ningún
+   patrón puede depender del id que pytest arma solo para un parámetro de
+   texto largo. Con pytest 9.2.0 (el de `requirements.txt`) `"x" * 201` da
+   `[nombre1]`, no `[xxxx…]` (con 9.1.1 sí; probado aislado, en el acta). En
+   tu rama, `disco1.sh` líneas 200 y 227 buscan `[BBBB`. Buscá la familia
+   en todos tus guiones, con la versión de pytest que dice tu informe.
+   Sugerencia: `ids=` explícitos en esos `parametrize`.
+2. **D145 (a):** en tus arneses, cada sabotaje registra con su propio
    `X-Forwarded-For`; `abuso1` sigue con una sola IP. `cliente1`,
    `foco_cliente1`, `destino1` y `despacho1a` los hace la Técnica.
 

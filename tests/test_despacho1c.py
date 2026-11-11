@@ -3,6 +3,7 @@ descripción que normalizada queda vacía no cruza el historial."""
 
 from __future__ import annotations
 
+import functools
 import json
 import subprocess
 from pathlib import Path
@@ -48,11 +49,24 @@ def test_lo_que_normaliza_a_vacio_no_cruza_el_historial(
 
 
 PANTALLA = Path(__file__).with_name("despacho1c_pantalla.js")
+CLIENTE_HTTP = Path(__file__).with_name("front422_pantalla.js")
+MOTIVO_402 = "Motivo sintético del plan"
+
+
+@functools.cache
+def _lo_que_lanza_el_402():
+    """Lo que el CDI.api de verdad lanza ante un 402 con ese motivo. El arnés de
+    pantalla lo repite: si lo escribiera a mano, podría dejar de parecerse."""
+    cuerpo = json.dumps({"detail": {"message": MOTIVO_402}})
+    salida = subprocess.run(["node", str(CLIENTE_HTTP), "api", "402", cuerpo], capture_output=True, text=True, timeout=60)
+    assert salida.returncode == 0, salida.stdout + salida.stderr
+    return json.loads(salida.stdout.strip().splitlines()[-1])["lanza"]
 
 
 def pantalla(escenario, respuesta, opciones=None):
     args = ["node", str(PANTALLA), escenario, json.dumps(respuesta)]
-    salida = subprocess.run([*args, json.dumps(opciones or {})], capture_output=True, text=True, timeout=60)
+    opciones = {**(opciones or {}), "lanza402": _lo_que_lanza_el_402()}
+    salida = subprocess.run([*args, json.dumps(opciones)], capture_output=True, text=True, timeout=60)
     assert salida.returncode == 0, salida.stderr[-800:]
     return json.loads(salida.stdout)
 
@@ -104,6 +118,9 @@ def test_ninguna_falla_deja_un_exito_a_la_vista(escenario, falla):
         assert caja is None or "memoria" in caja["texto"], vista
     else:
         assert caja is None, vista
+        if falla == "402":
+            # el plan vencido dice el motivo del servidor, no el de una falla de red ni uno fijo
+            assert toasts[-1]["detalle"] == MOTIVO_402, toasts[-1]
         # el panel sigue abierto para reintentar
         assert vista["panelAbierto"] == (escenario in CON_PANEL), vista
 

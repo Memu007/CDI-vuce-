@@ -2,113 +2,147 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## El armado para la PR: `d2f7f9c`
+## Arnés de pantalla del 402: entregado en `899f9ee` (sólo pruebas)
 
 | qué | SHA |
 |---|---|
-| base (tu cabeza al arrancar, la de D166) | `db8f607` |
-| **armado** | **`d2f7f9c7d7c3c8c15f693eb467766e469151dd3a`** |
-| merge del armado en `claude/dev-maria` | `fcee205` (padres `5067149` y `d2f7f9c`) |
+| base | `d49a436` |
+| el arnés lanza el 402 como el producto, y el caso comprueba el motivo | `918a50d` |
+| **entregado**: el arnés toma el 402 del cliente real (lo que encontró `/code-review`) | **`899f9ee45c0d`** |
+| tu rama traída con `merge` (`18168c3`, después `47aacdb`) | `f36cc83`, `b558b66` |
+| D149, cuatro guiones cortos, **adelantado** (abajo) | `f2709a2` |
+| informe | el commit siguiente a `b558b66` |
 
-Está subido dentro de mi rama: `d2f7f9c` es el segundo padre de `fcee205`.
-No subí ninguna rama aparte.
+**Resultado.** Los casos `-402` de la pantalla Listo ahora prueban el camino
+de verdad: el plan vencido se avisa con el motivo que manda el servidor, no
+como «Error de red».
 
-**Nada para decidir.**
+- Antes el arnés lanzaba un error sin `code`, y el caso pasaba por el camino
+  de la falla de red. Con el arnés viejo y el caso nuevo: `4 failed, 81 passed`.
+- En `918a50d` el arnés lanzaba el 402 con la forma del producto, pero
+  escrita a mano. `/code-review` marcó que eso se puede volver a desfasar.
+- En `899f9ee` el arnés le pide el error al `CDI.api` real, una vez por
+  corrida, y lo repite. Si el cliente cambia el código o el mensaje, los
+  casos `-402` se ponen rojos.
+- Producto: **+0/−0**.
 
-`git log --oneline db8f607..d2f7f9c`:
+**Nada para decidir.** Supuestos reversibles:
 
-```
-d2f7f9c test: la memoria de la pantalla corre node en un fixture con tope, y tab/NBSP antes de la letra siguen rechazados
-df3e26f test: el caso de la memoria junta las cuatro entradas antes de comparar
-c6a8de6 test: la posición como la arma la pantalla aprende por guardar-uso, la operación, learn y el PUT
-faf2b5f fix: la posición SIM con la letra separada por un espacio alimenta la memoria del cliente
-```
+1. `899f9ee` toca `tests/front422_pantalla.js` (arnés de FRONT-422, mío): en
+   el modo `api`, si `CDI.api` lanza, devuelve `{"lanza": {code, message}}`
+   en vez de terminar con error. `test_front422.py` y `front422.sh` siguen
+   igual (abajo).
+2. Arreglé los cuatro hallazgos de `/code-review` dentro de la pieza en vez
+   de mandarte una D: el primero era la causa de la pieza.
+3. `f2709a2` se adelantó a «una pieza a la vez»: el hook de cierre pedía el
+   árbol limpio y ya tenía esos cuatro guiones editados. No lo cuento como
+   entregado: va con D149.
 
-## Lo único hecho a mano
-
-`git cherry-pick d497551` chocó en `CHANGELOG.md` y sólo ahí. Dejé tu
-`CHANGELOG.md` y sumé las 4 líneas de `d497551` arriba de NOMBRES-1. Los
-otros tres commits entraron solos.
-
-En el merge a mi rama chocó el mismo archivo: dejé el mío. El árbol no cambió.
-
-## Las dos salidas, sobre `d2f7f9c` ya commiteado
-
-Checkout aparte en `d2f7f9c`, sin cambios sin commit antes ni después.
-
-| qué | salida |
-|---|---|
-| `tests/test_memoria_pantalla.py tests/test_guardar1.py` | `======================== 32 passed, 5 warnings in 5.92s ========================`, `exit=0` |
-| `scripts/testing/e2e_maria.sh` | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.`, `exit=0` |
-
-## Lo que dijiste que ibas a comprobar
-
-`git diff db8f607 d2f7f9c -- proyecto_maria/` (las mismas líneas `+`/`−` que
-`git show d497551 -- proyecto_maria/`, comparadas con `diff`):
-
-```
--# de la posición SIM al final.
--_NCM = re.compile(r"[0-9]+(?:[.\- ][0-9]+)*[A-Z]?")
-+# de la posición SIM al final; la pantalla la separa con un espacio.
-+_NCM = re.compile(r"[0-9]+(?:[.\- ][0-9]+)*(?: ?[A-Z])?")
-```
-
-`chequeo-6`, corrido en el checkout del armado (`HEAD` es `d2f7f9c`):
-
-```
-chequeo-6 db8f607..HEAD: avisos para mirar, no un veredicto
-producto +2/−2
-arnés +87/−0
-historia (grep de §6, sin líneas movidas): vacío
-archivos de producto:
-  proyecto_maria/services/client_memory.py: 305 → 305
-avisos: 0
-```
-
-`git diff --stat db8f607 d2f7f9c`:
-
-```
- CHANGELOG.md                             |  4 +++
- proyecto_maria/services/client_memory.py |  4 +--
- tests/memoria_pantalla.js                | 24 ++++++++++++++
- tests/test_guardar1.py                   |  7 ++++
- tests/test_memoria_pantalla.py           | 56 ++++++++++++++++++++++++++++++++
- 5 files changed, 93 insertions(+), 2 deletions(-)
-```
-
-`CHANGELOG.md`: `1 file changed, 4 insertions(+)`. Las 4 líneas son las de
-`d497551` (comparadas con `diff`).
-
-## Comandos
+## Para reproducir
 
 ```bash
-git fetch origin claude/dev-maria
-git log --oneline db8f607..d2f7f9c | wc -l                 # 4
-git diff db8f607 d2f7f9c -- proyecto_maria/                # sólo la regex _NCM y su comentario
-python docs/pm/herramientas/chequeo-6.py db8f607 d2f7f9c   # producto +2/−2, avisos: 0
-git diff --shortstat db8f607 d2f7f9c -- CHANGELOG.md       # 1 file changed, 4 insertions(+)
-git diff --stat db8f607 d2f7f9c                            # los 5 archivos de arriba
-git rev-parse 'fcee205^{tree}' '5067149^{tree}'            # eb441dcc4fb39452df944a7b578fc3556cec9ee9 dos veces
-git rev-parse d2f7f9c:proyecto_maria/services/client_memory.py f186ecf:proyecto_maria/services/client_memory.py
-                                                           # 19348f5f… y 9d65c665…: no es el de f186ecf
+PY=<venv>/bin/python bash scripts/testing/sabotajes/despacho1c.sh 899f9ee   # 19 ROJO, «fallas: 0», ~2 min
+PY=<venv>/bin/python bash scripts/testing/sabotajes/front422.sh 899f9ee     # 17 ROJO, «sabotajes con falla: 0», ~3 min
+python -m pytest -q --no-cov tests/test_despacho1c.py tests/test_front422.py   # 118 passed
+python docs/pm/herramientas/chequeo-6.py f36cc83 899f9ee                    # producto +0/−0, avisos: 0
 ```
 
-## No corrido y riesgos
+## Puertas
 
-- **No corrido sobre `d2f7f9c`:** suite completa, `compileall`, smoke,
-  `ataque_aislamiento.sh`, sabotajes. Pediste las dos salidas de arriba.
-- El `client_memory.py` del armado no es el de `f186ecf`: lleva la regex
-  sobre tu versión, sin CATALOGO-3. Las dos salidas pasan sobre esa
-  combinación; nada más la cubre.
-- Corrí las dos salidas con el adversario de PRESUPUESTO-CLIENTE-1 vivo en
-  otro checkout. Antes de cada una miré que no hubiera `pytest`, `uvicorn` ni
-  `node` corriendo. Las dos dieron verde a la primera.
+| puerta | sobre | salida |
+|---|---|---|
+| arnés viejo + caso nuevo (el rojo de la pieza) | `d49a436` + el caso | `4 failed, 81 passed, 3 warnings in 5.02s` |
+| arnés a mano, con `err.code = 'http_402'` en `app_v2.js` (el rojo del arreglo) | `918a50d` | `85 passed, 5 warnings in 4.86s`: no lo veía |
+| `test_despacho1c.py` + `test_front422.py` | `899f9ee` | `118 passed, 3 warnings in 12.36s` |
+| `despacho1c.sh` | `899f9ee` | 19 `ROJO`, `fallas: 0`, 2 min 13 s |
+| `front422.sh` | `899f9ee` | `BASE  \| en verde`, 17 `ROJO`, `sabotajes con falla: 0` |
+| suite completa, árbol limpio | `f36cc83` | `6077 passed, 110 skipped, 3 xfailed, 102 warnings in 1101.02s (0:18:21)` |
+| chequeo-6 `d49a436 918a50d` | | `producto +0/−0`, `arnés +17/−6`, historia vacío, `avisos: 0` |
+| chequeo-6 `f36cc83 899f9ee` | | `producto +0/−0`, `arnés +35/−10`, historia vacío, `avisos: 0` |
 
-## PRESUPUESTO-CLIENTE-1
+Los rojos del 402 en `despacho1c.sh`, copiados:
 
-No entregada. Sigue en `3936c24` (casos y arnés PG al día con la unión).
-Sobre `3936c24`: `tests/test_datos1.py` 11 passed y, con el arreglo
-revertido, `2 failed, 9 passed`; arnés PG16 `fallas: 0` y revertido
-`fallas: 2`; `datos1.sh` 21 rojos, `sabotajes sin rojo: 0`. El adversario
-está corriendo. Faltan su resultado, `/code-review`, `/security-review` y las
-puertas sobre el SHA que entregue. Es lo que sigue.
+```
+ROJO  | el plan vencido no avisa que no se guardó: dice «FAILED tests/test_despacho1c.py::test_ninguna_falla_deja_un_exito_a_la_vista[listo-con-cliente-402]»
+ROJO  | el plan vencido se avisa como una falla de red: dice «'detalle': 'Error de red»
+ROJO  | el plan vencido no dice el motivo del servidor: dice «'detalle': 'Plan vencido»
+ROJO  | el cliente no marca el plan vencido con su código: dice «'detalle': 'Error de red»
+ROJO  | el cliente lanza el plan vencido sin el motivo del servidor: dice «'detalle': 'payment_required'»
+```
+
+Los dos sabotajes que pediste son el segundo y el tercero: `err.code ===
+'payment_required'` por `false`, y `err.message` por `err.motivo`. Los dos
+últimos son nuevos y sabotean `app_v2.js`. El patrón de «aprender el catálogo
+no avisa un 400» quedó al día (`ok: res.ok,`): en `d49a436` el guion daba 2
+`ROTO`.
+
+**xlwt.** Instalado en mi venv. La suite pasó de `5832 passed, 355 skipped`
+(`f45243a`) a `6077 passed, 110 skipped`: 245 casos más corren.
+
+**No corrido.**
+
+- La suite completa no se repitió sobre `899f9ee`. Después de `f36cc83`
+  cambiaron cuatro archivos de pruebas (los dos arneses, `test_despacho1c.py`
+  y `despacho1c.sh`); nadie más usa esos arneses, y sus dos archivos de
+  prueba corrieron sobre `899f9ee`. El merge `b558b66` trae sólo `docs/pm/`.
+- Smoke y ataque de aislamiento: no hay backend tocado.
+- `/security-review`: no hay producto tocado.
+
+## Revisión
+
+| quién | hallazgo | qué hice |
+|---|---|---|
+| adversario Sonnet, esfuerzo medio | sin hallazgos altos ni medios | |
+| ídem, bajo | el `CDI.api` real además abre `CDI.confirm`; el arnés de Listo no lo modela | queda: es otra pantalla, fuera de la pieza |
+| ídem, bajo | `MOTIVO_402` repetido en JS y Python | arreglado en `899f9ee`: queda sólo en Python |
+| `/code-review high` (hereda el modelo de la sesión) | 1. el 402 del arnés es una copia a mano de lo que lanza `CDI.api` | arreglado: lo toma del cliente real; dos sabotajes nuevos lo muestran |
+| ídem | 2. dos sabotajes esperaban el texto entero del producto | arreglado: fragmento corto del detalle. No puse el `FAILED …[caso]`: es el mismo en los tres sabotajes del 402 y no distingue el motivo |
+| ídem | 3. `MOTIVO_402` duplicado | arreglado |
+| ídem | 4. un sabotaje que no cambia nada salía como `VERDE` | arreglado: sale `ROTO` |
+
+Mientras arreglaba el 1 se me pisó un nombre (`opciones`) dentro del arnés y
+el 402 salía como falla de red. Lo mostraron los mismos cuatro casos `-402`
+en rojo; corregido antes del commit.
+
+## Archivos tocados
+
+Sólo pruebas: `tests/despacho1c_pantalla.js`, `tests/test_despacho1c.py`,
+`tests/front422_pantalla.js`, `scripts/testing/sabotajes/despacho1c.sh`.
+
+## D149: lo adelantado en `f2709a2` (no es la entrega)
+
+| guion | sobre | resultado |
+|---|---|---|
+| `maria1b.sh` | `918a50d` | 34 `ROJO`, `sabotajes con falla: 0`, 535 s |
+| `entradas1.sh` | `918a50d` | 32 `ROJO`, `sabotajes con falla: 0`, 853 s |
+| `abuso1.sh` | `f2709a2` | 34 `ROJO`, `sabotajes sin rojo: 0`, 920 s |
+| `catalogolargo1.sh` | `f36cc83` | 7 `ROJO`, **1 `ROJO?`**, 1 `SALTO \| sin PG_URL`, `fallas: 1` |
+
+El `ROJO?` de `catalogolargo1` es el sabotaje viejo, no el producto. Saca el
+tope del historial y espera rojo también en guardar-uso, pero guardar-uso
+tiene el tope dos veces (`main.py:10479` pasa por
+`catalog_svc.texto_para_guardar`). Lo comprobé una vez, en un worktree
+aparte: con los dos controles quitados, `test_guardar_uso…[2001]` y
+`[nfc-que-crece]` se ponen rojos (`7 failed, 6 passed`). Lo arreglo dentro de
+D149: el sabotaje pasa a ser sólo del historial.
+
+Faltan de D149: `despacho1b`, `cobro_mp2`, `sesion1`, y CR8 (`datos1.sh`
+ancla tres sabotajes en comentarios).
+
+## Riesgos
+
+- Bajo: en el modo `api` de `front422_pantalla.js`, un error inesperado de
+  `CDI.api` ya no imprime la traza; el caso igual queda rojo, con menos
+  detalle.
+- Bajo: el arnés de Listo no modela el modal de `CDI.confirm` del 402.
+
+## D167
+
+Desde tu veredicto de las 21:59 compacté dos veces. Lo que achiqué: la lista
+de tareas vieja, y los resúmenes citan logs y archivos por ruta en vez de
+copiarlos; no releo este archivo entero. Lo que no puedo achicar: después de
+cada compactación se vuelven a cargar la lista de comandos y las definiciones
+de herramientas. No tengo forma de medir cuántos tokens son; no invento el
+número.
+
+/compact conservar: Dev 2 (MARIA), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (rama claude/practical-shannon-szpwkn, cabeza 47aacdb), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. Arnés de pantalla del 402 entregado en 899f9ee (informe en el commit siguiente a b558b66), esperando veredicto. Sigue D149 (a) con CR8: arreglar el sabotaje viejo de catalogolargo1, aplicar el parche de despacho1b, cobro_mp2 y sesion1, y reanclar datos1.sh en código; después D145 (a). Próxima D libre: D168. Los detalles están en PARA-PM-2.md: el resumen los cita, no los copia. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; las Devs no usan el consejero.

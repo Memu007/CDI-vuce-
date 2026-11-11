@@ -131,7 +131,7 @@ sabotaje $M "agrupar sin modelo" "$G[agrupar_no_json]" \
   "    pedido: AgruparRequest," "    pedido: Request," \
   "    item_ids = pedido.item_ids" "    item_ids = (await pedido.json()).get(\"item_ids\", [])"
 sabotaje $M "los ítems de agrupar sin validar" "$G[agrupar_surrogate]" \
-  "    item_ids: list[TextoCodificable] = []" "    item_ids: list[str] = []"
+  "    item_ids: list[TextoCodificable] = " "    item_ids: list[str] = "
 sabotaje $M "desagrupar sin tope del entero" "$G[desagrupar_enorme]" \
   "Field(ge=-2**31, le=2**31 - 1)" "Field()"
 
