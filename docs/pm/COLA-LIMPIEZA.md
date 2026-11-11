@@ -159,3 +159,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie`: compara tiempo
   contra 0,5 s y dio 0,66 s en la CI sin cambio de producto; medir algo que no
   dependa del runner.
+- Tres lectores de la posición SIM que no aceptan lo mismo: `_NCM` en
+  `client_memory.py`, `_POSICION` en `despacho_lector.py` y `_partes` en
+  `sufijos_arca.py`. Uno solo, con su tabla de formas (D165 a, MEMORIA-E2E).
