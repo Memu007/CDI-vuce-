@@ -784,10 +784,13 @@
                 CDI.toast && CDI.toast('No se guardó al cliente',
                     'La operación no quedó en el historial. Volvé a Listo y reintentá.', 'error');
             });
-            saveCatalogLearn(items, carga).then(aprendido => {
-                if (!aprendido && !avisoDeLaOperacion && CDI.toast) {
+            saveCatalogLearn(items, carga).then(r => {
+                if (!r.ok && !avisoDeLaOperacion && CDI.toast) {
                     CDI.toast('Algunos productos no quedaron en la memoria',
+                        (r.detail ? r.detail + ' ' : '') +
                         'La operación está lista, pero la próxima vez esos productos no se van a sugerir solos.', 'warning');
+                } else if (r.avisos && r.avisos.length && !avisoDeLaOperacion && CDI.toast) {
+                    CDI.toast('Origen no reconocido', r.avisos.join(' ') + ' No se guardó su origen.', 'warning');
                 }
             });
         } catch (err) {
@@ -1358,11 +1361,11 @@
     CDI.saveOperationToHistory = saveOperationToHistory;
     CDI.seguroSinLeer = seguroSinLeer;
 
-    // true si aprendió o no había nada para aprender.
+    // ok si aprendió o no había nada para aprender; detail, qué producto rechazó el servidor.
     async function saveCatalogLearn(items, carga) {
         const op = (carga && carga.operacion) || {};
         const vendorName = String(op.vendedor_nombre || '').trim();
-        if (!vendorName || !Array.isArray(items) || !items.length) return true;
+        if (!vendorName || !Array.isArray(items) || !items.length) return { ok: true };
 
         const productos = items.map(it => ({
             descripcion: String(it.descripcion || '').trim(),
@@ -1371,7 +1374,7 @@
             unidad_medida: String(it.unidad_medida || '').trim(),
         })).filter(p => p.descripcion && p.ncm);
 
-        if (!productos.length) return true;
+        if (!productos.length) return { ok: true };
 
         // Derivar vendor_id slug (mismo criterio que backend: alfanumerico lowercased sin acentos)
         const vendor_id = vendorName
@@ -1393,9 +1396,13 @@
                     updated: data && data.updated || 0,
                 });
             }
-            return res.ok;
+            return {
+                ok: res.ok,
+                detail: res.ok ? '' : textoDeError(data && data.detail, ''),
+                avisos: res.ok && Array.isArray(data && data.avisos) ? data.avisos : []
+            };
         } catch (_) {
-            return false;
+            return { ok: false, detail: '' };
         }
     }
 

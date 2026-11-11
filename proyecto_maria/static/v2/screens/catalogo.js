@@ -267,7 +267,7 @@
                     '</label>' +
                     '<label class="catalogo-product-field">' +
                         '<span>Origen</span>' +
-                        '<input type="text" data-field="origen" value="' + CDI.escapeHtml(origen) + '" placeholder="XX" maxlength="3">' +
+                        '<input type="text" data-field="origen" value="' + CDI.escapeHtml(origen) + '" placeholder="País o código">' +
                     '</label>' +
                 '</div>' +
                 '<div class="catalogo-product-actions">' +
@@ -320,7 +320,8 @@
             );
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.detail || 'No se pudo guardar');
-            if (CDI.toast) CDI.toast.success('Producto actualizado');
+            if (CDI.toast && data.aviso) CDI.toast('Producto actualizado', data.aviso, 'warning');
+            else if (CDI.toast) CDI.toast.success('Producto actualizado');
             CDI.track && CDI.track('catalogo_producto_edited', {
                 vendor_id: detailVendorId,
                 product_key: productKey,

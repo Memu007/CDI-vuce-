@@ -684,20 +684,51 @@ _PAISES_PANTALLA = Path(__file__).resolve().parents[1] / "static" / "v2" / "pais
 
 
 @lru_cache(maxsize=1)
-def codigos_tabla_oficial() -> frozenset:
-    """Los códigos de país de la tabla oficial MARIA (TABLA PAISES V.0
+def _tabla_oficial() -> dict:
+    """Código -> nombre normalizado de la tabla oficial MARIA (TABLA PAISES V.0
     25082010.xlsx, 309 países). Una sola copia: la que usa la pantalla."""
     js = _PAISES_PANTALLA.read_text(encoding="utf-8")
     m = re.search(r"const COUNTRIES = (\[.*?\]);", js)
     if not m:
         raise RuntimeError(f"No se encontró la tabla de países (const COUNTRIES) en {_PAISES_PANTALLA}")
-    return frozenset(int(p["code"]) for p in json.loads(m.group(1)))
+    return {int(p["code"]): _normalizar_pais(p["name"]) for p in json.loads(m.group(1))}
+
+
+def codigos_tabla_oficial() -> frozenset:
+    return frozenset(_tabla_oficial())
+
+
+@lru_cache(maxsize=1)
+def _nombres_de_pais() -> dict:
+    """Nombre normalizado -> código: los alias de la pantalla más los del servidor."""
+    js = _PAISES_PANTALLA.read_text(encoding="utf-8")
+    m = re.search(r"const ALIASES = (\{.*?\});", js)
+    if not m:
+        raise RuntimeError(f"No se encontró la tabla de nombres (const ALIASES) en {_PAISES_PANTALLA}")
+    return {**{k: int(v) for k, v in json.loads(m.group(1)).items()}, **_PAISES_NORM}
+
+
+def codigo_de_pais(texto) -> int | None:
+    """El código del país si se reconoce con certeza; si no, None. Mismo criterio
+    que `resolve` en paises_maria.js; dos letras tienen que ser ASCII («ＢＲ», «ÉS»)."""
+    escrito = unicodedata.normalize("NFC", str(texto or "")).strip()
+    if len(escrito) <= 2 and not (escrito.isascii() and escrito.isalpha()):
+        return None
+    m = re.fullmatch(r"0?([0-9]{3})(?:\s*[·-]\s*(.+))?", escrito)
+    if not m:
+        return _nombres_de_pais().get(_normalizar_pais(escrito))
+    codigo, nombre = int(m.group(1)), m.group(2)
+    # «310 - Vietnam» o «203-ARG»: el nombre que contradice el código no se adivina.
+    if codigo in _tabla_oficial() and (nombre is None or _normalizar_pais(nombre) == _tabla_oficial()[codigo]
+                                       or _nombres_de_pais().get(_normalizar_pais(nombre)) == codigo):
+        return codigo
+    return None
 
 
 def _codigo_de_la_tabla(texto: str) -> bool:
     """Un código de país: sólo cifras 0-9 y en la tabla oficial («²», «٢٢٢» o
     «99999» no son países)."""
-    return bool(re.fullmatch(r"[0-9]+", texto)) and int(texto) in codigos_tabla_oficial()
+    return bool(re.fullmatch(r"[0-9]{1,4}", texto)) and int(texto) in codigos_tabla_oficial()
 
 
 def procedencia_de(item: dict) -> str:
@@ -752,12 +783,22 @@ def pais_reconocido(pais) -> bool:
     que son adivinanzas. Sirve para que el sistema AVISE en vez de meter un
     código de origen errado en el TXT aduanero (ej: 'XX', 'Vietnam').
     """
-    if pais is None or str(pais).strip() == "":
-        return False
-    texto = str(pais).strip()
-    if any(c.isdigit() for c in texto):
-        return _codigo_de_la_tabla(texto)
-    return _normalizar_pais(pais) in _PAISES_NORM
+    return codigo_de_pais(pais) is not None
+
+
+def origen_valido(texto) -> str | None:
+    """El origen como se guarda si es un país de la tabla (nombre o código); si no, None."""
+    if codigo_de_pais(texto) is None:
+        return None
+    escrito = " ".join(unicodedata.normalize("NFC", str(texto)).split())
+    return escrito.upper() if len(escrito) == 2 else escrito
+
+
+def clave_de_origen(origen) -> str:
+    """Con qué se comparan dos orígenes: «313», «TAIWAN» y «TW» son el mismo."""
+    if pais_reconocido(origen):
+        return str(get_pais_codigo(origen))
+    return str(origen or "").strip().upper()
 
 
 def pais_de_la_tabla(pais) -> bool:
@@ -766,7 +807,7 @@ def pais_de_la_tabla(pais) -> bool:
     return pais_reconocido(pais)
 
 
-def get_pais_codigo(pais: str) -> int:
+def get_pais_codigo(pais: str, default: int = PAIS_DEFAULT_IMPORT) -> int:
     """Obtiene el código de país oficial MARIA para un nombre/código.
 
     Estrategia: normaliza (mayúsculas, sin acentos ni puntos) y busca match
@@ -776,24 +817,27 @@ def get_pais_codigo(pais: str) -> int:
     default; usar `pais_reconocido()` para detectar ese caso y avisar.
     """
     if not pais:
-        return PAIS_DEFAULT_IMPORT
+        return default
+    codigo = codigo_de_pais(pais)
+    if codigo is not None:
+        return codigo
 
-    # Si ya es un número, devolverlo
-    if re.fullmatch(r"[0-9]+", str(pais).strip()):
+    # Un código tiene hasta 4 cifras, como en `_codigo_de_la_tabla`: con miles
+    # de cifras int() lanza ValueError.
+    if re.fullmatch(r"[0-9]{1,4}", str(pais).strip()):
         return int(str(pais).strip())
 
     norm = _normalizar_pais(pais)
-    # 1) Match exacto normalizado
     if norm in _PAISES_NORM:
         return _PAISES_NORM[norm]
-    # 2) Fallback por prefijo estricto (>=4 chars) solo si no hubo exacto
+    # Fallback por prefijo estricto (>=4 chars) solo si no hubo exacto
     if len(norm) >= 4:
         prefijo = norm[:4]
         for key_norm, code in _PAISES_NORM.items():
             if key_norm.startswith(prefijo):
                 return code
 
-    return PAIS_DEFAULT_IMPORT
+    return default
 
 
 def _exacto(valor) -> Decimal:
@@ -1080,15 +1124,21 @@ def es_exportacion(tipo_destinacion) -> bool:
     return re.match(r"[^A-Z0-9]*EC", texto) is not None
 
 
+def codigo_de_destinacion(texto) -> str:
+    """Las 4 letras o números ASCII en mayúsculas, o "" si no es un código."""
+    codigo = str(texto or "").strip()
+    return codigo.upper() if re.fullmatch(r"[A-Za-z0-9]{4}", codigo) else ""
+
+
 def destinacion_del_txt(tipo_destinacion, exportacion: bool = False) -> str:
     """La destinación como va al ISTA: cuatro letras o números ASCII, o ValueError."""
     if es_exportacion(tipo_destinacion) != exportacion:
         raise ValueError(IMPORTACION_EN_EXPORTACION if exportacion else EXPORTACION_EN_IMPORTACION)
-    codigo = str(tipo_destinacion or "").strip() or ("" if exportacion else "IC04")
-    if not re.fullmatch(r"[A-Za-z0-9]{4}", codigo):
+    codigo = codigo_de_destinacion(str(tipo_destinacion or "").strip() or ("" if exportacion else "IC04"))
+    if not codigo:
         ejemplo = "EC01" if exportacion else "IC04"
         raise ValueError(f"Destinación: va un código de 4 letras o números, como {ejemplo}.")
-    return codigo.upper()
+    return codigo
 
 
 def generate_maria_txt(operation_id: str, items: list, 
@@ -1409,7 +1459,7 @@ def generate_maria_txt(operation_id: str, items: list,
         # Defensa en profundidad: el frontend lo valida, pero el endpoint de
         # generación también puede llamarse directamente.
         ncms = {str(it.get('ncm') or it.get('pieza') or '').replace('.', '').replace(' ', '').upper() for it in grupo_items}
-        origenes = {str(it.get('pais_origen') or it.get('origen') or '').strip().upper() for it in grupo_items}
+        origenes = {clave_de_origen(it.get('pais_origen') or it.get('origen')) for it in grupo_items}
         # Las unidades, por su código: «kg» y «KGS», o «1» y «01», son la misma.
         unidades = {get_unidad_codigo(it.get('unidad') or it.get('unidad_medida') or it.get('um')) for it in grupo_items}
         if any(it.get('subitems') for it in grupo_items):

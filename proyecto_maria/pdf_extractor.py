@@ -542,6 +542,8 @@ def _llm_extract_pdf_items(text: str) -> list[dict]:
             print(f"⚠️ LLM devolvió {len(items_raw)} items, truncando a 2000")
             items_raw = items_raw[:2000]
 
+        from proyecto_maria.core.maria_generator import origen_valido
+
         out = []
         for it in items_raw:
             if not isinstance(it, dict):
@@ -570,9 +572,7 @@ def _llm_extract_pdf_items(text: str) -> list[dict]:
             cantidad = cantidad if cantidad > 0 else 1.0
             peso_unitario = peso_unitario if peso_unitario > 0 else 0.1
 
-            # origen: solo letras ISO, max 3
-            origen_raw = re.sub(r'[^A-Za-z]', '', str(it.get('origen') or ''))
-            origen = (origen_raw[:3] or 'XX').upper()
+            origen = origen_valido(str(it.get('origen') or '')) or 'XX'
 
             item = {
                 # Campos básicos
@@ -2024,12 +2024,12 @@ sin completar una operación de importación. Las secciones siguientes aplican
 
 def validar_documento_importacion(result: dict) -> dict:
     """Sólo una clasificación positiva admite productos de una nueva lectura."""
-    from proyecto_maria.core.maria_generator import es_exportacion
+    from proyecto_maria.core.maria_generator import codigo_de_destinacion, es_exportacion
     documento = result.get("documento") if isinstance(result, dict) else None
     if not isinstance(documento, dict):
         raise DocumentoNoAdmitido(MENSAJE_DOCUMENTO_NO_ADMITIDO)
     clase = {campo: str(documento.get(campo) or "").strip().lower()
-             for campo in ("tipo", "operacion", "destinacion")}
+             for campo in ("tipo", "operacion")}
     operacion = result.get("operacion") if isinstance(result.get("operacion"), dict) else {}
     if (clase["tipo"] != "factura_comercial" or clase["operacion"] != "importacion"
             or any(es_exportacion(destinacion) for destinacion in (
@@ -2038,7 +2038,7 @@ def validar_documento_importacion(result: dict) -> dict:
                    and str(datos["tipo_documento"]).strip().lower() != "factura_comercial"
                    for datos in (result, operacion))):
         raise DocumentoNoAdmitido(MENSAJE_DOCUMENTO_NO_ADMITIDO)
-    clase["destinacion"] = clase["destinacion"].upper()
+    clase["destinacion"] = codigo_de_destinacion(documento.get("destinacion"))
     return clase
 
 
@@ -2069,22 +2069,19 @@ def _iso2_por_codigo_maria() -> dict:
 
 def _origen_desde_factura(raw) -> str:
     """País leído de la factura → código de dos letras de la tabla oficial
-    VUCE, o "" si no se reconoce. Acepta dos letras, tres letras (ISO 3166-1)
-    y el nombre ("China", "P.R. China")."""
+    VUCE (o el nombre, si el país no tiene uno), o "" si no se reconoce.
+    Acepta dos letras, tres letras (ISO 3166-1) y el nombre ("China", "P.R. China")."""
     from proyecto_maria.core.maria_generator import get_pais_codigo, pais_reconocido
-    from proyecto_maria.core.paises_iso3 import ISO3_A_ISO2
 
     texto = str(raw or '').strip()
     # «NA» en una factura casi siempre es «no aplica», no Namibia.
-    if not texto or texto.isdigit() or texto.upper() in ('NA', 'N/A'):
+    if not texto or texto.upper() in ('NA', 'N/A'):
         return ''
     mayus = texto.upper()
     if len(mayus) == 2 and mayus.isalpha():
         return mayus if pais_reconocido(mayus) else ''
-    if len(mayus) == 3 and mayus in ISO3_A_ISO2:
-        return ISO3_A_ISO2[mayus]
     if pais_reconocido(texto):
-        return _iso2_por_codigo_maria().get(get_pais_codigo(texto), '')
+        return _iso2_por_codigo_maria().get(get_pais_codigo(texto), texto)
     return ''
 
 

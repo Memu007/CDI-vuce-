@@ -21,6 +21,7 @@ on-demand al construir get_vendor/get_vendor_by_id.
 """
 
 from __future__ import annotations
+import functools
 import hashlib
 import math
 import re
@@ -80,8 +81,20 @@ def ncm_para_guardar(valor) -> str:
     return ncm
 
 
+def origen_para_guardar(valor) -> tuple[str, str]:
+    """(origen, aviso): ("", aviso) si no es un país de la tabla; «XX» es el
+    «sin origen» de la factura. ValueError si no se puede guardar como texto."""
+    origen = texto_para_guardar(valor, "El origen")
+    if not origen or origen.upper() == "XX":
+        return "", ""
+    # Import local: despacho_lector importa de este módulo.
+    from proyecto_maria.core.despacho_lector import origen_para_catalogo
+    guardado, aviso = origen_para_catalogo(origen)
+    return ("", aviso) if aviso else (guardado or "", "")
+
+
 # Patron valido para vendor_id (slug generado por _vendor_key).
-_VENDOR_ID_RE = re.compile(r"^[a-z0-9_]{1,60}$")
+_VENDOR_ID_RE = re.compile(r"^[a-z0-9_~]{1,60}$")
 
 
 def is_valid_vendor_id(vendor_id: str) -> bool:
@@ -99,25 +112,82 @@ def _normalize(text: str) -> str:
     """Normaliza texto para usar como clave de catalogo."""
     if not text:
         return ""
-    text = unicodedata.normalize("NFD", text)
-    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
+    if not text.isascii():
+        text = unicodedata.normalize("NFD", text)
+        text = "".join(c for c in text if unicodedata.category(c) != "Mn")
     text = re.sub(r"[^a-z0-9\s]", " ", text.lower())
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _sufijo(texto: str) -> str:
+    """Resumen de las letras y cifras no latinas que _normalize descarta (CJK,
+    kana, griego): «º» y «ª» no cuentan; «µ» llega como «μ» y sí."""
+    fuera = "".join(
+        c for c in unicodedata.normalize("NFC", texto)
+        if c > "\u024f" and (unicodedata.category(c)[0] == "L" or unicodedata.category(c) == "Nd")
+        if not _normalize(c) and not unicodedata.name(c, "").startswith("LATIN")
+    )
+    if not fuera:
+        return ""
+    return hashlib.sha256(fuera.casefold().encode("utf-8", "surrogatepass")).hexdigest()[:16]
+
+
+def _compatible(texto: str) -> str:
+    """NFKC salvo en «ºª№™℠», para que «Nº» siga igual a «N°» y «Bolt™» a «Bolt»;
+    las unidades como «㎜» sí pasan a «mm»."""
+    if texto.isascii() or unicodedata.is_normalized("NFKC", texto):
+        return texto
+    return unicodedata.normalize("NFC", "".join(
+        c if c in "ºª№™℠" else unicodedata.normalize("NFKC", c)
+        for c in texto
+    ))
+
+
+# La memoria del cliente la pide para cada fila guardada, una vez por ítem del pedido.
+@functools.lru_cache(maxsize=4096)
 def clave_de_producto(descripcion: str) -> str:
-    """Clave del producto en el catálogo. Lo que normaliza a vacío (CJK, emoji) usa
-    un resumen del texto: entra en el índice único y «~» no sale de _normalize."""
+    """Clave del producto en el catálogo: lo que se lee igual da la misma."""
+    return _clave(_compatible(descripcion))
+
+
+def _clave(descripcion: str) -> str:
+    """Lo que normaliza a vacío (CJK, emoji) usa un resumen del texto: entra en
+    el índice único y «~» no sale de _normalize."""
     clave = _normalize(descripcion)
+    sufijo = _sufijo(descripcion) if clave else ""
     if clave:
-        return clave
+        return f"{clave}~{sufijo}" if sufijo else clave
     texto = " ".join(unicodedata.normalize("NFC", descripcion).lower().split())
     return "~" + hashlib.sha256(texto.encode("utf-8", "surrogatepass")).hexdigest()[:40]
 
 
+def parecido(clave_a: str, clave_b: str) -> float:
+    """Parecido entre dos claves de producto: con letras no latinas distintas
+    no se parecen; si sólo una las tiene, a lo sumo llegan a parecidas."""
+    if clave_a == clave_b:
+        return 1.0
+    base_a, _, sufijo_a = clave_a.partition("~")
+    base_b, _, sufijo_b = clave_b.partition("~")
+    if sufijo_a == sufijo_b:
+        return _similarity(base_a, base_b)
+    if sufijo_a and sufijo_b:
+        return 0.0
+    return min(_similarity(base_a, base_b), FUZZY_THRESHOLD)
+
+
+_MAX_VENDOR_ID = 60
+
+
 def _vendor_key(vendor_name: str) -> str:
-    """Genera la clave del proveedor (slug)."""
-    return re.sub(r"\s+", "_", _normalize(vendor_name))[:60]
+    """Clave del proveedor; "" si el nombre no tiene nada. Si no entra en 60,
+    el final es un resumen del total: dos nombres largos parecidos no se pisan."""
+    nombre = (vendor_name or "").replace("\x00", "").strip()
+    if not nombre:
+        return ""
+    clave = _clave(nombre).replace(" ", "_")
+    if len(clave) <= _MAX_VENDOR_ID:
+        return clave
+    return clave[:39] + "~" + hashlib.sha256(clave.encode("utf-8")).hexdigest()[:20]
 
 
 # Stop-words minimas (ES + EN + PT)
@@ -217,7 +287,7 @@ async def get_vendor(
 ) -> Optional[dict]:
     """Retorna el catalogo del proveedor por nombre (slug por dentro)."""
     vendor_id = _vendor_key(vendor_name)
-    rows = await _fetch_vendor_rows(db, owner_username, vendor_id)
+    rows = await _fetch_vendor_rows(db, owner_username, vendor_id) if vendor_id else []
     if not rows:
         return None
     nombre = rows[0].vendor_nombre or vendor_name
@@ -284,7 +354,7 @@ async def match_items(
     vendor_nombre, items_matched, tasa_reconocimiento, items_nuevos.
     """
     vendor_id = _vendor_key(vendor_name)
-    rows = await _fetch_vendor_rows(db, owner_username, vendor_id)
+    rows = await _fetch_vendor_rows(db, owner_username, vendor_id) if vendor_id else []
 
     vendor_known = bool(rows)
     vendor_nombre = (rows[0].vendor_nombre if rows else vendor_name) or vendor_name
@@ -324,7 +394,7 @@ async def match_items(
             best_score = 0.0
             best_key = None
             for prod_key in productos.keys():
-                score = _similarity(desc, prod_key)
+                score = parecido(desc_key, prod_key)
                 if score > best_score:
                     best_score = score
                     best_key = prod_key
@@ -361,17 +431,34 @@ async def match_items(
 # -----------------------------------------------------------------
 
 def _producto_valido(prod) -> Optional[tuple]:
-    """(descripción, ncm, origen, unidad, precio) de un producto del lote, o
-    None si no tiene descripción. ValueError si un campo no se puede guardar."""
+    """(descripción, ncm, origen, unidad, precio, aviso), o None sin descripción.
+    ValueError si un campo no se guarda; un origen no reconocido va vacío con aviso."""
     if not isinstance(prod, dict):
         raise ValueError(AVISO_NO_ES_OBJETO)
     desc = texto_para_guardar(prod.get("descripcion"))
     if not desc:
         return None
     ncm = ncm_para_guardar(prod.get("ncm")) or ncm_para_guardar(prod.get("pieza"))
-    origen = texto_para_guardar(prod.get("origen"), "El origen")
+    origen, aviso = origen_para_guardar(prod.get("origen"))
     unidad = texto_para_guardar(prod.get("unidad_medida"), "La unidad")
-    return desc, ncm, origen, unidad, _precio(prod.get("valor_unitario"))
+    return desc, ncm, origen, unidad, _precio(prod.get("valor_unitario")), aviso
+
+
+def _producto_del_lote(numerado: tuple) -> Optional[tuple]:
+    """_producto_valido con el número y la descripción en el error y en el aviso,
+    para que la pantalla diga qué producto no se aprendió entero."""
+    n, prod = numerado
+    desc = prod.get("descripcion") if isinstance(prod, dict) else None
+    desc = desc.replace("\x00", "").strip() if isinstance(desc, str) else ""
+    cual = f"Producto {n}" + (f" («{desc[:60]}»)" if desc and not _MEDIO_PAR.search(desc) else "")
+    try:
+        valido = _producto_valido(prod)
+    except ValueError as e:
+        raise ValueError(f"{cual}: {e}") from None
+    if valido is None:
+        return None
+    *campos, aviso = valido
+    return (*campos, f"{cual}: {aviso}" if aviso else "")
 
 
 def _precio(valor) -> Optional[float]:
@@ -403,17 +490,20 @@ async def save_products(
             "productos_actualizados": 0,
             "total_en_catalogo": 0,
             "owner_username": owner_username,
+            "avisos": [],
         }
 
     vendor_name = texto_para_guardar(vendor_name, "El proveedor")
     vendor_id = _vendor_key(vendor_name)
+    if not vendor_id:
+        raise ValueError("Falta el nombre del proveedor.")
     # Todo el lote se valida antes de escribir: uno malo no deja la mitad guardada.
-    validos = [p for p in map(_producto_valido, productos_in) if p]
+    validos = [p for p in map(_producto_del_lote, enumerate(productos_in, 1)) if p]
 
     saved = 0
     updated = 0
 
-    for desc, ncm, origen, unidad, precio in validos:
+    for desc, ncm, origen, unidad, precio, _aviso in validos:
         product_key = clave_de_producto(desc)
         extra_blob = {"unidad_medida": unidad} if unidad else None
 
@@ -475,6 +565,7 @@ async def save_products(
         "productos_actualizados": updated,
         "total_en_catalogo": int(total),
         "owner_username": owner_username,
+        "avisos": [p[5] for p in validos if p[5]],
     }
 
 
@@ -512,8 +603,13 @@ async def update_product(
     # None es «no cambia»; todos los textos se validan antes de tocar la fila.
     textos = {campo: texto_para_guardar(updates.get(campo), que) for campo, que in (
         ("descripcion_original", "La descripción"),
-        ("origen", "El origen"), ("unidad_medida", "La unidad"),
+        ("unidad_medida", "La unidad"),
     ) if updates.get(campo) is not None}
+    aviso = ""
+    if updates.get("origen") is not None:
+        origen, aviso = origen_para_guardar(updates["origen"])
+        if not aviso:
+            textos["origen"] = origen
     if updates.get("ncm") is not None:
         textos["ncm"] = ncm_para_guardar(updates["ncm"])
 
@@ -552,7 +648,7 @@ async def update_product(
     await db.commit()
     await db.refresh(row)
 
-    return {**_row_to_dict(row), "_key": new_key}
+    return {**_row_to_dict(row), "_key": new_key, **({"aviso": aviso} if aviso else {})}
 
 
 async def delete_product(

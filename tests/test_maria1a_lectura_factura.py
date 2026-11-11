@@ -191,13 +191,14 @@ def test_instrucciones_a_gemini_no_piden_estimar_el_peso():
 
 
 def test_tabla_tres_letras_apunta_a_la_tabla_oficial():
-    from proyecto_maria.core.maria_generator import PAISES_INDEC, pais_reconocido
+    from proyecto_maria.core.maria_generator import PAISES_INDEC, codigo_de_pais, pais_reconocido
     from proyecto_maria.core.paises_iso3 import ISO3_A_ISO2
 
     assert len(ISO3_A_ISO2) > 150
     for tres, dos in ISO3_A_ISO2.items():
         assert len(tres) == 3 and len(dos) == 2
         assert dos in PAISES_INDEC and pais_reconocido(dos), (tres, dos)
+        assert codigo_de_pais(tres) == PAISES_INDEC[dos], (tres, dos)
     assert ISO3_A_ISO2["CHN"] == "CN" and ISO3_A_ISO2["MEX"] == "MX"
     assert ISO3_A_ISO2["CHE"] == "CH" and ISO3_A_ISO2["MNE"] == "ME"
 

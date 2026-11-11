@@ -462,6 +462,60 @@ def test_reset_pedidos_simultaneos_no_pasan_el_tope():
     assert codigos == [200] * 5 + [429] * 15, codigos
 
 
+MSJ_RESET = "Si el email existe, se envió un link."
+
+
+def _links_de_reset(username):
+    async def _correr():
+        async with conn.AsyncSessionLocal() as s:
+            r = await s.execute(text("select count(*) from password_reset_tokens where user_username = :u"),
+                                {"u": username})
+            return r.scalar_one()
+    return asyncio.run(_correr())
+
+
+def test_reset_tres_por_hora_por_cuenta_aunque_cambie_la_ip(monkeypatch, reloj):
+    """Cada pedido llega de otra IP, así que el tope por IP no corta. El
+    cuarto de la hora contesta lo mismo, no manda el mail ni crea un link:
+    un link nuevo anularía al usarse el que la persona sí pidió."""
+    enviados = []
+    monkeypatch.setattr(main_mod, "send_email", lambda to, *a, **k: enviados.append(to) or True)
+    c = TestClient(app)
+    u = "ab3r_" + uuid.uuid4().hex[:8]
+    email = f"{u}@ejemplo.test"
+    assert c.post("/auth/register", headers=_xff(_ip()), json={
+        "username": u, "password": CLAVE, "email": email, "name": "Ab"}).status_code == 200
+    for variante in (email.upper(), email.capitalize(), email, email):
+        r = c.post(RESET, json={"email": variante}, headers=_xff(_ip()))
+        assert r.status_code == 200 and r.json() == {"message": MSJ_RESET}, r.text
+    assert enviados == [email] * 3, "el cuarto pedido de la hora mandó el mail"
+    assert _links_de_reset(u) == 3, "el cuarto pedido de la hora creó un link"
+    reloj()
+    reloj(59 * 60)
+    c.post(RESET, json={"email": email}, headers=_xff(_ip()))
+    assert (enviados, _links_de_reset(u)) == ([email] * 3, 3), "a los 59 minutos ya mandó otro"
+    reloj(2 * 60)
+    c.post(RESET, json={"email": email}, headers=_xff(_ip()))
+    assert (enviados, _links_de_reset(u)) == ([email] * 4, 4), "pasada la hora no volvió a mandar"
+
+
+def test_reset_una_ip_inventada_no_gasta_el_tope_de_la_cuenta(monkeypatch):
+    """Sin proxy que agregue su entrada, la IP la escribe el cliente: una IP
+    con forma de clave de cuenta no puede caer en el contador de esa cuenta."""
+    enviados = []
+    monkeypatch.setattr(main_mod, "send_email", lambda to, *a, **k: enviados.append(to) or True)
+    c = TestClient(app)
+    u = "ab3c_" + uuid.uuid4().hex[:8]
+    email = f"{u}@ejemplo.test"
+    assert c.post("/auth/register", headers=_xff(_ip()), json={
+        "username": u, "password": CLAVE, "email": email, "name": "Ab"}).status_code == 200
+    for prefijo in ("cuenta:", "-cuenta:", "", ":cuenta:"):
+        for _ in range(4):
+            c.post(RESET, json={"email": "nadie@ejemplo.test"}, headers=_xff(f"{prefijo}{u}"))
+    assert c.post(RESET, json={"email": email}, headers=_xff(_ip())).status_code == 200
+    assert enviados == [email], "una IP inventada gastó el tope de la cuenta"
+
+
 def test_c9_registros_simultaneos_no_pasan_el_tope():
     """Veinte registros a la vez desde una IP: pasan cinco, como en fila."""
     import httpx

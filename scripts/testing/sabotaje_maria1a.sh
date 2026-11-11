@@ -69,8 +69,8 @@ reemplazar $F "    texto = str(raw or '').strip()
     # «NA» en una"
 caso "corta_a_dos_letras" "'CH', 'ME'"
 
-# 2. sin la tabla de tres letras
-reemplazar $F "if len(mayus) == 3 and mayus in ISO3_A_ISO2:" "if False:"
+# 2. sin los códigos de tres letras en la tabla de nombres
+reemplazar proyecto_maria/core/maria_generator.py "json.loads(m.group(1)).items()}" "json.loads(m.group(1)).items() if not (len(k) == 3 and k.isupper())}"
 caso "sin_tabla_iso3" "FAILED $T::test_pais_de_origen_contra_la_tabla_oficial[pdf_directo]"
 
 # 3. se arregla una sola copia: la de producción vuelve a cortar

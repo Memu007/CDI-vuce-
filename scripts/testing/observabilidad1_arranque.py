@@ -12,10 +12,15 @@ y ya tiene filas, como la de producción. Comprueba:
 - si la migración falla, la app arranca igual, lo dice en el log y los
   pedidos responden. En SQLite falla porque `api_logs` es una vista; en
   Postgres, porque otra conexión tiene tomada la tabla: el arranque no
-  espera ese lock más de unos segundos.
+  espera ese lock más de unos segundos, tampoco para el índice cuando la
+  columna ya está;
+- en Postgres, si falla al confirmar la columna no queda y el log no dice
+  que la agregó; si falla al confirmar el índice, la columna queda, el log
+  lo dice y no anuncia el índice.
 
 uso (Postgres local y descartable, nunca el de producción; el usuario tiene
-que poder crear bases; sin URL corre sólo SQLite):
+que ser superusuario, porque las fallas al confirmar usan un EVENT TRIGGER;
+sin URL corre sólo SQLite):
   python scripts/testing/observabilidad1_arranque.py [postgresql://cdi@127.0.0.1:55432/postgres]
 Necesita uvicorn (y psycopg2 para Postgres) en el mismo Python.
 """
@@ -279,7 +284,7 @@ def base_vieja(b):
     chequear(b.esquema() == esquema1, "el segundo arranque no cambia el esquema de api_logs")
     chequear(b.sql("select * from api_logs order by id") == filas1, "ni sus filas")
     chequear("api_logs.owner_username" not in app.texto(), "ni dice que agregó algo")
-    chequear("[OBSERVABILIDAD-1]" not in app.texto(),
+    chequear(FALLA_COLUMNA not in app.texto() and FALLA_INDICE not in app.texto(),
              "ni falla" + (" con una lectura abierta sobre la tabla" if lectura is not None else ""))
 
     app = App(b, "admin")
@@ -293,23 +298,36 @@ def base_vieja(b):
         app.parar()
 
 
-def base_con_falla(b):
-    print(f"\n== {b.nombre}: la migración falla")
+FALLA_COLUMNA = "no se pudo agregar api_logs.owner_username"
+FALLA_INDICE = "no se pudo crear el índice ix_api_logs_owner_username"
+
+
+def dice_falla_de(app, paso):
+    """El log nombra el paso que falló y no el otro."""
+    falla, otra = (FALLA_INDICE, FALLA_COLUMNA) if paso == "índice" else (FALLA_COLUMNA, FALLA_INDICE)
+    chequear(esperar(lambda: falla in app.texto(), 5), f"y el log dice que falló {'el' if paso == 'índice' else 'la'} {paso}")
+    chequear(otra not in app.texto(), f"y no dice que falló otra cosa: {otra!r}")
+
+
+def base_con_falla(b, con_columna=False):
+    print(f"\n== {b.nombre}: la migración falla" + (" con la columna ya puesta" if con_columna else ""))
     traba = None
     if b.nombre == "SQLite":
         b.sql("CREATE TABLE logs_reales (id VARCHAR PRIMARY KEY, endpoint VARCHAR(200))",
               "CREATE VIEW api_logs AS SELECT id, endpoint FROM logs_reales")
     else:
         b.vieja()
+        if con_columna:
+            b.sql("ALTER TABLE api_logs ADD COLUMN owner_username VARCHAR(50)")
         traba = psycopg2.connect(b.url)
         traba.cursor().execute("LOCK TABLE api_logs IN ACCESS EXCLUSIVE MODE")
     inicio = time.monotonic()
     app = App(b, "falla")
     try:
-        chequear(app.arranco, f"la app arranca igual ({time.monotonic() - inicio:.1f} s)")
+        chequear(app.arranco, f"la app arranca igual{' con la columna ya puesta' if con_columna else ''} "
+                              f"({time.monotonic() - inicio:.1f} s)")
         if app.arranco:
-            chequear(esperar(lambda: "[OBSERVABILIDAD-1] no se pudo agregar api_logs.owner_username" in app.texto(), 5),
-                     "y lo dice en el log")
+            dice_falla_de(app, "índice" if con_columna else "columna")
             r = app.pedir("/robots.txt")
             chequear(r[0] == 200, f"los pedidos responden aunque la métrica no se grabe: {r[0]}")
     finally:
@@ -318,19 +336,64 @@ def base_con_falla(b):
             traba.rollback()
             traba.close()
     if traba is not None:
-        chequear(b.columna() is None, "con la tabla tomada no agregó nada")
+        chequear(b.columna() == (("VARCHAR(50)", True, None) if con_columna else None) and b.indices() == [],
+                 f"con la tabla tomada no agregó nada: {b.columna()} {b.indices()}")
         app = App(b, "suelta")
         try:
-            chequear(app.arranco and b.columna() == ("VARCHAR(50)", True, None),
-                     "suelta la tabla, el próximo arranque la agrega")
+            chequear(app.arranco and b.columna() == ("VARCHAR(50)", True, None)
+                     and b.indices() == ["ix_api_logs_owner_username"],
+                     f"suelta la tabla, el próximo arranque agrega lo que faltaba: {b.columna()} {b.indices()}")
         finally:
             app.parar()
+
+
+def falla_al_confirmar(tag, objeto, queda_columna):
+    """Una trampa hace fallar el commit de la transacción que corre `tag` sobre `objeto`."""
+    def escenario(b):
+        print(f"\n== {b.nombre}: falla al confirmar {tag}")
+        b.vieja()
+        b.sql("CREATE TABLE trampa (x int)",
+              "CREATE FUNCTION trampa_falla() RETURNS trigger LANGUAGE plpgsql AS "
+              "$$BEGIN RAISE EXCEPTION 'trampa: falla al confirmar'; END$$",
+              "CREATE CONSTRAINT TRIGGER trampa_t AFTER INSERT ON trampa DEFERRABLE INITIALLY DEFERRED "
+              "FOR EACH ROW EXECUTE FUNCTION trampa_falla()",
+              "CREATE FUNCTION trampa_ddl() RETURNS event_trigger LANGUAGE plpgsql AS "
+              "$$BEGIN IF EXISTS (SELECT 1 FROM pg_event_trigger_ddl_commands() "
+              f"WHERE object_identity = '{objeto}') THEN INSERT INTO trampa VALUES (1); END IF; END$$",
+              f"CREATE EVENT TRIGGER trampa_e ON ddl_command_end WHEN TAG IN ('{tag}') "
+              "EXECUTE FUNCTION trampa_ddl()")
+        app = App(b, "confirma")
+        try:
+            chequear(app.arranco, "la app arranca igual")
+            dice_falla_de(app, "índice" if queda_columna else "columna")
+        finally:
+            app.parar()
+        dice = "agregada columna api_logs.owner_username" in app.texto()
+        if queda_columna:
+            chequear(b.columna() == ("VARCHAR(50)", True, None), f"la columna queda: {b.columna()}")
+            chequear(dice, "y el log dice que la agregó")
+        else:
+            chequear(b.columna() is None, f"la columna no queda: {b.columna()}")
+            chequear(not dice, "y el log no dice que la agregó")
+        chequear(b.indices() == [], f"sin índice: {b.indices()}")
+        chequear("agregado indice" not in app.texto(), "y el log no lo anuncia")
+    escenario.__name__ = f"falla_al_confirmar({tag})"
+    return escenario
+
+
+def indice_con_tabla_tomada(b):
+    base_con_falla(b, con_columna=True)
+
+
+ESCENARIOS_PG = (indice_con_tabla_tomada,
+                 falla_al_confirmar("ALTER TABLE", "public.api_logs", False),
+                 falla_al_confirmar("CREATE INDEX", "public.ix_api_logs_owner_username", True))
 
 
 bases = []
 try:
     for clase in [SQLite] + ([Postgres] if URL else []):
-        for escenario in (base_vieja, base_con_falla):
+        for escenario in (base_vieja, base_con_falla) + (ESCENARIOS_PG if clase is Postgres else ()):
             b = clase()
             bases.append(b)
             try:
