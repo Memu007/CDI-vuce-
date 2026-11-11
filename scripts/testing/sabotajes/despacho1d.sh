@@ -61,8 +61,8 @@ sabotaje $F "la operación vuelve a esperar al catálogo" \
   'saveCatalogLearn(items, carga).then(() => saveOperationToHistory(items, data, carga, foto)).then(r => {' \
   "FAILED $T::$C[colgado-guardado]"
 sabotaje $F "aprender el catálogo con la red caída no avisa" \
-  '            return false;' \
-  '            return true;' \
+  "            return { ok: false, detail: '' };" \
+  "            return { ok: true, detail: '' };" \
   "FAILED $T::$X[aprender-red]"
 sabotaje $N "confirmar la posición con la red caída no avisa" \
   '        } catch (_) { /* red caída o plan vencido: el mismo aviso */ }' \

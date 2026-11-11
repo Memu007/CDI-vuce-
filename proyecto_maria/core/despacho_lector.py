@@ -840,21 +840,19 @@ def _numero_del_renglon(valor, nombre, problemas):
 
 def origen_para_catalogo(valor) -> tuple[str | None, str | None]:
     """El origen que se guarda en el catálogo (None si no vino) o por qué no
-    sirve: tiene que ser el código de dos letras de un país de la tabla."""
-    from proyecto_maria.core.maria_generator import pais_reconocido
+    sirve: el nombre o el código de un país de la tabla."""
+    from proyecto_maria.core.maria_generator import origen_valido
 
     if not isinstance(valor, (str, type(None))):
-        return None, "El origen tiene que ser el código de dos letras."
+        return None, "El origen tiene que ser el nombre o el código del país."
     escrito = (valor or "").strip()
     if _MEDIO_PAR.search(escrito):
         # No se repite en el mensaje: no se puede mandar en la respuesta.
         return None, "El origen tiene un carácter que no se puede guardar."
-    # Se mira antes de pasar a mayúsculas («ıt» sería «IT») y pais_reconocido
-    # normaliza con NFKD («ＢＲ» o «ÉS» pasarían): sólo dos letras ASCII.
-    if escrito and not (len(escrito) == 2 and escrito.isascii() and escrito.isalpha()
-                        and pais_reconocido(escrito)):
-        return None, f"No reconozco el origen «{escrito}»: usá el código de dos letras."
-    return escrito.upper() or None, None
+    ok = origen_valido(escrito)
+    if escrito and not ok:
+        return None, f"No reconozco el origen «{escrito}»: usá el nombre o el código del país."
+    return ok or None, None
 
 
 def renglon_para_catalogo(renglon) -> tuple[dict | None, list[str]]:

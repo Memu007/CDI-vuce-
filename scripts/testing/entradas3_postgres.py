@@ -1,8 +1,9 @@
 """ENTRADAS-3 contra un Postgres de verdad: lo que SQLite guarda sin quejarse y
 Postgres no. tests/test_entradas3.py (que conftest ata a SQLite) no lo mide, y
 bajo pytest el registro de pedidos no se escribe. Comprueba que:
-1. un pedido con NUL en la ruta, o con una ruta de más de 200 caracteres, queda
-   en api_logs;
+1. un pedido con NUL en la ruta, o a una ruta de 300 caracteres que no existe,
+   queda en api_logs como <sin ruta>; el de un molde de 300 caracteres queda
+   recortado a 200, y el de una excepción con NUL en el mensaje también queda;
 2. un número enorme en la operación manual o al guardar al cliente no se guarda,
    y el listado de clientes y las métricas del cliente siguen respondiendo;
 3. un NUL en la consulta no da 500.
@@ -57,15 +58,15 @@ def admin(consulta, url=URL, parametros=None):
         con.close()
 
 
-def registrados(prefijo):
-    return admin("select count(*) from api_logs where endpoint like %s", URL_BASE, (prefijo + "%",))[0][0]
+def registrados(donde, parametros):
+    return admin(f"select count(*) from api_logs where {donde}", URL_BASE, parametros)[0][0]
 
 
-def esperar_registro(prefijo, tope=15.0):
+def esperar_registros(donde, parametros, cuantos, tope=15.0):
     # El registro se escribe en una tarea aparte: se espera a verlo, con un tope.
     hasta = time.monotonic() + tope
     while time.monotonic() < hasta:
-        if registrados(prefijo):
+        if registrados(donde, parametros) >= cuantos:
             return True
         time.sleep(0.05)
     return False
@@ -77,6 +78,14 @@ try:
     import proyecto_maria.main as main_mod  # noqa: E402
     from proyecto_maria.core.rate_limit import limiter  # noqa: E402
     limiter.enabled = False
+    # Rutas sólo de esta prueba: un molde más largo que la columna y una
+    # excepción con NUL en el mensaje, que por HTTP no se pueden pedir de otra forma.
+    MOLDE_LARGO = "/api/e3-molde" + "/x" * 150
+    main_mod.app.add_api_route(MOLDE_LARGO, lambda: {"ok": True})
+
+    def _falla():
+        raise RuntimeError("e3\x00falla")
+    main_mod.app.add_api_route("/api/e3-falla", _falla)
 
     with TestClient(main_mod.app, raise_server_exceptions=False) as c:
         def cuenta():
@@ -93,11 +102,22 @@ try:
         sesion = cuenta()
 
         # 1. registro de pedidos
-        for nombre, ruta, prefijo in [("NUL en la ruta", "/api/nul-a%00b", "/api/nul-a"),
-                                      ("ruta de 300 caracteres", LARGA, LARGA[:200])]:
+        sin_ruta = ("endpoint = '<sin ruta>' and status_code = 404", None)
+        for nombre, ruta in [("NUL en la ruta", "/api/nul-a%00b"), ("ruta de 300 caracteres", LARGA)]:
+            antes = registrados(*sin_ruta)
             r = c.get(ruta, headers=sesion)
-            chequear(r.status_code < 500 and esperar_registro(prefijo),
-                     f"{nombre}: {r.status_code}; en api_logs: {registrados(prefijo)}")
+            chequear(r.status_code < 500 and esperar_registros(*sin_ruta, antes + 1),
+                     f"{nombre}: {r.status_code}; como <sin ruta>: {registrados(*sin_ruta) - antes}")
+
+        r = c.get(MOLDE_LARGO, headers=sesion)
+        molde = ("endpoint = %s", (MOLDE_LARGO[:200],))
+        chequear(r.status_code == 200 and esperar_registros(*molde, 1),
+                 f"molde de 300 caracteres: {r.status_code}; recortado a 200: {registrados(*molde)}")
+
+        r = c.get("/api/e3-falla", headers=sesion)
+        falla = ("endpoint = '/api/e3-falla' and status_code = 500 and error_message = %s", ("e3\ufffdfalla",))
+        chequear(r.status_code == 500 and esperar_registros(*falla, 1),
+                 f"excepción con NUL en el mensaje: {r.status_code}; en api_logs: {registrados(*falla)}")
 
         # 2. números enormes y las sumas de total_value, cada uno en su cuenta
         for numero in ("1e308", "-1e308", "1e16"):

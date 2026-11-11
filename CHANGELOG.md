@@ -15,6 +15,64 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - «8471.30.00.900 R», como la arma la pantalla, se aprende al confirmar, al guardar la operación, en learn y al editar el producto.
 
+## 2026-11-10 · fix: en la memoria del cliente el texto idéntico no distingue mayúsculas y la misma hora no la decide la base (CATALOGO-3)
+
+- «CABLE 2,5MM2» cuenta como el mismo texto que «Cable 2,5mm2»; con el mismo texto y dos NCM gana el último confirmado.
+- Dos confirmaciones a la misma hora dan siempre el mismo NCM, en SQLite y en Postgres.
+- Un producto guardado por una versión anterior con otro espaciado («Cable  2,5mm2») también cuenta como el mismo texto: se compara la clave guardada.
+
+## 2026-11-10 · fix: el NCM recordado de un cliente no depende del orden de las filas (CATALOGO-3)
+
+- Si dos productos guardados se parecen igual a lo que se busca, gana el que tiene el texto idéntico y, si no hay, el último confirmado; antes ganaba el que la base devolvía primero, el mismo para los dos textos.
+
+## 2026-11-10 · perf: la memoria del cliente calcula la clave de cada fila una vez por pedido (CATALOGO-3)
+
+- Buscar diez productos contra cientos de filas guardadas con descripciones largas o en kana ya no recalcula la clave de cada fila para cada producto.
+
+## 2026-11-10 · fix: el catálogo no pierde el NCM por un origen que no reconoce y encuentra lo que se lee igual (CATALOGO-3)
+
+- Guardar un uso o cambiar el NCM de una fila con un origen viejo o no reconocido guarda el NCM y avisa que el origen quedó sin cambiar.
+- Dos descripciones que se leen igual (µ/μ, ｶﾞｽ/ガス, ², ﬁ, ㎜/mm, ℃/°C) dan la misma clave; «123» se lee como LIBIA.
+- Al finalizar, un producto con un origen que no reconoce se aprende igual, sin guardar ese origen (conserva el que tenía), y la pantalla lo nombra; importación, exportación, la pantalla y el extractor leen el país con el mismo criterio, también con espacios raros (BOM, \x85) o letras fuera del plano básico.
+
+## 2026-11-10 · fix: pasar una operación a otro cliente da de baja su presupuesto compartido (PRESUPUESTO-CLIENTE-1)
+
+- Si una operación ya compartida se guarda en otro cliente, el link que mostraba los datos del cliente anterior deja de andar, como al borrarlo. Si el guardado falla, el link queda como estaba.
+
+## 2026-11-09 · fix: el catálogo y la memoria no mezclan proveedores ni productos en chino, y el origen se guarda entero (CATALOGO-3)
+
+- Un proveedor con nombre sólo en chino, emoji o con los mismos 60 primeros caracteres que otro ya no comparte catálogo; «电线 2mm» y «钢管 2mm» son dos productos. Las filas viejas se migran al arrancar sin perder ninguna.
+- El origen vale si es un país reconocido, por nombre o código, y se guarda tal cual: «TAIWAN» ya no queda como «TAI» (310). Cuando el catálogo rechaza un producto, la pantalla dice cuál.
+- Un origen hecho de miles de cifras ya no rompe los avisos con un error 500: generar lo rechaza como origen no reconocido.
+
+## 2026-11-09 · chore: bcrypt queda fijado en 5.0.0 (D102)
+
+- Una instalación nueva no puede traer una bcrypt 4.x, que compara sólo los primeros 72 bytes de la clave: con ella, en el login entraría una clave más larga que empieza igual que la verdadera.
+
+## 2026-11-09 · fix: el panel de dev muestra como texto lo que llega de los pedidos (D139)
+
+- La tabla de pedidos recientes ya no interpreta como HTML el endpoint, el método, la IP ni la hora: un camino con `<img onerror=…>` guardado antes de que las métricas guardaran el molde ya no corre en el navegador del admin, y `<sin ruta>` se lee tal cual.
+
+## 2026-11-09 · fix: una invitación a un email que ya tiene cuenta no ocupa lugar en el estudio (ORG-1)
+
+- Si la persona invitada se registró sin el link, entró a otro estudio o se puso ese email en el perfil, la invitación no se puede usar mientras esa cuenta tenga el email: deja de contar para el tope del plan y el dueño puede invitar a otra persona.
+- Al registrarse con una invitación, una vencida del mismo email sigue vencida aunque nadie la haya abierto.
+
+## 2026-11-08 · fix: las métricas guardan la ruta y no el camino pedido (OBSERVABILIDAD-1)
+
+- El panel de uso muestra `/api/invitations/{token}` en vez del token, el hash, el CUIT o el nombre de archivo que traía el camino; un pedido a una ruta que no existe queda como `<sin ruta>`.
+- La migración de `api_logs` agrega la columna y el índice en transacciones separadas: si el índice falla, la columna queda, y el log anuncia cada uno recién cuando quedó guardado.
+- Si falla el índice, el log dice que falló el índice y no culpa a la columna.
+
+## 2026-11-08 · fix: el lector y el perfil sólo dejan pasar una destinación que es un código (AVISOS-2b)
+
+- El lector de facturas deja vacía la destinación que no es un código de 4 letras o números ASCII, en vez de pasarla en mayúsculas a la revisión.
+- Guardar en el perfil una destinación por defecto que no es un código de importación (de más o de menos, con guion bajo, una EC) da 400 y no cambia nada del perfil; vaciarla sigue limpiándola.
+
+## 2026-11-08 · fix: una cuenta recibe hasta 3 links de cambio de clave por hora, aunque los pedidos lleguen de IPs distintas (RESET-3)
+
+- Desde el cuarto pedido de la hora la respuesta es la misma, pero no se manda el mail ni se crea un link: uno nuevo anularía el que la persona sí pidió.
+- La cuenta del tope no se puede gastar con pedidos que inventan su IP: se lleva aparte de los contadores por IP.
 ## 2026-11-08 · fix: un nombre de usuario que ya existe con otras mayúsculas no se registra (NOMBRES-1)
 
 - **fix(permisos):** el registro y crear un estudio rechazan con «Usuario ya existe» un nombre que ya existe escrito con otras mayúsculas (`emi` existe → `Emi`, `EMI`), para todas las cuentas. Las cuentas que ya difieren sólo en mayúsculas siguen entrando con su nombre exacto; nada se migra.

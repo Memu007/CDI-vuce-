@@ -231,6 +231,17 @@
     </div>
 
     <script>
+        // Lo que llega de la API va como texto: nunca se interpreta como HTML.
+        function fila(celdas) {
+            const tr = document.createElement('tr');
+            celdas.forEach((texto) => {
+                const td = document.createElement('td');
+                td.textContent = texto == null ? '—' : String(texto);
+                tr.appendChild(td);
+            });
+            return tr;
+        }
+
         async function fetchStats() {
             try {
                 const response = await fetch('/api/dev/stats');
@@ -247,24 +258,17 @@
 
                 // Update Logs
                 const tbody = document.getElementById('logs-body');
-                tbody.innerHTML = '';
-                
-                data.logs.forEach(log => {
-                    const statusClass = log.status >= 500 ? 'status-500' : 
-                                      log.status >= 400 ? 'status-400' : 'status-200';
-                    
-                    const row = `
-                        <tr>
-                            <td class="text-muted">${log.time}</td>
-                            <td><span class="badge bg-secondary">${log.method}</span></td>
-                            <td>${log.endpoint}</td>
-                            <td class="${statusClass}">${log.status}</td>
-                            <td>${log.latency} ms</td>
-                            <td class="text-muted">${log.ip}</td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += row;
-                });
+                tbody.replaceChildren(...data.logs.map((log) => {
+                    const tr = fila([log.time, log.method, log.endpoint, log.status, log.latency + ' ms', log.ip]);
+                    const metodo = document.createElement('span');
+                    metodo.className = 'badge bg-secondary';
+                    metodo.textContent = log.method;
+                    tr.cells[1].replaceChildren(metodo);
+                    tr.cells[0].className = tr.cells[5].className = 'text-muted';
+                    tr.cells[3].className = log.status >= 500 ? 'status-500' :
+                                            log.status >= 400 ? 'status-400' : 'status-200';
+                    return tr;
+                }));
             } catch (error) {
                 console.error('Error fetching stats:', error);
             }
@@ -324,15 +328,6 @@
 
         async function fetchPagosRechazados() {
             const tbody = document.getElementById('pagos-rechazados-body');
-            const fila = (celdas) => {
-                const tr = document.createElement('tr');
-                celdas.forEach((texto) => {
-                    const td = document.createElement('td');
-                    td.textContent = texto == null ? '—' : String(texto);
-                    tr.appendChild(td);
-                });
-                return tr;
-            };
             try {
                 const response = await fetch('/api/dev/pagos-mp-rechazados');
                 const data = await response.json();

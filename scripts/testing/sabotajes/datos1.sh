@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Negativos de DATOS-1: cada sabotaje deshace una regla (/health honesto,
-# los 500 sin detalle técnico, borrar un cliente con presupuesto compartido)
-# y tests/test_datos1.py tiene que fallar por ese motivo.
+# Negativos de DATOS-1 y PRESUPUESTO-CLIENTE-1: cada sabotaje deshace una
+# regla (/health honesto, los 500 sin detalle técnico, borrar un cliente con
+# presupuesto compartido, pasar una operación compartida a otro cliente) y
+# tests/test_datos1.py tiene que fallar por ese motivo.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/datos1.sh [SHA]
 # Trabaja en un worktree descartable con su propia SQLite y sin terceros: no
@@ -118,6 +119,40 @@ sabotaje $M "otro dueño puede borrar el cliente" \
   $'        client = await _cliente_con_cuenta_bloqueada(db, client_id, username)\n        op_rows' \
   $'        client = await db.get(ClientModel, client_id)\n        username = client.owner_username\n        op_rows' \
   "FAILED $T::test_otro_dueno_no_borra_el_cliente_ni_su_presupuesto" "assert 200 == 404"
+
+# --- D141 (a): pasar una operación compartida a otro cliente
+P="FAILED $T::test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto"
+BORRA=$'    if operation.client_id not in (None, client_id):\n'
+sabotaje $M "pasada a otro cliente, el link sigue andando, también al borrar el anterior" \
+  "$BORRA" $'    if False:\n' \
+  "$P" "FAILED $T::test_borrar_el_cliente_anterior_no_deja_el_link_de_la_operacion_pasada" \
+  "AssertionError: (True, 200)" "assert 200 == 404"
+sabotaje $M "pasada a otro cliente, sólo se borra uno de sus links" \
+  $'        await db.execute(\n            sa_delete(PublicQuoteModel).where(PublicQuoteModel.operation_id == operation.id)\n        )\n' \
+  $'        q = (await db.execute(sa_select(PublicQuoteModel).where(PublicQuoteModel.operation_id == operation.id))).scalars().first()\n        await db.delete(q)\n' \
+  "$P" "AssertionError: (True, 200)" "assert 200 == 404"
+sabotaje $M "borrar el cliente anterior suelta también la operación que ya pasó" \
+  $'        op_rows = await db.execute(\n            sa_select(OperationModel).where(\n                OperationModel.client_id == client_id,\n                OperationModel.owner_username == username,\n' \
+  $'        op_rows = await db.execute(\n            sa_select(OperationModel).where(\n                OperationModel.owner_username == username,\n' \
+  "FAILED $T::test_borrar_el_cliente_anterior_no_deja_el_link_de_la_operacion_pasada" "assert None =="
+sabotaje $M "se borra aunque siga en el mismo cliente" \
+  "$BORRA" $'    if True:\n' \
+  "$P" "AssertionError: (False, 200)" "assert 404 == 200"
+sabotaje $M "se borra al recibir cliente por primera vez" \
+  "$BORRA" $'    if operation.client_id != client_id:\n' \
+  "$P" "AssertionError: sin cliente antes" "assert 404 == 200"
+sabotaje $M "el borrado queda aunque el guardado falle" \
+  $'PublicQuoteModel.operation_id == operation.id)\n        )\n' \
+  $'PublicQuoteModel.operation_id == operation.id)\n        )\n        await db.commit()\n' \
+  "$P" "AssertionError: (True, 400)" "assert 404 == 200"
+sabotaje $M "se borran también los links de otras operaciones" \
+  'sa_delete(PublicQuoteModel).where(PublicQuoteModel.operation_id == operation.id)' \
+  'sa_delete(PublicQuoteModel).where(PublicQuoteModel.operation_id.isnot(None))' \
+  "$P" "AssertionError: otra operación del mismo cliente" "assert 404 == 200"
+sabotaje $M "el guardado encuentra la operación de otro dueño" \
+  $'        OperationModel.id == operacion_id,\n        OperationModel.owner_username == username,\n' \
+  $'        OperationModel.id == operacion_id,\n' \
+  "$P" "AssertionError: assert '" "' != '"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

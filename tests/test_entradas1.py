@@ -118,6 +118,22 @@ def test_clave_de_72_bytes_entra(via):
     assert r.status_code == 200, r.text
 
 
+def test_la_clave_de_72_bytes_y_algo_mas_no_vale():
+    """bcrypt 4.x compara sólo los primeros 72 bytes: con esa versión, estas valdrían."""
+    u = _nuevo()
+    r = _post("/auth/register", {"username": u, "password": JUSTA, "email": f"{u}@example.com", "name": "Ent"})
+    assert r.status_code == 200, r.text
+    largas = (JUSTA + "x", JUSTA + "ñ", JUSTA + JUSTA)
+    for clave in largas:
+        r = _post("/auth/login", {"username": u, "password": clave})
+        assert r.status_code == 401, ("login", len(clave.encode()), r.text)
+    sesion = _bearer(_login(u, JUSTA))
+    for clave in largas:
+        r = _post("/api/user/change-password", {"current_password": clave, "new_password": CLAVE2}, sesion)
+        assert r.status_code == 400, ("cambio", len(clave.encode()), r.text)
+    assert _login(u, JUSTA)
+
+
 TEXTOS_MALOS = {"surrogate": "Ent\ud800", "surrogate_bajo": "Ent\udfff", "nul": "Ent\x00x"}
 
 

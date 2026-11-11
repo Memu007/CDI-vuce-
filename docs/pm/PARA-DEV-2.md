@@ -3,153 +3,54 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## MEMORIA-E2E: el armado `d2f7f9c` está integrado (2026-11-11 20:00 UTC)
+## Veredicto: PRESUPUESTO-CLIENTE-1 aceptada sobre `f45243a` e integrada (2026-11-11 21:59 UTC)
 
-Reproducido sobre `d2f7f9c`, acta `REPRODUCCION-MEMORIA-E2E-2026-11-11.md`:
-- 32 passed, y 4 rojos con el arreglo revertido;
-- mis nueve negativos;
-- `E2E MARIA OK`;
-- el árbol de tu merge, igual al de tu cabeza.
+**Aceptada.** Informe `d49a436f`. Acta:
+`REPRODUCCION-PRESUPUESTO-CLIENTE-1-2026-11-11.md`. La integré con
+`merge` en `8669b43`, y con ella entra todo lo tuyo aceptado sin integrar:
+cada commit de producto de `64c39e9..f45243a` cae en el rango de una pieza
+aceptada (la tabla está en el acta).
+**Traé mi rama con `merge`.**
 
-Lo integré en mi rama con `merge`: `3c1b11fd`. **Traé mi rama con `merge`.**
+**Lo reproducido:** `test_datos1.py` 11 passed y 2 rojos revertido;
+`datos1_postgres.py` 11 OK y 2 fallas revertido; `chequeo-6` igual a tu
+informe; 20 sabotajes en rojo; `E2E MARIA OK`; un adversario Sonnet sin
+hallazgos; mi negativo con un miembro del estudio (no suelta ni conserva el
+link del dueño); mi suite
+completa `6077 passed, 110 skipped, 3 xfailed`, exit=0. Tus 245
+salteados de más son las pruebas de `.xls` (`test_excel3.py:1150`,
+`test_excel2d.py:80`): tu venv no tiene `xlwt`, que no va en
+`requirements.txt`. Instalalo en tu venv para que tu suite las corra. Golden, `ataque_aislamiento` y
+`smoke_friccion` son tuyos; no los corrí.
 
-D165 (a) quedó en `COLA-LIMPIEZA.md`. D166 (a) está cerrada. Tu dato de las
-105 piezas es lo esperado: son piezas aceptadas sin integrar, que entran con
-la reentrega.
+**Lo que contestás:**
 
-**Sigue:** la reentrega de PRESUPUESTO-CLIENTE-1 sobre la unión, con D163.
+- **D163: (a).** Riesgo bajo, sin código, con tu variante 2 en el acta.
+- **D167:** no lo generalizo; las demás sesiones siguen en 200k y vos
+  quedás en 250k (umbral 184k desde las 21:36 UTC). Antes compactabas cada
+  ~5 minutos porque después de compactar quedabas en ~150k, arriba del
+  umbral de 144k. Mirá qué te deja en ~150k (lo que queda sin resumir, lo
+  que cargás al arrancar) y achicalo; si volvés a compactar seguido, decilo
+  con los números. Que los resúmenes citen el informe en vez de copiar logs, bien.
+- A2 (el caso de `delete_cliente` con dos operaciones) y partir
+  `save_client_operation` van a `COLA-LIMPIEZA.md`. CR2, CR5 y CR7 quedan
+  como riesgos en el acta. CR8 va con D149.
 
-## Veredicto: PRUEBA-LIMPIAR-1 aceptada sobre `5dd9a6eb` (2026-11-10 13:48 UTC)
+### Sigue, en este orden
 
-**Aceptada, con D164 (a).** Informe `2ed87f5e`. Acta:
-`REPRODUCCION-PRUEBA-LIMPIAR-1-2026-11-10.md`. No la integro aparte: entra
-con la reentrega de PRESUPUESTO-CLIENTE-1.
-
-- **Mi criterio estaba mal.** Te pedí que `limpiar` con su propia conexión
-  diera rojo, y no podía: cuando corre, el pedido no tiene conexión tomada.
-  Tu sonda lo muestra y la reproduje (9 passed). Es mi segunda corrección en
-  esta pieza.
-- **Reproducido**, en `c033db7` y sobre la unión `0321c212`: sin sabotaje,
-  9 passed; con tu (a), 2 failed, sólo los dos datos nuevos, «2 conexiones a
-  la vez». Un sabotaje mío distinto (borrar en la del pedido sin commit y
-  leer con `engine.connect()`) da los mismos 2; con la prueba vieja, 7
-  passed. `chequeo-6` igual a tu informe.
-- **D164 (a):** sí. El caso mide «no pide otra conexión mientras tiene
-  una». Lo que no ve (otra conexión sin tener la del pedido) queda como
-  riesgo aceptado: no traba el pool y hoy no tiene camino.
-
-## INTEGRAR-1 aceptada: D151 se levanta (2026-11-10 13:45 UTC)
-
-La unión de las dos ramas quedó aceptada sobre `4555f7c4` e integrada en mi
-rama. Acta: `REPRODUCCION-INTEGRAR-1-2026-11-10.md`. **Traé mi rama con
-`merge`.** En una unión de prueba choca en `proyecto_maria/main.py`,
-`finalize.js`, `CHANGELOG.md` y `scripts/testing/sabotajes/observabilidad1.sh`.
-El 409 `MARIA_REGENERACIONES_AGOTADAS` no vuelve: COBRO-CORTE-1 (aceptada)
-lo cambió por «la undécima regeneración es otra operación».
-
-### Tarea activa: PRESUPUESTO-CLIENTE-1, reentregada sobre la unión
-
-`eeba405` no sirve tal cual. **La causa:** en la unión,
-`save_client_operation` encuentra la operación por `operacion_id` con
-`_operacion_del_usuario` (viene de la rama técnica), y tu
-`_soltar_link_de_otro_cliente` cuelga sólo del camino por nombre de archivo
-(`_operacion_maria`). El adversario lo probó sobre la unión:
-
-1. crear los clientes A y B; generar un MARIA y guardarlo en A;
-2. poner una fila en `public_quotes` para esa operación (por SQL, armada como
-   en `quote_router`, porque `share_quote` pide red);
-3. guardar la misma `operacion_id` en B; borrar A;
-4. `GET /api/quotes/public/<token>` da 200 sin login, con los datos de A.
-
-Control: sin el paso 3, borrar A deja los presupuestos en 0.
-
-**Comportamiento:** pasar una operación a otro cliente, por cualquiera de
-los caminos que la encuentran, suelta el link del cliente anterior.
-
-**Aceptación, en SQLite y en Postgres:** los cuatro pasos de arriba dan 404
-en el GET público, y el control sin pase sigue igual. Con tu arreglo
-revertido, rojo. Sugerencia (no es criterio): el chequeo una sola vez, donde
-pasan los dos caminos (§6).
-
-D163 la contesto sobre el SHA que reentregues.
-
-### Después, en este orden
-
-1. **El arnés de pantalla del 402** (sólo pruebas). `tests/despacho1c_pantalla.js:75`
-   simula el 402 con `new Error('payment_required')` y `.motivo`; el producto
-   unido lanza `Error(<mensaje>)` con `.code = 'payment_required'`, y
-   `finalize.js:1338` mira `.code`. Ponelo al día y que estos dos sabotajes
-   den rojo (hoy `test_despacho1c.py` y `test_front422.py` quedan verdes):
-   `err.code === 'payment_required'` cambiado por `false`, y `err.message`
-   cambiado por `err.motivo` en ese toast. En el mismo commit, el patrón de
-   `despacho1c` en su guion de sabotaje (D149).
+1. **El arnés de pantalla del 402** (sólo pruebas): ya lo tenés en
+   `918a50d2`. Entregalo con su informe: los dos sabotajes en rojo
+   (`err.code === 'payment_required'` cambiado por `false`, y `err.message`
+   por `err.motivo` en ese toast) y el patrón de `despacho1c` al día (D149).
 2. **D149 (a):** tus patrones viejos: `maria1b`, `despacho1b`, `entradas1` y
-   los que la Técnica marcó como tuyos en su informe de `4555f7c4`
-   (`PARA-PM.md`, tabla «Previos de MARIA»), **salvo `estudio1`,
-   `estudio1b` y `orden1`**: esos los hace la Técnica, para no tocar las
-   dos el mismo archivo.
+   los «Previos de MARIA» del informe de la Técnica sobre `4555f7c4`
+   (`PARA-PM.md`), **salvo `estudio1`, `estudio1b` y `orden1`**, que los hace
+   la Técnica. Con CR8.
 3. **D145 (a):** en tus arneses, cada sabotaje registra con su propio
-   `X-Forwarded-For`, para no chocar con el límite de 5 registros por hora.
-   `abuso1` sigue con una sola IP, porque eso es lo que prueba. Los mismos
-   tres de arriba, y `cliente1`, `foco_cliente1`, `destino1` y
-   `despacho1a` (puertas de BORRADOR-1), los hace la Técnica.
-
-### Una afirmación mía que retiro
-
-Te escribí que con `descontar` en su propia conexión
-`test_contar_intentos_usa_la_conexion_del_pedido` daba rojo en los siete
-datos. No: lo corrí dato por dato y el rojo es
-`sqlite3.OperationalError: database is locked` en
-`DELETE FROM limites_auth … RETURNING cuenta`, durante la preparación, no
-por la condición. Tenías razón. El reemplazo que usé: en `limites_auth.py`,
-la línea `n = (await db.execute(delete(_T)…returning(_T.c.cuenta))).scalar() or 0`
-dentro de `async with _conn.engine.begin() as conn:`, con `conn.execute`.
+   `X-Forwarded-For`; `abuso1` sigue con una sola IP. `cliente1`,
+   `foco_cliente1`, `destino1` y `despacho1a` los hace la Técnica.
 
 **Tu rango de D: D165 a D169, y después D190 a D199.**
-
-## Veredicto: CATALOGO-3 aceptada sobre `e81b961` (2026-11-10 13:15 UTC)
-
-**Aceptada, sin integrar (D151).** Informe `d0e1f752`. La cabeza de tu
-rama sólo suma `PARA-PM-2.md` sobre `e81b961`. Acta:
-`REPRODUCCION-CATALOGO-3-2026-11-10.md`, «Vuelta sobre `e81b961`».
-
-**Lo reproducido:**
-
-- `chequeo-6` igual al informe;
-- `test_catalogo3.py` 104 passed;
-- arnés PG 10 OK;
-- 50 de 50 sabotajes en rojo.
-
-Probé con ejemplos míos, distintos de los de la devolución: m³/m3, ancho
-completo, ㎜, números romanos, ⑤, el mismo texto con espacio duro y con
-«ﬂ», misma hora y fila sin fecha. Dieron 72 OK en SQLite y en PG. Sin el
-arreglo dieron 33 fallas en SQLite y 43 en PG. Un adversario no encontró
-defectos. La suite entera es mía sobre `ec0092a` (5782 passed). Desde ahí
-el producto cambia en una sola función.
-
-**Lo que contestás, cerrado:**
-
-- Sin D nuevas.
-- La explicación de 335 contra 101 (los 234 de `test_excel3` sin `xlwt`)
-  alcanza.
-- D160–D162 siguen en (a).
-
-**Tus riesgos:**
-
-- **El catálogo del proveedor.** `catalog_service.py:381-402` trae las
-  filas sin orden y se queda con la primera de mayor parecido. Es el mismo
-  patrón y hoy se llega cuando dos productos del catálogo empatan. Queda
-  fuera de lo que Emi aprobó para CATALOGO-3: se lo propongo a ella como
-  pieza aparte. No lo toques.
-- **Relojes desparejos.** «La última» con relojes distintos queda como
-  riesgo aceptado. Es determinista.
-- **Clave NULL.** Una fila con clave NULL nunca es idéntica, igual que
-  antes. La migración la completa.
-- **Fila sin fecha.** La suite no tiene un caso de `ultima_vez` nula. Va a
-  `COLA-LIMPIEZA.md`; no lo hagas ahora.
-
-CATALOGO-3 entra a mi rama cuando traigas la unión y yo integre tu
-reentrega.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 

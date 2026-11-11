@@ -52,7 +52,8 @@ HON="FAILED $T::test_cuerpo_mas_hondo_que_la_pila_da_400"
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
 pytest_() { "$PY" -m pytest -q --no-cov -p no:cacheprovider -W ignore -rf "$T" 2>&1; }
-postgres_() { env -u DATABASE_URL "$PY" scripts/testing/entradas3_postgres.py "$PG_URL" 2>&1; }
+# El log de la excepción con NUL trae un NUL: sin sacarlo, grep la toma por binaria.
+postgres_() { env -u DATABASE_URL "$PY" scripts/testing/entradas3_postgres.py "$PG_URL" 2>&1 | tr -d '\000'; }
 
 rm -f test.db
 for CORRER in pytest_ postgres_; do
@@ -91,10 +92,12 @@ sabotaje $M "un número enorme se guarda" "FAILED $T::test_numero_enorme_da_400_
 
 CORRER=postgres_
 # --- Lo que sólo se ve en Postgres
-sabotaje $M "la ruta con NUL no queda en api_logs" "FALLA | NUL en la ruta" \
-  "endpoint=_guardable_en_pg(endpoint)[:200]," "endpoint=endpoint[:200],"
-sabotaje $M "la ruta larga no queda en api_logs" "FALLA | ruta de 300 caracteres" \
+sabotaje $M "un pedido sin molde guarda el camino" "FALLA | NUL en la ruta" \
+  'or "<sin ruta>",' 'or request.url.path,'
+sabotaje $M "un molde largo no queda en api_logs" "FALLA | molde de 300 caracteres" \
   "endpoint=_guardable_en_pg(endpoint)[:200]," "endpoint=_guardable_en_pg(endpoint),"
+sabotaje $M "una excepción con NUL no queda en api_logs" "FALLA | excepción con NUL en el mensaje" \
+  "error_message=_guardable_en_pg(error) if error else error" "error_message=error"
 sabotaje $M "un número enorme revienta el listado en Postgres" "FALLA | después de 1e308" \
   "    if abs(numero) > 1e15:" "    if False:"
 

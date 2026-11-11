@@ -9,7 +9,9 @@ Comprueba:
    andando;
 3. otro dueño no puede borrarlo (404) y el presupuesto sigue andando;
 4. un cliente sin presupuesto se sigue borrando;
-5. si el borrado falla a mitad, no se borra nada (ni cliente ni presupuesto).
+5. si el borrado falla a mitad, no se borra nada (ni cliente ni presupuesto);
+6. una operación guardada en otro cliente pierde su link; si ese guardado
+   falla (400), el link sigue; borrar después el cliente anterior no la toca.
 
 uso (con un Postgres local y descartable, nunca el de producción):
   python scripts/testing/datos1_postgres.py postgresql://cdi@127.0.0.1:55432/<base>
@@ -39,10 +41,13 @@ from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 import proyecto_maria.main as main_mod  # noqa: E402
 from proyecto_maria.core.rate_limit import limiter  # noqa: E402
 from proyecto_maria.database.models import Client  # noqa: E402
+from tests.test_maria7_rechazos_24_10 import _pedido  # noqa: E402
 
 limiter.enabled = False
 FALLAS = []
 CLAVE = "SecureP@ss1"
+ITEM = {"pieza": "8471.30.12", "descripcion": "TABLETA SINTETICA", "origen": "CHN",
+        "cantidad": 1, "valor_unitario": 50, "peso_unitario": 0.5}
 
 
 def chequear(ok, que):
@@ -59,6 +64,12 @@ def sql(consulta, *args):
 
 def contar(tabla, columna, valor):
     return sql(f"select count(*) from {tabla} where {columna}=%s", valor)[0][0]
+
+
+def cliente_de(op):
+    """El cliente de la operación; None también si la operación no está."""
+    filas = sql("select client_id from operations where id=%s", op)
+    return filas[0][0] if filas else None
 
 
 with TestClient(main_mod.app, raise_server_exceptions=False) as c:
@@ -78,15 +89,16 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
                 c.cookies.set(k, v)
             return c
 
-        def cliente(self, compartir=True):
-            """Cliente sintético con una operación; devuelve (cliente, op, token o None)."""
+        def cliente_vacio(self):
             self.activo()
             r = c.post("/api/clientes", json={"nombre": f"Cliente DATOS1 {uuid.uuid4().hex[:6]}"})
             assert r.status_code == 200, r.text
-            cid = r.json()["cliente"]["id"]
-            r = c.post(f"/api/clientes/{cid}/operaciones", json={"items": [{
-                "pieza": "8471.30.12", "descripcion": "TABLETA SINTETICA", "origen": "CHN",
-                "cantidad": 1, "valor_unitario": 50, "peso_unitario": 0.5}]})
+            return r.json()["cliente"]["id"]
+
+        def cliente(self, compartir=True):
+            """Cliente sintético con una operación; devuelve (cliente, op, token o None)."""
+            cid = self.cliente_vacio()
+            r = c.post(f"/api/clientes/{cid}/operaciones", json={"items": [ITEM]})
             assert r.status_code == 200, r.text
             op = r.json()["operation_id"]
             token = None
@@ -148,6 +160,34 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
     r = c.delete(f"/api/clientes/{cid2}")
     chequear(r.status_code == 200 and contar("clients", "id", cid2) == 0,
              f"un cliente sin presupuesto se sigue borrando ({r.status_code})")
+
+    # --- 6. la operación pasa a otro cliente
+    x, y = a.cliente_vacio(), a.cliente_vacio()
+
+    def guardar(cid, valor=50, opid=None):
+        cuerpo = {"items": [{**ITEM, "valor_unitario": valor}]}
+        if opid:
+            cuerpo["operacion_id"] = opid
+        return c.post(f"/api/clientes/{cid}/operaciones", json=cuerpo)
+
+    r = c.post("/generate_maria", json=_pedido())
+    assert r.status_code == 200, r.text
+    op6 = r.json()["operacion_id"]
+    r = guardar(x, opid=op6)
+    assert r.status_code == 200 and r.json()["operation_id"] == op6, r.text
+    r = c.post("/api/quotes/share", json={"operation_id": op6})
+    assert r.status_code == 200, r.text
+    token6 = r.json()["token"]
+    r = guardar(y, "NaN", op6)
+    chequear(r.status_code == 400 and link(token6) == 200 and cliente_de(op6) == x,
+             f"si el guardado en otro cliente falla, el link sigue ({r.status_code})")
+    r = guardar(y, opid=op6)
+    chequear(r.status_code == 200 and r.json()["operation_id"] == op6 and link(token6) == 404
+             and contar("public_quotes", "operation_id", op6) == 0 and cliente_de(op6) == y,
+             f"guardada en otro cliente, la operación pierde su link ({r.status_code})")
+    r = c.delete(f"/api/clientes/{x}")
+    chequear(r.status_code == 200 and link(token6) == 404 and cliente_de(op6) == y,
+             f"borrar el cliente anterior no la toca ni devuelve el link ({r.status_code})")
 
 print(f"fallas: {len(FALLAS)}")
 sys.exit(1 if FALLAS else 0)

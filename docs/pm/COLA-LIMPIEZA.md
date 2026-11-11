@@ -162,3 +162,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - Tres lectores de la posición SIM que no aceptan lo mismo: `_NCM` en
   `client_memory.py`, `_POSICION` en `despacho_lector.py` y `_partes` en
   `sufijos_arca.py`. Uno solo, con su tabla de formas (D165 a, MEMORIA-E2E).
+- `proyecto_maria/main.py` `save_client_operation` pasa las 150 líneas (153
+  con la llamada de PRESUPUESTO-CLIENTE-1): partirla.
+- `tests/test_datos1.py`: un caso con dos operaciones en el cliente que se
+  borra; hoy, si `delete_cliente` borra sólo los links de la primera, queda
+  verde (A2 del informe de PRESUPUESTO-CLIENTE-1).

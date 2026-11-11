@@ -1309,7 +1309,7 @@ async def _migrate_widen_pieza_column():
 
 
 async def _migrate_catalogo_sin_tope():
-    """Lleva a text las columnas del catálogo y el origen de la memoria del cliente. Si falla, el
+    """Lleva a text las columnas del catálogo y los orígenes de la memoria y de los ítems. Si falla, el
     arranque se detiene: con el tope viejo, guardar-uso respondería sin guardar."""
     from proyecto_maria.database.connection import engine, IS_SQLITE
 
@@ -1318,7 +1318,8 @@ async def _migrate_catalogo_sin_tope():
     # Una tabla por transacción: guardar-uso escribe las dos en el orden
     # contrario, y tomarlas juntas puede trabarse con él.
     for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "origen", "vendor_nombre")),
-                            ("client_product_history", ("origen_frecuente",))):
+                            ("client_product_history", ("origen_frecuente",)),
+                            ("operation_items", ("origen",))):
         async with engine.begin() as conn:
             # Si otra conexión tiene tomada la tabla, falla rápido y el reinicio
             # lo vuelve a intentar, en vez de colgar el arranque.
@@ -1336,39 +1337,45 @@ async def _migrate_catalogo_sin_tope():
 
 
 async def _migrate_catalogo_claves():
-    """Da la clave de hoy a las filas sin letras ni números latinos que tienen
-    otra: guardarlas de nuevo buscaría por la de hoy y armaría una segunda fila."""
+    """Da el proveedor y la clave de hoy a las filas que tienen otros: guardarlas
+    de nuevo buscaría por los de hoy y armaría una segunda fila."""
     from sqlalchemy import text
     from proyecto_maria.core import catalog_service as catalog_svc
     from proyecto_maria.database.connection import engine, IS_SQLITE
 
-    sin_latinas = "NOT GLOB '*[A-Za-z0-9]*'" if IS_SQLITE else "!~ '[A-Za-z0-9]'"
+    # Sólo cambian las filas con algo fuera de ASCII, sin proveedor o con el
+    # proveedor recortado a 60.
+    no_ascii = "GLOB '*[^ -~]*'" if IS_SQLITE else "~ '[^ -~]'"
     try:
         async with engine.begin() as conn:
             if not IS_SQLITE:
                 await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
+                # Con dos workers, el segundo espera hasta 5 s; si no alcanza, la saltea y la hace el otro.
+                await conn.exec_driver_sql("SELECT pg_advisory_xact_lock(7302551)")
             res = await conn.execute(text(
-                "SELECT id, descripcion, product_key FROM vendor_catalog_products "
-                f"WHERE descripcion {sin_latinas} AND descripcion <> '' AND product_key NOT LIKE '~%'"
+                "SELECT id, vendor_id, vendor_nombre, product_key, descripcion FROM vendor_catalog_products "
+                f"WHERE descripcion {no_ascii} OR COALESCE(vendor_nombre, '') {no_ascii} "
+                "OR vendor_id = '' OR length(vendor_id) >= 60 ORDER BY id"
             ))
             movidas = choques = 0
-            for fila_id, descripcion, clave in res.fetchall():
-                nueva = catalog_svc.clave_de_producto(descripcion)
-                if nueva == clave or not nueva.startswith("~"):
+            for fila_id, vendor_id, nombre, clave, descripcion in res.fetchall():
+                nuevo = catalog_svc._vendor_key(nombre or "") or vendor_id or "~sin_nombre"
+                nueva = catalog_svc.clave_de_producto(descripcion) if descripcion else clave
+                if (nuevo, nueva) == (vendor_id, clave):
                     continue
-                # Si la clave nueva ya es de otra fila del mismo proveedor, quedan las dos.
+                # Si ya hay otra fila con ese proveedor y esa clave, quedan las dos.
                 hecho = await conn.execute(text(
-                    "UPDATE vendor_catalog_products SET product_key = :nueva WHERE id = :id AND NOT EXISTS ("
-                    "SELECT 1 FROM vendor_catalog_products o WHERE o.owner_username = "
-                    "vendor_catalog_products.owner_username AND o.vendor_id = vendor_catalog_products.vendor_id "
-                    "AND o.product_key = :nueva)"
-                ), {"nueva": nueva, "id": fila_id})
+                    "UPDATE vendor_catalog_products SET vendor_id = :nuevo, product_key = :nueva "
+                    "WHERE id = :id AND NOT EXISTS (SELECT 1 FROM vendor_catalog_products o "
+                    "WHERE o.owner_username = vendor_catalog_products.owner_username "
+                    "AND o.vendor_id = :nuevo AND o.product_key = :nueva AND o.id <> :id)"
+                ), {"nuevo": nuevo, "nueva": nueva, "id": fila_id})
                 if hecho.rowcount:
                     movidas += 1
                 else:
                     choques += 1
         if movidas or choques:
-            print(f"✅ Migracion: {movidas} claves del catálogo al día, {choques} quedan por un choque")
+            print(f"✅ Migracion: {movidas} filas del catálogo al día, {choques} quedan por un choque")
     except Exception as mig_err:
         print(f"⚠️ Migracion claves del catálogo (no critica): {mig_err!r}")
 
@@ -1566,7 +1573,16 @@ async def _migrate_add_api_logs_owner_column():
     """
     from proyecto_maria.database.connection import engine, IS_SQLITE
 
+    async def ddl(conn, sql):
+        if not IS_SQLITE:
+            # Si otra conexión tiene tomada la tabla, mejor fallar al rato (y
+            # reintentar en el próximo arranque) que colgar el arranque.
+            await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
+        await conn.exec_driver_sql(sql)
+
     try:
+        # Columna e índice en transacciones separadas: el lock exclusivo del
+        # ALTER no espera al índice, y si el índice falla la columna queda.
         async with engine.begin() as conn:
             if IS_SQLITE:
                 res = await conn.exec_driver_sql("PRAGMA table_info(api_logs)")
@@ -1580,21 +1596,27 @@ async def _migrate_add_api_logs_owner_column():
             if not columnas:
                 # Base vacía: init_db ya la crea con la columna y el índice.
                 return
-            if not IS_SQLITE:
-                # Si otra conexión tiene tomada la tabla, mejor fallar al rato
-                # (y reintentar en el próximo arranque) que colgar el arranque.
-                await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
-            if "owner_username" not in columnas:
-                await conn.exec_driver_sql(
+            agrega_columna = "owner_username" not in columnas
+            if agrega_columna:
+                await ddl(conn,
                     "ALTER TABLE api_logs ADD COLUMN owner_username VARCHAR(50)"
                     if IS_SQLITE else
                     "ALTER TABLE api_logs ADD COLUMN IF NOT EXISTS owner_username VARCHAR(50)"
                 )
-                print("✅ Migracion: agregada columna api_logs.owner_username")
+    except Exception:
+        logging.exception(
+            "no se pudo agregar api_logs.owner_username; "
+            "la app arranca igual, pero las métricas no se graban hasta que exista"
+        )
+        return
+    if agrega_columna:
+        print("✅ Migracion: agregada columna api_logs.owner_username")
 
-            # Un índice cuya primera columna sea owner_username alcanza, se
-            # llame como lo nombra create_all o como `ix_api_logs_owner`, el
-            # de scripts/migrate_add_owner.py.
+    try:
+        # Un índice cuya primera columna sea owner_username alcanza, se
+        # llame como lo nombra create_all o como `ix_api_logs_owner`, el
+        # de scripts/migrate_add_owner.py.
+        async with engine.begin() as conn:
             if IS_SQLITE:
                 res = await conn.exec_driver_sql("PRAGMA index_list(api_logs)")
                 tiene_indice = False
@@ -1611,16 +1633,18 @@ async def _migrate_add_api_logs_owner_column():
                 )
                 tiene_indice = res.first() is not None
             if not tiene_indice:
-                await conn.exec_driver_sql(
+                await ddl(conn,
                     "CREATE INDEX IF NOT EXISTS ix_api_logs_owner_username "
                     "ON api_logs (owner_username)"
                 )
-                print("✅ Migracion: agregado indice ix_api_logs_owner_username")
     except Exception:
         logging.exception(
-            "[OBSERVABILIDAD-1] no se pudo agregar api_logs.owner_username; "
-            "la app arranca igual, pero las métricas no se graban hasta que exista"
+            "no se pudo crear el índice ix_api_logs_owner_username; "
+            "la app arranca igual y las métricas se graban, sin índice"
         )
+        return
+    if not tiene_indice:
+        print("✅ Migracion: agregado indice ix_api_logs_owner_username")
 
 
 @asynccontextmanager
@@ -1771,6 +1795,11 @@ async def _cuenta_por_email(db: AsyncSession, email: str):
         return None
     return cuentas[0] if cuentas else None
 
+
+async def _tope_por_cuenta(db: AsyncSession, clave: str) -> bool:
+    """Más de tres pedidos en la hora para la cuenta de la clave, lleguen de la IP que lleguen."""
+    return limiter.enabled and await limites_auth.contar(db, clave, 3600) > 3
+
 class PasswordResetConfirm(BaseModel):
     token: TextoCodificable
     new_password: ClaveNueva
@@ -1791,8 +1820,13 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
         log_429(req, "reset bloqueado")
         raise HTTPException(status_code=429, detail=f"Demasiados intentos. Intente en {espera // 60 + 1} minutos.")
     
+    mensaje = {"message": "Si el email existe, se envió un link."}
     # 1. Buscar usuario
     user = await _cuenta_por_email(db, request.email)
+    # Antes de trabar la cuenta: contar hace commit y soltaría la traba. Fuera
+    # de «reset:», que es de la IP y la IP puede traer cualquier texto.
+    if user and await _tope_por_cuenta(db, f"reset-cuenta:{user.username}"):
+        return mensaje
     if user:
         # Trabar la cuenta con el email leído: un cambio de clave o email a la vez barre este link o lo impide.
         user = (await db.execute(select(User).where(
@@ -1801,7 +1835,7 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
     if not user:
         # Por seguridad, no decimos si el email existe o no, pero simulamos éxito
         # Opcional: sleep aleatorio para evitar timing attacks
-        return {"message": "Si el email existe, se envió un link."}
+        return mensaje
 
     # 2. Generar token
     token = str(uuid.uuid4())
@@ -1830,14 +1864,11 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
     
     email_sent = send_email(user.email, "Recuperar Contraseña - CDI", email_body)
     
-    response = {"message": "Si el email existe, se envió un link."}
-    
     if _pista_dev_habilitada(email_sent):
         # MODO DEV: Devolver token para facilitar pruebas si no hay SMTP
         print(f"🔑 [DEV] Reset Token para {user.username}: {token}")
-        response["dev_token_hint"] = token
-        
-    return response
+        mensaje["dev_token_hint"] = token
+    return mensaje
 
 class RecoverUsernameRequest(BaseModel):
     email: TextoCodificable
@@ -1855,7 +1886,7 @@ async def recover_username(request: RecoverUsernameRequest, req: Request, db: As
     if not user:
         return mensaje
     # Por cuenta y no por texto: dos textos que la base toma por el mismo email son una cuenta.
-    if limiter.enabled and await limites_auth.contar(db, f"recuperar:cuenta:{user.username}", 3600) > 3:
+    if await _tope_por_cuenta(db, f"recuperar:cuenta:{user.username}"):
         return mensaje
 
     email_body = f"""
@@ -1971,8 +2002,11 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                 # Crear tarea en background (no bloquea respuesta al usuario)
                 # Usamos el loop de eventos actual
                 import asyncio
+                # El molde y no el camino: el camino trae tokens, hashes,
+                # CUIT y nombres de archivo. El router lo deja en el scope.
+                ruta = request.scope.get("route")
                 asyncio.create_task(log_request_background(
-                    str(request.url.path),
+                    getattr(ruta, "path_format", None) or "<sin ruta>",
                     request.method,
                     request.client.host,
                     status_code,
@@ -2424,7 +2458,8 @@ async def update_user_profile(
     if "default_puerto_destino" in body:
         u.default_puerto_destino = _sanitize_op_default(body.get("default_puerto_destino"))
     if "default_tipo_destinacion" in body:
-        u.default_tipo_destinacion = _sanitize_op_default(body.get("default_tipo_destinacion"))
+        destinacion = str(body.get("default_tipo_destinacion") or "").strip()
+        u.default_tipo_destinacion = _destinacion_o_400(destinacion) if destinacion else None
 
     if not cambia_email:
         await db.commit()
@@ -3516,6 +3551,7 @@ async def register(request: RegisterRequest, req: Request, background_tasks: Bac
         await db.execute(
             sa_update(Invitation)
             .where(Invitation.org_id == invite_org.id, Invitation.status == "pending",
+                   Invitation.expires_at > datetime.now(timezone.utc),
                    func.lower(func.trim(Invitation.email)) == request.email)
             .values(status="accepted")
             .execution_options(synchronize_session=False)
@@ -3742,7 +3778,7 @@ async def create_manual_operation(
     items = [dict(
         pieza=_guardable_en_pg(str(it.get("pieza", "") or ""))[:20],
         descripcion=_guardable_en_pg(str(it.get("descripcion", "") or "")),
-        origen=_guardable_en_pg(str(it.get("origen", "") or "XX")).upper()[:3],
+        origen=_guardable_en_pg(str(it.get("origen", "") or "XX")).upper(),
         cantidad=_numero_de_afuera(it.get("cantidad"), "La cantidad"),
         valor_unitario=_numero_de_afuera(it.get("valor_unitario"), "El valor unitario"),
         peso_unitario=_numero_de_afuera(it.get("peso_unitario"), "El peso unitario"),
@@ -6297,6 +6333,15 @@ async def _operacion_del_usuario(db: AsyncSession, username: str, operacion_id: 
     return result.scalars().first()
 
 
+async def _soltar_link_de_otro_cliente(db: AsyncSession, operation, client_id: str) -> None:
+    """Si la operación pasa a otro cliente, su link compartido se va, como al borrar el
+    cliente: es el presupuesto armado para el anterior. Sin commit: cae con el resto si falla."""
+    if operation.client_id not in (None, client_id):
+        await db.execute(
+            sa_delete(PublicQuoteModel).where(PublicQuoteModel.operation_id == operation.id)
+        )
+
+
 def _del_periodo(operacion, cuenta) -> bool:
     """Las regeneraciones que le quedaban a una operación de un período anterior no pasan a éste."""
     inicio, creada = cuenta.billing_period_started_at, operacion.created_at
@@ -8123,6 +8168,7 @@ async def save_client_operation(
             currency=str(data.get("currency") or "USD")[:3],
         )
         if operation is not None:
+            await _soltar_link_de_otro_cliente(db, operation, client_id)
             for campo, valor in campos.items():
                 setattr(operation, campo, valor)
             operation.extra = {**(operation.extra or {}), "resumen": resumen}
@@ -8166,7 +8212,7 @@ async def save_client_operation(
                     descripcion=str(item.get("descripcion") or ""),
                     # Lo que falta queda vacío (0 o ""): nada de cantidad 1,
                     # peso 0,5 ni origen «XX» inventados (MARIA-1b, D6 Dev 2).
-                    origen=str(item.get("origen") or "")[:3],
+                    origen=str(item.get("origen") or ""),
                     cantidad=_numero_de_afuera(item.get("cantidad"), "La cantidad"),
                     valor_unitario=_numero_de_afuera(item.get("valor_unitario"), "El valor unitario"),
                     peso_unitario=_numero_de_afuera(item.get("peso_unitario"), "El peso unitario"),
@@ -8279,7 +8325,8 @@ async def agrupar_items(
 
     # Validar mismo NCM, origen y unidad
     ncms = {it.pieza for it in items}
-    origenes = {it.origen for it in items}
+    from proyecto_maria.core.maria_generator import clave_de_origen
+    origenes = {clave_de_origen(it.origen) for it in items}
     unidades = {(it.unidad if hasattr(it, 'unidad') else None) for it in items}
 
     if len(ncms) > 1:
@@ -8290,7 +8337,7 @@ async def agrupar_items(
     if len(origenes) > 1:
         raise HTTPException(
             status_code=400,
-            detail=f"Los ítems tienen orígenes distintos: {', '.join(sorted(origenes))}. Todos deben tener el mismo origen.",
+            detail=f"Los ítems tienen orígenes distintos: {', '.join(sorted({it.origen or '' for it in items}))}. Todos deben tener el mismo origen.",
         )
     if len(unidades) > 1:
         raise HTTPException(
@@ -8405,12 +8452,17 @@ async def get_client_metrics(
                 OperationItemModel.origen != "",
             )
             .group_by(OperationItemModel.origen)
-            .order_by(sa_desc("n"))
-            .limit(1)
+            .order_by(sa_func.count(OperationItemModel.id).desc(), OperationItemModel.origen)
         )
-        top = orig_rows.first()
-        if top:
-            origen_frecuente = str(top.origen or "-")
+        # «CHINA» y «CN» son el mismo país: se suman antes de elegir, y lo
+        # nombra la forma más usada (el orden de la consulta la pone primero).
+        from proyecto_maria.core.maria_generator import clave_de_origen
+        por_pais: dict[str, list] = {}
+        for origen, n in orig_rows.all():
+            cuenta = por_pais.setdefault(clave_de_origen(origen), [0, origen])
+            cuenta[0] += n
+        if por_pais:
+            origen_frecuente = str(max(por_pais.values(), key=lambda c: c[0])[1] or "-")
 
     return {
         "total_operaciones": total_ops,
@@ -10120,7 +10172,7 @@ def _ncm_recordado_con_sim_del_proveedor(recordado: dict, del_proveedor) -> str:
     de la factura (cada memoria busca por parecido por su lado)."""
     from proyecto_maria.core import catalog_service as catalog_svc
     if (not del_proveedor or not del_proveedor.get("producto_key")
-            or del_proveedor["producto_key"] != catalog_svc._normalize(recordado.get("descripcion") or "")):
+            or del_proveedor["producto_key"] != catalog_svc.clave_de_producto(recordado.get("descripcion") or "")):
         return recordado["ncm"]
     return _ncm_del_cliente_o_sim_del_proveedor(recordado["ncm"], del_proveedor.get("ncm"))
 
@@ -10435,7 +10487,7 @@ async def guardar_uso_ncm(
         descripcion = catalog_svc.texto_para_guardar(data.get("descripcion"))
         ncm = catalog_svc.texto_para_guardar(data.get("ncm"), "El NCM")
         vendor_name = catalog_svc.texto_para_guardar(data.get("vendor_name"), "El proveedor")
-        origin = catalog_svc.texto_para_guardar(data.get("origen"), "El origen")
+        origin, aviso_origen = catalog_svc.origen_para_guardar(data.get("origen"))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not descripcion or not ncm:
@@ -10491,7 +10543,8 @@ async def guardar_uso_ncm(
         logging.warning("ncm confirmation memory unavailable: %s", err)
         historial_guardado = False
 
-    return {"success": True, "historial_guardado": historial_guardado}
+    respuesta = {"success": True, "historial_guardado": historial_guardado}
+    return {**respuesta, "aviso": f"No se guardó el origen. {aviso_origen}"} if aviso_origen else respuesta
 
 @app.post("/api/ncm/import-historial")
 async def import_ncm_historial(
@@ -10827,8 +10880,8 @@ async def invite_to_organization(
         )
 
     # Tope del plan: miembros (el dueño también) más los emails con una
-    # invitación pendiente sin vencer. Volver a invitar a un email que ya
-    # tiene una pendiente no ocupa otro lugar.
+    # invitación pendiente sin vencer y sin cuenta en CDI, la única que se
+    # puede usar. Volver a invitar a un email pendiente no ocupa otro lugar.
     tope = billing_service.plan_de_la_cuenta(org)["users"]
     emails_miembros = await _emails_de_miembros(db, org.id)
     ahora = datetime.now(timezone.utc)
@@ -10839,7 +10892,11 @@ async def invite_to_organization(
         (inv.email or "").strip().lower()
         for inv in pendientes.scalars().all()
         if not inv.expires_at or _utc(inv.expires_at) > ahora
-    } - set(emails_miembros)
+    }
+    con_cuenta = await db.execute(
+        select(func.lower(User.email)).where(func.lower(User.email).in_(emails_pendientes))
+    )
+    emails_pendientes -= {email for (email,) in con_cuenta.all()}
     if clean_email not in emails_pendientes and len(emails_miembros) + len(emails_pendientes) >= tope:
         raise HTTPException(
             status_code=400,
@@ -12163,7 +12220,9 @@ async def catalog_update_product(
                 status_code=404,
                 detail=f"Producto '{product_key}' no existe o la nueva descripción colisiona con otro producto",
             )
-        return {"success": True, "vendor_id": vendor_id, "producto": updated}
+        aviso = updated.pop("aviso", "")
+        respuesta = {"success": True, "vendor_id": vendor_id, "producto": updated}
+        return {**respuesta, "aviso": f"El origen no cambió. {aviso}"} if aviso else respuesta
     except HTTPException:
         raise
     except ValueError as e:

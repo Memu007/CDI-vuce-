@@ -15,9 +15,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from proyecto_maria.database.connection import AsyncSessionLocal
-from proyecto_maria.database.models import PublicQuote
+from proyecto_maria.database.models import Operation, PublicQuote
 from proyecto_maria.main import app, get_current_user, get_db
 from tests.conftest import cuenta_de_prueba
+from tests.test_maria7_rechazos_24_10 import _pedido
 
 # El router de presupuestos se monta en el arranque (lifespan), que el
 # TestClient sin `with` no corre: igual que en test_pilar_b_quotes.py.
@@ -143,19 +144,11 @@ def _como(usuario):
 def _cliente_con_presupuesto(c, creados):
     """Crea un cliente con una operación compartida; devuelve (cliente, op, token).
     Lo anota en `creados` para que la prueba lo retire al terminar."""
-    r = c.post("/api/clientes", json={"nombre": f"DATOS1_{uuid.uuid4().hex[:8]}"})
-    assert r.status_code == 200, r.text
-    cid = r.json()["cliente"]["id"]
-    creados.append((app.dependency_overrides[get_current_user](), cid))
-    r = c.post(f"/api/clientes/{cid}/operaciones", json={"items": [{
-        "pieza": "8471.30.12", "descripcion": "TABLETA SINTETICA", "origen": "CHN",
-        "cantidad": 1, "valor_unitario": 50, "peso_unitario": 0.5,
-    }]})
+    cid = _cliente(c, creados)
+    r = _guardar(c, cid)
     assert r.status_code == 200, r.text
     op = r.json()["operation_id"]
-    r = c.post("/api/quotes/share", json={"operation_id": op})
-    assert r.status_code == 200, r.text
-    return cid, op, r.json()["token"]
+    return cid, op, _compartir(c, op)
 
 
 async def _presupuestos_de(op_id):
@@ -189,8 +182,8 @@ def otro_usuario(auth_override):
 
 @pytest.fixture()
 def creados(cliente_http):
-    """Clientes que creó la prueba; al terminar se borran (con sus operaciones
-    y presupuestos) como su dueño."""
+    """Clientes que creó la prueba; al terminar los borra su dueño, y sus
+    operaciones quedan sin cliente."""
     lista = []
     yield lista
     app.dependency_overrides.pop(get_db, None)
@@ -258,3 +251,111 @@ async def test_si_falla_a_mitad_no_se_borra_nada(dueno, cliente_http, creados):
     assert c.get(f"/api/clientes/{cid}").status_code == 200
     assert c.get(f"/api/quotes/public/{token}").status_code == 200
     assert await _presupuestos_de(op) == 1
+
+
+# --- D141 (a): pasar una operación a otro cliente -------------------------
+
+ITEM = {"pieza": "8471.30.12", "descripcion": "TABLETA SINTETICA", "origen": "CHN",
+        "cantidad": 1, "valor_unitario": 50, "peso_unitario": 0.5}
+
+
+def _cliente(c, creados):
+    r = c.post("/api/clientes", json={"nombre": f"PC1_{uuid.uuid4().hex[:8]}"})
+    assert r.status_code == 200, r.text
+    cid = r.json()["cliente"]["id"]
+    creados.append((app.dependency_overrides[get_current_user](), cid))
+    return cid
+
+
+def _guardar(c, cid, opid=None, item=ITEM):
+    """Sin `opid` crea una operación nueva; con él, guarda esa en el cliente."""
+    cuerpo = {"items": [item]}
+    if opid:
+        cuerpo["operacion_id"] = opid
+    return c.post(f"/api/clientes/{cid}/operaciones", json=cuerpo)
+
+
+def _compartir(c, op):
+    r = c.post("/api/quotes/share", json={"operation_id": op})
+    assert r.status_code == 200, r.text
+    return r.json()["token"]
+
+
+async def _cliente_de(op_id):
+    async with AsyncSessionLocal() as s:
+        return (await s.get(Operation, op_id)).client_id
+
+
+async def _operacion_sin_cliente(dueno, archivo):
+    async with AsyncSessionLocal() as s:
+        op = Operation(owner_username=dueno["username"], generated_file=archivo)
+        s.add(op)
+        await s.commit()
+        return op.id
+
+
+async def test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto(
+    dueno, otro_usuario, cliente_http, creados
+):
+    """El link compartido es el presupuesto armado para un cliente: pasada a
+    otro, la operación deja de mostrarse ahí. Quedarse en el mismo cliente, recibir
+    uno por primera vez o fallar a mitad no lo borra."""
+    c = cliente_http
+    _como(dueno)
+    a, b = _cliente(c, creados), _cliente(c, creados)
+    op = _guardar(c, a).json()["operation_id"]
+    tokens = [_compartir(c, op), _compartir(c, op)]
+    otro_op = _guardar(c, a).json()["operation_id"]
+    otro_token = _compartir(c, otro_op)
+    op_suelta = await _operacion_sin_cliente(dueno, f"MARIA_{uuid.uuid4().hex}.TXT")
+    token_suelto = _compartir(c, op_suelta)
+
+    # (cliente, operación, ítem, código, link que tiene que seguir andando)
+    pasos = [
+        (a, op, ITEM, 200, True),
+        (b, op, {**ITEM, "valor_unitario": "NaN"}, 400, True),
+        (a, op_suelta, ITEM, 200, True),
+        (b, op, ITEM, 200, False),
+    ]
+    for cid, opid, item, codigo, sigue in pasos:
+        r = _guardar(c, cid, opid, item)
+        assert r.status_code == codigo, (cid == b, opid == op, r.text)
+        assert r.status_code != 200 or r.json()["operation_id"] == opid, "la misma operación"
+        esperado = 200 if sigue else 404
+        for token in tokens:
+            assert c.get(f"/api/quotes/public/{token}").status_code == esperado, (cid == b, codigo)
+    assert c.get(f"/api/quotes/public/{otro_token}").status_code == 200, "otra operación del mismo cliente"
+    assert await _presupuestos_de(op) == 0
+    assert await _cliente_de(op) == b
+    assert c.get(f"/api/quotes/public/{token_suelto}").status_code == 200, "sin cliente antes"
+    assert await _cliente_de(op_suelta) == a
+
+    # Una operación ajena no se encuentra: el otro dueño crea la suya.
+    _como(otro_usuario)
+    r = _guardar(c, _cliente(c, creados), otro_op)
+    assert r.status_code == 200, r.text
+    assert r.json()["operation_id"] != otro_op
+    _como(dueno)
+    assert c.get(f"/api/quotes/public/{otro_token}").status_code == 200, "otro dueño"
+    assert await _cliente_de(otro_op) == a
+
+
+async def test_borrar_el_cliente_anterior_no_deja_el_link_de_la_operacion_pasada(
+    dueno, cliente_http, creados
+):
+    """Un MARIA generado y guardado en A, pasado a B, ya no es de A: borrar A no
+    lo toca y su link no vuelve."""
+    c = cliente_http
+    _como(dueno)
+    a, b = _cliente(c, creados), _cliente(c, creados)
+    r = c.post("/generate_maria", json=_pedido())
+    assert r.status_code == 200, r.text
+    op = r.json()["operacion_id"]
+    assert await _cliente_de(op) is None
+    assert _guardar(c, a, op).json()["operation_id"] == op
+    token = _compartir(c, op)
+    assert _guardar(c, b, op).status_code == 200
+    assert c.delete(f"/api/clientes/{a}").status_code == 200
+    assert c.get(f"/api/quotes/public/{token}").status_code == 404
+    assert await _presupuestos_de(op) == 0
+    assert await _cliente_de(op) == b

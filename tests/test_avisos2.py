@@ -5,7 +5,9 @@
 2. Una exportación no acepta una destinación de importación.
 3. Un texto enorme no se normaliza entero.
 4. Con el seguro borrado y de vuelta a FOB, el 400 dice lo que pasó.
-5. El lector de PDF rechaza la exportación con lo invisible adelante.
+5. El lector de PDF rechaza la exportación con lo invisible adelante, y lo
+   que no es un código lo deja vacío.
+6. El perfil sólo guarda como default un código de importación.
 
 Datos inventados.
 """
@@ -51,7 +53,7 @@ def test_una_destinacion_de_importacion_valida_sale_igual(client, destinacion, s
 @pytest.mark.parametrize("ruta", RUTAS)
 @pytest.mark.parametrize("destinacion", [
     "0EC01", "XEC01", "IC041", "IC0", "​IC04", "IC​04", "ᴇC01", "ＩＣ０４",
-    "ıc04", "ICØ04", "IC-4",
+    "ıc04", "ICØ04", "IC-4", "IC_4",
 ])
 def test_lo_que_no_es_un_codigo_da_400_y_no_genera(client, ruta, destinacion):
     _entrar(client)
@@ -132,3 +134,30 @@ def test_el_lector_rechaza_la_exportacion_con_lo_invisible_adelante(monkeypatch,
         (respuesta if lugar == "raiz" else respuesta["operacion"])["tipo_destinacion"] = valor
     with pytest.raises(ValueError, match="factura comercial de importación"):
         _leer(monkeypatch, copia, respuesta, clasificar=False)
+
+
+@pytest.mark.parametrize("copia", COPIAS)
+@pytest.mark.parametrize("valor, queda", [
+    ("\u200b" * 65 + "EC01", ""), ("IC-04", ""), ("IC04 (consumo)", ""), ("\u200bIC04", ""),
+    ("ＩＣ０４", ""), ("IC_4", ""), ("\u212aC04", ""), (" ic04 ", "IC04"),
+])
+def test_el_lector_deja_vacio_lo_que_no_es_un_codigo(monkeypatch, copia, valor, queda):
+    r = _leer(monkeypatch, copia, _respuesta(dict(FACTURA, destinacion=valor)), clasificar=False)
+    assert (r["documento"]["destinacion"], r["operacion"]["tipo_destinacion"]) == (queda, queda), r["documento"]
+
+
+# ------------------------------------------------- 6. el default del perfil
+
+
+@pytest.mark.parametrize("default, status, queda", [
+    ("IC041", 400, "IC05"), ("IC0", 400, "IC05"), ("EC01", 400, "IC05"), ("IC_4", 400, "IC05"),
+    (" ic04 ", 200, "IC04"), ("", 200, ""),
+])
+def test_el_perfil_solo_guarda_un_codigo_de_importacion(client, default, status, queda):
+    _entrar(client)
+    assert client.put("/api/user/profile", json={"default_tipo_destinacion": "IC05"}).status_code == 200
+    r = client.put("/api/user/profile", json={"default_tipo_destinacion": default, "name": "Otro nombre"})
+    assert r.status_code == status, r.text
+    perfil = client.get("/api/user/profile").json()["profile"]
+    assert perfil["default_tipo_destinacion"] == queda, perfil
+    assert (perfil["name"] == "Otro nombre") == (status == 200), perfil

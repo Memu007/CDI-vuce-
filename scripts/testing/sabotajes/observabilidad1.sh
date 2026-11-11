@@ -2,7 +2,9 @@
 # Negativos de OBSERVABILIDAD-1: cada sabotaje deshace una regla de la
 # migración de `api_logs.owner_username` (se agrega sola al arrancar,
 # nullable y sin tocar filas, con su índice sin duplicar, dos veces no hace
-# nada ni pide el lock, si falla la app arranca igual y lo dice en el log) y
+# nada ni pide el lock, si falla la app arranca igual y lo dice en el log,
+# columna e índice se confirman cada uno por su lado y el log lo anuncia
+# después) o de la métrica (guarda el molde de la ruta, no el camino) y
 # tests/test_observabilidad1.py o scripts/testing/observabilidad1_arranque.py
 # tiene que fallar por ese motivo.
 #
@@ -46,6 +48,10 @@ for viejo, nuevo in zip(pares[::2], pares[1::2]):
     if s.count(viejo) != 1:
         sys.exit(f"patrón no encontrado una sola vez ({s.count(viejo)}): {viejo!r}")
     s = s.replace(viejo, nuevo)
+try:
+    compile(s, p, "exec")
+except SyntaxError as e:
+    sys.exit(f"el sabotaje deja {p} sin compilar: {e}")
 open(p, "w", encoding="utf-8").write(s)
 PYEOF
 }
@@ -75,7 +81,7 @@ sabotaje() {
   fi
   git checkout -q -- proyecto_maria/
   if ! aplicar "$M" "${pares[@]}"; then
-    echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return
+    echo "ROTO  | $nombre: el sabotaje no se pudo aplicar"; FALLAS=$((FALLAS+1)); return
   fi
   local salida codigo
   salida="$($corredor)"; codigo=$?
@@ -105,7 +111,7 @@ sabotaje pytest_o1 "no agrega la columna" 1 \
   "FAILED $T::test_base_vieja_recibe_columna_nullable_con_indice_y_conserva_filas" "la columna tiene que quedar VARCHAR(50)"
 sabotaje arranque_pg "en Postgres no agrega la columna" 1 \
   '"ALTER TABLE api_logs ADD COLUMN IF NOT EXISTS owner_username VARCHAR(50)"' '"SELECT 1"' \
-  "FALLA | al arrancar la columna existe" "FALLA | suelta la tabla, el próximo arranque la agrega"
+  "FALLA | al arrancar la columna existe" "FALLA | suelta la tabla, el próximo arranque agrega lo que faltaba"
 
 # --- nullable, sin tocar filas
 sabotaje pytest_o1 "la columna es NOT NULL con un dueño por defecto" 1 \
@@ -119,8 +125,8 @@ sabotaje arranque_pg "en Postgres la columna tiene un dueño por defecto" 1 \
 
 # --- con índice, sin duplicarlo
 sabotaje pytest_o1 "no crea el índice" 1 \
-  $'            if not tiene_indice:\n                await conn.exec_driver_sql(' \
-  $'            if False:\n                await conn.exec_driver_sql(' \
+  $'            if not tiene_indice:\n                await ddl(conn,' \
+  $'            if False:\n                await ddl(conn,' \
   "FAILED $T::test_base_vieja_recibe_columna_nullable_con_indice_y_conserva_filas" "tiene que quedar un índice sobre owner_username: []" \
   "FAILED $T::test_columna_sin_indice_recibe_el_indice"
 sabotaje pytest_o1 "busca el índice por nombre y no por columna" 1 \
@@ -132,10 +138,10 @@ sabotaje arranque_pg "en Postgres no crea el índice" 1 \
 
 # --- dos veces no hace nada (ni pide el lock)
 sabotaje pytest_o1 "agrega la columna aunque ya esté" 1 \
-  'if "owner_username" not in columnas:' 'if True:' \
+  'agrega_columna = "owner_username" not in columnas' 'agrega_columna = True' \
   "FAILED $T::test_columna_sin_indice_recibe_el_indice"
 sabotaje arranque_pg "en Postgres pide el lock aunque la columna ya esté" 1 \
-  'if "owner_username" not in columnas:' 'if True:' \
+  'agrega_columna = "owner_username" not in columnas' 'agrega_columna = True' \
   "FALLA | ni falla con una lectura abierta sobre la tabla"
 sabotaje pytest_o1 "sin tabla no se va antes" 1 \
   $'            if not columnas:\n                # Base vacía: init_db ya la crea con la columna y el índice.\n                return\n' '' \
@@ -151,15 +157,51 @@ sabotaje arranque_sqlite "la falla frena el arranque" 1 \
   $'"la app arranca igual, pero las métricas no se graban hasta que exista"\n        )\n        raise\n' \
   "FALLA | la app arranca igual"
 sabotaje pytest_o1 "la falla no va al log" 1 \
-  $'        logging.exception(\n            "[OBSERVABILIDAD-1]' $'        (lambda *a: None)(\n            "[OBSERVABILIDAD-1]' \
+  $'        logging.exception(\n            "no se pudo agregar' $'        (lambda *a: None)(\n            "no se pudo agregar' \
   "FAILED $T::test_si_falla_no_levanta_y_deja_el_motivo_en_el_log" "la falla no quedó en el log"
 sabotaje pytest_o1 "la falla va al log sin el motivo" 1 \
-  $'        logging.exception(\n            "[OBSERVABILIDAD-1]' $'        logging.error(\n            "[OBSERVABILIDAD-1]' \
+  $'        logging.exception(\n            "no se pudo agregar' $'        logging.error(\n            "no se pudo agregar' \
   "FAILED $T::test_si_falla_no_levanta_y_deja_el_motivo_en_el_log" "el log tiene que traer el motivo"
 sabotaje arranque_pg "en Postgres espera el lock sin límite" 1 \
-  $'                # (y reintentar en el próximo arranque) que colgar el arranque.\n                await conn.exec_driver_sql("SET LOCAL lock_timeout = \'5s\'")' \
-  $'                # (y reintentar en el próximo arranque) que colgar el arranque.\n                pass' \
-  "FALLA | la app arranca igual"
+  $'            await conn.exec_driver_sql("SET LOCAL lock_timeout = \'5s\'")\n        await conn.exec_driver_sql(sql)' \
+  $'            pass\n        await conn.exec_driver_sql(sql)' \
+  "FALLA | la app arranca igual ("
+sabotaje arranque_pg "en Postgres el índice espera el lock sin límite" 1 \
+  $'                await ddl(conn,\n                    "CREATE INDEX' $'                await conn.exec_driver_sql(\n                    "CREATE INDEX' \
+  "FALLA | la app arranca igual con la columna ya puesta"
+
+# --- columna e índice se confirman por separado y el log lo dice después
+sabotaje arranque_pg "columna e índice en una sola transacción" 3 \
+  $'        async with engine.begin() as conn:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA table_info(api_logs)' \
+  $'        conn = await engine.connect()\n        await conn.begin()\n        if True:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA table_info(api_logs)' \
+  $'        async with engine.begin() as conn:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA index_list(api_logs)' \
+  $'        if True:\n            if IS_SQLITE:\n                res = await conn.exec_driver_sql("PRAGMA index_list(api_logs)' \
+  $'    if not tiene_indice:\n        print(' $'    await conn.commit()\n    if not tiene_indice:\n        print(' \
+  "FALLA | la columna queda: None"
+sabotaje arranque_pg "anuncia la columna antes de confirmarla" 2 \
+  $'VARCHAR(50)"\n                )\n    except' \
+  $'VARCHAR(50)"\n                )\n                print("✅ Migracion: agregada columna api_logs.owner_username")\n    except' \
+  $'    if agrega_columna:\n        print(' $'    if False:\n        print(' \
+  "FALLA | y el log no dice que la agregó"
+sabotaje arranque_pg "anuncia el índice antes de confirmarlo" 2 \
+  $'"ON api_logs (owner_username)"\n                )\n    except' \
+  $'"ON api_logs (owner_username)"\n                )\n                print("✅ Migracion: agregado indice ix_api_logs_owner_username")\n    except' \
+  $'    if not tiene_indice:\n        print(' $'    if False:\n        print(' \
+  "FALLA | y el log no lo anuncia"
+sabotaje pytest_o1 "la falla del índice dice que falta la columna" 1 \
+  '"no se pudo crear el índice ix_api_logs_owner_username; "' '"no se pudo agregar api_logs.owner_username; "' \
+  "FAILED $T::test_si_falla_el_indice_la_columna_queda_y_el_log_lo_dice" "el log no dice que falló el índice"
+sabotaje arranque_pg "en Postgres la falla del índice dice que falta la columna" 1 \
+  '"no se pudo crear el índice ix_api_logs_owner_username; "' '"no se pudo agregar api_logs.owner_username; "' \
+  "FALLA | y el log dice que falló el índice"
+
+# --- la métrica guarda el molde de la ruta
+sabotaje pytest_o1 "la métrica guarda el camino crudo" 1 \
+  'getattr(ruta, "path_format", None) or "<sin ruta>"' 'str(request.url.path)' \
+  "FAILED $T::test_la_metrica_guarda_el_molde_de_la_ruta_y_no_el_camino" "la métrica guardó otra cosa que el molde"
+sabotaje pytest_o1 "un camino sin ruta guarda el camino" 1 \
+  'getattr(ruta, "path_format", None) or "<sin ruta>"' 'getattr(ruta, "path_format", None) or str(request.url.path)' \
+  "FAILED $T::test_la_metrica_guarda_el_molde_de_la_ruta_y_no_el_camino" "/no-existe-zq9"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS; no corridos: $NO_CORRIDOS"
