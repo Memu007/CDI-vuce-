@@ -144,19 +144,11 @@ def _como(usuario):
 def _cliente_con_presupuesto(c, creados):
     """Crea un cliente con una operación compartida; devuelve (cliente, op, token).
     Lo anota en `creados` para que la prueba lo retire al terminar."""
-    r = c.post("/api/clientes", json={"nombre": f"DATOS1_{uuid.uuid4().hex[:8]}"})
-    assert r.status_code == 200, r.text
-    cid = r.json()["cliente"]["id"]
-    creados.append((app.dependency_overrides[get_current_user](), cid))
-    r = c.post(f"/api/clientes/{cid}/operaciones", json={"items": [{
-        "pieza": "8471.30.12", "descripcion": "TABLETA SINTETICA", "origen": "CHN",
-        "cantidad": 1, "valor_unitario": 50, "peso_unitario": 0.5,
-    }]})
+    cid = _cliente(c, creados)
+    r = _guardar(c, cid)
     assert r.status_code == 200, r.text
     op = r.json()["operation_id"]
-    r = c.post("/api/quotes/share", json={"operation_id": op})
-    assert r.status_code == 200, r.text
-    return cid, op, r.json()["token"]
+    return cid, op, _compartir(c, op)
 
 
 async def _presupuestos_de(op_id):

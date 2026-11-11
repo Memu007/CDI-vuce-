@@ -46,6 +46,8 @@ from tests.test_maria7_rechazos_24_10 import _pedido  # noqa: E402
 limiter.enabled = False
 FALLAS = []
 CLAVE = "SecureP@ss1"
+ITEM = {"pieza": "8471.30.12", "descripcion": "TABLETA SINTETICA", "origen": "CHN",
+        "cantidad": 1, "valor_unitario": 50, "peso_unitario": 0.5}
 
 
 def chequear(ok, que):
@@ -62,6 +64,12 @@ def sql(consulta, *args):
 
 def contar(tabla, columna, valor):
     return sql(f"select count(*) from {tabla} where {columna}=%s", valor)[0][0]
+
+
+def cliente_de(op):
+    """El cliente de la operación; None también si la operación no está."""
+    filas = sql("select client_id from operations where id=%s", op)
+    return filas[0][0] if filas else None
 
 
 with TestClient(main_mod.app, raise_server_exceptions=False) as c:
@@ -81,15 +89,16 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
                 c.cookies.set(k, v)
             return c
 
-        def cliente(self, compartir=True):
-            """Cliente sintético con una operación; devuelve (cliente, op, token o None)."""
+        def cliente_vacio(self):
             self.activo()
             r = c.post("/api/clientes", json={"nombre": f"Cliente DATOS1 {uuid.uuid4().hex[:6]}"})
             assert r.status_code == 200, r.text
-            cid = r.json()["cliente"]["id"]
-            r = c.post(f"/api/clientes/{cid}/operaciones", json={"items": [{
-                "pieza": "8471.30.12", "descripcion": "TABLETA SINTETICA", "origen": "CHN",
-                "cantidad": 1, "valor_unitario": 50, "peso_unitario": 0.5}]})
+            return r.json()["cliente"]["id"]
+
+        def cliente(self, compartir=True):
+            """Cliente sintético con una operación; devuelve (cliente, op, token o None)."""
+            cid = self.cliente_vacio()
+            r = c.post(f"/api/clientes/{cid}/operaciones", json={"items": [ITEM]})
             assert r.status_code == 200, r.text
             op = r.json()["operation_id"]
             token = None
@@ -153,14 +162,10 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
              f"un cliente sin presupuesto se sigue borrando ({r.status_code})")
 
     # --- 6. la operación pasa a otro cliente
-    a.activo()
-    x = c.post("/api/clientes", json={"nombre": "Cliente DATOS1 X"}).json()["cliente"]["id"]
-    y = c.post("/api/clientes", json={"nombre": "Cliente DATOS1 Y"}).json()["cliente"]["id"]
-    item = {"pieza": "8471.30.12", "descripcion": "TABLETA SINTETICA", "origen": "CHN",
-            "cantidad": 1, "valor_unitario": 50, "peso_unitario": 0.5}
+    x, y = a.cliente_vacio(), a.cliente_vacio()
 
     def guardar(cid, valor=50, opid=None):
-        cuerpo = {"items": [{**item, "valor_unitario": valor}]}
+        cuerpo = {"items": [{**ITEM, "valor_unitario": valor}]}
         if opid:
             cuerpo["operacion_id"] = opid
         return c.post(f"/api/clientes/{cid}/operaciones", json=cuerpo)
@@ -174,16 +179,14 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
     assert r.status_code == 200, r.text
     token6 = r.json()["token"]
     r = guardar(y, "NaN", op6)
-    chequear(r.status_code == 400 and link(token6) == 200
-             and sql("select client_id from operations where id=%s", op6)[0][0] == x,
+    chequear(r.status_code == 400 and link(token6) == 200 and cliente_de(op6) == x,
              f"si el guardado en otro cliente falla, el link sigue ({r.status_code})")
     r = guardar(y, opid=op6)
-    chequear(r.status_code == 200 and r.json()["operation_id"] == op6 and link(token6) == 404 and contar("public_quotes", "operation_id", op6) == 0
-             and sql("select client_id from operations where id=%s", op6)[0][0] == y,
+    chequear(r.status_code == 200 and r.json()["operation_id"] == op6 and link(token6) == 404
+             and contar("public_quotes", "operation_id", op6) == 0 and cliente_de(op6) == y,
              f"guardada en otro cliente, la operación pierde su link ({r.status_code})")
     r = c.delete(f"/api/clientes/{x}")
-    chequear(r.status_code == 200 and link(token6) == 404
-             and sql("select client_id from operations where id=%s", op6)[0][0] == y,
+    chequear(r.status_code == 200 and link(token6) == 404 and cliente_de(op6) == y,
              f"borrar el cliente anterior no la toca ni devuelve el link ({r.status_code})")
 
 print(f"fallas: {len(FALLAS)}")

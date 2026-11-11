@@ -123,12 +123,10 @@ sabotaje $M "otro dueño puede borrar el cliente" \
 # --- D141 (a): pasar una operación compartida a otro cliente
 P="FAILED $T::test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto"
 BORRA=$'    if operation.client_id not in (None, client_id):\n'
-sabotaje $M "pasada a otro cliente, el link sigue andando" \
+sabotaje $M "pasada a otro cliente, el link sigue andando, también al borrar el anterior" \
   "$BORRA" $'    if False:\n' \
-  "$P" "AssertionError: (True, 200)" "assert 200 == 404"
-sabotaje $M "borrar el cliente anterior deja el link de la operación pasada" \
-  "$BORRA" $'    if False:\n' \
-  "FAILED $T::test_borrar_el_cliente_anterior_no_deja_el_link_de_la_operacion_pasada" "assert 200 == 404"
+  "$P" "FAILED $T::test_borrar_el_cliente_anterior_no_deja_el_link_de_la_operacion_pasada" \
+  "AssertionError: (True, 200)" "assert 200 == 404"
 sabotaje $M "pasada a otro cliente, sólo se borra uno de sus links" \
   $'        await db.execute(\n            sa_delete(PublicQuoteModel).where(PublicQuoteModel.operation_id == operation.id)\n        )\n' \
   $'        q = (await db.execute(sa_select(PublicQuoteModel).where(PublicQuoteModel.operation_id == operation.id))).scalars().first()\n        await db.delete(q)\n' \
