@@ -23,7 +23,7 @@ corrida() {
   local sabotaje="$1" esperada="$2" texto="$3" salida codigo; shift 3
   salida="$(CONEXIONES1_SABOTAJE="$sabotaje" PY="$PY" scripts/testing/con_pg16.sh \
     "$PY" scripts/testing/conexiones1_medir.py "$@" 2>&1)"; codigo=$?
-  local nombre="${sabotaje:-sin sabotaje}"
+  local nombre="${ETIQUETA:-${sabotaje:-sin sabotaje}}"
   if [ "$codigo" -ne "$esperada" ]; then
     echo "MAL   | $nombre: salida $codigo, esperaba $esperada"; tail -15 <<<"$salida"
     FALLAS=$((FALLAS+1))
@@ -35,7 +35,34 @@ corrida() {
   fi
 }
 
+# en_codigo <viejo> <nuevo>...: cambia connection.py para que el producto no
+# cierre la sesión; lo deshace la llamada siguiente o el final del script.
+en_codigo() {
+  git checkout -q -- .
+  "$PY" - "$@" <<'PYEOF' || { echo "PATRÓN | $1"; FALLAS=$((FALLAS+1)); return 1; }
+import sys
+p = "proyecto_maria/database/connection.py"; s = open(p, encoding="utf-8").read()
+for viejo, nuevo in zip(sys.argv[1::2], sys.argv[2::2]):
+    if s.count(viejo) != 1:
+        sys.exit(f"patrón no encontrado una sola vez: {viejo!r}")
+    s = s.replace(viejo, nuevo)
+open(p, "w", encoding="utf-8").write(s)
+PYEOF
+}
+
 corrida ""                       0 "sin conexiones tomadas" "$@"
 corrida close_cancelado          1 "QUEDAN CONEXIONES TOMADAS" "$@"
 corrida close_cancelado_suelto   1 "QUEDAN CONEXIONES TOMADAS" "$@"
+
+ABRE='    async with AsyncSessionLocal() as session:'
+SIN_WITH='    if (session := AsyncSessionLocal()) is not None:'
+CIERRA='            await session.close()'
+# El producto no cierra la sesión y la guarda: el pool nunca vuelve a cero.
+en_codigo "$ABRE" "$SIN_WITH" "$CIERRA" \
+  '            get_async_session.__dict__.setdefault("vivas", []).append(session)' &&
+  ETIQUETA="el producto guarda la sesión sin cerrar" corrida "" 1 "QUEDAN CONEXIONES TOMADAS" "$@"
+# El producto no cierra la sesión y la suelta: el recolector la levanta y avisa.
+en_codigo "$ABRE" "$SIN_WITH" "$CIERRA" '            pass' &&
+  ETIQUETA="el producto suelta la sesión sin cerrar" corrida "" 1 "QUEDAN CONEXIONES TOMADAS" "$@"
+git checkout -q -- .
 exit $((FALLAS > 0))
