@@ -41,6 +41,7 @@ from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 import proyecto_maria.main as main_mod  # noqa: E402
 from proyecto_maria.core.rate_limit import limiter  # noqa: E402
 from proyecto_maria.database.models import Client  # noqa: E402
+from tests.test_maria7_rechazos_24_10 import _pedido  # noqa: E402
 
 limiter.enabled = False
 FALLAS = []
@@ -164,9 +165,11 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
             cuerpo["operacion_id"] = opid
         return c.post(f"/api/clientes/{cid}/operaciones", json=cuerpo)
 
-    r = guardar(x)
+    r = c.post("/generate_maria", json=_pedido())
     assert r.status_code == 200, r.text
-    op6 = r.json()["operation_id"]
+    op6 = r.json()["operacion_id"]
+    r = guardar(x, opid=op6)
+    assert r.status_code == 200 and r.json()["operation_id"] == op6, r.text
     r = c.post("/api/quotes/share", json={"operation_id": op6})
     assert r.status_code == 200, r.text
     token6 = r.json()["token"]

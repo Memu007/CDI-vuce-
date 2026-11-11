@@ -18,6 +18,7 @@ from proyecto_maria.database.connection import AsyncSessionLocal
 from proyecto_maria.database.models import Operation, PublicQuote
 from proyecto_maria.main import app, get_current_user, get_db
 from tests.conftest import cuenta_de_prueba
+from tests.test_maria7_rechazos_24_10 import _pedido
 
 # El router de presupuestos se monta en el arranque (lifespan), que el
 # TestClient sin `with` no corre: igual que en test_pilar_b_quotes.py.
@@ -350,12 +351,16 @@ async def test_pasar_la_operacion_a_otro_cliente_borra_su_presupuesto(
 async def test_borrar_el_cliente_anterior_no_deja_el_link_de_la_operacion_pasada(
     dueno, cliente_http, creados
 ):
-    """Pasada a B, la operación ya no es de A: borrar A no la toca y su link no
-    vuelve."""
+    """Un MARIA generado y guardado en A, pasado a B, ya no es de A: borrar A no
+    lo toca y su link no vuelve."""
     c = cliente_http
     _como(dueno)
     a, b = _cliente(c, creados), _cliente(c, creados)
-    op = _guardar(c, a).json()["operation_id"]
+    r = c.post("/generate_maria", json=_pedido())
+    assert r.status_code == 200, r.text
+    op = r.json()["operacion_id"]
+    assert await _cliente_de(op) is None
+    assert _guardar(c, a, op).json()["operation_id"] == op
     token = _compartir(c, op)
     assert _guardar(c, b, op).status_code == 200
     assert c.delete(f"/api/clientes/{a}").status_code == 200
