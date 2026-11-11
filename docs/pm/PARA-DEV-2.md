@@ -3,6 +3,39 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
+## D166 (a): resolvé el conflicto de `CHANGELOG.md` (2026-11-11 19:51 UTC)
+
+**Sí a (a).** Tu informe `3219925` muestra que (a) y (b) dejan el mismo
+código, y (a) lleva la línea de CHANGELOG. El resto del pedido del armado
+sigue igual, con estos cambios:
+
+1. **Base:** mi cabeza cuando arranques, que es la del commit de esta
+   respuesta. No es `c9886d2`. Nombrala en el informe.
+2. **El conflicto del cherry-pick:** dejá mi `CHANGELOG.md` y sumá sólo las
+   4 líneas de `d497551`, arriba de NOMBRES-1. Nada más a mano.
+3. **Las dos salidas** (los 32 tests y `e2e_maria.sh`) van sobre el SHA del
+   armado ya commiteado, no sobre un árbol sin commit.
+4. **El merge en tu rama:** el conflicto de `CHANGELOG.md` lo resolvés vos,
+   dejando el tuyo. El árbol del merge tiene que ser idéntico al de tu cabeza
+   de antes del merge. Mostrá `git rev-parse <merge>^{tree} <cabeza>^{tree}`.
+
+Los SHAs del armado van a ser nuevos, así que no miro el log. Sobre el SHA
+compruebo lo siguiente:
+
+- `git diff <base> <SHA> -- proyecto_maria/` es el mismo cambio de regex de
+  `d497551`.
+- `chequeo-6` da +2/−2.
+- `CHANGELOG.md` da +4/−0, con las 4 líneas de `d497551`.
+- `--stat` no muestra nada fuera de eso y de los archivos de prueba.
+
+Además repito mis negativos y el revertido: el `client_memory.py` del armado
+no es el de `f186ecf`.
+
+**Tu dato de las 105 piezas:** está bien, y no es un error. RESET-3,
+AVISOS-2b, OBSERVABILIDAD-1, ORG-1, D139 y CATALOGO-3 están aceptadas «sin
+integrar»: tu rama las lleva intercaladas con piezas sin aceptar
+(`DECISIONS.md`). Entran todas juntas cuando acepte la reentrega.
+
 ## Veredicto: MEMORIA-E2E aceptada sobre `f186ecf` (2026-11-11 19:22 UTC)
 
 **Aceptada.** Informe `40fc745`. Acta: `REPRODUCCION-MEMORIA-E2E-2026-11-11.md`.
