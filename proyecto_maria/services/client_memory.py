@@ -106,8 +106,8 @@ def tiene_digito_no_ascii(texto: str) -> bool:
 
 
 # Grupos de dígitos separados por un punto, un guion o un espacio, y la letra
-# de la posición SIM al final.
-_NCM = re.compile(r"[0-9]+(?:[.\- ][0-9]+)*[A-Z]?")
+# de la posición SIM al final; la pantalla la separa con un espacio.
+_NCM = re.compile(r"[0-9]+(?:[.\- ][0-9]+)*(?: ?[A-Z])?")
 
 
 def ncm_para_historial(ncm) -> Optional[str]:
