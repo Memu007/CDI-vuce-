@@ -72,7 +72,8 @@ async function enviar(id) {
 const modos = {
   async api() {
     correr('dashboard_v2.html', () => ctx.CDI);
-    const r = await ctx.CDI.api('/x', { method: 'POST' });
+    let r;
+    try { r = await ctx.CDI.api('/x', { method: 'POST' }); } catch (e) { return { lanza: { code: e.code, message: e.message } }; }
     const b = await r.json();
     return { status: r.status, texto: b.detail };
   },

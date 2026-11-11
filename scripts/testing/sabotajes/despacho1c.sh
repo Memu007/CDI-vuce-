@@ -30,9 +30,11 @@ p = sys.argv[1]; s = open(p).read()
 viejo, nuevo = sys.argv[2], sys.argv[3]
 if s.count(viejo) != 1:
     sys.exit(f"patrón no encontrado una sola vez ({s.count(viejo)}): {viejo!r}")
+if viejo == nuevo:
+    sys.exit(f"el sabotaje no cambia nada: {viejo!r}")
 open(p, "w").write(s.replace(viejo, nuevo))
 PYEOF
-  then echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return; fi
+  then echo "ROTO  | $nombre: el sabotaje no encontró su patrón o no cambia nada"; FALLAS=$((FALLAS+1)); return; fi
   local salida codigo
   salida="$("${PRUEBA[@]}" 2>&1)"; codigo=$?
   if [ "$codigo" -eq 0 ]; then
@@ -93,17 +95,31 @@ sabotaje $F "una falla al guardar deja abierta la caja de éxito anterior" \
   "        hide(\$('readyClientSuccess'));" \
   '' \
   "FAILED $T::$X[listo-con-cliente-500]"
-sabotaje $F "el plan vencido no avisa que no se guardó" \
-  "                CDI.toast && CDI.toast('No se guardó al cliente', err.motivo || 'Plan vencido o límite alcanzado', 'error');" \
-  '' \
+TOAST_402="                CDI.toast && CDI.toast('No se guardó al cliente', err.message || 'Plan vencido o límite alcanzado', 'error');"
+sabotaje $F "el plan vencido no avisa que no se guardó" "$TOAST_402" '' \
   "FAILED $T::$X[listo-con-cliente-402]"
+sabotaje $F "el plan vencido se avisa como una falla de red" \
+  "            if (err && err.code === 'payment_required') {" \
+  "            if (false) {" \
+  "'detalle': 'Error de red"
+sabotaje $F "el plan vencido no dice el motivo del servidor" "$TOAST_402" "${TOAST_402/err.message/err.motivo}" \
+  "'detalle': 'Plan vencido"
+A=proyecto_maria/static/v2/app_v2.js
+sabotaje $A "el cliente no marca el plan vencido con su código" \
+  "            err.code = 'payment_required';" \
+  "            err.code = 'http_402';" \
+  "'detalle': 'Error de red"
+sabotaje $A "el cliente lanza el plan vencido sin el motivo del servidor" \
+  '            const err = new Error(lead);' \
+  "            const err = new Error('payment_required');" \
+  "'detalle': 'payment_required'"
 sabotaje $F "la caja no dice lo que no quedó en la memoria" \
   "            'Operación asociada a ' + nombre + (sinMemoria" \
   "            'Operación asociada a ' + nombre + (false" \
   "FAILED $T::$X[asignar-cliente-no-guardado]"
 sabotaje $F "aprender el catálogo no avisa un 400" \
-  "            return { ok: res.ok, detail: res.ok ? '' : textoDeError(data && data.detail, '') };" \
-  "            return { ok: true, detail: '' };" \
+  '                ok: res.ok,' \
+  '                ok: true,' \
   "FAILED $T::$X[aprender-400]"
 sabotaje $F "guardar y aprender a la vez: el aviso del catálogo tapa el error" \
   'if (!r.ok && !avisoDeLaOperacion && CDI.toast) {' \
