@@ -2,164 +2,98 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## MEMORIA-E2E entregada en f186ecf (base 7d5c9e7)
+## El armado para la PR no entra limpio: frené (D166)
 
-| commit | qué |
-|---|---|
-| `d497551` | fix: la posición SIM con la letra separada por un espacio alimenta la memoria del cliente |
-| `9be52ef` | test: la posición como la arma la pantalla aprende por guardar-uso, la operación, learn y el PUT |
-| `195af11` | test: el caso junta las cuatro entradas antes de comparar |
-| `f186ecf` | test: node en un fixture con tope; tab y NBSP antes de la letra siguen rechazados |
-| `a471763` | merge de tu rama (`816038e`); sólo `docs/pm/` |
-| (este) | docs: informe |
+No hay SHA de armado. `git cherry-pick d497551` sobre tu cabeza `c9886d2`
+choca en `CHANGELOG.md` y sólo ahí. No lo resolví a mano para entregar.
 
-Las puertas corrieron sobre `f186ecf`. Lo que hay después es tu rama y este
-informe: `git diff f186ecf..HEAD --stat` muestra sólo `docs/pm/`.
+```
+Auto-merging CHANGELOG.md
+CONFLICT (content): Merge conflict in CHANGELOG.md
+Auto-merging proyecto_maria/services/client_memory.py
+error: could not apply d497551... fix: la posición SIM con la letra separada por un espacio alimenta la memoria del cliente
+exit=1
+```
 
-**Resultado:** «8471.30.00.900 R», como la manda la pantalla, aprende por las
-cuatro entradas y el catálogo del cliente la muestra. `e2e_maria.sh` verde.
-El cambio de producto es una regex en `client_memory.py`: acepta un espacio
-(sólo el espacio común) entre la posición y la letra. `producto +2/−2`.
+**Por qué choca.** `d497551` suma 4 líneas a `CHANGELOG.md` justo debajo de
+`---`, pegadas a 58 líneas de entradas que tu rama no tiene (CATALOGO-3,
+PRESUPUESTO-CLIENTE-1, D102, D139, ORG-1, OBSERVABILIDAD-1, AVISOS-2b,
+RESET-3). Git no encuentra dónde apoyarlas.
 
-`ncm_para_historial` la usa sólo la memoria (`client_memory.py:152`,
-`main.py:9002` y `:10504`, `despacho_lector.py:870`). Lo que sale en el TXT no
-pasa por ahí.
+Los otros tres commits y la parte de código de `d497551` entran solos.
 
 ## Decisiones
 
-**D165. Tres lugares leen una posición SIM y no aceptan lo mismo.**
-`client_memory.py:110` (`_NCM`: grupos de dígitos con punto, guion o espacio,
-letra opcional), `despacho_lector.py:134` (`_POSICION`: sólo puntos, letra
-pegada) y `sufijos_arca.py:34` (`_partes`: saca puntos y cualquier blanco,
-exige 11 dígitos). El defecto de esta pieza salió de ahí: uno de los tres no
-aceptaba lo que la pantalla arma.
-- (a) A la cola de limpieza: un solo normalizador, con su tabla de formas.
-- (b) Pieza ahora, antes de PRESUPUESTO-CLIENTE-1.
-- (c) Dejarlo: cada uno lee una fuente distinta.
+**D166. Cómo armo el SHA.** Probé las dos primeras en un checkout aparte,
+con commits locales que ya borré (no subí ninguno).
 
-Recomiendo **(a)**. Hoy no conozco otro camino de la pantalla que falle, y
-unificar toca lo que lee el despacho y lo que arma el sufijo: es una pieza
-con su propio rojo, no un agregado a esta. `COLA-LIMPIEZA.md` no lo edito yo.
+- (a) Me autorizás a resolver ese conflicto: tu `CHANGELOG.md` más sólo las
+  4 líneas de MEMORIA-E2E arriba de NOMBRES-1. Probado: los cuatro commits
+  entran, `git diff c9886d2 <SHA> -- CHANGELOG.md` da +4/−0 y el resto del
+  árbol es igual al de (b). **Tu paso 3 vuelve a chocar** en `CHANGELOG.md`
+  al traerlo a mi rama (corrido con `git merge-tree`: `CONFLICT (content)`,
+  sólo ese archivo). Lo resolvería dejando mi `CHANGELOG.md`, que ya tiene la
+  entrada. Son dos resoluciones a mano, las dos de texto en ese archivo.
+- (b) El armado sin las 4 líneas de `CHANGELOG.md` en el primer commit.
+  Probado: ninguna resolución a mano; `git merge-tree` en mi rama da limpio y
+  el árbol resultante es idéntico a mi cabeza (`3ee0fba…` los dos). Costo: tu
+  PR lleva un cambio de producto sin su línea de CHANGELOG hasta que integres
+  el resto de mi rama, que la trae.
+- (c) Integrás antes las piezas de MARIA que le faltan a tu rama y rehago el
+  armado sobre esa cabeza.
 
-## Lo que no coincide con lo que dijiste
+Recomiendo **(a)**: la PR sale con su línea de CHANGELOG (`CLAUDE.md` §5) y
+lo que resuelvo a mano se comprueba con un `git diff` de un archivo de texto.
+Si preferís cero manos, (b) ya está probada.
 
-- **El modelo.** Escribiste que Emi me pasaba a Fable al borde de pieza. Lo
-  cambió antes: el arreglo, los casos, el adversario y `/code-review` son de
-  Opus 5.5; las puertas finales sobre `f186ecf`, el rojo repetido y este
-  informe son de Fable 5.2. Los revisores de `/code-review` corrieron con
-  Opus.
-- **«Después», punto 4** (`smoke_friccion.sh` al día con ABUSO-1): el script
-  ya espera «Evento sin sesión no admitido» en los dos eventos y 401 en
-  by-cuit (SMOKE-1). Me parece hecho; decime si falta algo.
+En las tres, `git log c9886d2..<SHA>` da cuatro commits con SHAs nuevos, no
+`d497551 9be52ef 195af11 f186ecf`: es un cherry-pick.
+
+## Lo que corrí sobre tu cabeza, sin commit
+
+Árbol: `c9886d2` + el código de `d497551` (sin `CHANGELOG.md`) + los tres
+commits de pruebas. Es el contenido de (b). No es un SHA.
+
+| qué | salida |
+|---|---|
+| `tests/test_memoria_pantalla.py tests/test_guardar1.py` | `======================== 32 passed, 5 warnings in 5.95s ========================`, `exit=0` |
+| `scripts/testing/e2e_maria.sh` | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.`, `exit=0` |
+
+**No corrido:** nada sobre un SHA de armado, porque no existe. Sobre el árbol
+de (a) no corrí pruebas: difiere del de (b) sólo en `CHANGELOG.md`.
+
+## Un dato que cambia lo que integrás
+
+A tu rama no le falta sólo PRESUPUESTO-CLIENTE-1.
+`git log --oneline --no-merges c9886d2..f186ecf | wc -l` da **105**, y
+`git diff --shortstat c9886d2 f186ecf -- proyecto_maria` da
+`14 files changed, 402 insertions(+), 202 deletions(-)`. Ahí están RESET-3,
+AVISOS-2b, SMOKE-1, OBSERVABILIDAD-1, ORG-1, D139, D102, CATALOGO-3,
+PRUEBA-LIMPIAR-1 y PRESUPUESTO-CLIENTE-1. `3d0083a` (RESET-3) no es ancestro
+de `c9886d2`. No sé por qué: te lo paso como dato.
+
+Consecuencia para el armado: su `client_memory.py` no es el de `f186ecf`.
+Lleva sólo el cambio de la regex sobre tu versión del archivo (sin
+CATALOGO-3). Las pruebas de arriba pasan sobre esa combinación.
 
 ## Comandos
 
 ```bash
-export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-python -m pytest -q --no-cov tests/test_memoria_pantalla.py tests/test_guardar1.py   # 32 passed (necesita node; sin node, 4 skipped)
-scripts/testing/e2e_maria.sh        # E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.
-# rojo: el arreglo revertido
-git show d497551 -- proyecto_maria/services/client_memory.py | git apply -R
-python -m pytest -q --no-cov tests/test_memoria_pantalla.py tests/test_guardar1.py   # 4 failed, 28 passed
-git checkout -- proyecto_maria/services/client_memory.py
+git worktree add /tmp/armado c9886d2 && cd /tmp/armado
+git cherry-pick d497551                    # CONFLICT (content): Merge conflict in CHANGELOG.md
+git status --short                         # UU CHANGELOG.md / M  proyecto_maria/services/client_memory.py
+git cherry-pick --abort
+git diff --shortstat c9886d2 d497551~1 -- CHANGELOG.md   # 1 file changed, 58 insertions(+)
+git show --stat --format= d497551 -- CHANGELOG.md        # CHANGELOG.md | 4 ++++
 ```
 
-## Rojos
+## PRESUPUESTO-CLIENTE-1
 
-Con el arreglo revertido (corrido de nuevo hoy sobre `a471763`):
-
-```
-FAILED tests/test_memoria_pantalla.py::test_pantalla_alimenta_memoria[individual]
-FAILED tests/test_memoria_pantalla.py::test_pantalla_alimenta_memoria[lote]
-FAILED tests/test_memoria_pantalla.py::test_pantalla_alimenta_memoria[sugerencia]
-FAILED tests/test_guardar1.py::test_la_forma_del_ncm_que_guarda_el_historial[8471.30.00.900 R-84713000]
-=================== 4 failed, 28 passed, 3 warnings in 5.80s ===================
-E   AssertionError: 8471.30.00.900 R
-E   AssertionError: assert None == '84713000'
-```
-
-El cuarto dato del caso, «base» (la posición sin letra), sigue verde con el
-arreglo revertido: es el control.
-
-Con la regex aflojada a `\s?` (copiado del mensaje de `f186ecf`):
-
-```
-FAILED ...[8471.30.00.900\tR-None]
-FAILED ...[8471.30.00.900\xa0R-None]
-2 failed, 30 passed
-```
-
-## Puertas sobre f186ecf
-
-| puerta | resultado |
-|---|---|
-| suite completa | `=== 5832 passed, 355 skipped, 3 xfailed, 104 warnings in 1117.20s (0:18:37) ====`, `exit=0` |
-| `python -m compileall -q proyecto_maria` | `exit=0` |
-| `scripts/testing/e2e_maria.sh` | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.`, `exit=0` |
-| `smoke_friccion.sh` | `==> OK · telemetría y alias session/state rechazan sin sesión + by-cuit protegido`, `exit=0` |
-| `tests/test_memoria_pantalla.py tests/test_guardar1.py` | `32 passed, 3 warnings in 5.72s` |
-| arnés Postgres | no corrido: la pieza no toca SQL |
-| `ataque_aislamiento.sh` | no corrido: no cambia datos, sesión ni permisos |
-| `/security-review` | no corrido: no es pieza de §3 |
-| sabotaje con guion propio | no hay: no es pieza de §3; el rojo es el de arriba |
-
-Archivos de producto tocados: `proyecto_maria/services/client_memory.py`.
-
-## chequeo-6 7d5c9e7 f186ecf
-
-```
-chequeo-6 7d5c9e7..f186ecf: avisos para mirar, no un veredicto
-producto +2/−2
-arnés +87/−0
-historia (grep de §6, sin líneas movidas): vacío
-archivos de producto:
-  proyecto_maria/services/client_memory.py: 308 → 308
-avisos: 0
-```
-
-## Revisión
-
-**Adversario: `adversario-sonnet-alto` (Sonnet, alto), sobre `195af11`.** Nada
-de severidad alta.
-
-| # | hallazgo | sev. | qué pasó |
-|---|---|---|---|
-| 1 | tab y NBSP antes de la letra no tenían negativo | media | arreglado en `f186ecf`, con su rojo |
-| 2 | el caso corría node al importar; sin node, error de colección | media | arreglado: fixture con skip |
-| 3 | guardar-uso guarda el NCM crudo en `ncm_historial` | baja | ya estaba; riesgo |
-| 4 | `.upper()` convierte «ſ» en S | baja | ya estaba; riesgo |
-| 5 | la memoria del proveedor (`save_products`) no valida la forma | baja | fuera de la pieza; riesgo |
-| 6 | `renglon_para_catalogo` ahora acepta la forma con espacio | baja | lo que lee de documentos pasa antes por `_POSICION`, que no cambió |
-| 7 | los separadores valen en cualquier lugar de la posición | baja | ya estaba; riesgo |
-| 8 | largo 16, dentro de los 20 de la columna | info | — |
-
-**`/code-review high`, `7d5c9e7..195af11`, revisores Opus.**
-
-| # | hallazgo | qué pasó |
-|---|---|---|
-| 1 | node al importar el módulo de prueba | arreglado en `f186ecf` |
-| 2 | el extractor de funciones se cuelga si las llaves no cierran | arreglado: corta y avisa |
-| 3 | `_POSICION` y `_NCM` no aceptan lo mismo | D165 |
-| 4 | varios lectores de posición SIM | D165 |
-| 5 | tres de las cuatro formas dan el mismo texto | queda: son tres caminos distintos de la pantalla |
-| 6 | el caso prueba los formateadores, no el body que arma `finalize.js` | hueco real del caso; ese camino lo cubre `e2e_maria.sh` |
-| 7 | repite el cargador de `despacho1c_pantalla.js` | queda; va con el punto 1 de «Después», que toca ese archivo |
-| 8 | «learn y la operación dan 200 sin aprender» | descartado, abajo |
-| 9 | el fixture `client` viene de `test_prelaunch_block2` | baja; queda |
-| 10 | nombre largo del caso | arreglado |
-
-**El 8, verificado contra el código.** La operación sí avisa: devuelve
-`historial_guardado: false` (`main.py:8242-8279`) y la pantalla muestra
-«Algunos productos no quedaron en la memoria…» (`finalize.js:780`, `:1220`).
-`learn` devuelve la cuenta en `aprendidos` (`main.py:8876`) y ninguna pantalla
-lo llama: `saveCatalogLearn` va al catálogo del proveedor. No es un defecto de
-esta pieza y no lo traigo como D.
-
-## Riesgos
-
-- Los de la tabla del adversario 3, 4, 5 y 7: ya estaban y no los toqué.
-- El caso nuevo depende de node. Sin node se saltea (4 skipped) y la forma
-  queda cubierta sólo por la fila de `test_guardar1` y por la e2e.
-- El caso lee las funciones de `ncm.js` por nombre: si se renombran, da rojo
-  con «no está en» o «llaves sin cerrar», no un verde falso.
-- Los 355 skipped de la suite no los desglosé en esta corrida.
+No entregada. En mi rama está `3936c24` (casos y arnés PG al día con la
+unión) y el merge de tu rama `0f146f2`. Sobre `3936c24`:
+`tests/test_datos1.py` 11 passed y, con el arreglo revertido,
+`2 failed, 9 passed`; arnés PG16 `fallas: 0` y revertido `fallas: 2`;
+`datos1.sh` 21 rojos, `sabotajes sin rojo: 0`. Faltan el adversario,
+`/code-review`, `/security-review` y las puertas sobre el SHA que entregue.
+Mientras contestás D166 sigo con esas revisiones; el armado va primero
+apenas respondas.
