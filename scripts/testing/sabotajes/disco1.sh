@@ -197,7 +197,7 @@ sabotaje "las tandas reordenan por clave" 1 \
 # tope del catálogo.
 sabotaje "sin tope de descripción" 1 \
   '        catalog_svc.validar_largo(descripcion)' '        pass' \
-  "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[BBBB"
+  "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[descripcion-de-2001]"
 sabotaje "sin tope de NCM" 1 \
   '_HISTORIAL_MAX_NCM = 20' '_HISTORIAL_MAX_NCM = 10**9' \
   "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba sintetica-888" \
@@ -224,7 +224,7 @@ sabotaje "importar no revisa" 1 \
 sabotaje "la fila mala va a errores y lo demás se guarda" 1 \
   $'        except HTTPException:\n            raise\n        except Exception as exc:\n            errores.append' \
   $'        except Exception as exc:\n            errores.append' \
-  "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[BBBB" "assert 200 == 400"
+  "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[descripcion-de-2001]" "assert 200 == 400"
 sabotaje "un archivo viejo con un carácter que la base no guarda se carga" 1 \
   $'        if _problema_historial(desc, ncm):\n            invalidas += 1' $'        if False:\n            invalidas += 1' \
   "FAILED $T::test_un_archivo_viejo_con_caracteres_que_la_base_no_guarda_los_saltea"

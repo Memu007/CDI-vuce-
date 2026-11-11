@@ -108,8 +108,8 @@ if [ -n "$PG_URL" ]; then
       '            pass' \
       "FALLA | primer arranque: las columnas son text"
     sabotaje $M "el arranque sigue si la migración falla" \
-      $'    if IS_SQLITE:\n        return\n    async with engine.begin() as conn:' \
-      $'    if IS_SQLITE:\n        return\n    with __import__("contextlib").suppress(Exception):\n      async with engine.begin() as conn:' \
+      $'    await _migrate_catalogo_sin_tope()\n' \
+      $'    with __import__("contextlib").suppress(Exception):\n        await _migrate_catalogo_sin_tope()\n' \
       "FALLA | con la tabla tomada el arranque falla"
   fi
 else
