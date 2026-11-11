@@ -51,7 +51,11 @@ pasar al aceptar, va como escape («Revisión y aceptación»).
 2. `chequeo-previo.sh <SHA>`: todo OK antes de correr nada. Los casos del
    informe; los negativos de la Dev; uno o dos negativos tuyos que ataquen
    otro borde.
-3. `suite-y-puertas.sh <base> <SHA>` cuando corresponde.
+3. La suite y las puertas cuando corresponde (`suite-y-puertas.sh` todavía no
+   existe: ver `docs/pm/herramientas/LEEME.md`). Si la pieza toca el
+   recorrido MARIA (carga, revisión, SIM/DC, agrupación, SBT, descarga,
+   memoria, catálogo o `static/v2`), `scripts/testing/e2e_maria.sh` sobre el
+   SHA y sobre la unión con la rama de PM.
 4. Si la pieza toca dinero, sesión, permisos, datos o es transversal:
    subagentes adversariales con contexto nuevo, con el modelo y el esfuerzo
    de la tabla de `ONBOARDING-PM.md` («Subagentes»).

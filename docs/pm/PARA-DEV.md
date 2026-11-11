@@ -3,6 +3,14 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## Puerta nueva: la e2e de MARIA (2026-11-10 14:17 UTC)
+
+Toda pieza que toque el recorrido MARIA o `static/v2` trae
+`scripts/testing/e2e_maria.sh` sobre su SHA en el informe (`/entregar`,
+§3). Hoy falla en `config/e2e_maria.js:279` por `e035fc98`, que arregla
+MARIA: hasta su arreglo, ese rojo es esperado; cualquier otro es tuyo.
+BORRADOR-1 ya la pasé: sólo ese rojo, y con el parche de evidencia da OK.
+
 ## INTEGRAR-1: aceptada sobre `4555f7c4` e integrada (2026-11-10 13:45 UTC)
 
 Evidencia: `docs/pm/REPRODUCCION-INTEGRAR-1-2026-11-10.md`. Suite igual a la

@@ -156,3 +156,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `app_v2.js` aviso «pendiente»: no se borra, puede pisar el de «lleno» y, si la
   pestaña de antes murió sin `pagehide`, otra pestaña no lo encuentra por 3 min
   (D170 b; acta de BORRADOR-1, hallazgo 4).
+- `tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie`: compara tiempo
+  contra 0,5 s y dio 0,66 s en la CI sin cambio de producto; medir algo que no
+  dependa del runner.

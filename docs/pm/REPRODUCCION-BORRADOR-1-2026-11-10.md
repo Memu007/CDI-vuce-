@@ -32,6 +32,13 @@ de navegador que dieron 429 (`cliente1`, `foco_cliente1`, `destino1`,
   ```
   La pieza no la saca de Clientes. La operación se recupera en otra pestaña.
 
+- **e2e de la CI** (`scripts/testing/e2e_maria.sh`) sobre `22163cec`
+  (2026-11-10 14:17 UTC): falla sólo en `config/e2e_maria.js:279`, «no
+  alimentó la memoria». Es la causa ya conocida de `e035fc98`, que esta
+  pieza trae de la base. Con el parche de una línea en `client_memory.py:110`
+  (sólo evidencia, revertido): `E2E MARIA OK`. La pieza no suma rojos en la
+  e2e.
+
 ## Adversario de la PM (Opus alto, sin red, `GEMINI_API_KEY` vacía)
 
 Comparó cada caso en las dos versiones: la pieza en el puerto 8890 y la base

@@ -105,6 +105,8 @@ evidencia y comportamiento.
   propio sólo donde lo pide `CLAUDE.md` §6; en lo demás, el arreglo
   revertido). La PM lo reproduce antes de creer el verde, y suma uno o dos propios que
   ataquen otro borde.
+- `scripts/testing/e2e_maria.sh` sobre el SHA cuando la pieza toca el
+  recorrido MARIA o `static/v2`: la CI la corre recién en la PR a `main`.
 - Suite completa cuando hay dinero, autenticación, permisos, órdenes, stock,
   migraciones, datos, seguridad, cambio transversal, un rojo inesperado o una
   publicación.
