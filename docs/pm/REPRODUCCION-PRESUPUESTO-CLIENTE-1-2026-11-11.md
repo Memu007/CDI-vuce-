@@ -119,12 +119,14 @@ Sobre `f45243a`, en el worktree de la pieza, con `DOLARAPI_BASE` local,
 La Dev, sobre el mismo SHA: `5832 passed, 355 skipped, 3 xfailed`. Mismo
 total (6190); la diferencia neta, 245, es `xlwt`: no está en
 `requirements.txt` (a propósito, lo dice `tests/test_excel3.py:1148`), mi
-venv lo tiene y el de la Dev no. Con un `xlwt` que no se puede importar
+venv lo tiene y el de la Dev, por el conteo, no (ella lo confirma al
+instalarlo). Con un `xlwt` que no se puede importar
 adelante en `PYTHONPATH`, `test_excel3.py` y `test_excel2d.py` dan
 `SKIPPED [234] tests/test_excel3.py:1150: could not import 'xlwt'`,
 `SKIPPED [11] tests/test_excel2d.py:80: …`, `739 passed, 245 skipped`.
-Es lo mismo que daba 335 contra 101 desde CATALOGO-3. En mi corrida esas
-245 corren y pasan.
+La diferencia vieja (335 contra 101 desde CATALOGO-3, 234) da justo lo de
+`test_excel3.py`; no recalculé esas corridas. En mi corrida las 245
+corren y pasan.
 
 ## Riesgos que quedan
 
