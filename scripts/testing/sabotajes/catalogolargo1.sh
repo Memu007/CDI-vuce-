@@ -80,10 +80,9 @@ sabotaje $M "el historial y guardar-uso miden el largo sin pasar a NFC" \
   '        if len(descripcion) > catalog_svc.MAX_DESCRIPCION: raise ValueError("largo")' \
   "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfd-que-achica]" \
   "FAILED $T::test_importar_el_historial_respeta_el_tope[nfc-que-crece]"
-sabotaje $M "el historial y guardar-uso no tienen el tope del catálogo" \
+sabotaje $M "el historial no tiene el tope del catálogo" \
   '        catalog_svc.validar_largo(descripcion)' \
   '        pass' \
-  "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfc-que-crece]" \
   "FAILED $T::test_importar_el_historial_respeta_el_tope[2001]"
 sabotaje $M "el catálogo da 500 en vez de 400 al guardar" \
   $'    except ValueError as e:\n        raise HTTPException(status_code=400, detail=str(e))\n    except Exception as e:\n        logging.exception("catalog_save error")' \

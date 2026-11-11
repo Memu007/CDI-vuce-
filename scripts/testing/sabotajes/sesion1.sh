@@ -179,13 +179,13 @@ sabotaje pytest $M "cambiar la clave no emite un token nuevo" \
 
 # --- resetear la contraseña: cierra todas
 sabotaje pytest $M "resetear la clave vuelve a poner active_jti en NULL" \
-  $'    revocar_sesiones(user)\n' $'    user.active_jti = None\n' \
+  'active_jti=uuid.uuid4().hex):' 'active_jti=None):' \
   "FAILED $T::test_resetear_clave_revoca_todas_las_sesiones" "la sesión vigente sigue entrando después del reset"
 
 # --- una revocada no vuelve: revocar nunca escribe NULL
 sabotaje pytest $D "revocar escribe NULL y resucita las viejas" \
   '    user.active_jti = uuid.uuid4().hex' '    user.active_jti = None' \
-  "FAILED $T::test_una_sesion_revocada_no_vuelve" "FAILED $T::test_resetear_clave_revoca_todas_las_sesiones"
+  "FAILED $T::test_una_sesion_revocada_no_vuelve"
 
 # --- cerrar sesión: revoca el token con el que se llama, y sólo si es el vigente
 sabotaje pytest $M "cerrar sesión sólo borra la cookie" \
@@ -227,10 +227,14 @@ sabotaje pytest $L "sumar o contar abre su propia conexión" \
 sabotaje pytest $L "mirar el bloqueo abre su propia conexión" \
   $'    hasta = (await db.execute(\n' $'    async with _conn.engine.connect() as conn:\n        hasta = (await conn.execute(\n' \
   "$C[perfil]" "$C[cambiar la clave]"
-sabotaje pytest $L "limpiar abre su propia conexión" \
+sabotaje pytest $L "limpiar pide otra conexión con la del pedido tomada" \
   $'    await db.execute(delete(_T).where(_T.c.clave == _clave(clave)))\n    await db.commit()\n' \
-  $'    async with _conn.engine.begin() as conn:\n        await conn.execute(delete(_T).where(_T.c.clave == _clave(clave)))\n' \
-  "$C[login]"
+  $'    await db.execute(select(_T.c.clave).where(_T.c.clave == _clave(clave)))\n    async with _conn.engine.begin() as conn:\n        await conn.execute(delete(_T).where(_T.c.clave == _clave(clave)))\n    await db.commit()\n' \
+  "$C[perfil con la clave buena]" "$C[cambiar la clave con la clave buena]"
+sabotaje pytest $L "descontar abre su propia conexión" \
+  $'    await db.execute(delete(_T).where(_T.c.vence <= ahora))\n    n = ' \
+  $'    async with _conn.engine.begin() as conn:\n        await conn.execute(delete(_T).where(_T.c.vence <= ahora))\n    n = ' \
+  "$C[login]" "login: 2 conexiones a la vez"
 sabotaje pytest $D "revisar la sesión se queda con su conexión durante la ruta" \
   $'    await db.commit()\n\n    team_owner = ' $'\n    team_owner = ' \
   "$C[ver el perfil]" "$C[perfil]" "$C[cambiar la clave]"
@@ -256,7 +260,7 @@ sabotaje pytest $M "el mismo email en mayúsculas pide la contraseña" \
   'cambia_email = "email" in body and body.get("email") != u.email' \
   "FAILED $T::test_guardar_el_perfil_con_el_mismo_email_no_pide_clave" "assert 400 == 200"
 sabotaje pytest $M "un email mal escrito pide la contraseña en vez de rechazarse" \
-  $'            raise HTTPException(status_code=400, detail="Email no válido")\n' $'            pass\n' \
+  '            _email_valido(raw_email)' '            pass' \
   "FAILED tests/test_user_profile_coverage.py::test_update_user_profile_email_invalido_400" "Email no válido"
 
 # --- la carrera del login en Postgres: sólo con un Postgres local y descartable

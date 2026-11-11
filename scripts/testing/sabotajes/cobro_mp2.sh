@@ -344,7 +344,7 @@ sabotaje $M "el checkout sin token da demo fuera de pruebas" \
   "        if not _es_desarrollo():
             raise HTTPException(status_code=503, detail=\"Los pagos" "        if False:
             raise HTTPException(status_code=503, detail=\"Los pagos"
-sabotaje $M "sin la variable de entorno hay demo" \
+sabotaje proyecto_maria/config.py "sin la variable de entorno hay demo" \
   "FAILED $T::test_sin_token_fuera_de_desarrollo_no_hay_demo[sin_variable]" \
   "os.getenv(\"ENVIRONMENT\") in (\"development\", \"test\", \"testing\")" \
   "os.getenv(\"ENVIRONMENT\", \"development\") in (\"development\", \"test\", \"testing\")"

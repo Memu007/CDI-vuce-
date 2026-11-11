@@ -216,8 +216,8 @@ sabotaje "un commit por renglón" proyecto_maria/main.py \
             await db.commit()" \
   "test_guardar_si_falla_la_base_no_guarda_ninguno"
 sabotaje "guardar sin sacar el NUL" proyecto_maria/main.py \
-  "renglones = _sin_nul(body.get(\"renglones\"))" \
-  "renglones = body.get(\"renglones\")" \
+  '    body = _cuerpo_guardable(body, rechazar_medio_par=False)' \
+  '    pass' \
   "test_guardar_saca_el_nul_de_los_textos"
 sabotaje "promedia con el valor vacío" proyecto_maria/services/client_memory.py \
   "    if not n:
@@ -489,16 +489,16 @@ sabotaje "la descripción no junta los espacios" "$C" \
   're.sub(r" ", " ", str(descripcion or "")' \
   "$F[espacios]"
 sabotaje "el NCM no acepta guiones" "$C" \
-  '_NCM = re.compile(r"[0-9]+(?:[.\- ][0-9]+)*[A-Z]?")' \
-  '_NCM = re.compile(r"[0-9]+(?:[. ][0-9]+)*[A-Z]?")' \
+  '_NCM = re.compile(r"[0-9]+(?:[.\- ][0-9]+)*(?: ?[A-Z])?")' \
+  '_NCM = re.compile(r"[0-9]+(?:[. ][0-9]+)*(?: ?[A-Z])?")' \
   "$F[guiones]"
 sabotaje "el NCM no acepta puntos" "$C" \
-  '_NCM = re.compile(r"[0-9]+(?:[.\- ][0-9]+)*[A-Z]?")' \
-  '_NCM = re.compile(r"[0-9]+(?:[\- ][0-9]+)*[A-Z]?")' \
+  '_NCM = re.compile(r"[0-9]+(?:[.\- ][0-9]+)*(?: ?[A-Z])?")' \
+  '_NCM = re.compile(r"[0-9]+(?:[\- ][0-9]+)*(?: ?[A-Z])?")' \
   "$F[puntos]"
 sabotaje "el NCM no acepta espacios" "$C" \
-  '_NCM = re.compile(r"[0-9]+(?:[.\- ][0-9]+)*[A-Z]?")' \
-  '_NCM = re.compile(r"[0-9]+(?:[.\-][0-9]+)*[A-Z]?")' \
+  '_NCM = re.compile(r"[0-9]+(?:[.\- ][0-9]+)*(?: ?[A-Z])?")' \
+  '_NCM = re.compile(r"[0-9]+(?:[.\-][0-9]+)*(?: ?[A-Z])?")' \
   "$F[espacios en el ncm]"
 sabotaje "el NCM sin recortar las puntas" "$C" \
   '    ncm = str(ncm).strip().upper()' \
@@ -591,9 +591,11 @@ async def _sin_atajar():' \
 # Vuelta 4: los NCM con otros dígitos y lo que no es un producto, por vía.
 O=test_un_ncm_con_otros_digitos_da_400_por_cada_via
 sabotaje "aprender no mira los dígitos" "$M" \
-  '_AVISO_MEDIO_PAR)
+  'upsert_client_product_history,
+    )
     if any(tiene_digito_no_ascii(' \
-  '_AVISO_MEDIO_PAR)
+  'upsert_client_product_history,
+    )
     if False and any(tiene_digito_no_ascii(' \
   "$O[aprender-arabigo]" "$O[aprender-ancho completo]" "$O[aprender-mezclado]"
 no_debe "aprender no mira los dígitos" "$ULTIMA" "$O[operacion-arabigo]"
@@ -620,24 +622,18 @@ sabotaje "aprender acepta lo que no es objeto" "$M" \
   "test_aprender_un_item_que_no_es_un_objeto_da_400[texto]" \
   "test_aprender_un_item_que_no_es_un_objeto_da_400[lista]"
 sabotaje "aprender no mira el medio par" "$M" \
-  'tiene_medio_par, upsert_client_product_history,
-    )
-    if tiene_medio_par(body):' \
-  'tiene_medio_par, upsert_client_product_history,
-    )
-    if False:' \
+  '    body = _cuerpo_guardable(body)
+    items = ' \
+  '    body = _cuerpo_guardable(body, rechazar_medio_par=False)
+    items = ' \
   "test_aprender_con_medio_par_da_400[origen]" "test_aprender_con_medio_par_da_400[clave]"
 sabotaje "/operaciones no mira el medio par" "$M" \
-  '        if tiene_medio_par(data):' \
-  '        if False:' \
+  '    return _cuerpo_guardable(data)' \
+  '    return _cuerpo_guardable(data, rechazar_medio_par=False)' \
   "test_una_operacion_con_medio_par_da_400_y_no_queda[unidad]"
 sabotaje "el cambio no mira el medio par" "$M" \
-  'tiene_digito_no_ascii, tiene_medio_par, valor_para_promedio,
-    )
-    if tiene_medio_par(body):' \
-  'tiene_digito_no_ascii, tiene_medio_par, valor_para_promedio,
-    )
-    if False:' \
+  '    body = _cuerpo_guardable(body) if isinstance(body, dict) else {}' \
+  '    body = _cuerpo_guardable(body, rechazar_medio_par=False) if isinstance(body, dict) else {}' \
   "test_cambiar_con_medio_par_da_400[origen]"
 sabotaje "aprender acepta 501" "$M" \
   '    if len(items) > 500:' \
@@ -743,12 +739,12 @@ sabotaje "operación sin resumen no es vacía" proyecto_maria/main.py \
   '' \
   "$VACIA[sin nada]" "$VACIA[nulos]"
 sabotaje "operación vacía cuenta un producto" proyecto_maria/main.py \
-  'total_items=int(resumen.get("items", len(items))),' \
-  'total_items=int(resumen.get("items", len(items) + 1)),' \
+  'len(items) if resumen.get("items") is None' \
+  'len(items) + 1 if resumen.get("items") is None' \
   "$VACIA[sin nada]" "$VACIA[nulos]"
 sabotaje "operación vacía con valor" proyecto_maria/main.py \
-  'total_value=float(resumen.get("valor_total", 0) or 0),' \
-  'total_value=float(resumen.get("valor_total", 0) or 1),' \
+  '_numero_de_afuera(resumen.get("valor_total"), "El valor total")' \
+  '_numero_de_afuera(resumen.get("valor_total") or 1, "El valor total")' \
   "$VACIA[sin nada]" "$VACIA[nulos]"
 RES=test_una_operacion_con_un_resumen_que_no_es_un_objeto_da_400
 sabotaje "operación sin revisar el resumen" proyecto_maria/main.py \
@@ -787,7 +783,7 @@ sabotaje "el PUT no valida el origen" proyecto_maria/main.py \
   "$ORI[lista]" "$ORI[tres letras]" "$ORI[numeros]" "$ORI[pais que no existe]" "$ORI[nombre]" \
   "$MAY[minusculas]" "$MAY[nulo]"
 sabotaje "el PUT no saca el NUL" proyecto_maria/main.py \
-  'body = _sin_nul(body) if isinstance(body, dict) else {}' \
+  'body = _cuerpo_guardable(body) if isinstance(body, dict) else {}' \
   'body = body if isinstance(body, dict) else {}' \
   "$MAY[nul]"
 no_debe "el PUT no saca el NUL" "$ULTIMA" "$MAY[minusculas]"
@@ -798,7 +794,7 @@ sabotaje "el PUT guarda el origen vacío" proyecto_maria/main.py \
 no_debe "el PUT guarda el origen vacío" "$ULTIMA" "$MAY[minusculas]"
 # Code-review sobre 0c3a059: el origen es texto y ASCII en guardar y en el PUT.
 TODO_O_NADA=test_guardar_es_todo_o_nada
-sabotaje "el origen sin isascii" "$LECTOR" \
+sabotaje "el origen sin isascii" proyecto_maria/core/maria_generator.py \
   'escrito.isascii() and ' \
   '' \
   "$TODO_O_NADA[ancho completo]" "$TODO_O_NADA[acento]" "$TODO_O_NADA[i sin punto]" \
@@ -812,7 +808,7 @@ sabotaje "el origen se mira en mayúsculas" "$LECTOR" \
   "$ORI[ese aguda]"
 sabotaje "el origen que no es texto" "$LECTOR" \
   '    if not isinstance(valor, (str, type(None))):
-        return None, "El origen tiene que ser el código de dos letras."
+        return None, "El origen tiene que ser el nombre o el código del país."
 ' \
   '' \
   "$TODO_O_NADA[origen numero]" "$ORI[lista]" "$ORI[numero]"

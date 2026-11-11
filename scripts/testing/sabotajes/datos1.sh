@@ -79,7 +79,8 @@ sabotaje $M "/health sin base sigue en 200" \
   '        return JSONResponse(status_code=503, content=checks)' '        return checks' \
   "FAILED $T::test_health_sin_base_503_sin_el_texto_del_error" "assert 200 == 503"
 sabotaje $M "/health vuelve a mostrar el error de la base" \
-  $'    except Exception:\n        # Sin base la API' $'    except Exception as e:\n        checks["db_error"] = str(e)\n        # Sin base la API' \
+  $'        checks["database"] = "error"\n        checks["status"] = "degraded"\n' \
+  $'        checks["database"] = "error"\n        checks["db_error"] = str(__import__("sys").exc_info()[1])\n        checks["status"] = "degraded"\n' \
   "FAILED $T::test_health_sin_base_503_sin_el_texto_del_error" "assert 'db_error' not in"
 sabotaje $M "/health no deja el error en el log" \
   $'        logging.exception("/health: la base no responde")\n' '' \
@@ -87,12 +88,12 @@ sabotaje $M "/health no deja el error en el log" \
 
 # --- D6: los 500 sin detalle técnico, que va al log; los 4xx igual que antes
 sabotaje $M "el 500 de HTTPException vuelve a mandar dev_detail" \
-  $'            content={"detail": _FRIENDLY_5XX, "code": "internal_error"},\n        )\n    # 4xx' \
-  $'            content={"detail": _FRIENDLY_5XX, "code": "internal_error", "dev_detail": str(exc.detail)},\n        )\n    # 4xx' \
+  $'            status_code=exc.status_code,\n            content={"detail": _FRIENDLY_5XX, "code": "internal_error"},\n' \
+  $'            status_code=exc.status_code,\n            content={"detail": _FRIENDLY_5XX, "code": "internal_error", "dev_detail": str(exc.detail)},\n' \
   "FAILED $T::test_http_exception_500_sin_dev_detail" "assert 'dev_detail' not in"
 sabotaje $M "el 500 no manejado vuelve a mandar dev_detail" \
-  $'        content={"detail": _FRIENDLY_5XX, "code": "internal_error"},\n    )\n\n# Agregar middleware' \
-  $'        content={"detail": _FRIENDLY_5XX, "code": "internal_error", "dev_detail": f"{type(exc).__name__}: {exc}"},\n    )\n\n# Agregar middleware' \
+  $'        status_code=500,\n        content={"detail": _FRIENDLY_5XX, "code": "internal_error"},\n' \
+  $'        status_code=500,\n        content={"detail": _FRIENDLY_5XX, "code": "internal_error", "dev_detail": f"{type(exc).__name__}: {exc}"},\n' \
   "FAILED $T::test_excepcion_no_manejada_sin_dev_detail" "assert 'dev_detail' not in"
 sabotaje $M "el 500 de HTTPException no deja el detalle en el log" \
   $'        logging.error(\n            "HTTPException 500 en %s %s: %s",\n            request.method, request.url.path, exc.detail,\n            exc_info=exc,\n        )\n' '' \
