@@ -70,13 +70,10 @@ sabotaje $CS "el tope no deja entrar el máximo" \
   '    if len(unicodedata.normalize("NFC", texto)) > MAX_DESCRIPCION:' \
   '    if len(unicodedata.normalize("NFC", texto)) >= MAX_DESCRIPCION:' \
   "FAILED $T::test_guardar_en_el_catalogo_respeta_el_tope[2000]"
-sabotaje $CS "guardar en el catálogo no controla el largo" \
-  '        validar_largo(desc)' \
-  '        pass' \
-  "FAILED $T::test_guardar_en_el_catalogo_respeta_el_tope[2001]"
-sabotaje $CS "cambiar un producto no controla el largo" \
-  '        validar_largo(val)' \
-  '        pass' \
+sabotaje $CS "el texto que se guarda en el catálogo no controla el largo" \
+  '    validar_largo(valor, que)' \
+  '    pass' \
+  "FAILED $T::test_guardar_en_el_catalogo_respeta_el_tope[2001]" \
   "FAILED $T::test_cambiar_un_producto_respeta_el_tope_y_alcanza_claves_largas"
 sabotaje $M "el historial y guardar-uso miden el largo sin pasar a NFC" \
   '        catalog_svc.validar_largo(descripcion)' \
@@ -97,8 +94,8 @@ sabotaje $M "el catálogo da 500 en vez de 400 al cambiar" \
   $'    except Exception as e:\n        logging.exception("catalog_update_product error")' \
   "FAILED $T::test_cambiar_un_producto_respeta_el_tope_y_alcanza_claves_largas"
 sabotaje $M "la clave de la URL vuelve a tener tope de 500" \
-  '    if not product_key or len(product_key) > catalog_svc.MAX_DESCRIPCION:' \
-  '    if not product_key or len(product_key) > 500:' \
+  '    if (not product_key or len(product_key) > catalog_svc.MAX_DESCRIPCION' \
+  '    if (not product_key or len(product_key) > 500' \
   "FAILED $T::test_cambiar_un_producto_respeta_el_tope_y_alcanza_claves_largas"
 
 if [ -n "$PG_URL" ]; then

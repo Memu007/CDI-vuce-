@@ -133,10 +133,11 @@ sabotaje $M "recuperar usuario sin límite por IP" \
   '15 * 60) > 5:' '15 * 60) > 10**6:' \
   "FAILED $T::test_los_limites_por_ip_duran_quince_minutos[/auth/recover-username-cuerpo2-200]" "[200, 200, 200, 200, 200, 200]"
 sabotaje $M "recuperar usuario: 4 por hora por cuenta" \
-  '3600) > 3:' '3600) > 4:' \
+  'contar(db, clave, 3600) > 3' 'contar(db, clave, 3600) > 4' \
   "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email" "el cuarto pedido de la hora mandó el mail"
 sabotaje $M "recuperar usuario: pasado el tope por cuenta manda igual" \
-  $'3600) > 3:\n        return mensaje' $'3600) > 3:\n        pass' \
+  $'    if await _tope_por_cuenta(db, f"recuperar:cuenta:{user.username}"):\n        return mensaje' \
+  $'    if await _tope_por_cuenta(db, f"recuperar:cuenta:{user.username}"):\n        pass' \
   "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email" "el cuarto pedido de la hora mandó el mail"
 
 # --- C9: registro
@@ -152,7 +153,7 @@ sabotaje $M "recuperar contraseña vuelve a chequear y después sumar" \
   'sumar_fallo(db, clave, tope=5) > 5:' 'sumar_fallo(db, clave, tope=5) > 10**6:' \
   "FAILED $T::test_reset_pedidos_simultaneos_no_pasan_el_tope"
 sabotaje $L "vencido el bloqueo, la cuenta sigue en vez de volver al tope" \
-  '    nueva = case((vencido, tope), else_=_T.c.cuenta + 1)' '    nueva = _T.c.cuenta + 1' \
+  '    nueva = _T.c.cuenta + 1 if exacta else case((vencido, tope), else_=_T.c.cuenta + 1)' '    nueva = _T.c.cuenta + 1' \
   "FAILED $T::test_reset_cinco_y_despues_uno_cada_quince_minutos" "[429, 429]"
 
 # --- Eventos
@@ -207,7 +208,7 @@ sabotaje $M "recuperar usuario: el corte por IP dura un minuto" \
   '15 * 60) > 5:' '60) > 5:' \
   "FAILED $T::test_los_limites_por_ip_duran_quince_minutos[/auth/recover-username-cuerpo2-200]"
 sabotaje $M "recuperar usuario: la ventana por cuenta es de un minuto" \
-  '3600) > 3:' '60) > 3:' \
+  'contar(db, clave, 3600) > 3' 'contar(db, clave, 60) > 3' \
   "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email"
 
 # --- un surrogate suelto o un NUL no da 500
