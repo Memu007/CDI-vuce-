@@ -751,3 +751,9 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   (`195af11`, e2e_maria.sh OK, sin puertas ni informe: no es entrega). La
   Técnica no subió nada nuevo (`f6e84dac`); lo que tenga sin subir se sabe
   cuando conteste.
+
+## 2026-11-11 18:44 UTC — Se retoma después del corte (Emi)
+
+- Emi: «Continua», sobre la pregunta de retomar con la recomendación de hacerlo
+  al ritmo de siempre. Tres rutinas prendidas otra vez con `update_trigger`
+  y Devs avisadas. Si vuelve un rechazo por límite, se corta igual que antes.
