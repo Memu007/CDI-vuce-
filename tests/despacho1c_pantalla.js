@@ -2,14 +2,14 @@
 // contesta el servidor al guardar. Uso: node despacho1c_pantalla.js <escenario> <respuesta> [opciones]
 // respuesta: true|false|null es historial_guardado (null: sin el campo); {"status": N}
 // contesta ese error; "red" es la red caída, 402 el plan vencido (CDI.api lanza) y
-// "colgado" no vuelve nunca. opciones: {"catalogo": respuesta del catálogo, "vendedor": nombre}.
+// "colgado" no vuelve nunca. opciones: {"catalogo": respuesta del catálogo, "vendedor": nombre,
+// "lanza402": lo que CDI.api lanza ante un 402, tomado del cliente real}.
 const vm = require('node:vm'), fs = require('node:fs'), path = require('node:path');
 const V2 = path.join(__dirname, '..', 'proyecto_maria', 'static', 'v2');
 const [escenario, flag] = process.argv.slice(2);
 const flagJson = JSON.parse(flag);
 const opciones = JSON.parse(process.argv[4] || '{}');
-// lo que lanza CDI.api ante un 402: el motivo del servidor como mensaje y el código aparte
-const MOTIVO_402 = 'Motivo sintético del plan';
+const { lanza402 } = opciones;
 const esFalla = flagJson !== null && typeof flagJson !== 'boolean';
 const conFlag = c => (flagJson === null ? c : esFalla ? flagJson : Object.assign({ historial_guardado: flagJson }, c));
 // qué guardados contestan la respuesta pedida; los demás contestan bien
@@ -74,7 +74,7 @@ function armar(fuente, extraCDI) {
       }
       if (cuerpo === 'colgado') return new Promise(() => {});
       if (cuerpo === 'red') throw new TypeError('Failed to fetch');
-      if (cuerpo === 402) throw Object.assign(new Error(MOTIVO_402), { code: 'payment_required' });
+      if (cuerpo === 402) throw Object.assign(new Error(lanza402.message), { code: lanza402.code });
       if (cuerpo.status) return { ok: false, status: cuerpo.status, json: async () => ({ detail: cuerpo.detail || 'falla sintética' }) };
       return { ok: true, status: 200, json: async () => cuerpo };
     },
