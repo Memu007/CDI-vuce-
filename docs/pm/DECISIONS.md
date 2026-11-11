@@ -724,3 +724,30 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   que manda la pantalla). Desde ahora, cada pieza que toca el recorrido MARIA
   trae esa e2e verde sobre su SHA y la PM la reproduce; «e2e-maria verde» va
   en «Antes de publicar».
+
+## 2026-11-11 18:41 UTC — Corte por límite semanal de la cuenta (PM)
+
+- Las dos Devs dieron rechazo `seven_day` («weekly limit»): MARIA al menos
+  desde el 10/11 19:36 UTC, la Técnica al menos desde el 11/11 11:16 UTC
+  (no busqué más atrás). Último commit de las Devs: 10/11 14:04 UTC. El
+  límite se renovó el 11/11 18:00 UTC.
+- Por la regla de Emi («un rechazo real por límite sigue cortando»): las tres
+  rutinas apagadas a las 18:39-18:40 UTC y las dos Devs avisadas de frenar
+  (subir lo que tengan a medias como trabajo en curso, sin entregar).
+- No se perdió ni se publicó nada. La PR Memu007/CDI-vuce-#6 sigue con
+  e2e-maria roja hasta la devolución de la memoria de MARIA.
+- Se retoma sólo cuando Emi lo diga: prender las tres rutinas con
+  `update_trigger` y seguir la cola de `NOW.md`.
+- El rojo de `tests` sobre `a0e66929` fue la aserción de tiempo de
+  `test_excel2d.py::test_la_subida_cara_no_frena_a_nadie` (0,66 s contra
+  0,5 s); hasta `0ffa73a0` sólo cambió `docs/pm` y ahí dio verde. Va a
+  `COLA-LIMPIEZA.md`.
+
+## 2026-11-11 18:43 UTC — Corrección a la entrada del corte (PM, con el consejero)
+
+- «No se perdió nada» vale para lo subido: `main` sigue en `8b45207` y las
+  ramas de las Devs no retrocedieron. El último commit de MARIA fue el 10/11
+  14:21 UTC (no 14:04). MARIA subió a las 18:42 UTC su MEMORIA-E2E a medias
+  (`195af11`, e2e_maria.sh OK, sin puertas ni informe: no es entrega). La
+  Técnica no subió nada nuevo (`f6e84dac`); lo que tenga sin subir se sabe
+  cuando conteste.
