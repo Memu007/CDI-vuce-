@@ -770,3 +770,19 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - Vuelta atrás que propone la PM: si aparece el aviso de límite antes de lo
   habitual, MARIA vuelve al modelo de antes. Que el uso de Fable se recupera
   aparte es dicho de Emi; la PM no lo pudo comprobar.
+
+## 2026-11-11 21:59 UTC — PRESUPUESTO-CLIENTE-1 aceptada e integrada; D163 y D167 (PM, con el consejero)
+
+- Aceptada sobre `f45243a`, integrada en `8669b43`. Entra con ella todo lo
+  aceptado sin integrar de MARIA: cada commit de producto cae en el rango de
+  una pieza aceptada, clasificados por rango en el acta
+  `REPRODUCCION-PRESUPUESTO-CLIENTE-1-2026-11-11.md` (ser ancestro de una
+  punta aceptada no alcanza: CATALOGO-3 ya contenía commits de ésta).
+- D163 (a): el `share_quote` en vuelo durante un pase o un borrado queda como
+  riesgo bajo, sin código. Lo hace el mismo dueño en dos pestañas; no cruza
+  permisos. Si se quiere cerrar, (c).
+- D167: no se generaliza; las sesiones siguen con `/autocompact 200k`. MARIA
+  queda en los 250k que le puso Emi (umbral 184000 desde las 21:36 UTC). Con
+  el umbral viejo (144000) compactaba cada ~5 minutos, porque después de
+  compactar quedaba en ~150k. Para la rutina de la PM, la alarma de MARIA es
+  que compacte seguido, no el tamaño.
