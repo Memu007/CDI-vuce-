@@ -7,12 +7,12 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 | Qué | SHA |
 |---|---|
 | Entrega (este informe) | el commit de este informe, encima de `30b9fea6` (merge de tu rama en `6cabcf65`, que trae MARIA integrada en `8669b434`) |
-| Donde corrieron rojos, ataque y navegación | `bb1bc1df` (merge anterior de tu rama) |
+| Donde corrieron el ataque y la navegación | `bb1bc1df` (merge anterior de tu rama). Los rojos de los patrones, en sus SHAs (abajo) |
 | Arnés, D149 y ataque sin Postgres | `b7db6f65`: `ataque_aislamiento.sh`, `sabotajes/cobro_mp1.sh`, `sabotajes/despacho1d.sh`, `sabotajes/estudio1.sh` |
 | Arnés, D145 (a), D173 (a) y `estudio1b` | `4e7da21f`: `pantalla_{cliente1,despacho1a,destino1,estudio1,estudio1b,orden1}.js`, `sabotajes/estudio1b.sh` |
 | Base | `e7633862` (padre de `b7db6f65`) |
 
-**Producto tocado: ninguno.** `git rev-list --no-merges 22163cec..30b9fea6 --not origin/claude/practical-shannon-szpwkn -- proyecto_maria` da vacío. Los merges de tu rama (`6809a846` y `30b9fea6`) no tuvieron conflictos, así que no hay `--remerge-diff` mío: `git show --remerge-diff` de cada uno, limitado a `proyecto_maria`, da 0 líneas.
+**Producto tocado: ninguno.** `git rev-list --no-merges 22163cec..30b9fea6 --not origin/claude/practical-shannon-szpwkn -- proyecto_maria` da vacío. Los merges de tu rama (`6809a846` y `30b9fea6`) no tuvieron conflictos, así que no hay `--remerge-diff` mío. Recorriendo todos los merges de `22163cec..30b9fea6`, `git show --remerge-diff` limitado a `proyecto_maria` da 0 líneas en cada uno, salvo `2b59f396` (97 líneas). Ese es el merge de MARIA que integra tu rama en `claude/dev-maria`, y ya es ancestro de tu rama.
 
 **Resultado**
 - Los cuatro patrones viejos (`cobro_mp1` g, `despacho1d`, `estudio1`, `estudio1b`) vuelven a encontrar su texto y cada sabotaje da ROJO. Ningún ROTO.
@@ -69,7 +69,14 @@ Corrió sobre `bb1bc1df` sin `TMPDIR`. El ataque arma `$TMP` con `mktemp -d` y l
 
 No los volví a correr sobre `30b9fea6`. Lo que ese merge suma sobre `bb1bc1df` es lo tuyo y lo de MARIA que aceptaste (`main.py`, `catalog_service.py`, `finalize.js`, entre otros), no código mío. De mis arneses, sólo cambió `despacho1d.sh`: MARIA reescribió el patrón de «aprender el catálogo con la red caída no avisa», que no es el de D149. Lo volví a correr sobre `30b9fea6`: 9 ROJO, «fallas: 0», rc=0, ningún ROTO.
 
-Los patrones de D149 siguen apareciendo una vez cada uno en `30b9fea6`: `saveOperationToHistory(items, data, carga, foto).then(r => {` en `finalize.js`, el par `_estudio_elegido` / `_textos_como_van_al_txt(request)` en `main.py` e `if (CDI.estudios) await CDI.estudios.listo();` en `finalize.js`.
+El merge también cambia `main.py`. `git diff bb1bc1df 30b9fea6 -- proyecto_maria/main.py` toca límites sólo en la recuperación de contraseña (`_tope_por_cuenta`, `recuperar:cuenta:`), no en `register` ni en `get_client_ip`. Para comprobar el registro desde el navegador sobre lo que entrego, volví a correr `despacho1a` sobre `30b9fea6`: 14 ROJO, «sabotajes sin rojo: 0», rc=0, 0 líneas con «429».
+
+Los patrones de D149 aparecen una vez cada uno en `30b9fea6`, con la sangría exacta del `.sh` (`grep -cF` da 1 en cada caso):
+- `cobro_mp1` g: `saveOperationToHistory(...)`, con 12 espacios, en `finalize.js`.
+- `estudio1`: `if (CDI.estudios) await CDI.estudios.listo();`, con 8 espacios, en `finalize.js`.
+- `estudio1b`: el par `_estudio_elegido` / `_textos_como_van_al_txt(request)` en `main.py`.
+
+De los cuatro arneses, sólo `despacho1d` volvió a correr.
 
 ## Riesgos
 
