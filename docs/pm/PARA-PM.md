@@ -2,188 +2,107 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## BORRADOR-1 (D143 a): el arranque ya no saca a la usuaria de Clientes. Si no fue a ninguna pantalla, o si el tour la llevó a la carga, recupera la operación de antes. D170 a D173 las decidís vos
+## D149 (a) con el ataque sin Postgres, D145 (a) en siete arneses y D173 (a). Salida de navegación de BORRADOR-1. Nada para decidir; un desvío: dos commits de arnés en vez de uno
 
 | Qué | SHA |
 |---|---|
-| Entrega (este informe) | el commit de este informe, encima de `1732cd72` (el merge de tu rama, que toca sólo `docs/pm`) |
-| Producto | `524a8f00` y `cc8b834b`: `app_v2.js` y `CHANGELOG.md` |
-| Pruebas y sabotaje | `d3dfc2e4`, `42f0ed9b` y `b0d6c274`: `scripts/testing/pantalla_borrador1.js` y `scripts/testing/sabotajes/borrador1.sh` |
-| Comentarios | `6c2b3383`: sólo comentarios de `app_v2.js` |
-| Base | `4555f7c4` |
+| Entrega (este informe) | el commit de este informe, encima de `30b9fea6` (merge de tu rama en `6cabcf65`, que trae MARIA integrada en `8669b434`) |
+| Donde corrieron rojos, ataque y navegación | `bb1bc1df` (merge anterior de tu rama) |
+| Arnés, D149 y ataque sin Postgres | `b7db6f65`: `ataque_aislamiento.sh`, `sabotajes/cobro_mp1.sh`, `sabotajes/despacho1d.sh`, `sabotajes/estudio1.sh` |
+| Arnés, D145 (a), D173 (a) y `estudio1b` | `4e7da21f`: `pantalla_{cliente1,despacho1a,destino1,estudio1,estudio1b,orden1}.js`, `sabotajes/estudio1b.sh` |
+| Base | `e7633862` (padre de `b7db6f65`) |
 
-`git diff b0d6c274 HEAD -- proyecto_maria tests scripts` da vacío: las puertas sobre `b0d6c274` valen para la entrega.
+**Producto tocado: ninguno.** `git rev-list --no-merges 22163cec..30b9fea6 --not origin/claude/practical-shannon-szpwkn -- proyecto_maria` da vacío. Los merges de tu rama (`6809a846` y `30b9fea6`) no tuvieron conflictos, así que no hay `--remerge-diff` mío: `git show --remerge-diff` de cada uno, limitado a `proyecto_maria`, da 0 líneas.
 
 **Resultado**
-- El arranque cambia de pantalla sólo si la usuaria todavía no fue a ninguna, o si está en la carga.
-  - A la carga la puede haber llevado el tour, y el tour no es una elección de ella.
-- Si ya está en otra pantalla, la operación de antes queda guardada y aparece el aviso «Quedó guardada la operación».
-- Si el usuario no llega a tiempo, tampoco la saca de donde está.
-- La base de `cliente1` era roja (`locator.click: Timeout`) y ahora da verde.
-- Los sabotajes de `cliente1` que dan ROJO? a partir del 6.º registro son el límite de registro (D145), no esta pieza. Está más abajo, con evidencia.
+- Los cuatro patrones viejos (`cobro_mp1` g, `despacho1d`, `estudio1`, `estudio1b`) vuelven a encontrar su texto y cada sabotaje da ROJO. Ningún ROTO.
+- `ataque_aislamiento.sh` ya no cae a SQLite: si Postgres 16 no levanta, sale con `rc=1` y el log de Postgres. Con Postgres, el control sigue en 47 bloqueados y 0 fugas.
+- Cada llamada a `/auth/register` de los siete arneses manda su propia `X-Forwarded-For`. Va por registro y no por sabotaje: `foco_cliente1` registra unas cien veces dentro de un mismo sabotaje, así que una IP por sabotaje igual llegaría al límite.
+- `pantalla_cliente1.js:41` falla con el status y el texto del registro si no es 2xx (D173 a). `foco_cliente1` usa ese mismo archivo, así que también lo hereda.
+- Navegación de BORRADOR-1 sobre `bb1bc1df`: los cinco arneses con rc=0, ningún ROTO y ningún 429 (tabla abajo).
 
-**Archivo de producto tocado:** `proyecto_maria/static/v2/app_v2.js`.
+**Desvío que tenés que saber:** pediste un commit de arnés y son dos (`b7db6f65` y `4e7da21f`). Los dos ya estaban subidos cuando lo noté; sin `push --force` no se pueden unir. Ninguno toca producto.
+
+**Puerta e2e de MARIA:** no aplica. La pieza no toca el recorrido MARIA ni `static/v2`; sólo `scripts/testing`.
 
 ## Decisiones
 
-Las D de esta entrega van de D170 en adelante. El rango lo elegí yo: D150 a D163 están tomadas, y comprobé con `git grep -E '\bD17[0-9]\b'` que D170 a D179 no aparecen en `docs/pm` de `claude/dev-tecnica`, `claude/practical-shannon-szpwkn` ni `claude/dev-maria`.
+Nada para decidir. No uso ninguna D de mi rango (D180 a D189).
 
-- **D170. El aviso «pendiente» no se borra y no se vuelve a ofrecer** (severidad baja).
-  - Pasa si la operación de antes llega mientras la usuaria está ocupada en otra pantalla.
-  - El texto dice «antes de recargar», nunca se borra y puede pisar el aviso de «lleno».
-  - La pestaña no vuelve a ofrecer la operación; aparece recién al recargar.
-  - (a) Pieza chica: al volver a una pantalla libre, ofrecerla de nuevo y borrar el aviso.
-  - (b) Dejarlo así; recargar la recupera.
-  - **Recomiendo (b) por ahora:** no se pierde nada y la salida existe.
-- **D171. Se pierde la operación con el tour después de recuperarla** (media; ya estaba antes de esta pieza, la reprodujo el adversario).
-  - Una usuaria nueva recupera una operación con ítems.
-  - El tour hace `goTo('upload')`.
-  - El guardado automático (`app_v2.js`, el intervalo cerca de la línea 1190) borra el borrador al estar en la carga.
-  - Si recarga, la operación ya no está.
-  - (a) Pieza nueva: el tour no lleva a la carga si hay una operación en curso.
-  - (b) A la cola.
-  - **Recomiendo (a):** pierde datos de la usuaria. Es chica, pero no entra en D143 (a), que era sólo no sacarla de Clientes.
-- **D172. La adopción está escrita de dos formas** (limpieza).
-  - `b && adoptarTarde(b)` aparece dos veces, y el arranque elige con un ternario: tres lugares, dos estilos.
-  - **Propongo** un `recuperar(b)` para `COLA-LIMPIEZA.md`. No lo hice dentro del arreglo (§6).
-- **D173. `pantalla_cliente1.js` sigue aunque el registro falle** (no es mía; lo propongo).
-  - La línea 38 hace `page.request.post(base + '/auth/register', …)` y no mira el status.
-  - Con el límite de 5 por hora (D145), a partir del 6.º registro sigue sin usuario, y cada sabotaje cae por timeout de click y no por su falla.
-  - El arnés se vuelve ROJO? en vez de decir «429».
-  - (a) Que falle con «no se pudo registrar: 429», como `pantalla_borrador1.js:47`, y que el arnés levante una base nueva por sabotaje, como `borrador1.sh`.
-  - (b) Dejarlo.
-  - **Recomiendo (a),** para MARIA o para quien tenga el arnés. Yo no lo toqué.
+Supuesto reversible: `pantalla_destino1.js` manda la `X-Forwarded-For` pero no mira el status del registro. D173 (a) pedía el chequeo sólo en `cliente1`, y no lo sumé donde no se pidió. Si lo querés en los demás, es una línea por arnés.
 
-## Rojo antes, verde después
+## Rojos de los patrones nuevos (cada uno, una vez)
 
-`pantalla_borrador1.js` sobre la base `4555f7c4`:
-```
-FALLA: el usuario no llega a tiempo: el arranque la sacó de Clientes y la llevó a upload
-FALLA: hay una operación de antes: el arranque la sacó de Clientes y la llevó a review
-FALLA: hay una operación de antes: no apareció el aviso «Quedó guardada la operación»
-rc=1
-```
-Esos textos son de la primera versión de la prueba. Los casos «sin ir a ninguna pantalla» y «el tour la lleva a la carga» los sumé en `b0d6c274`. Su rojo con el arreglo revertido son los sabotajes `siempre_tarde`, `tour_ocupa` y `queda_carga`, de abajo.
+Corrieron sobre `54ddb500` (`despacho1d`, `estudio1`), `542c1860` (`cobro_mp1`) y `4e7da21f` (`estudio1b`). Los tres son ancestros de `bb1bc1df`, y `git diff <cada uno> bb1bc1df -- scripts/testing tests proyecto_maria` da sólo `client_memory.py`, `tests/memoria_pantalla.js`, `tests/test_guardar1.py` y `tests/test_memoria_pantalla.py` (MARIA). Ningún script de sabotaje ni pantalla cambió.
 
-## Sabotaje: `scripts/testing/sabotajes/borrador1.sh b0d6c274`
-
-Cada parte del arreglo se revierte en un worktree descartable, con una base nueva por corrida (el registro tiene límite por hora). Salida entera:
-```
-OK    | producto: ok: el arranque no saca de Clientes y recupera si no fue a ninguna pantalla
-ROJO bien | decide_tarde:
-        FALLA: hay una operación de antes: el arranque tenía que dejarla en clientes y la llevó a review
-        FALLA: hay una operación de antes: no apareció el aviso «Quedó guardada la operación»
-        FALLA: hay una operación de antes: la operación de antes se cargó en la pestaña
-        FALLA: hay una operación de antes: la operación de antes ya no está guardada
-ROJO bien | sin_freno:
-        FALLA: el usuario no llega a tiempo: el arranque tenía que dejarla en clientes y la llevó a upload
-        FALLA: hay una operación de antes: el arranque tenía que dejarla en clientes y la llevó a upload
-ROJO bien | siempre_tarde:
-        FALLA: sin ir a ninguna pantalla: el arranque tenía que dejarla en review y la llevó a upload
-        FALLA: sin ir a ninguna pantalla: la operación de antes no se recuperó
-        FALLA: el tour la lleva a la carga: el arranque tenía que dejarla en review y la llevó a upload
-        FALLA: el tour la lleva a la carga: la operación de antes no se recuperó
-ROJO bien | tour_ocupa:
-        FALLA: el tour la lleva a la carga: el arranque tenía que dejarla en review y la llevó a upload
-        FALLA: el tour la lleva a la carga: la operación de antes no se recuperó
-ROJO bien | queda_carga:
-        FALLA: el tour la lleva a la carga: el arranque tenía que dejarla en review y la llevó a upload
-corridas que no dieron lo esperado: 0
-rc=0
-```
-El sabotaje es propio porque la pieza toca el borrador guardado de la usuaria, que es dato (§3).
-
-## Puertas
-
-| Puerta | SHA | Resultado |
+| Arnés | Resultado | El rojo del patrón nuevo |
 |---|---|---|
-| Suite completa | `d3dfc2e4` (producto igual al de `524a8f00`) | 5907 passed, 110 skipped, 3 xfailed, rc=0 |
-| compileall | `d3dfc2e4` | rc=0 |
-| Los 6 archivos de pytest que leen `app_v2.js` | `b0d6c274` | 103 passed, 1 skipped, 2 xfailed |
-| `borrador1.sh` | `b0d6c274` | 5 ROJO bien, 0 inesperadas |
-| `cliente1.sh` | `b0d6c274` | rc=1: 4 ROJO correcto, 30 ROJO? por 429 (D145, abajo) |
-| `foco_cliente1.sh` | `b0d6c274` | cortado por mí (rc=143): su API dio 5 registros con 200 y 42 con 429, D145 |
-| `destino1.sh` | `b0d6c274` | PENDIENTE_DESTINO |
-| `despacho1a.sh` | `b0d6c274` | PENDIENTE_DESPACHO |
-| `orden1.sh` | `b0d6c274` | «FALLA: no se pudo registrar el usuario de prueba: 429»: es D145 |
+| `cobro_mp1` | 145 ROJO, «sabotajes con falla: 0», rc=0 | «ROJO  · g: Listo guarda la operación sin el archivo del MARIA: dice «FALLA: import: la pantalla hizo»» |
+| `despacho1d` | 9 ROJO, «fallas: 0», rc=0 | «ROJO  · la operación vuelve a esperar al catálogo: dice «FAILED tests/test_despacho1c.py::test_la_operacion_no_espera_al_catalogo[colgado-guardado]»» |
+| `estudio1` | 37 ROJO, «sabotajes sin rojo: 0», rc=0 | «ROJO  · generar no espera la lista de estudios: dice «FALLA: generar antes de la lista manda estudio_id»» y «ROJO  · los avisos anotan el uso: dice «FAILED tests/test_estudio1.py::test_los_avisos_y_un_txt_que_no_se_genera_no_cuentan_como_uso»» |
+| `estudio1b` | 20 ROJO, «sabotajes sin rojo: 0», rc=0 | ancla nueva `_textos_como_van_al_txt(request)`: «ROJO  · el uso del perfil no se anota: dice «FAILED tests/test_estudio1b.py::test_generar_con_el_perfil_despues_de_un_estudio_preselecciona_el_perfil»» |
 
-Los 6 archivos son `test_sufijos1`, `test_ncm_batch_frontend`, `test_punta_a_punta1`, `test_regression_phase0`, `test_static_endpoints` y `test_tour_onboarding`.
+En las celdas cambié la barra vertical del log por `·`.
 
-**Los ROJO? de `cliente1` son 429, no esta pieza**
-- El arnés usa una sola API y una sola base. Cada corrida de `pantalla_cliente1.js` registra un usuario nuevo y no mira el status (D173).
-- El log de la API a mitad de la corrida, contando los `POST /auth/register`:
-  ```
-        5 "POST /auth/register HTTP/1.1" 200
-        6 "POST /auth/register HTTP/1.1" 429
-  ```
-- Los 5 con 200 son la base y los 4 primeros sabotajes, que dieron ROJO correcto:
-  - «el CUIT no se marca»;
-  - «el domicilio no se marca»;
-  - «el inicio de actividad no se marca»;
-  - «el inicio de actividad vuelve a esconderse».
-- Desde el 5.º sabotaje («no avisa lo que falta»), cada uno cae por `locator.click` o `page.waitForFunction: Timeout 30000ms` y no por su falla.
-- Los mismos sabotajes dieron ROJO correcto en corridas anteriores a D145.
+## El ataque sin Postgres: rojo y control
 
-<details><summary>chequeo-6 4555f7c4..b0d6c274</summary>
+Corrió sobre `bb1bc1df` sin `TMPDIR`. El ataque arma `$TMP` con `mktemp -d` y levanta Postgres con `su` como otro usuario. Con mi `TMPDIR` (un directorio de root sin permiso para otros) Postgres no podía entrar y daba un rojo falso; por eso el rojo de abajo ocupa el puerto a propósito.
 
-```
-chequeo-6 4555f7c4..b0d6c274: avisos para mirar, no un veredicto
-producto +7/−9
-arnés +183/−0
-historia (grep de §6, sin líneas movidas): vacío
-archivos de producto:
-  proyecto_maria/static/v2/app_v2.js: 1201 → 1199
-avisos: 0
-rc=0
-```
-</details>
+- **Rojo (puerto 5434 ocupado a propósito, 21:03:51 UTC):** rc=1.
+  - «❌ No levantó Postgres 16: sin él no se mide.»
+  - Del log de Postgres: «could not bind IPv4 address "127.0.0.1": Address already in use» y «FATAL:  could not create any TCP/IP sockets».
+  - Antes de `b7db6f65`, en ese caso seguía sobre SQLite.
+- **Control (puerto libre, 21:03:59 UTC):** rc=0.
+  - «✅ Postgres listo», «Bloqueado: 47   ·   Fugas: 0   ·   Sin probar: 0», «✅ PUERTA G3 PASADA. Ningún despachante ve datos de otro.».
 
-## Revisiones
+## Navegación de BORRADOR-1 sobre `bb1bc1df`
 
-**Adversario: Sonnet, esfuerzo alto, sobre `42f0ed9b`**
-
-| # | Hallazgo | Qué hice |
-|---|---|---|
-| 1 | Con el tour, una usuaria lenta y una tecla, la operación quedaba «pendiente» y no se recuperaba | Arreglado en `cc8b834b`; los casos y el sabotaje en `b0d6c274` |
-| 2 | La prueba no distinguía «siempre adoptarTarde» | Casos nuevos y sabotaje `siempre_tarde` |
-| 3 | El aviso «pendiente» no se borra y pisa el de «lleno» (baja) | D170 |
-| 4 | Pérdida con el tour después de recuperar (media; ya estaba antes) | D171 |
-
-Probó sin hallazgo:
-- esperas de 0, 2 y 5,5 s;
-- ir a Clientes y volver;
-- recargar;
-- respuestas 500;
-- `recuperada` dos veces.
-
-**`/code-review high` sobre lo que cambió hasta `42f0ed9b`**
-
-| # | Dónde | Hallazgo | Qué hice |
+| Arnés | Resultado | 429 | Inicio → fin (UTC) |
 |---|---|---|---|
-| 1 | `pantalla_borrador1.js` | «ya no está guardada» no distinguía el defecto: adoptarla copia el estado a la clave de la pestaña | Arreglado: mira la clave de esta pestaña y la de la otra por separado |
-| 2 | `pantalla_borrador1.js` | No prueba cambiar de pantalla mientras corre `buscarBorrador` | Queda como riesgo bajo; el freno es el mismo `currentScreen` |
-| 3 | `pantalla_borrador1.js` | El caso «tarde» leía la pantalla sin esperar al arranque | Arreglado: espera una condición |
-| 4 | `pantalla_borrador1.js` | El cierre con `runBeforeUnload` no tenía tope | Arreglado: tope de 10 s |
-| 5 | `borrador1.sh` | `levantar` aceptaba cualquier `/health` del puerto | Arreglado: exige que la API propia siga viva |
-| 6 | `app_v2.js` | La carga a la que lleva el tour contaba como elección de ella | Arreglado en `cc8b834b` |
-| 7 | `app_v2.js` | Texto «pendiente» y no vuelve a ofrecerse | D170 |
-| 8 | `app_v2.js` | Comentarios viejos | Arreglado en `6c2b3383` |
-| 9 | `app_v2.js` | La adopción en dos estilos, en tres lugares | D172 |
-| 10 | `borrador1.sh` | Sabotaje propio para un arreglo de navegación | Justificado: toca el borrador guardado (§3) |
+| `cliente1` | 34 ROJO, «sabotajes sin rojo: 0», rc=0 | 0 | 21:04:31 → 21:09:15 |
+| `foco_cliente1` | «con espera, 80 ms: 100 bien, 0 fallas de 100», «con espera, en el peor momento: 5 bien, 0 fallas de 5», «sin espera, en el peor momento: 0 bien, 5 fallas de 5 (5 con lo de otro campo en la razón social)», «mediciones con falla: 0», rc=0 | 0 | 21:09:15 → 21:39:23 |
+| `destino1` | 19 ROJO, «sabotajes sin rojo: 0», rc=0 | 0 | 21:39:23 → 21:46:15 |
+| `despacho1a` | 14 ROJO, «sabotajes sin rojo: 0», rc=0 | 0 | 21:46:15 → 21:47:16 |
+| `orden1` | 76 ROJO, «sabotajes sin rojo: 0», rc=0 | 0 | 21:47:16 → 22:17:58 |
 
-## Riesgos y lo no corrido
+`foco_cliente1` no imprime líneas ROJO: mide corridas. El rojo es la fila «sin espera». «429» es la cantidad de líneas del log que contienen «429».
 
-- **`cc8b834b` no pasó por un segundo adversario ni por otro `/code-review`.** Lo cubren los casos nuevos y los sabotajes `tour_ocupa` y `queda_carga`.
-- **Queda una ventana tardía:** si el usuario tarda más que el tope de 4 s del arranque y ella, con el tour en la carga, toca otra pantalla, la operación queda «pendiente» como en D170.
-- **La suite corrió sobre `d3dfc2e4`, no sobre `b0d6c274`.** Entre los dos cambian sólo `app_v2.js` (+6/−5) y el arnés. Sobre `b0d6c274` corrí los 6 archivos de pytest que leen `app_v2.js`.
-- **No corrí otros arneses de navegador** fuera de los cuatro que pide D143 (a) y `orden1`.
+No los volví a correr sobre `30b9fea6`. Lo que ese merge suma sobre `bb1bc1df` es lo tuyo y lo de MARIA que aceptaste (`main.py`, `catalog_service.py`, `finalize.js`, entre otros), no código mío. De mis arneses, sólo cambió `despacho1d.sh`: MARIA reescribió el patrón de «aprender el catálogo con la red caída no avisa», que no es el de D149. Lo volví a correr sobre `30b9fea6`: 9 ROJO, «fallas: 0», rc=0, ningún ROTO.
 
-## Comandos para reproducir
+Los patrones de D149 siguen apareciendo una vez cada uno en `30b9fea6`: `saveOperationToHistory(items, data, carga, foto).then(r => {` en `finalize.js`, el par `_estudio_elegido` / `_textos_como_van_al_txt(request)` en `main.py` e `if (CDI.estudios) await CDI.estudios.listo();` en `finalize.js`.
+
+## Riesgos
+
+- **Versión de Postgres:** el mensaje dice «Postgres 16», pero el script no mira el número de versión; usa el `initdb` del PATH. En este contenedor el log dice 16.15. En una máquina con otra versión mediría sobre esa sin avisar. Severidad baja; si querés el chequeo, es una pieza aparte.
+- **IP inventada:** `ipNueva()` arma `10.x.x.x` al azar (unos 16 millones). El 429 llega con más de 5 registros por hora desde una IP (`main.py`, `register`). Que seis de unos cientos caigan en la misma es despreciable.
+- **No corrí:** la suite completa (no se tocó producto ni `tests/`) ni `e2e_maria.sh` (la puerta no aplica).
+
+## Para reproducir
 
 ```bash
-git diff --stat 4555f7c4 b0d6c274 -- proyecto_maria/ CHANGELOG.md   # sólo app_v2.js (+7/−9) y CHANGELOG.md (+5)
-PY=<venv>/bin/python TMPDIR=/tmp/cdi-s1 scripts/testing/sabotajes/borrador1.sh b0d6c274   # «OK    | producto» y 5 «ROJO bien», «corridas que no dieron lo esperado: 0»
-git grep -n -E '\bD17[0-9]\b' origin/claude/dev-maria -- docs/pm   # vacío: el rango D170 en adelante está libre
+git fetch origin claude/practical-shannon-szpwkn
+git rev-list --no-merges 22163cec..30b9fea6 --not origin/claude/practical-shannon-szpwkn -- proyecto_maria   # vacío
+git show --remerge-diff --format= 30b9fea6 -- proyecto_maria | wc -l    # 0 (igual con 6809a846)
+bash scripts/testing/sabotajes/estudio1b.sh bb1bc1df          # 20 ROJO, «sabotajes sin rojo: 0»
+bash scripts/testing/ataque_aislamiento.sh                    # sin Postgres 16: rc=1 y «❌ No levantó Postgres 16»; con él: 47 / 0 / 0
+grep -ln "X-Forwarded-For" scripts/testing/pantalla_*.js      # seis archivos; foco_cliente1 usa pantalla_cliente1.js
 ```
 
-/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. BORRADOR-1 entregada con este informe, encima de 1732cd72; D170 a D173 abiertas (mis D siguen en D174). Sigue CONEXIONES-1 parte B: lo que tenía a medio hacer está en el parche conexiones1_b_wip.patch del scratchpad. No integrar 0231eee. Rutina trig_011UpBfwEu9TUzoNUrviqoP5 /respondio cada 2 h, minuto 15.
+## chequeo-6
+
+Corrió sobre `bb1bc1df`, no sobre `30b9fea6`: medido ahí, sumaría como míos los cambios de MARIA que trae tu rama. El único AVISO es `pantalla_cliente1.js:27`: la función anónima del arnés pasa de 296 a 297 líneas por el chequeo de D173 (a), que es una línea. Queda porque D173 pedía el chequeo ahí, donde está el registro. Partir esa función va a la cola de limpieza; no lo hago dentro de esta pieza.
+
+<details><summary>Salida de <code>docs/pm/herramientas/chequeo-6.py e7633862 bb1bc1df</code></summary>
+
+```
+chequeo-6 e7633862..bb1bc1dff1b92d8954857f60264be10f7b285c29: avisos para mirar, no un veredicto
+producto +2/−2
+arnés +121/−26
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/services/client_memory.py: 305 → 305
+  AVISO creció una función de más de 150: scripts/testing/pantalla_cliente1.js:27 <anónima> 296 → 297, 1 en su propio cuerpo (§6: lo nuevo va aparte)
+avisos: 1
+```
+
+</details>
