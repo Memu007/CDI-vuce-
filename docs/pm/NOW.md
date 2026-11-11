@@ -150,6 +150,8 @@ Desde el 2026-10-24 (Emi: Codex deja CDI; dos Devs nuevas en Claude).
 | Dev MARIA (Dev 2) | session_01C8gCBjvn36wnYC6qG2Sixi | trig_01WmrC3ALqBXkD9UBv6dFGbP (min 35) | claude/dev-maria | alto |
 | Dev técnica (Dev 1) | session_018yxeKHYQKFA3qJ2WJmQru7 | trig_011UpBfwEu9TUzoNUrviqoP5 (min 15) | claude/dev-tecnica | medio |
 
+**Las tres rutinas están apagadas desde el 2026-11-11 18:40 UTC (corte por límite semanal); se prenden sólo cuando Emi diga de retomar.**
+
 Rutinas: cada 2 h de 8 a 22 y a las 2 y a las 5, hora de Argentina (`ONBOARDING-PM.md`, «Modo automático»).
 
 Canales: Dev MARIA lee `PARA-DEV-2.md` y contesta en `PARA-PM-2.md`; Dev

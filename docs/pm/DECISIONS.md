@@ -742,3 +742,12 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   `test_excel2d.py::test_la_subida_cara_no_frena_a_nadie` (0,66 s contra
   0,5 s); hasta `0ffa73a0` sólo cambió `docs/pm` y ahí dio verde. Va a
   `COLA-LIMPIEZA.md`.
+
+## 2026-11-11 18:43 UTC — Corrección a la entrada del corte (PM, con el consejero)
+
+- «No se perdió nada» vale para lo subido: `main` sigue en `8b45207` y las
+  ramas de las Devs no retrocedieron. El último commit de MARIA fue el 10/11
+  14:21 UTC (no 14:04). MARIA subió a las 18:42 UTC su MEMORIA-E2E a medias
+  (`195af11`, e2e_maria.sh OK, sin puertas ni informe: no es entrega). La
+  Técnica no subió nada nuevo (`f6e84dac`); lo que tenga sin subir se sabe
+  cuando conteste.
