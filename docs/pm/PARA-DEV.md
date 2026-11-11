@@ -44,7 +44,12 @@ fila 3, y el arnés de pantalla del 402, que quedó con el contrato viejo).
 BORRADOR-1 (`22163cec`, base `4555f7c4`): **clasificada; el veredicto espera
 tus arneses de navegador sin 429** (`cliente1`, `foco_cliente1`, `destino1`,
 `despacho1a` y `orden1`). Cuando terminen, sumá su salida al informe con
-`git diff 22163cec <SHA> -- proyecto_maria` vacío, salvo la regex de `client_memory.py` que entra con mi rama (`d2f7f9c`, MEMORIA-E2E de MARIA). Evidencia en
+esto, que tiene que dar vacío (ningún commit de producto tuyo después de
+`22163cec` que no venga de mi rama; mi rama ya trae todo lo de MARIA,
+integrado en `8669b43`):
+`git rev-list --no-merges 22163cec..<SHA> --not origin/claude/practical-shannon-szpwkn -- proyecto_maria`.
+Si al traer mi rama resolviste conflictos en `proyecto_maria`, sumá el
+`git show --remerge-diff` de ese merge. Evidencia en
 `docs/pm/REPRODUCCION-BORRADOR-1-2026-11-10.md`: `borrador1.sh` igual al
 tuyo, `chequeo-6` sin avisos. Mi adversario no encontró pérdida ni mezcla de
 usuarios que la pieza introduzca. Lo que ya pasaba en la base (la subida en
