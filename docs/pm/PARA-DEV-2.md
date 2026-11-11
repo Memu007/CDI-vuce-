@@ -3,54 +3,21 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Devolución primero: la memoria no aprende la posición que manda la pantalla (2026-11-10 14:14 UTC)
+## MEMORIA-E2E: el armado `d2f7f9c` está integrado (2026-11-11 20:00 UTC)
 
-**Va antes que PRESUPUESTO-CLIENTE-1.** La e2e de la CI (`e2e-maria`) está
-roja en la PR `Memu007/CDI-vuce-#6` desde `0321c212`:
-`config/e2e_maria.js:279` no encuentra el producto en
-`/api/clientes/{id}/catalogo/productos` («no alimentó la memoria»).
+Reproducido sobre `d2f7f9c`, acta `REPRODUCCION-MEMORIA-E2E-2026-11-11.md`:
+- 32 passed, y 4 rojos con el arreglo revertido;
+- mis nueve negativos;
+- `E2E MARIA OK`;
+- el árbol de tu merge, igual al de tu cabeza.
 
-**La causa.** La pantalla (`ncm.js:1369` y `:1764`, `saveNcmUsage`) manda a
-`/api/ncm/guardar-uso` la posición con un espacio antes de la letra DC.
-Body capturado:
-`{'descripcion': 'Modulo de prueba E2E A', 'ncm': '8471.30.00.900 R', 'origen': '310', ...}`.
-`ncm_para_historial` (`client_memory.py:110`) no acepta ese espacio, da
-`None` y guardar-uso responde 400 (está en `server.log`). `e035fc98`
-(DESPACHO-1b) cambió `_ncm_suggestion_key`, que era tolerante, por
-`ncm_para_historial`. En su padre `c55bd329` la función ya daba `None` para
-ese texto: nunca aceptó el formato de la pantalla; DESPACHO-1b sacó el
-último camino tolerante.
+Lo integré en mi rama con `merge`: `3c1b11fd`. **Traé mi rama con `merge`.**
 
-**Evidencia.**
-- Bisección con la e2e entre `c55bd329` (OK) y `b40fd0d5` (falla): primer
-  commit malo `e035fc98`.
-- En la cabeza de la PR `2d72892b`, un cambio de una línea a esa regex da
-  `E2E MARIA OK`. Es una sola causa. Sugerencia (no es criterio): no
-  importa cómo lo arregles.
-- El camino de la operación (`main.py` ~8195-8232, con el ncm crudo) dio
-  200, pero lo que aprende ahí es leído, no corrido.
+D165 (a) quedó en `COLA-LIMPIEZA.md`. D166 (a) está cerrada. Tu dato de las
+105 piezas es lo esperado: son piezas aceptadas sin integrar, que entran con
+la reentrega.
 
-**Sin camino en producción:** `e035fc98` no está en `main`. Es un camino
-de hoy en tu rama y en la mía.
-
-**Comportamiento.** Toda posición tal como la emite la pantalla (la
-individual, la de SIM+DC en lote y la que viene de una sugerencia) alimenta
-la memoria del cliente por cada entrada que la recibe: guardar-uso, la
-operación, learn y el PUT. Lo que hoy se rechaza por mal formado sigue
-rechazado.
-
-**Aceptación.**
-- Un caso con la familia como datos, armada con lo que manda la pantalla
-  (no `100D` escrito a mano): las cuatro entradas aprenden y el catálogo del
-  cliente la muestra. Con tu arreglo revertido, rojo.
-- `scripts/testing/e2e_maria.sh` verde sobre tu SHA (cómo correrla, en
-  `ONBOARDING-DEV.md`), con la salida en el informe.
-
-**Lo que cambia para adelante.** Desde DESPACHO-1b acepté tus piezas sin
-correr esta e2e: es un escape mío, no tuyo. Desde ahora, cada pieza que toca
-el recorrido MARIA (carga, revisión, SIM/DC, agrupación, SBT, descarga,
-memoria, catálogo) trae `e2e_maria.sh` verde en el informe, y yo la
-reproduzco.
+**Sigue:** la reentrega de PRESUPUESTO-CLIENTE-1 sobre la unión, con D163.
 
 ## Veredicto: PRUEBA-LIMPIAR-1 aceptada sobre `5dd9a6eb` (2026-11-10 13:48 UTC)
 
@@ -126,8 +93,6 @@ D163 la contesto sobre el SHA que reentregues.
    `abuso1` sigue con una sola IP, porque eso es lo que prueba. Los mismos
    tres de arriba, y `cliente1`, `foco_cliente1`, `destino1` y
    `despacho1a` (puertas de BORRADOR-1), los hace la Técnica.
-4. **El smoke** (`smoke_friccion.sh`) al día con ABUSO-1: hoy manda
-   `smoke_wave1` sin sesión y ABUSO-1 lo descarta.
 
 ### Una afirmación mía que retiro
 

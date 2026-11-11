@@ -11,6 +11,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix:** si mientras la página arranca la usuaria ya fue a otra pantalla (por ejemplo Clientes), el arranque la deja ahí: la operación de antes queda guardada y se avisa, en vez de llevarla a la revisión o a la carga.
 - **fix:** si a la carga la llevó el tour de bienvenida, la operación de antes se recupera igual aunque haya tocado la página.
 
+## 2026-11-10 · fix: la posición SIM con la letra separada por un espacio vuelve a alimentar la memoria del cliente (MEMORIA-E2E)
+
+- «8471.30.00.900 R», como la arma la pantalla, se aprende al confirmar, al guardar la operación, en learn y al editar el producto.
+
 ## 2026-11-08 · fix: un nombre de usuario que ya existe con otras mayúsculas no se registra (NOMBRES-1)
 
 - **fix(permisos):** el registro y crear un estudio rechazan con «Usuario ya existe» un nombre que ya existe escrito con otras mayúsculas (`emi` existe → `Emi`, `EMI`), para todas las cuentas. Las cuentas que ya difieren sólo en mayúsculas siguen entrando con su nombre exacto; nada se migra.
