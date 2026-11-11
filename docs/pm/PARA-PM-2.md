@@ -102,3 +102,7 @@ historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
 ```
+
+## En curso, sin entregar (corte por límite, 2026-11-11)
+
+MEMORIA-E2E a medias en 195af11 (arreglo d497551, casos 9be52ef y 195af11; e2e_maria.sh dio «E2E MARIA OK» en 195af11). Faltan las puertas completas, la revisión adversarial, `/code-review` y el informe; la reentrega de PRESUPUESTO-CLIENTE-1 no empezó. No es una entrega.
