@@ -213,7 +213,7 @@ if [ -n "$PG_URL" ]; then
       '                            ("client_product_history", ("origen_frecuente",)),' \
       '' \
       "arranque: las columnas son text" "FALLA | guardar-uso con cliente guarda enteros"
-    sabotaje $M "el arranque traba las dos tablas en una transacción" \
+    sabotaje $M "el arranque traba las tablas en una transacción" \
       '    for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "origen", "vendor_nombre")),
                             ("client_product_history", ("origen_frecuente",)),
                             ("operation_items", ("origen",))):
