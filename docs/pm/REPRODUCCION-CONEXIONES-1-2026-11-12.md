@@ -716,3 +716,184 @@ asyncio.run(main())
 ```
 
 </details>
+
+## H (sólo arnés): aceptada como medición sobre `bd8665bf`, con devolución por la causa (2026-11-12 11:45 UTC)
+
+Integrada por avance directo. `chequeo-6.py 6001684c bd8665bf`: producto
++0/−0, arnés +323/−0, 0 avisos, igual al informe.
+
+### Lo corrido por la PM, sobre `bd8665bf`
+
+| Caso | Árbol | rc | Resultado |
+|---|---|---|---|
+| 6 | HEAD | 1 | `deadlocks: 5; rondas sin armar: 0` (las 5 del informe) |
+| 6 | (b) completo | 0 | `deadlocks: 0; rondas sin armar: 0` |
+| 6 | sólo NO KEY, 1.ª corrida | **2** | `Invalida: la app no soltó sus conexiones`, después de la ronda «recarga + maria \| usuario \| créditos vencidos» |
+| 6 | sólo NO KEY, 2.ª corrida | 1 | `deadlocks: 3; rondas sin armar: 0` (igual al informe) |
+| 7 | HEAD | 1 | `cuentas mal: 4; rondas sin armar: 0` |
+
+**El rc=2 no tiene causa confirmada.** Lo mismo, 50 veces seguidas
+(maria + recarga, usuario, créditos al día): 0 fallas. Hipótesis, sin
+probar: algo abre una conexión después de `engine.dispose` (por ejemplo, la
+tarea en segundo plano del registro de pedidos, `log_request_background`,
+que no espera a nadie) y la espera de «cero conexiones» lo ve. Es arnés, no
+producto: va como devolución.
+
+### Mis negativos: la carrera sin forzar, sobre HEAD
+
+El caso 6 toma la fila desde afuera para que los dos pedidos coincidan. Lo
+lancé sin eso: los dos pedidos a la vez con una barrera de dos hilos, 30
+rondas por par, org con créditos extra vencidos y sin limpiar.
+
+| Par | HEAD | sólo NO KEY |
+|---|---|---|
+| recarga + guardado | 28/30 deadlock | 0/30 |
+| recarga + MARIA | 30/30 | 0/30 |
+| guardado + recarga | 25/30 | 0/30 |
+| control: recarga + guardado con créditos al día | 0/30 | — |
+
+**Condiciones, para no exagerar:** es con los dos pedidos lanzados en el
+mismo instante y sólo en la primera actividad de la org después de que
+vencen sus créditos extra: cualquier alta contada o recarga los limpia
+(`_expire_extra_ops`, `billing_service.py:109`) y ahí ya no pasa. No sé
+cada cuánto coinciden en producción.
+
+**Quién pierde** (recarga + guardado, 30 rondas, 24 deadlocks): el guardado
+18 veces, el aviso de MP 6. Las 6 veces que pierde el aviso, la recarga no
+quedó acreditada (sin fila en `mp_pagos_aplicados`, créditos `(0, None)`).
+Reenviado como lo reintentaría MP, da 200 y acredita (`aplicado`, `(10,
+True)`). O sea: la plata no se pierde **si MP reintenta**; eso lo simulé, no
+lo verifiqué con MP.
+
+**D204 sigue:** renovación + guardado con prueba vencida, usuario y org,
+`[200, 402]`; las dos cuentas quedan `past_due` con el período por delante y
+`tiene_acceso` da `False`: pagó y queda bloqueada hasta la próxima
+renovación.
+
+### Decisiones
+
+- **H aceptada como medición, con devolución por la causa:** lo que abre una
+  conexión después de `dispose` rompe la espera a cero conexiones. Diagnosticar
+  el rc=2 o hacer la espera robusta a esa familia, con un caso que lo muestre.
+- **D205 y D206 van a Emi** (punto 13 de NOW). Recomiendo D206 (a) y D205
+  (a). Los dos llevan revisión fuerte: candados de cobro y
+  `get_current_user`.
+
+### No corrido por la PM
+
+- `e2e_maria.sh` y la suite: H no toca producto.
+- El caso 7 con (b): confío en el informe (4 MAL, igual que HEAD).
+
+<details><summary><code>pm_natural.py</code> (en <code>scripts/testing/</code> de un worktree de <code>bd8665bf</code>; <code>con_pg16.sh $PY</code>)</summary>
+
+```python
+"""Negativo de la PM: recarga + guardado (y recarga + maria) de org con créditos
+vencidos, lanzados a la vez SIN tomar la fila desde afuera. ¿Pasa sin forzar?"""
+import os, sys, threading
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from conexiones1_rondas import correr, m, PEDIDOS, DEADLOCKS, OTRAS
+import conexiones1_creditos as h
+from proyecto_maria.database.connection import engine
+from fastapi.testclient import TestClient
+from concurrent.futures import ThreadPoolExecutor
+N = int(os.environ.get("N", "30"))
+def main():
+    with TestClient(m.app, raise_server_exceptions=False) as c:
+        for a, b in (("recarga", "guardado"), ("recarga", "maria"), ("guardado", "recarga")):
+            dl_tot, quinientos = 0, 0
+            for i in range(N):
+                s, cl, ref, cuenta = h.preparar(c, True)
+                antes = h.sql(DEADLOCKS)[0][0]
+                bar = threading.Barrier(2)
+                def lanzar(p):
+                    bar.wait(); return PEDIDOS[p](c, ref, s, cl)
+                with ThreadPoolExecutor(2) as ex:
+                    fs = [ex.submit(lanzar, a), ex.submit(lanzar, b)]
+                    cods = [f.result(h.PLAZO).status_code for f in fs]
+                c.portal.call(engine.dispose)
+                h.hasta(lambda: h.sql(OTRAS)[0][0] == 0)
+                dl = h.sql(DEADLOCKS)[0][0] - antes
+                dl_tot += dl; quinientos += 500 in cods
+            print(f"natural | {a} + {b} | org vencidos | rondas {N} | deadlocks {dl_tot} | rondas con 500: {quinientos}", flush=True)
+    return 0
+if __name__ == "__main__":
+    sys.exit(correr(main))
+```
+
+</details>
+
+<details><summary><code>pm_natural2.py</code> (igual; quién pierde, control, D204 y el bucle del rc=2)</summary>
+
+```python
+"""Negativos de la PM sobre HEAD: quién pierde en el deadlock natural, control con
+créditos al día, si D204 persiste, y el rc=2 en bucle."""
+import os, sys, threading
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from conexiones1_rondas import correr, m, PEDIDOS, DEADLOCKS, OTRAS, ronda
+import conexiones1_creditos as h
+from tests.mp_firma import aviso_firmado
+from proyecto_maria.database.connection import engine
+from fastapi.testclient import TestClient
+from concurrent.futures import ThreadPoolExecutor
+N = int(os.environ.get("N", "30"))
+def natural(c, vencidos):
+    res = {"dl": 0, "pierde_webhook": 0, "pierde_guardado": 0, "no_acreditada": 0, "reintento_acredita": 0}
+    for i in range(N):
+        s, cl, ref, cuenta = h.preparar(c, True)
+        if not vencidos:
+            h.sql("update organizations set extra_ops_expires_at = now() + interval '20 days' where id = %s", cuenta[2])
+        antes = h.sql(DEADLOCKS)[0][0]
+        bar, pidbox = threading.Barrier(2), {}
+        def rec():
+            bar.wait(); pid, r = h.recargar(c, ref); pidbox["pid"] = pid; return r
+        def gua():
+            bar.wait(); return PEDIDOS["guardado"](c, ref, s, cl)
+        with ThreadPoolExecutor(2) as ex:
+            fr, fg = ex.submit(rec), ex.submit(gua)
+            rr, rg = fr.result(h.PLAZO), fg.result(h.PLAZO)
+        c.portal.call(engine.dispose); h.hasta(lambda: h.sql(OTRAS)[0][0] == 0)
+        res["dl"] += h.sql(DEADLOCKS)[0][0] - antes
+        pid = pidbox["pid"]
+        if rr.status_code != 200:
+            res["pierde_webhook"] += 1
+            est = h.sql("select estado from mp_pagos_aplicados where payment_id = %s", pid)
+            ops = h.sql("select extra_ops_remaining, extra_ops_expires_at > now() from organizations where id = %s", cuenta[2])
+            res["no_acreditada"] += est != [("aplicado",)]
+            r2 = c.post("/api/payments/webhook", **aviso_firmado("payment", pid, "secreto-de-prueba"))
+            est2 = h.sql("select estado from mp_pagos_aplicados where payment_id = %s", pid)
+            ops2 = h.sql("select extra_ops_remaining, extra_ops_expires_at > now() from organizations where id = %s", cuenta[2])
+            res["reintento_acredita"] += est2 == [("aplicado",)]
+            print(f"  webhook {rr.status_code}: estado {est} ops {ops} -> reintento {r2.status_code} estado {est2} ops {ops2}", flush=True)
+        if rg.status_code != 200:
+            res["pierde_guardado"] += 1
+    print(f"natural recarga+guardado org créditos {'vencidos' if vencidos else 'al día'}: rondas {N} {res}", flush=True)
+def d204(c):
+    for de_org in (False, True):
+        ajuste = "billing_status = 'trial', trial_ends_at = now() - interval '1 day'"
+        codigos, _, _, (tabla, clave, valor) = ronda(c, "renovación", "guardado", de_org, ajuste)
+        st = h.sql(f"select billing_status, trial_ends_at > now() from {tabla} where {clave} = %s", valor)
+        s = h.preparar  # sesión: reusar no se puede; leer acceso directo
+        print(f"d204 {'org' if de_org else 'usuario'}: {codigos} queda {st}", flush=True)
+        ent = h.sql(f"select billing_status, trial_ends_at from {tabla} where {clave} = %s", valor)[0]
+        fake = type("E", (), {"billing_status": ent[0], "trial_ends_at": ent[1], "plan": "premium"})()
+        try:
+            print("   tiene_acceso:", m.billing_service.tiene_acceso(fake), flush=True)
+        except Exception as e:
+            print("   tiene_acceso error:", repr(e)[:150], flush=True)
+def bucle(c):
+    fallas = 0
+    for i in range(int(os.environ.get("NB", "50"))):
+        try:
+            ronda(c, "maria", "recarga", False, "billing_status = 'active', extra_ops_expires_at = now() + interval '20 days'")
+        except h.Invalida as e:
+            fallas += 1; print("  bucle Invalida:", e, flush=True)
+    print(f"bucle maria+recarga usuario al día: fallas {fallas}", flush=True)
+def main():
+    with TestClient(m.app, raise_server_exceptions=False) as c:
+        natural(c, True); natural(c, False); d204(c); bucle(c)
+    return 0
+if __name__ == "__main__":
+    sys.exit(correr(main))
+```
+
+</details>

@@ -3,81 +3,57 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## CONEXIONES-1 H: aceptada como medición sobre `bd8665bf`, con devolución por la causa (2026-11-12 11:45 UTC)
+
+Integré `bd8665bf` (avance directo). Evidencia: acta
+`REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección H.
+
+- **Reproducido, igual al informe:** caso 6 en HEAD 5 deadlocks; con (b) 0;
+  caso 7 en HEAD 4 MAL; `chequeo-6` +0/−0, arnés +323/−0, 0 avisos.
+- **No igual:** caso 6 con sólo NO KEY, la primera corrida salió **rc=2**
+  (`la app no soltó sus conexiones`, después de «recarga + maria | usuario |
+  créditos vencidos»). La segunda dio 3, como tu informe. El mismo par 50
+  veces seguidas: 0 fallas. No tengo la causa.
+- **Mis negativos (sin tomar la fila desde afuera, dos hilos con barrera):**
+  en HEAD, org con créditos vencidos, recarga + guardado 28/30, recarga +
+  MARIA 30/30, guardado + recarga 25/30; con NO KEY 0/90; con créditos al
+  día 0/30. Cuando pierde el aviso de MP (6 de 24), la recarga no queda
+  acreditada; el reintento estilo MP la acredita. D204 sigue: `past_due`
+  con el período por delante y `tiene_acceso` en `False`.
+
+**Devolución por la causa:** lo que abre una conexión después de
+`engine.dispose` rompe la espera a cero conexiones del arnés, y la ronda
+sale «inválida» sin que el producto haya fallado. Sospecho de la tarea del
+registro de pedidos en segundo plano (`log_request_background`), pero no lo
+probé: diagnosticalo vos.
+
+**Tus D:** D205 y D206 van a Emi (punto 13 de NOW), con tu recomendación (a)
+en las dos. D207–D209 siguen libres.
+
+## Tarea activa: CONEXIONES-1 I, sólo arnés (2026-11-12 11:45 UTC)
+
+1. **La causa del rc=2.** Diagnosticala con evidencia (qué conexión queda
+   abierta y quién la abre). Arreglá el arnés para toda esa familia, no
+   sólo para el registro de pedidos, y mostrá un caso que antes daba rc=2 y
+   ahora no, con el rojo del arreglo revertido una vez. Sin esperas fijas.
+   Si la causa está en producto, no lo tocás: me lo decís como D.
+2. **El caso natural como script** (≤80 líneas): los dos pedidos a la vez
+   sin tomar la fila desde afuera, recarga + guardado y recarga + MARIA de
+   una org con créditos vencidos, más el control con créditos al día. Por
+   ronda: deadlock sí/no, quién pierde, y cuando pierde el aviso de MP, si
+   la recarga quedó acreditada antes y después de un reintento firmado.
+   Corrido en HEAD y con `parche_nokey.diff`, una vez cada uno. Podés partir
+   de `pm_natural2.py` (acta, sección H).
+
+`chequeo-6` con producto +0/−0.
+
+**Si Emi dice que sí a D182 o a D206 (a) mientras tanto,** dejás I donde
+esté, lo decís en el informe y arrancás esa pieza.
+
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 
-Integré `b60c30d4` (avance directo, sólo `PARA-PM.md`). El plan queda como
-base de la pieza; la pieza sigue esperando el sí de Emi a D182.
-
-- **Lo reproduje:**
-  - el comando 1 da `2.0.25 True False`;
-  - el comando 2 da 3755 con `require_active_billing` y las 8 con
-    `require_billing_vigente`;
-  - el mecanismo de la FK, mínimo, en mi PG16 y sin la app:
-    - con la dueña en `FOR UPDATE`, el segundo `UPDATE` de la org espera y
-      sale `DeadlockDetectedError`;
-    - con `FOR NO KEY UPDATE`, el segundo `UPDATE` no espera, el aviso
-      confirma y el alta sigue (ok/ok).
-- **No lo reproduje:** los resultados 1 a 3 dentro de la app. Los mediste
-  sobre árboles sin commitear y no hay copiable.
-- **Mi negativo de G no veía el par alta + recarga de la org: bien visto.**
-  En el acta, cada «(b)» va a decir sobre qué árbol se midió. En G, (b) era
-  el `commit` en la dependencia y perdía la recarga. En tu plan, (b) es
-  vigente + el conteo bloqueado, y da deadlock.
-- **Pregunta que el plan no contesta: ¿esto pasa hoy?** En HEAD, el guardado
-  (8158/8181) y generar MARIA (`_contar_maria`) ya toman a la dueña con
-  `FOR UPDATE` y después la org. Con una recarga de la org a la vez, el
-  mecanismo es el mismo. Hasta que se mida, no escribo que (b) lo introduce.
-
-**Tus D:**
-
-- **D200: (a), por la PM.** `of=` en las dos consultas, más el caso 6
-  mirando el SQL. La subida de SQLAlchemy va a la cola de limpieza.
-- **D201: (a), por la PM**, con un dato más en el caso 5 u 8: después de
-  borrar `require_active_billing`, los créditos extra vencidos no se pueden
-  gastar en un alta manual. Lo hace hoy `_expire_extra_ops` dentro de
-  `can_create_operation`, bajo el candado.
-- **D202: (a), por la PM.** Lo leí: `_vencer_y_guardar` hace su propio
-  `commit` (con `rollback` si falla), así que el `commit` nuevo de vigente
-  no lleva esa escritura. Vale tu condición: si el caso 4 da 200 con algo
-  perdido, pasás a (b) y lo decís.
-- **D203: (a), por la PM**, y el espejo entra como dato del caso 6, no como
-  riesgo: `cancel_billing` o `reactivate_billing` + alta de la misma org.
-  Si un par da rojo con (a), entra (b) con ese rojo.
-- **D204: la medición la ordeno yo; el arreglo lo decide Emi.** Si
-  reproduce sobre HEAD, es plata en producción hoy, como D188: no la
-  arreglás dentro de la pieza sin su sí. Va en la tarea de abajo.
-
-**Condiciones de la pieza:** siguen las de F y G (base caída en los tres
-`commit` como datos, `try/finally`, anclas en código, impaga con JSON roto
-en 402, créditos + caso 6, `billing_status`, los demás caminos, revisión
-fuerte). Tu plan las cubre todas.
-
-## Tarea activa: CONEXIONES-1 H, sólo arnés: los casos 6 y 7 sobre HEAD (2026-11-12 10:47 UTC)
-
-Tu cola del roadmap no tiene otra pieza que no espere a Emi. Sin producto:
-
-1. **El caso 6 como script en el repo** (≤80 líneas, sin esperas fijas),
-   corrido sobre HEAD. Pares: alta + guardado · alta + recarga ·
-   guardado + recarga · generar MARIA + recarga · alta + aviso de suscripción
-   · `cancel_billing` o `reactivate_billing` + alta. Cuentas: usuario y org.
-   Créditos vencidos y no vencidos. Por par: códigos, deadlocks de
-   `pg_stat_database` y el SQL de `_cuenta_bloqueada`.
-   - Lo que más importa: **si guardado + recarga o generar MARIA + recarga
-     de una org dan deadlock hoy.** Si da, es un hallazgo de producción y me
-     lo decís arriba del informe.
-2. **El caso 7 (D204) como script, sobre HEAD:** un aviso de renovación a la
-   vez que una cuenta vencida pasa por vigente, con usuario y org, y con
-   trial vencido y `active` fuera de gracia. Si no reproduce, lo decís así.
-3. **Los resultados 1 a 3 del plan, copiables:** el parche de (b) +
-   `FOR NO KEY UPDATE` como archivo de arnés que los scripts aplican en un
-   worktree. Así los reproduzco con un comando.
-4. Rojos: los casos corridos con el parche aplicado y sin él, una vez cada
-   uno.
-
-`chequeo-6` con producto +0/−0. Tus D siguen en D205–D209.
-
-**Si Emi dice que sí a D182 mientras tanto,** dejás H donde esté, lo decís
-en el informe y arrancás la pieza: los scripts de H son sus casos 6 y 7.
+Acta, sección «Plan» (en Git, `6001684c`). D200–D203 (a) por la PM; sus
+condiciones siguen para la pieza.
 
 ## CONEXIONES-1 G: aceptada sobre `6ce56cf9` e integrada (2026-11-12 10:13 UTC)
 
