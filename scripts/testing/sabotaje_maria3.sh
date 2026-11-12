@@ -162,7 +162,7 @@ caso no_aplica_se_marca "${T}test_no_aplica_no_es_un_dato_sin_leer[na_guion-pymu
 # 16. el lector vuelve a poner «None» en la fecha que no vino (una copia)
 reemplazar_primero $X "'fecha_emision': fecha," \
   "'fecha_emision': str(operacion.get('fecha_emision', '')),"
-caso fecha_none "${T}test_la_fecha_que_no_vino_queda_vacia[None-"
+caso fecha_none "${T}test_la_fecha_que_no_vino_queda_vacia[None-pymupdf]"
 
 # 17. el año del IEXT vuelve a salir de hoy
 reemplazar $G "    anio_iext = fecha_factura[-2:]" '    anio_iext = datetime.now().strftime("%y")'
@@ -195,7 +195,7 @@ caso sin_aviso_futura "${T}test_fecha_futura_o_vieja_se_avisa[40-futura]"
 
 # 24. cifras que no son 0-9 llegan a int()
 reemplazar $G 'm = re.fullmatch(r"0?([0-9]{3})(?:' 'm = re.fullmatch(r"0?(\d{3})(?:'
-caso cifras_raras "${T}test_procedencia_no_reconocida_se_rechaza[/generate_maria/avisos-"
+caso cifras_raras "${T}test_procedencia_no_reconocida_se_rechaza[/generate_maria/avisos-٢٢٢]"
 
 # 25. una procedencia de producto en blanco pisa la de la operación
 reemplazar $G '        valor = str(item.get(clave) or "").strip()' '        valor = str(item.get(clave) or "")'
@@ -214,9 +214,8 @@ caso avisos_gastos_500 "${T}test_gastos_que_no_son_un_importe_dan_400[/generate_
 
 # 28. el flete no se valida (con CIF llega a GTOS-POS-FOB)
 reemplazar $G '    flete = centavos(importe_valido(flete or 0, "Flete"))' '    flete = Decimal(repr(float(flete or 0)))'
-# Al generar, el flete lo validan también el control del pedido y la
-# conversión de importes del endpoint. Cada una alcanza sola para el 400: el
-# sabotaje saca las tres.
+# Al generar lo validan también el control del pedido y la conversión de
+# importes del endpoint, y cada una alcanza sola para el 400: se sacan las tres.
 reemplazar proyecto_maria/core/controles_maria.py '    ("flete", "Flete"), ("seguro", "Seguro"),' '    ("seguro", "Seguro"),'
 reemplazar $M '    request.flete = importe_valido(request.flete, "Flete") or 0' '    request.flete = request.flete or 0'
 caso flete_sin_validar "${T}test_flete_o_seguro_que_no_son_un_importe_dan_400[/generate_maria-flete-inf]"
