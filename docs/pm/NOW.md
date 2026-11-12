@@ -101,6 +101,8 @@ antes de cerrar la Fase 3.
    real en `scripts/utils/cambiar_ai.sh:62` de `main` y en el historial desde
    `32e4282`; revocarla en la consola de Anthropic. Después, pieza chica para
    sacar el archivo (el historial queda; lo que protege es revocar).
+   2026-11-12 01:19 UTC: Emi le escribió al chat suelto «Listo eliminadas»
+   después de los pasos de Anthropic. No comprobado. Gemini: falta que confirme.
 3. **Despachante:** recordarle los archivos reales (favor 1). Ya respondió
    todas las preguntas.
 4. **Catálogo NCM:** Emi trajo el nomenclador vigente (2026-10-07). Lo
