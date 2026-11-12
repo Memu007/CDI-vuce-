@@ -3,11 +3,64 @@
 Entrega `22163cec`, base `4555f7c4`, Dev técnica. Producto: sólo
 `proyecto_maria/static/v2/app_v2.js` (+7/−9).
 
-**Estado: clasificada; falta el veredicto.** Para aceptar faltan los arneses
-de navegador que dieron 429 (`cliente1`, `foco_cliente1`, `destino1`,
-`despacho1a` y `orden1`), que la Técnica vuelve a correr con D173 (a) en
-`4e7da21f`. Antes de contarlos para este SHA hay que ver que
-`git diff 22163cec 4e7da21f -- proyecto_maria` dé vacío.
+**Estado: aceptada sobre `c8733be`** (merge de mi rama en la de la Técnica,
+con su informe en `52029147`). Producto igual a `22163cec`: las líneas de
+`app_v2.js` que entran con el merge son las mismas de
+`git diff 4555f7c4 22163cec`. Abajo, primero lo corrido sobre `c8733be`; después,
+la clasificación del 10/11, que sigue igual.
+
+## Sobre `c8733be` (2026-11-11/12, venv de la PM, pytest 9.2.0)
+
+| Corrida | Resultado |
+|---|---|
+| `cliente1` | 34 ROJO, rc=0 |
+| `destino1` | 19 ROJO, rc=0 |
+| `despacho1a` | 14 ROJO, rc=0 |
+| `orden1` | 76 ROJO, rc=0 |
+| `foco_cliente1` | igual al informe, «mediciones con falla: 0», 1716 s |
+| `sabotajes/estudio1b.sh` | 20 ROJO, rc=0 |
+| `sabotajes/despacho1d.sh` | 9 ROJO, rc=0 |
+| `sabotajes/estudio1.sh` | 36 ROJO y 1 ROJO?, rc=1 (abajo) |
+| `sabotajes/borrador1.sh` | 5 ROJO, rc=0 |
+| `sabotajes/cobro_mp1.sh` | 145 ROJO, 5 BASE en verde y 1 VERDE esperado por diseño; «sabotajes con falla: 0» |
+| `ataque_aislamiento.sh`, puerto ocupado | rc=1, «❌ No levantó Postgres 16», «Address already in use» |
+| `ataque_aislamiento.sh`, control | `Bloqueado: 47 · Fugas: 0 · Sin probar: 0`, PUERTA G3 PASADA |
+| `scripts/testing/e2e_maria.sh` | `E2E MARIA OK` |
+| `chequeo-6.py` | igual al informe |
+| suite completa (pytest 9.2.0, sobre `c8733be`) | `6077 passed, 110 skipped, 3 xfailed, 105 warnings in 1434.22s`, igual a la referencia de `f45243a` |
+
+Ningún arnés de navegación dio 429. La suite, después del resumen, imprimió
+una vez «Task was destroyed but it is pending!» (un generador asíncrono al
+cerrar) y salió con 0; no lo comparé con la corrida de referencia.
+
+Portón: `git rev-list --no-merges 22163cec..c8733be --not origin/claude/practical-shannon-szpwkn -- proyecto_maria`
+da 0 commits. `git show --remerge-diff` de cada merge de `22163cec..c8733be`,
+limitado a `proyecto_maria`: 0 líneas, salvo `2b59f396`, que es el merge de
+MARIA y ya es ancestro de mi rama. Con
+`git show --remerge-diff --format= 2b59f396 -- proyecto_maria | wc -l` da 97,
+igual al informe (yo había anotado 137 contando de otra forma).
+
+Merge de prueba de `c8733be` sobre mi rama, en otro worktree: sin conflictos,
+`git diff c8733be <merge> -- proyecto_maria` vacío, y
+`tests/test_despacho1c.py tests/test_front422.py` (el arnés 402 de MARIA, que
+`c8733be` no tiene): `118 passed`.
+
+**El ROJO? de `estudio1`, con su causa atada.** El sabotaje «el nombre de más
+de 200 entra» sí rompe la prueba: falla como
+`test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve[nombre4]`. Con pytest
+9.2.0 (el de `requirements.txt`) un parámetro de texto largo da id
+`[nombre+índice]`, y `estudio1.sh` busca `[xxxxx`. Es el mismo hallazgo que
+`disco1.sh` de MARIA (acta del arnés 402). El patrón ya estaba antes de D149:
+`b7db6f65` no lo tocó. Con pytest 9.1.1 sobre las mismas dependencias,
+`--collect-only` de `tests/test_estudio1.py` da ese caso como `[xxxxxxxx…]`,
+que es lo que busca el guion. La Técnica informó 37 ROJO; su versión de pytest
+**no está comprobada**: que la explique es una inferencia.
+
+D149 (a) queda aceptada en lo que pedía; `estudio1.sh` entero queda abierto
+hasta dar rc=0 con 9.2.0 (agregado en `PARA-DEV.md`), igual que `disco1.sh`.
+
+**No corrido:** adversarios nuevos (es arnés, sin dinero, sesión ni
+permisos); `estudio1.sh` saboteado con pytest 9.1.1 (sólo el `--collect-only`).
 
 ## Lo que corrió la PM
 
