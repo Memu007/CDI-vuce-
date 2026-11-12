@@ -114,7 +114,7 @@ contador por fase funcionando del lado bueno.
 
 ## Rojo y verde del caso
 
-Con el diff de D (el de tu `c1311852`) más el `test_conexiones1.py` de E:
+Con el diff de D (el de mi informe en `c1311852`) más el `test_conexiones1.py` de E:
 
 ```
 E   assert 500 == 400
@@ -350,24 +350,33 @@ index 00000000..e5d0187f
 
 ## Comandos copiables
 
-Desde un worktree limpio en `299e0ee8`, con el entorno de pytest de siempre.
+Desde la raíz del repo con la rama traída, con el entorno de pytest de siempre.
+El diff sale del informe en la rama (el worktree en `299e0ee8` tiene el
+informe de D).
 
 ```bash
-git worktree add /tmp/e 299e0ee8 && cd /tmp/e
-awk '/^```diff$/{f=1;next} /^```$/{f=0} f' docs/pm/PARA-PM.md > /tmp/e.diff   # este informe, ya mergeado
-git apply --check /tmp/e.diff && echo limpio                                    # → limpio
-git apply /tmp/e.diff
-python -m pytest -q --no-cov tests/test_conexiones1.py                          # → 5 passed
+git fetch origin claude/dev-tecnica
+git show origin/claude/dev-tecnica:docs/pm/PARA-PM.md | awk '/^```diff$/{f=1;next} /^```$/{f=0} f' > /tmp/e.diff
+git show c1311852:docs/pm/PARA-PM.md | awk '/^```diff$/{f=1;next} /^```$/{f=0} f' > /tmp/d.diff
+git worktree add --detach /tmp/e 299e0ee8 && cd /tmp/e
+# rojo: producto de D + test de E
+git apply --exclude=tests/test_conexiones1.py /tmp/d.diff && git apply --include=tests/test_conexiones1.py /tmp/e.diff
+python -m pytest -q --no-cov tests/test_conexiones1.py        # → 1 failed, 4 passed; assert 500 == 400 en body-400
+git checkout -- . && rm tests/test_conexiones1.py
+# verde: el diff revisado
+git apply --check /tmp/e.diff && echo limpio && git apply /tmp/e.diff   # → limpio
+python -m pytest -q --no-cov tests/test_conexiones1.py        # → 5 passed
 python -m pytest -q --no-cov tests/test_conexiones1.py tests/test_cobro_corte1.py   # → 103 passed
 scripts/testing/con_pg16.sh python scripts/testing/conexiones1_medir.py --pico 60 --lento 30   # → rc=0, «sin conexiones tomadas»
 git checkout -- . && rm tests/test_conexiones1.py
-PY=python scripts/testing/sabotajes/conexiones1.sh 299e0ee8                    # → seis BIEN, rc=0
+scripts/testing/con_pg16.sh python scripts/testing/conexiones1_medir.py --pico 60 --lento 30   # sin diff → rc=4, «POOL LLENO…»
+PY=python scripts/testing/sabotajes/conexiones1.sh 299e0ee8   # → seis BIEN, rc=0
 ```
 
-Para el rojo: el mismo árbol con el diff de D (`git show
-c1311852:docs/pm/PARA-PM.md`, su bloque ```diff) y el
-`test_conexiones1.py` de este diff → `1 failed, 4 passed`, `assert 500 == 400`
-en `body-400`.
+El control corre el medidor con sus valores por defecto (`--pico 30
+--lento 2`): con 30 pedidos lentos el pool de 50 no se llena, y por eso «sin
+sabotaje» da 0 sobre `299e0ee8` sin diff, mientras que con `--pico 60 --lento
+30` el mismo SHA da rc=4.
 
 ## Puertas
 
