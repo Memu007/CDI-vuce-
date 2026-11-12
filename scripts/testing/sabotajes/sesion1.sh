@@ -223,21 +223,22 @@ C="FAILED $T::test_contar_intentos_usa_la_conexion_del_pedido"
 sabotaje pytest $L "sumar o contar abre su propia conexión" \
   $'async def _escribir(db: AsyncSession, ahora: float, consulta) -> int:\n    await db.execute(delete(_T).where(_T.c.vence <= ahora))\n    cuenta = (await db.execute(consulta)).scalar_one()\n    await db.commit()\n    return cuenta\n' \
   $'async def _escribir(db: AsyncSession, ahora: float, consulta) -> int:\n    async with _conn.engine.begin() as conn:\n        await conn.execute(delete(_T).where(_T.c.vence <= ahora))\n        return (await conn.execute(consulta)).scalar_one()\n' \
-  "$C[login sin usuario]" "$C[login con clave mala]"
+  "$C[login sin usuario]" "$C[login con clave mala]" "login sin usuario: 2 conexiones a la vez"
 sabotaje pytest $L "mirar el bloqueo abre su propia conexión" \
   $'    hasta = (await db.execute(\n' $'    async with _conn.engine.connect() as conn:\n        hasta = (await conn.execute(\n' \
-  "$C[perfil]" "$C[cambiar la clave]"
+  "$C[perfil]" "$C[cambiar la clave]" "cambiar la clave: 2 conexiones a la vez"
 sabotaje pytest $L "limpiar pide otra conexión con la del pedido tomada" \
   $'    await db.execute(delete(_T).where(_T.c.clave == _clave(clave)))\n    await db.commit()\n' \
   $'    await db.execute(select(_T.c.clave).where(_T.c.clave == _clave(clave)))\n    async with _conn.engine.begin() as conn:\n        await conn.execute(delete(_T).where(_T.c.clave == _clave(clave)))\n    await db.commit()\n' \
-  "$C[perfil con la clave buena]" "$C[cambiar la clave con la clave buena]"
+  "$C[perfil con la clave buena]" "$C[cambiar la clave con la clave buena]" \
+  "perfil con la clave buena: 2 conexiones a la vez"
 sabotaje pytest $L "descontar abre su propia conexión" \
   $'    await db.execute(delete(_T).where(_T.c.vence <= ahora))\n    n = ' \
   $'    async with _conn.engine.begin() as conn:\n        await conn.execute(delete(_T).where(_T.c.vence <= ahora))\n    n = ' \
   "$C[login]" "login: 2 conexiones a la vez"
 sabotaje pytest $D "revisar la sesión se queda con su conexión durante la ruta" \
   $'    await db.commit()\n\n    team_owner = ' $'\n    team_owner = ' \
-  "$C[ver el perfil]" "$C[perfil]" "$C[cambiar la clave]"
+  "$C[ver el perfil]" "$C[perfil]" "$C[cambiar la clave]" "ver el perfil: 2 conexiones a la vez"
 
 # --- cambiar el email pide la contraseña actual
 sabotaje pytest $M "cambiar el email sin clave no verifica nada" \

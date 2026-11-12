@@ -207,7 +207,7 @@ sabotaje "el tope del peso deja afuera el máximo" "$LECTOR" \
   "peso <= _MAX_NUMERO" \
   "test_un_peso_por_unidad_justo_en_el_tope_marca_el_renglon"
 
-# 5) Guardar: todo o nada, sin NUL, sin promediar con el vacío y sin sumar a
+# 5) Guardar: todo o nada, sin promediar con el vacío y sin sumar a
 # un producto de otro NCM.
 sabotaje "un commit por renglón" proyecto_maria/main.py \
   "client_id=client_id, **campos)
@@ -215,10 +215,6 @@ sabotaje "un commit por renglón" proyecto_maria/main.py \
   "client_id=client_id, **campos)
             await db.commit()" \
   "test_guardar_si_falla_la_base_no_guarda_ninguno"
-sabotaje "guardar sin sacar el NUL" proyecto_maria/main.py \
-  '    body = _cuerpo_guardable(body, rechazar_medio_par=False)' \
-  '    pass' \
-  "test_guardar_saca_el_nul_de_los_textos"
 sabotaje "promedia con el valor vacío" proyecto_maria/services/client_memory.py \
   "    if not n:
         return nuevo, 1
@@ -782,11 +778,11 @@ sabotaje "el PUT no valida el origen" proyecto_maria/main.py \
 ' \
   "$ORI[lista]" "$ORI[tres letras]" "$ORI[numeros]" "$ORI[pais que no existe]" "$ORI[nombre]" \
   "$MAY[minusculas]" "$MAY[nulo]"
-sabotaje "el PUT no saca el NUL" proyecto_maria/main.py \
-  'body = _cuerpo_guardable(body) if isinstance(body, dict) else {}' \
-  'body = body if isinstance(body, dict) else {}' \
-  "$MAY[nul]"
-no_debe "el PUT no saca el NUL" "$ULTIMA" "$MAY[minusculas]"
+sabotaje "el cuerpo se guarda sin sacar el NUL" proyecto_maria/main.py \
+  '        data = _sin_nul(data)' \
+  '        pass' \
+  "test_guardar_saca_el_nul_de_los_textos" "$MAY[nul]"
+no_debe "el cuerpo se guarda sin sacar el NUL" "$ULTIMA" "$MAY[minusculas]"
 sabotaje "el PUT guarda el origen vacío" proyecto_maria/main.py \
   'row.origen_frecuente = origen or "XX"' \
   'row.origen_frecuente = origen' \

@@ -65,7 +65,12 @@ fi
 sabotaje $CS "el catálogo mide el largo sin pasar a NFC" \
   '    if len(unicodedata.normalize("NFC", texto)) > MAX_DESCRIPCION:' \
   '    if len(texto) > MAX_DESCRIPCION:' \
-  "FAILED $T::test_guardar_en_el_catalogo_respeta_el_tope[nfc-que-crece]"
+  "FAILED $T::test_guardar_en_el_catalogo_respeta_el_tope[nfc-que-crece]" \
+  "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfc-que-crece]"
+sabotaje $CS "ninguna memoria controla el largo" \
+  '    if len(unicodedata.normalize("NFC", texto)) > MAX_DESCRIPCION:' \
+  '    if False:' \
+  "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[2001]"
 sabotaje $CS "el tope no deja entrar el máximo" \
   '    if len(unicodedata.normalize("NFC", texto)) > MAX_DESCRIPCION:' \
   '    if len(unicodedata.normalize("NFC", texto)) >= MAX_DESCRIPCION:' \
