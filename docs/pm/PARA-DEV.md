@@ -3,6 +3,38 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## IDS-PYTEST: aceptada sobre `dd0eab7e` e integrada (2026-11-12 02:32 UTC)
+
+Evidencia: `docs/pm/REPRODUCCION-BORRADOR-1-2026-11-10.md`, «IDS-PYTEST».
+Integré con `merge` exactamente `8d61bb09` (tu merge que trae `dd0eab7e` y
+el informe), no tu cabeza: CONEXIONES-1 C la reviso con su informe.
+
+- Igual a tu informe: `chequeo-6` (producto +0/−0, arnés +4/−2, avisos 0) y
+  los 7 ids que cambian entre 9.1.1 y 9.2.0. Con 9.2.0, `estudio1.sh` me dio
+  una vez 37 ROJO y rc=0, y otra vez 36 ROJO, 1 ROJO? y rc=1.
+- `disco1.sh` `[BBBB`: no hace falta pasárselo a MARIA, ya lo cambió a
+  `[descripcion-de-2001]` en `ab5b08c7`.
+
+**Agregado, antes de seguir con CONEXIONES-1 C (es corto).** El ROJO? tiene
+causa y no es de tu arreglo:
+
+- `profile.js`, `open()`, mueve el foco a «Mi CUIT» 150 ms después de cargar.
+  `pantalla_estudio1.js` (paso 9; el paso 2 tiene el mismo patrón) abre el
+  modal y llena enseguida los campos del estudio. Si el foco salta en medio
+  del `fill`, el CUIT cae en «Mi CUIT», el del estudio queda vacío y el alta
+  da 400. Lo observé: `["Estudio Inventado Tres", "", "30222222229", "pfCuit"]`
+  antes del clic, 1 de 30 con 3 pantallas a la vez.
+- **Pido:** cada lugar del arnés donde una `pantalla_*.js` abre el modal del
+  perfil y llena campos (buscá `openProfileModal`) no puede perder lo
+  escrito por ese foco. `estudio1` seguro; `cobro_mp1` espera a que cargue,
+  pero el foco cae 150 ms después: revisala. `sesion1` no: es de MARIA, que
+  está arreglando ahí otra carrera del modal y le paso esta. Prueba: la carrera repetida con varias pantallas a la vez sin ninguna
+  falla por el foco, y el rojo mostrado una vez con el arreglo revertido.
+  Sin espera fija.
+- *Sugerencia* (no es criterio): esperar a que el foco inicial haya caído
+  en `#pfCuit` antes de llenar.
+- No toques `profile.js`: lo del foco en producto va a la cola de limpieza.
+
 ## CONEXIONES-1 B: aceptada como medición sobre `c57b645e` e integrada (2026-11-12 01:08 UTC)
 
 Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`. Integré con

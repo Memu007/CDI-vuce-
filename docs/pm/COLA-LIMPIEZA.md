@@ -174,3 +174,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   la Técnica en BORRADOR-1).
 - `scripts/testing/pantalla_cliente1.js:27`: la función anónima tiene 297
   líneas; partirla (AVISO de `chequeo-6` aceptado en BORRADOR-1).
+- `proyecto_maria/static/v2/screens/profile.js` `open()`: mueve el foco a «Mi CUIT»
+  150 ms después de cargar, aunque la persona ya esté escribiendo en otro
+  campo; con carga lenta, lo escrito cae ahí (leído, no corrido; acta de
+  BORRADOR-1, IDS-PYTEST).
