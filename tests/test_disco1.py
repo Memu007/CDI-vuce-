@@ -333,7 +333,7 @@ def _sin_excepciones():
 
 
 @pytest.mark.parametrize("desc,ncm,dice", [
-    ("B" * 2001, "8413.70.10", "La descripción pasa de 2000 caracteres"),
+    pytest.param("B" * 2001, "8413.70.10", "La descripción pasa de 2000 caracteres", id="descripcion-de-2001"),
     ("Bomba sintetica", "8" * 21, "La NCM pasa de 20 caracteres"),
 ])
 def test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda(client, duenos, desc, ncm, dice):
@@ -368,7 +368,8 @@ def test_confirmar_en_el_tope_entra(client, duenos):
 
 
 @pytest.mark.parametrize("desc,ncm,dice", [
-    ("B" * 2001, "8413.70.10", "Fila 3: la descripción pasa de 2000 caracteres"),
+    pytest.param("B" * 2001, "8413.70.10", "Fila 3: la descripción pasa de 2000 caracteres",
+                 id="descripcion-de-2001"),
     ("Bomba sintetica", "8413.70.10.0000000000000", "Fila 3: la NCM pasa de 20 caracteres"),
     ("Bomba\x00sintetica", "8413.70.10", "Fila 3: la descripción tiene un carácter nulo"),
     ("Bomba\ud800sintetica", "8413.70.10", "Fila 3: la descripción tiene un carácter que no es texto válido"),

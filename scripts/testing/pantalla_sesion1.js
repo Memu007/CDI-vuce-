@@ -28,8 +28,14 @@ const CLAVE = 'Clave-Inventada-123';
   await page.goto(base + '/dashboard?v=2');
   await page.waitForFunction(() => typeof window.CDI?.openProfileModal === 'function');
   async function abrirPerfil(email) {
+    // El cierre esconde el modal un rato después y, ya cargado, el foco salta a «Mi CUIT»:
+    // lo que se escriba antes de que pasen las dos cosas se puede perder.
+    await page.waitForFunction(() => document.getElementById('profileModal').hidden)
+      .catch(() => falla('el perfil no terminó de cerrarse'));
     await page.evaluate(() => CDI.openProfileModal());
-    await page.waitForFunction(m => document.getElementById('pfEmail').value === m, email);
+    await page.waitForFunction(m => document.getElementById('pfEmail').value === m
+      && document.activeElement.id === 'pfCuit', email)
+      .catch(() => falla('el perfil no terminó de abrir con el foco en «Mi CUIT»'));
   }
   const campoVisible = () => page.isVisible('#pfEmailPasswordField');
   const put = () => page.waitForResponse(x => x.url().endsWith('/api/user/profile') && x.request().method() === 'PUT');

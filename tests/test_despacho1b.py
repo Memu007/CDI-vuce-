@@ -997,7 +997,7 @@ def test_una_sola_hoja_cara_se_corta_en_el_tope_de_cpu():
     antes = time.process_time()
     leido = leer_despacho(data, 0.5)
     gastado = time.process_time() - antes
-    assert "El PDF da demasiado trabajo: leí hasta la hoja 0." in leido["avisos"], leido["avisos"]
+    assert leido["avisos"] == ["El PDF da demasiado trabajo: leí hasta la hoja 0."]
     assert gastado < 2.5, gastado
 
 
@@ -1005,7 +1005,7 @@ def test_el_lector_aparte_corta_una_sola_hoja_cara():
     from proyecto_maria.core.despacho_lector import leer_despacho_aparte
     from tests.pdf_bombas import una_hoja_cara
     leido = asyncio.run(leer_despacho_aparte(una_hoja_cara(), 120, limite_cpu_s=0.5))
-    assert "El PDF da demasiado trabajo: leí hasta la hoja 0." in leido["avisos"], leido["avisos"]
+    assert leido["avisos"] == ["El PDF da demasiado trabajo: leí hasta la hoja 0."]
 
 
 def test_fuera_del_hilo_principal_el_tope_se_mira_entre_hojas():

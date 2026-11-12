@@ -65,7 +65,12 @@ fi
 sabotaje $CS "el catálogo mide el largo sin pasar a NFC" \
   '    if len(unicodedata.normalize("NFC", texto)) > MAX_DESCRIPCION:' \
   '    if len(texto) > MAX_DESCRIPCION:' \
-  "FAILED $T::test_guardar_en_el_catalogo_respeta_el_tope[nfc-que-crece]"
+  "FAILED $T::test_guardar_en_el_catalogo_respeta_el_tope[nfc-que-crece]" \
+  "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfc-que-crece]"
+sabotaje $CS "ninguna memoria controla el largo" \
+  '    if len(unicodedata.normalize("NFC", texto)) > MAX_DESCRIPCION:' \
+  '    if False:' \
+  "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[2001]"
 sabotaje $CS "el tope no deja entrar el máximo" \
   '    if len(unicodedata.normalize("NFC", texto)) > MAX_DESCRIPCION:' \
   '    if len(unicodedata.normalize("NFC", texto)) >= MAX_DESCRIPCION:' \
@@ -80,10 +85,9 @@ sabotaje $M "el historial y guardar-uso miden el largo sin pasar a NFC" \
   '        if len(descripcion) > catalog_svc.MAX_DESCRIPCION: raise ValueError("largo")' \
   "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfd-que-achica]" \
   "FAILED $T::test_importar_el_historial_respeta_el_tope[nfc-que-crece]"
-sabotaje $M "el historial y guardar-uso no tienen el tope del catálogo" \
+sabotaje $M "el historial no tiene el tope del catálogo" \
   '        catalog_svc.validar_largo(descripcion)' \
   '        pass' \
-  "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfc-que-crece]" \
   "FAILED $T::test_importar_el_historial_respeta_el_tope[2001]"
 sabotaje $M "el catálogo da 500 en vez de 400 al guardar" \
   $'    except ValueError as e:\n        raise HTTPException(status_code=400, detail=str(e))\n    except Exception as e:\n        logging.exception("catalog_save error")' \
@@ -109,8 +113,8 @@ if [ -n "$PG_URL" ]; then
       '            pass' \
       "FALLA | primer arranque: las columnas son text"
     sabotaje $M "el arranque sigue si la migración falla" \
-      $'    if IS_SQLITE:\n        return\n    async with engine.begin() as conn:' \
-      $'    if IS_SQLITE:\n        return\n    with __import__("contextlib").suppress(Exception):\n      async with engine.begin() as conn:' \
+      $'    await _migrate_catalogo_sin_tope()\n' \
+      $'    with __import__("contextlib").suppress(Exception):\n        await _migrate_catalogo_sin_tope()\n' \
       "FALLA | con la tabla tomada el arranque falla"
   fi
 else
