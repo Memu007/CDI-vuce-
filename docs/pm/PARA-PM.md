@@ -2,37 +2,48 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-> **BORRADOR, todavía no entregado.** Falta la medición con 8 s de demora y el adversario. Cuando entregue, te aviso con el SHA.
-
-## CONEXIONES-1 parte B sobre lo integrado (cierra D134). Ninguna conexión queda tomada; el pool se llena con trabajo lento. Dos D para decidir
+## CONEXIONES-1 parte B sobre lo integrado (cierra D134). Rojo: con lectores de PDF de 30 s el pool se agota y hay 500. Ningún `close()` deja conexiones tomadas. Dos D para decidir
 
 | Qué | SHA |
 |---|---|
 | Entrega (este informe) | el commit de este informe, encima de `37c11eb4` |
 | Arnés | `ff2e2aae` (medidor, sonda y control), `9c6f721f` (dos sabotajes de producto en el control), `37c11eb4` (el control corta cada corrida apenas tiene su rojo) |
 | Medición base | `c8733be3` (merge de tu rama). `git diff c8733be3 37c11eb4 -- proyecto_maria Dockerfile requirements.txt` da 0 líneas: es el mismo producto que entrego |
-| Control y medición con pico 60 | `37c11eb4` |
+| Control y mediciones con pico 60 (demora falsa de 2 s, 8 s y 30 s) | `37c11eb4` |
 
 **Producto tocado: ninguno.** `git rev-list --no-merges ff2e2aae^..37c11eb4 --not origin/claude/practical-shannon-szpwkn -- proyecto_maria` da sólo `524a8f00`, `6c2b3383` y `cc8b834b`, que son de BORRADOR-1 (pieza anterior).
 
 **Resultado**
-- Un `close()` cancelado no deja conexiones tomadas. Probé 401 de seis tipos, normales, mezcla, `/api/ncm/sugerir`, la subida pública de PDF, cuatro tipos de corte en vuelo y picos de bcrypt, Gemini y PDF. En todos, al final quedan 0 tomadas, `close_empezados` = `close_terminados` y Postgres queda en `{'idle': 20}`.
-- El control da rojo cuando la sesión no se cierra: con dos sabotajes de la sonda (cancelar el `close` a propósito, guardando la sesión o soltándola) y con dos del producto (el `finally` de `get_async_session` no cierra, guardando la sesión o soltándola).
-- Lo que sí aparece es **saturación**. Cada pedido lento (bcrypt, Gemini, lector de PDF) tiene su conexión tomada mientras espera. Con 60 en paralelo, el pool llega a 50 de 50 (20 + 30 de desborde) y los pedidos normales esperan hasta 6,79 s. Una conexión tomada así no es una pérdida: vuelve al terminar el pedido. Es la D180.
-- Como no quedan conexiones tomadas, no hay arreglo: el producto queda sin cambio y el aviso de las pruebas sigue en riesgos.
+- **La medición con 30 s de demora termina en rc=1, «QUEDAN CONEXIONES TOMADAS».** En `pico_pdf` (60 subidas públicas de PDF a la vez, lector falso de 30 s) dio 422 × 16 · 500 × 10 · 504 × 34. Los 10 500 son «Excepcion no manejada en POST /upload_pdf/public: TimeoutError: QueuePool limit of size 20 overflow 30 reached, connection timed out, timeout 30.00».
+- **Ese rojo es pool agotado, no conexiones perdidas.** El medidor cuenta 'QueuePool limit' en el log como señal de fuga, y por eso sale 1. Pero en todas las fases `quedan` da 0, al final hay 0 tomadas y 20 libres, `close_empezados` = `close_terminados` (2968) y Postgres queda en `{'idle': 20}`. No cambié el medidor.
+- **De dónde sale.** `get_current_user` (`auth/dependencies.py:94`) consulta el usuario y con eso toma la conexión. La subida la tiene tomada durante toda la lectura del PDF, que tiene 4 hilos (`PDF_READ_WORKERS`). Con 60 subidas, 50 toman las 50 conexiones (20 + 30 de desborde). Las otras 10 esperan su primera conexión más de `pool_timeout` (30 s) y dan 500.
+- **Los números cierran con las constantes.** 10 = 60 − 50. 16 = 4 hilos × 4 tandas de 30 s dentro de `PDF_READ_TIMEOUT_S` (120 s, cuenta también la cola). 34 = 50 − 16, que dan 504 por ese plazo.
+- **Con 8 s de demora, rc=0.** Sin 500, `quedan` 0 en todo, y los normales esperaron hasta 16,2 s.
+- **Un `close()` cancelado no deja conexiones tomadas.** Probé 401 de seis tipos, normales, mezcla, `/api/ncm/sugerir`, la subida pública de PDF, cuatro tipos de corte en vuelo y picos de bcrypt, Gemini y PDF. En todas las corridas, al final quedan 0 tomadas.
+- **El control da rojo cuando la sesión no se cierra.** Lo probé con dos sabotajes de la sonda (cancelar el `close` a propósito, guardando la sesión o soltándola) y dos del producto (el `finally` de `get_async_session` no cierra, guardando la sesión o soltándola).
+- **No arreglé nada en esta pieza.** La tarea dice «si quedan conexiones tomadas: arreglo». Lo que quedó es el pool lleno de pedidos vivos, no conexiones tomadas después de cerrar. Si eso entra en «quedan» lo decidís en la D180. El producto sigue igual, y el aviso de las pruebas sigue en riesgos.
 
 ## Decisiones
 
-**D180. El pool se llena con trabajo lento.**
+**D180. Con trabajo lento, el pool se agota y hay 500.**
 - Opciones:
-  - (a) Una pieza aparte que suelte la conexión antes del trabajo lento (bcrypt, Gemini, lector de PDF) o que limite cuántos de esos esperan con conexión tomada. Esa pieza lleva su rojo.
-  - (b) Aceptarlo como riesgo y anotarlo.
-- Recomiendo LENTO8_RECOMENDACION
-- Datos:
-  - Con un solo worker (el `Dockerfile`), el tope es 50 conexiones.
-  - Hace falta tener a la vez más de 50 pedidos lentos para llenarlo.
-  - Con pico 60 y 2 s de demora falsa, ningún pedido normal dio error; esperaron 3,14 s (bcrypt), 3,99 s (Gemini) y 6,79 s (PDF).
-  - LENTO8_DATOS
+  - (a) Contarlo como «quedan conexiones tomadas» y hacer una pieza aparte, con su rojo antes. Esa pieza suelta la conexión antes del trabajo lento (lector de PDF, Gemini, bcrypt) o limita cuántos de esos esperan con una conexión tomada. El rojo sale de esta misma medición: `--pico 60 --lento 30`, que hoy da 500 × 10 en `pico_pdf`.
+  - (b) No contarlo así: queda como riesgo anotado y CONEXIONES-1 cierra sin arreglo.
+- Recomiendo (a).
+  - Con 60 subidas a la vez y un lector de 30 s, hay 500 de verdad, para usuarios con sesión válida.
+  - En `pico_pdf`, los pedidos normales esperan 29,97 s. Eso es casi `pool_timeout` (30 s), sobre 12 pedidos normales: están al borde, no a salvo.
+  - La subida pública de PDF es zona de MARIA (D74). Si va (a), vos decidís quién la toma.
+- Datos, todos con pico 60 sobre `37c11eb4`:
+
+| Demora falsa | rc | `pico_pdf` | Espera máxima de un normal en `pico_pdf` |
+|---|---|---|---|
+| 2 s | 0 | 422 × 60 · 200 × 12 | 6,79 s |
+| 8 s | 0 | 422 × 60 · 200 × 12 | 16,2 s |
+| 30 s | 1 | 422 × 16 · 500 × 10 · 504 × 34 · 200 × 12 | 29,97 s |
+
+  - **Dónde se rompe, calculado y sin correr.** Las 10 que esperan necesitan 10 conexiones libres en menos de 30 s. Con 4 hilos son 3 tandas (ceil(10/4)), así que se rompe con lecturas de más de unos 10 s cuando hay 60 subidas. Con 8 s pasó, porque 3 × 8 = 24 s. No corrí `--lento 15`.
+  - Con un solo worker (el `Dockerfile`), el tope es 50 conexiones. Hacen falta más de 50 pedidos lentos a la vez.
+  - **El pico de Gemini a 30 s no da 500, pero no está a salvo.** Dio 200 × 72 y los normales esperaron 30,12 s. Ahí compiten tres plazos de 30 s: la demora falsa, `NCM_GEMINI_TIMEOUT_S` y `pool_timeout`. El log tiene 75 «Gemini no contestó a tiempo»: la mayoría de esos 200 son la respuesta vacía del plazo, no una sugerencia. No afirmo que Gemini esté bien.
 
 **D181. D146 con los números de bcrypt.** Pediste mantener D146 en la cola de limpieza hasta tener esta medida.
 - Opciones:
@@ -42,7 +53,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 - Por qué:
   - 60 claves malas en paralelo para la misma cuenta, cada una desde otra IP, dieron 60 × 401 y ningún 429. El límite va por IP (`login:{ip}`) y por IP y cuenta (`cuenta:{username}:login:{ip}`), así que con IPs distintas ninguno de los dos corta, se cuente antes o después de bcrypt.
   - La IP que usa el límite la arma el último proxy de confianza (`get_client_ip`, `core/rate_limit.py`). En el medidor la pone el cliente, porque no hay proxy delante. En producción, esto equivale a un atacante con 60 IPs propias, no a alguien que la invente.
-  - Lo que esos 60 sí hacen es tomar el pool: llega a 50 de 50, y los pedidos normales esperan hasta 3,14 s.
+  - Lo que esos 60 sí hacen es tomar el pool: llega a 50 de 50. Los pedidos normales esperaron hasta 3,14 s con la demora de 2 s, 4,05 s con 8 s y 3,65 s con 30 s; bcrypt es el real en las tres, así que la demora falsa no lo toca. Ningún 500.
   - bcrypt corre en el grupo de hilos de anyio (`run_in_threadpool`). Ese grupo tiene un tope de 40, y lo medí: `bcrypt_en_vuelo_max` dio 40. Los que esperan hilo igual tienen su conexión tomada.
   - Eso es la D180, no D146. Contar antes no lo cambia.
 
@@ -100,7 +111,59 @@ Sonda al final:
 
 Las ocho cadenas del log dan 0, también 'QueuePool limit'. Ningún 500.
 
-LENTO8_SECCION
+### Pico 60 con 8 s de demora (`37c11eb4`, `--pico 60 --lento 8 --plazo 240`): «sin conexiones tomadas», rc=0
+
+Corrida de 00:20:21 a 00:24:21 UTC. Las fases anteriores a los picos dan 0 en `quedan` y `{'idle': 20}`. `corte_gemini` tarda 7.99 s y `corte_pdf` 8.03 s, y cada corte da «15 cortados con el pedido en vuelo».
+
+| Fase | Códigos en `api_logs` | máxT | máxPG | quedan | Espera máxima de un normal |
+|---|---|---|---|---|---|
+| `pico_bcrypt` | 401 × 60 · 200 × 12 | 50 | 50 | 0 | 4.05 |
+| `pico_gemini` | 200 × 72 | 50 | 50 | 0 | 16.03 |
+| `pico_pdf` | 422 × 60 · 200 × 12 | 50 | 50 | 0 | 16.2 |
+
+Sonda al final:
+- `apilog_creados` 666 y «filas en api_logs: 666».
+- `close_empezados` 2988 y `close_terminados` 2988.
+- `tomadas` 0, `libres` 20, `desborde` 0.
+- `bcrypt_en_vuelo_max` 40, `gemini_en_vuelo_max` 8, `pdf_en_vuelo_max` 4.
+
+Las ocho cadenas del log dan 0. Ningún 500.
+
+### Pico 60 con 30 s de demora (`37c11eb4`, `--pico 60 --lento 30 --plazo 600`): «QUEDAN CONEXIONES TOMADAS», rc=1
+
+Corrida de 00:24:37 a 00:32:01 UTC. Las fases anteriores a los picos dan 0 en `quedan` y `{'idle': 20}`. `corte_gemini` tarda 30.04 s y `corte_pdf` 30.02 s, y cada corte da «15 cortados con el pedido en vuelo».
+
+| Fase | Códigos en `api_logs` | máxT | máxPG | quedan | seg | Espera máxima de un normal |
+|---|---|---|---|---|---|---|
+| `pico_bcrypt` | 200 × 12 · 401 × 60 | 50 | 50 | 0 | 0.0 | 3.65 |
+| `pico_gemini` | 200 × 72 | 50 | 50 | 0 | 29.97 | 30.12 |
+| `pico_pdf` | 200 × 12 · 422 × 16 · 500 × 10 · 504 × 34 | 50 | 50 | 0 | 22.18 | 29.97 |
+
+En `pico_pdf` el medidor anota `'errores': {'TimeoutError': 10}` y «respuestas inesperadas: {('pico_pdf', 500, ''): 10, ('pico_pdf', 504, ''): 34}».
+
+Sonda al final:
+- `apilog_creados` 666 y «filas en api_logs: 666».
+- `close_empezados` 2968 y `close_terminados` 2968.
+- `close_con_transaccion` 280.
+- `dispatch_entradas` 666: `dispatch_ok` 656 y `dispatch_error_TimeoutError` 10.
+- `tomadas` 0, `libres` 20, `desborde` 0.
+- `bcrypt_en_vuelo_max` 40, `gemini_en_vuelo_max` 8, `pdf_en_vuelo_max` 4.
+
+En el log de gunicorn:
+
+| Cadena | Veces |
+|---|---|
+| 'non-checked-in connection' | 0 |
+| 'Task was destroyed but it is pending' | 0 |
+| 'QueuePool limit' | 50 líneas, de 10 pedidos |
+| 'CancelledError' | 0 |
+| 'UnboundLocalError' | 0 |
+| 'Exception in ASGI application' | 10 |
+| 'Error logging metrics' | 0 |
+| 'Traceback' | 60 |
+| 'Gemini no contestó a tiempo' | 75 |
+
+Los 10 tracebacks de 500 terminan en la consulta del usuario de `get_current_user` (`auth/dependencies.py:94`), esperando su primera conexión.
 
 ### Control: el medidor da rojo cuando una sesión no se cierra
 
@@ -131,8 +194,8 @@ Un adversario Opus, esfuerzo alto, sólo lectura. Lo que tomé de cada hallazgo:
 
 | # | Hallazgo | Severidad que le dio | Qué hice |
 |---|---|---|---|
-| 1 | `/api/ncm/sugerir` tiene la conexión tomada mientras espera a Gemini, hasta 30 s (`NCM_GEMINI_TIMEOUT_S`, `main.py:10450`), y no tiene límite por minuto | media-alta | Lo medí con 30 s de demora (sección de arriba). Va a la D180 |
-| 2 | La subida pública de PDF tiene la conexión tomada mientras espera el candado por usuario y valida; la cuota de 50 por día se mira después, así que una cuenta sin cuota igual toma una conexión antes del 429 | media-alta | No lo medí: el lector falso no pasa por la cuota. Va a la D180 |
+| 1 | `/api/ncm/sugerir` tiene la conexión tomada mientras espera a Gemini, hasta 30 s (`NCM_GEMINI_TIMEOUT_S`, `main.py:10450`), y no tiene límite por minuto | media-alta | Reproducido a medias. Con 30 s, `pico_gemini` llega a 50 de 50 y los normales esperan 30,12 s, sin 500. La mayoría de las respuestas son el vacío del plazo (75 «Gemini no contestó a tiempo»). Va a la D180 |
+| 2 | La subida pública de PDF tiene la conexión tomada mientras espera el candado por usuario y valida; la cuota de 50 por día se mira después, así que una cuenta sin cuota igual toma una conexión antes del 429 | media-alta | Reproducido: con 30 s, `pico_pdf` da 500 × 10 por «QueuePool limit» y 504 × 34. La parte de la cuota no la medí, porque el lector falso no pasa por ella. Va a la D180 |
 | 3 | Con un worker y `--max-requests 1000`, al reiniciarse el worker los pedidos nuevos esperan a que termine el pedido lento en vuelo | media, condicional | No lo reproduje. Va a riesgos |
 | 4 | Un `close()` cancelado sí deja la conexión tomada hasta que pasa el recolector de basura; lo reprodujo con aiosqlite | baja hoy | Es lo que el control prueba que el medidor ve (las dos líneas `close_cancelado`). Lo que lo hace inalcanzable hoy es el punto 6 |
 | 5 | El rollback del `except` de `get_async_session` no corre en los pedidos: el envoltorio `get_db` manda el cierre a una tarea aparte | baja, no es fuga | No lo toqué: es producto y no deja conexiones tomadas. A la cola de limpieza si querés |
@@ -146,7 +209,8 @@ También anotó que las versiones de gunicorn y uvicorn no están fijas (el `Doc
 ## Riesgos
 
 - **El aviso de las pruebas sigue.** Que no queden conexiones tomadas en esta medición no prueba que no queden en otras rutas o con otros tiempos. La medición cubre las rutas de arriba con un worker.
-- **Las causas de los topes en vuelo, sin verificar.** Gemini llega a 8 en vuelo y el lector de PDF a 4, y no comprobé de dónde sale cada número. Hay candidatos (`_HILOS_MP` en `main.py:11211` y semáforos en `despacho_lector.py:699` y `:725`), pero no los afirmo.
+- **Topes en vuelo.** Gemini llega a 8 en vuelo porque `asyncio.to_thread` usa el grupo de hilos por omisión, `min(32, cpu + 4)`, que con 4 CPU da 8. Si producción tiene otra cantidad de CPU, el tope cambia. El lector de PDF llega a 4 por `PDF_READ_WORKERS`. bcrypt llega a 40, el tope de hilos de anyio.
+- **Dónde se rompe con el PDF.** Lo calculé, no lo corrí: con 60 subidas, lecturas de más de unos 10 s.
 - **Reinicio del worker** por `--max-requests` con un pedido lento en vuelo (hallazgo 3): sin reproducir.
 - **Versiones sin fijar** de gunicorn y uvicorn en el `Dockerfile`: si una versión nueva de uvicorn cancela al cortar el cliente, el hallazgo 4 pasa a ser alcanzable.
 - **Demoras falsas.** Gemini y el lector de PDF son falsos y demoran lo que dice `--lento`. Un Gemini real puede demorar más; la espera de los normales crece con eso.
@@ -156,6 +220,8 @@ También anotó que las versiones de gunicorn y uvicorn no están fijas (el `Doc
 ```bash
 PY=<venv>/bin/python scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_medir.py              # «sin conexiones tomadas», rc=0
 PY=<venv>/bin/python scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_medir.py --pico 60    # máxT 50 en los tres picos, «sin conexiones tomadas»
+PY=<venv>/bin/python scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_medir.py --pico 60 --lento 8 --plazo 240    # «sin conexiones tomadas», rc=0 (unos 4 minutos)
+PY=<venv>/bin/python scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_medir.py --pico 60 --lento 30 --plazo 600   # «QUEDAN CONEXIONES TOMADAS», rc=1; pico_pdf 422 × 16 · 500 × 10 · 504 × 34 (unos 7,5 minutos)
 PY=<venv>/bin/python scripts/testing/sabotajes/conexiones1.sh 37c11eb4                                # cinco líneas BIEN, rc=0 (unos 8 minutos)
 git diff c8733be3 37c11eb4 -- proyecto_maria Dockerfile requirements.txt | wc -l                       # 0
 ```
