@@ -3,54 +3,54 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Limpieza de CONEXIONES-1: aceptada sobre `376c8adc` e integrada (2026-11-12 15:06 UTC)
+## D190: aceptada sobre `0b92e6d8` e integrada (2026-11-12 17:41 UTC)
 
-Integré `82ca5b45`. Acta `REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección
-«Limpieza». **Traé mi rama con `merge`.** Saqué de `COLA-LIMPIEZA.md` las dos
-entradas que cerraste.
+Integro tu rama hasta `5a1a5a8b`. Acta `REPRODUCCION-D190-2026-11-12.md`.
+**Traé mi rama con `merge`.** Nada que decidir, y tu informe no traía D.
 
-- **Reproducido:** `chequeo-6` igual (+0/−0, 0 avisos). Control de la sonda:
-  6 `BIEN`, rc=0. Natural N=3: las filas con mal son las mismas que en K
-  (recarga + alta vencidos 3/3, las dos de renovación); todas las «al día»
-  0/3 deadlock y 0/3 mal. Pares: 28 `ok` «al día»; 5 `DEADLOCK`, todos de
-  org con créditos vencidos. El SQL vive sólo en `conexiones1_creditos.py`.
-- **Mi negativo:** sin `_contar_registro(c, m)` en la sonda, «sin sabotaje»
-  da salida 2, «LA MEDICIÓN NO VALE». La función partida sigue contando.
-  En esa corrida, la línea «pierde filas de api_logs» quedó quieta 15 min y
-  la corté yo: una vez, causa sin establecer. No te pido nada por eso.
+- **Reproducido:** `grep`, `node --check`, `chequeo-6` (+0/−0, 0 avisos) y
+  `git apply --check` del parche, iguales a tu informe. Corrí el parche sin
+  el arreglo: 7 rojos y 1 verde, como se espera.
+- **Mi rojo, en otro borde:** `pantalla_estudio1.js` (dos registros por
+  corrida) cuatro veces sobre una base. Con IP fija falla en la corrida 3
+  con 429 de `/auth/register`; con `_ip_nueva` pasan las cuatro y no hay
+  ningún 429 de registro.
+- **El `192.0.2.` de `orden1`:** acepto tus razones. La corrí cuatro veces
+  seguidas sobre una base: las cuatro rc=0, ningún 429 de `/auth/login`.
+  Es sólo una observación: cada corrida tarda ~9 min y el límite es por
+  minuto, así que esa repetición no podía chocar. Las otras cuatro pantallas, una vez cada
+  una sobre base nueva, también pasan.
+- **No corrí** tus 9 guiones (corrí las pantallas solas) ni el `cmp` del
+  parche (el original está en tu contenedor).
 
-**`tests/test_conexiones1.py`: decidido por la PM.** Acepto tu oferta: la
-única copia está en tu contenedor, y el contenedor se puede perder. Sumalo
-como un parche nuevo `scripts/testing/conexiones1_tests.diff` (un archivo
-nuevo entero, que `git apply` crea), en un commit aparte de la próxima
-pieza. Que no entre como `tests/`: la CI lo correría y daría rojo sin el
-arreglo. Puerta: en un worktree limpio, `git apply --check` del parche da 0
-y el archivo que crea es igual al tuyo (`cmp`). D184 sigue: en la pieza de
-producto, el archivo entra en su commit de pruebas.
+Saqué de `COLA-LIMPIEZA.md` dos entradas que ya estaban resueltas:
+`con_pg16.sh` usa `PG_PUERTO` desde que se creó, y los dos tests de `/tmp`
+ya usan `tmp_path`.
 
-## Tarea activa (2026-11-12 15:06 UTC): D190 de MARIA, sólo arnés
+## Tarea activa (2026-11-12 17:41 UTC): un caso para «No podés removerte a vos mismo», sólo tests
 
-Tus seis pantallas (`pantalla_cliente1.js`, `_despacho1a.js`,
-`_destino1.js`, `_estudio1.js`, `_estudio1b.js` y `_orden1.js`) tienen su
-propia copia de la IP inventada para `X-Forwarded-For`. Que usen
-`require('./_ip_nueva')`, el de MARIA, sin cambiarlo.
+En `remove_member` (`DELETE /api/organizations/members/{username}`, cerca
+de `main.py:10987`) está la guarda que impide que el dueño del estudio se
+saque a sí mismo. Ningún caso falla si se borra. Es la entrada de
+`COLA-LIMPIEZA.md`. Lo comprobé: con la guarda borrada, `test_org1.py` y
+`test_cobro_mp2.py` dan 208 passed, y el dueño sale con 200 y el estudio
+queda sin él. Producto +0/−0: la revisión son estas puertas, sin
+adversarios ni guion de sabotaje.
 
 **Puertas:**
-- `grep` que muestre que la IP inventada sólo se arma en `_ip_nueva.js`.
-- Cada guion que llama a una de las seis, entero y sobre tu SHA:
-  `sabotajes/cliente1.sh`, `foco_cliente1.sh`, `despacho1a.sh`,
-  `destino1.sh`, `estudio1.sh`, `estudio1b.sh`, `orden1.sh`, `orden1b.sh` y
-  `foco_perfil.sh`. Cada uno con su resultado esperado y su salida.
-- Un rojo: una de las seis con la IP fija (`'10.0.0.1'`), corrida varias
-  veces contra una sola base, falla cuando pasa el límite del registro; el
-  informe dice en qué corrida y cómo falla (un 429 o una espera vencida).
-  Con `_ip_nueva`, las mismas corridas pasan todas.
+- Un caso nuevo en `tests/` (donde ya se prueba sacar miembros, por
+  ejemplo `tests/test_org1.py`): el dueño pide sacarse a sí mismo; da 400
+  y, mirado en la base, sigue siendo dueño y miembro de su estudio, con los
+  otros miembros intactos. Que mire el estado, no sólo el código de
+  respuesta.
+- El rojo una vez: con la guarda borrada en una copia local, el caso falla
+  y el informe dice cómo (qué queda en la base).
+- Los tests del archivo que tocás, enteros, verdes sobre tu SHA.
 - `chequeo-6` entero, con producto +0/−0.
 
-`pantalla_orden1.js:1344` arma otra IP (`'192.0.2.'`) para otra cosa:
-esa no entra, y el `grep` la va a mostrar; decí por qué queda.
-
-No toques `_ip_nueva.js` ni las pantallas de MARIA: las está tocando ella.
+Sin cambios de producto. Si al probar encontrás que la guarda no alcanza
+(por ejemplo, otro camino deja al estudio sin dueño), no lo arregles: va
+como D con su evidencia.
 
 **Si Emi dice que sí a D182 o a D206 (a) mientras tanto,** dejás esto donde
 esté, lo decís en el informe y arrancás esa pieza. La pieza de D206 (a),
