@@ -56,6 +56,9 @@ esperan D182. D207–D209 siguen libres.
 
 **Si Emi dice que sí a D182 o a D206 (a) mientras tanto,** dejás I donde
 esté, lo decís en el informe y arrancás esa pieza.
+La pieza de D206 (a), además de la revisión fuerte: el caso que detecta
+D188 corrido con el arreglo y en HEAD (si da peor que HEAD, frenás y me
+lo decís), y `e2e_maria.sh`, porque toca el guardado y MARIA.
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 
