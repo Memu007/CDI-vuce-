@@ -147,12 +147,16 @@ antes de cerrar la Fase 3.
    compartidos antes de publicar, de operaciones que después cambiaron de
    cliente, siguen abiertos. Si sabés de un caso, avisá y se arma una pieza
    chica para cortarlos.
-13. **Para decidir de día: el arreglo de CONEXIONES-1 C** (D180). Una
-   cuenta sola, pidiendo sugerencias de NCM o subiendo PDFs, puede tomar todas
-   las conexiones de la base: la misma cuenta espera 30 s (medido). Si la
-   Técnica mide que a otra cuenta le pasa lo mismo, recomiendo arreglarlo
-   (sale de la fila del roadmap, que decía «sólo si quedan conexiones
-   tomadas», y no quedan).
+13. **Para decidir de día: el arreglo de CONEXIONES-1 (D182). Recomiendo
+   que sí.** Medido: mientras una cuenta manda unos 60 pedidos a la vez de
+   sugerencias de NCM o de subida de PDF, y la IA tarda 30 s, **otra cuenta**
+   que sólo consulta espera 30 s. Con el arreglo espera 0,3 s. No le da
+   errores a la otra cuenta, y el login no cambia. La pieza se define por el
+   resultado: «una cuenta lenta no hace esperar a otra en las rutas
+   medidas». La Técnica todavía mide dos rutas más, y la pieza las cubre si
+   hace falta. Es un cambio chico en la parte compartida de cobro: va con
+   revisión fuerte (`/security-review`, adversarios, la suite completa y
+   `e2e_maria.sh`). Lo hace la Técnica.
 14. **Para decidir de día: el tope de tiempo de la CI** (recomiendo subirlo).
    La revisión automática de la PR corta a los 20 minutos y la suite ya
    tarda eso: la última corrida (`9e088e32`) se cortó por tiempo, sin rojos
@@ -182,7 +186,7 @@ Sesiones viejas, apagadas (historia): Dev 1 session_01VV5RVDA64AuzLaPBDnwH39
 `claude/dev2-maria`; las ramas `codex/*`.
 
 Archivos abiertos por Dev:
-- Dev técnica (CONEXIONES-1 C, sólo arnés): `scripts/testing/conexiones1_*`. Sin producto hasta el sí de Emi.
+- Dev técnica (CONEXIONES-1 D, sólo arnés): `scripts/testing/conexiones1_*`. Sin producto hasta el sí de Emi (D182).
 - Dev MARIA (ORG-1 y ORG-1b): invitaciones y registro en `proyecto_maria/main.py`,
   `database/models.py`, `templates/landing.html`. Las dos tocan `main.py` en zonas distintas.
 
@@ -243,8 +247,6 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 2026-11-12 02:32 UTC: **IDS-PYTEST aceptada** sobre `dd0eab7e` e integrada (merge exacto de `8d61bb09`; acta REPRODUCCION-BORRADOR-1, «IDS-PYTEST»): chequeo-6 limpio, 7 ids iguales al informe; `estudio1.sh` con 9.2.0 dio rc=0 una vez y 1 ROJO? otra. **Causa del ROJO?, observada:** `profile.js` mueve el foco a «Mi CUIT» 150 ms después de cargar y la prueba escribe el CUIT del estudio ahí (1 de 30 con 3 a la vez). Arreglo de la prueba a la Técnica (`estudio1`, `cobro_mp1`) después del informe de CONEXIONES-1 C, con reproducción que dé el rojo siempre; dato a MARIA para su `sesion1`; el foco en producto, a la cola. CI de `9e088e32` cortada por el tope de 20 min: a Emi (punto 14). Vuelta de las 01:55 (cerrada acá): MARIA en `e248d8a8` corre `despacho1b.sh` (~2 h) y diagnostica un ROJO? de `sesion1`, 148,7k de 184k; la Técnica en `76b50666` (CONEXIONES-1 C), 140,6k de 144k. Sin rechazos por límite, sin D abiertas, ninguna sin tarea.
 2026-11-12 01:08 UTC: **CONEXIONES-1 B aceptada como medición** sobre `c57b645e` e integrada (merge exacto, producto vacío; acta REPRODUCCION-CONEXIONES-1-2026-11-12). Igual al informe con 30 s; mi negativo con 15 s también rompe; control cinco BIEN. El medidor junta pool lleno con fuga y mide a la misma cuenta. **D180 (a)**, decidido por la PM: `/api/ncm/sugerir` sin tope, una cuenta sola toma 50 de 50 conexiones (misma cuenta a 30 s; otra cuenta, no medido) → CONEXIONES-1 C a la Técnica **sólo arnés** (otra cuenta, pool lleno aparte de fuga, cuota de producción, arreglo propuesto sin commitear), después del informe de los ids (`dd0eab7e`). El arreglo de producto va a Emi (consejero: el roadmap dice «arreglar sólo si las deja»). **D181 (b)** a la cola. MARIA avisada en su canal (la subida es su zona). CONEXIONES-1 sigue abierta en el roadmap.
 2026-11-12 00:48 UTC: **BORRADOR-1 aceptada** sobre `c8733be` e integrada (merge exacto; producto = `22163cec`; acta REPRODUCCION-BORRADOR-1-2026-11-10). Arneses de navegación sin 429, cobro_mp1 145 ROJO, ataque sin PG rc=1 y control 47/0, E2E MARIA OK, suite `6077 passed, 110 skipped, 3 xfailed`, arnés 402 sobre el merge 118 passed. `estudio1.sh` da 1 ROJO? con pytest 9.2.0 (`[nombre4]`; con 9.1.1 el id es `[xxxx…]`): agregado a la Técnica, después de CONEXIONES-1 B, con su versión de pytest. Vuelta de las 23:55: MARIA en `ab5b08c7` (disco1 con ids, sin informe), tanda larga en segundo plano, 177,5k de 184k; la Técnica entregó CONEXIONES-1 B en `c57b645e` a las 00:41 (D180-D181; la reproduzco) y hace el agregado de los ids, 143,9k de 144k. Ninguna sin tarea.
-2026-11-11 23:04 UTC: **Arnés 402 de MARIA aceptado** sobre `899f9ee` e integrado (merge de `94a765fc`, árbol igual al suyo; acta REPRODUCCION-ARNES-402-2026-11-11): despacho1c 19 y front422 17 ROJO, 118 passed, mi negativo en `app_v2.js` da 4 failed. `f2709a2` entra sin aceptar: va con D149. **Hallazgo:** con pytest 9.2.0 un parámetro de texto largo da id `[arg+índice]` (9.1.1 daba el valor): `estudio1.sh` (`[xxxxx`, Técnica) y `disco1.sh` (`[BBBB`, MARIA) quedan ROJO? aunque el sabotaje rompa la prueba; va a la familia de D149. Reproducción de D149/BORRADOR-1 de la Técnica en curso.
-2026-11-11 21:59 UTC: **PRESUPUESTO-CLIENTE-1 aceptada** sobre `f45243a` e integrada en `8669b43`, y con ella todo lo aceptado sin integrar de MARIA (cada commit de producto cae en el rango de una pieza aceptada; acta REPRODUCCION-PRESUPUESTO-CLIENTE-1-2026-11-11). Suite mía `6077 passed, 110 skipped, 3 xfailed`, exit=0 (la Dev: 355; los 245 de más son las pruebas `.xls`, su venv no tiene `xlwt`). D163 (a); D167: no se generaliza; MARIA en 250k (umbral 184k desde las 21:36; antes compactaba cada ~5 min porque quedaba en ~150k). MARIA sigue con el arnés 402 (`918a50d2`, sin informe), D149, D145. Portón de BORRADOR-1 de la Técnica reescrito contra mi rama. Checks de la PR sobre `6cabcf65` (leídos a las 22:23 UTC): `tests` y `e2e-maria` verdes, mergeable `clean`. Vuelta de las 21:55 (hecha a las 22:01): MARIA trajo mi rama y arma el informe del arnés 402 mientras corren sus sabotajes de D149 (contexto ~175k reales, umbral 184k: mirar si compacta seguido); la Técnica espera orden1 para el informe de D149 (141k, umbral 144k). Ninguna sin tarea.
 
 ## /compact conservar de la PM principal
 
