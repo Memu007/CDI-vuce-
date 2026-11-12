@@ -143,8 +143,10 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `ultima_vez` nula («sin fecha pierde» sólo lo prueba el acta de la PM):
   un caso con la fila sin fecha en los dos órdenes, con su rojo.
 - `proyecto_maria/main.py` login: el límite cuenta después de `verify_password`;
-  cada clave mala paga bcrypt antes del freno. Contar antes, si CONEXIONES-1 B
-  muestra que pesa (D146 b).
+  cada clave mala paga bcrypt antes del freno (D146 b, D181 b). CONEXIONES-1 B:
+  60 claves malas desde 60 IPs no las corta nada; el caso que falta probar es
+  muchas a la vez desde la misma IP (`abuso1` sólo lo prueba en serie).
+- `scripts/testing/conexiones1_sonda.py` `_instalar` (96 líneas): partirla.
 - `proyecto_maria/main.py` `delete_cliente`: la operación queda sin cliente con su
   `generated_file`, y el TXT se sigue bajando (fila 4 del code-review de INTEGRAR-1).
 - `proyecto_maria/main.py` tope de registro: el `or` corta antes y el intento
