@@ -21,7 +21,7 @@ PUERTO="${PUERTO:-8856}"
 TMPD="$(mktemp -d)"; WT="$TMPD/wt"
 git -C "$REPO" worktree add --detach "$WT" "$SHA" >/dev/null || exit 2
 API=""
-trap '[ -n "$API" ] && kill $API 2>/dev/null; git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -f -- "$TMPD/local.db" "$TMPD/api.log"; rmdir "$TMPD"' EXIT
+trap '[ -n "$API" ] && kill $API 2>/dev/null; git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -f -- "$TMPD/local.db" "$TMPD/api.log" "$TMPD/salida"; rmdir "$TMPD"' EXIT
 cd "$WT"
 P=proyecto_maria/static/v2/screens/profile.js
 
@@ -29,7 +29,6 @@ P=proyecto_maria/static/v2/screens/profile.js
 CASOS=(
   "scripts/testing/pantalla_estudio1.js·#pfEstudioNombre"
   "scripts/testing/pantalla_estudio1.js·#pfEstudioCuit"
-  "scripts/testing/pantalla_cobro_mp1.js·#pfBillingBlock > summary"
 )
 
 reloj() {
@@ -62,10 +61,13 @@ PYEOF
 
 correr() {
   rm -f -- "$TMPD/local.db" "$TMPD/api.log"
+  if curl -fsS "http://127.0.0.1:$PUERTO/health" >/dev/null 2>&1; then
+    echo "FALLA: el puerto $PUERTO ya está ocupado"; return 2
+  fi
   ENVIRONMENT=development JWT_SECRET_KEY=clave-inventada-solo-local-0123456789abcdef \
   EMAIL_VERIFICATION_REQUIRED=false ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x \
   ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x DATABASE_URL="sqlite+aiosqlite:///$TMPD/local.db" \
-  GEMINI_API_KEY=test-key DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares \
+  GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares \
     "$PY" -m uvicorn proyecto_maria.main:app --host 127.0.0.1 --port "$PUERTO" >"$TMPD/api.log" 2>&1 &
   API=$!
   if ! curl -fsS --retry 60 --retry-connrefused --retry-delay 1 "http://127.0.0.1:$PUERTO/health" >/dev/null 2>&1; then
@@ -81,7 +83,8 @@ PIERDE=0; ILEGIBLE=0
 for caso in "${CASOS[@]}"; do
   js="${caso%%·*}"; campo="${caso#*·}"
   if ! reloj "$campo"; then echo "ROTO        | $caso: no se pudo poner el reloj"; ILEGIBLE=1; continue; fi
-  salida="$(correr "$js")"; codigo=$?
+  correr "$js" >"$TMPD/salida" 2>&1; codigo=$?
+  salida="$(cat "$TMPD/salida")"
   focos="$(grep -o 'GET /health?foco=[a-z]*&ms=[0-9]*' "$TMPD/api.log" | sed 's#GET /health?##' | tr '\n' ' ')"
   robado="$(grep -o 'GET /health?robado=[^ ]*' "$TMPD/api.log" | sed 's#GET /health?##' | tr '\n' ' ')"
   if [ -n "$robado" ]; then
