@@ -5,6 +5,7 @@
 // Datos inventados. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_borrador1.js
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const base = process.env.BASE_URL || 'http://127.0.0.1:8771';
 const FACTURA = 'F0001-demo-borrador';
@@ -42,9 +43,8 @@ async function dejarOperacion(ctx) {
     for (const caso of CASOS) {
       const ctx = await browser.newContext();
       const id = Date.now() + '_' + Math.floor(Math.random() * 1e6);
-      const r = await ctx.request.post(base + '/auth/register',
+      await registrarCuenta(ctx.request, base,
         { data: { username: 'borrador_' + id, password: 'Clave-Inventada-123', email: 'borrador' + id + '@ejemplo.test' } });
-      if (!r.ok()) falla('no se pudo registrar el usuario de prueba: ' + r.status());
       if (caso.borrador) await dejarOperacion(ctx);
 
       // El usuario espera hasta que la prueba lo suelta: el arranque no puede terminar antes.

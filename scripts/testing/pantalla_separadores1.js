@@ -7,6 +7,7 @@
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_separadores1.js [captura.png]
 const { chromium } = require('playwright');
 const ipNueva = require('./_ip_nueva');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const OP = { numero_factura: 'INV-2026/0458', moneda: 'DOL', incoterm: 'CFR', comprador_cuit: '30712345671',
              comprador_nombre: 'Importadora Inventada SA', vendedor_nombre: 'Proveedor Inventado Ltd',
@@ -21,7 +22,7 @@ const PREGUNTA = '¿1.500 o 1,5? Escribilo con punto de miles (1.500) o como 1,5
   const page = await (await b.newContext({ viewport: { width: 1400, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  await page.request.post(base + '/auth/register', { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: 's1_' + id, password: 'Clave-Inventada-123', email: 's1' + id + '@ejemplo.test' } });
+  await registrarCuenta(page.request, base, { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: 's1_' + id, password: 'Clave-Inventada-123', email: 's1' + id + '@ejemplo.test' } });
   const pantalla = () => page.$eval('.screen.is-active', el => el.dataset.screen);
 
   await page.goto(base + '/dashboard');

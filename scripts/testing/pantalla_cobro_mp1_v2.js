@@ -8,6 +8,7 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_cobro_mp1_v2.js
 const { chromium } = require('playwright');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const OP = { moneda: 'DOL', incoterm: 'CFR', comprador_cuit: '30712345671', fecha_emision: '10/10/2026', numero_factura: 'FAC_V2' };
 const LONA = { pieza: '39211390900F', descripcion: 'Lona de PVC gris', origen: 'CN', cantidad: 750,
@@ -18,8 +19,7 @@ const LONA = { pieza: '39211390900F', descripcion: 'Lona de PVC gris', origen: '
   const page = await (await b.newContext({ viewport: { width: 1400, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  const reg = await page.request.post(base + '/auth/register', { data: { username: 'cmp1v_' + id, password: 'Clave-Inventada-123', email: 'cmp1v' + id + '@ejemplo.test' } });
-  if (!reg.ok()) falla('no se pudo registrar: ' + reg.status());
+  await registrarCuenta(page.request, base, { data: { username: 'cmp1v_' + id, password: 'Clave-Inventada-123', email: 'cmp1v' + id + '@ejemplo.test' } });
   // Sin el CUIT del despachante no se genera el TXT (ESTUDIO-1); inventado.
   const perfil = await page.request.put(base + '/api/user/profile', { data: { cuit: '20999999998' } });
   if (!perfil.ok()) falla('no se pudo cargar el CUIT del perfil: ' + perfil.status());

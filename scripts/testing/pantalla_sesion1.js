@@ -9,6 +9,7 @@
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_sesion1.js
 // (servidor local con EMAIL_VERIFICATION_REQUIRED=false)
 const { chromium } = require('playwright');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const CLAVE = 'Clave-Inventada-123';
 
@@ -20,8 +21,7 @@ const CLAVE = 'Clave-Inventada-123';
   page.on('pageerror', e => errores.push(String(e)));
   const u = 'ses1_' + Date.now(), mail = u + '@ejemplo.test', otro = 'otro-' + mail;
 
-  let r = await page.request.post(base + '/auth/register', { data: { username: u, password: CLAVE, email: mail, name: 'Ses' } });
-  if (!r.ok()) falla('registro: ' + r.status() + ' ' + await r.text());
+  let r = await registrarCuenta(page.request, base, { data: { username: u, password: CLAVE, email: mail, name: 'Ses' } });
   r = await page.request.post(base + '/auth/login', { data: { username: u, password: CLAVE } });
   if (!r.ok()) falla('login: ' + r.status() + ' ' + await r.text());
 

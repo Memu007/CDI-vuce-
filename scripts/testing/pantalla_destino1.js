@@ -7,6 +7,7 @@
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_destino1.js [captura.png]
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
 const ipNueva = require('./_ip_nueva');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const TRES = [
   ['NO_VALIDA', 'Comercialización o reventa'],
@@ -18,7 +19,7 @@ const TRES = [
   const page = await (await b.newContext({ viewport: { width: 1280, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  await page.request.post(base + '/auth/register', { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: 'd1_' + id, password: 'Clave-Inventada-123', email: 'd1' + id + '@ejemplo.test' } });
+  await registrarCuenta(page.request, base, { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: 'd1_' + id, password: 'Clave-Inventada-123', email: 'd1' + id + '@ejemplo.test' } });
   const rc = await page.request.post(base + '/api/clientes', { data: { nombre: 'Cliente D1', cuit: '30712345678' } });
   const cj = await rc.json(); const cliente = cj.cliente || cj;
 

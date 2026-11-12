@@ -6,6 +6,7 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_maria1b.js <xlsx> [captura.png]
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
+const registrarCuenta = require('./_registrar');
 const FILAS = '2 fila(s) del Excel no se pudieron leer (filas 7, 9)';
 const HOJAS = 'El Excel tiene otras hojas con datos que no se leyeron (Hoja2)';
 const SIN_REVISAR = 'No se revisaron todas las hojas del libro';
@@ -17,7 +18,7 @@ function falla(msg) { console.error('FALLA: ' + msg); process.exit(1); }
   const page = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  await page.request.post(base + '/auth/register', { data: { username: 'prueba_' + id, password: 'Clave-Inventada-123', email: 'p' + id + '@ejemplo.test' } });
+  await registrarCuenta(page.request, base, { data: { username: 'prueba_' + id, password: 'Clave-Inventada-123', email: 'p' + id + '@ejemplo.test' } });
   await page.route('**/upload_excel_v2/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
     message: 'ok', filename: 'factura.xlsx', items_count: 1, applied_mapping: true,
     operacion: { comprador_cuit: '30712345670', incoterm: 'FOB',

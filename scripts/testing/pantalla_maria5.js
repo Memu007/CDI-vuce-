@@ -7,6 +7,7 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_maria5.js [captura.png]
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const centavos = s => Math.round(parseFloat(s) * 100);
 (async () => {
@@ -14,7 +15,7 @@ const centavos = s => Math.round(parseFloat(s) * 100);
   const page = await (await b.newContext({ viewport: { width: 1280, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  await page.request.post(base + '/auth/register', { data: { username: 'm5_' + id, password: 'Clave-Inventada-123', email: 'm5' + id + '@ejemplo.test' } });
+  await registrarCuenta(page.request, base, { data: { username: 'm5_' + id, password: 'Clave-Inventada-123', email: 'm5' + id + '@ejemplo.test' } });
 
   await page.goto(base + '/dashboard');
   await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.despachante);

@@ -7,6 +7,7 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_maria7.js [captura-telefono.png]
 const { chromium } = require('playwright');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 (async () => {
   const b = await chromium.launch();
@@ -14,7 +15,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   const id = Date.now();
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
-  await page.request.post(base + '/auth/register', { data: { username: 'm7_' + id, password: 'Clave-Inventada-123', email: 'm7' + id + '@ejemplo.test' } });
+  await registrarCuenta(page.request, base, { data: { username: 'm7_' + id, password: 'Clave-Inventada-123', email: 'm7' + id + '@ejemplo.test' } });
 
   await page.route('**/generate_maria', async r => { await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, filename: 'MARIA_X.TXT', download_url: '#', content: '', supuestos: [] }) }); });
   // La subida se simula: la fecha ambigua llega como pregunta, con el título de la factura.

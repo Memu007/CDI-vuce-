@@ -9,6 +9,7 @@
 // uso: BASE_URL=http://127.0.0.1:<puerto> PY=<python con openpyxl> node scripts/testing/pantalla_despacho1a.js
 const { chromium } = require('playwright');
 const ipNueva = require('./_ip_nueva');
+const registrarCuenta = require('./_registrar');
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -24,11 +25,10 @@ const PY = process.env.PY || 'python3';
   for (const ancho of [1280, 390]) {
     const ctx = await b.newContext({ viewport: { width: ancho, height: 900 }, acceptDownloads: true });
     const page = await ctx.newPage();
-    let r = await page.request.post(base + '/auth/register', {
+    let r = await registrarCuenta(page.request, base, {
       headers: { 'X-Forwarded-For': ipNueva() },
       data: { username: 'd1a_' + ancho + '_' + id, password: 'Clave-Inventada-123', email: 'd1a' + ancho + id + '@ejemplo.test' },
     });
-    if (!r.ok()) falla('registro: ' + r.status() + ' ' + await r.text());
     r = await page.request.post(base + '/api/clientes', { data: { nombre: 'Cliente Inventado D1a ' + ancho } });
     if (!r.ok()) falla('alta del cliente: ' + r.status() + ' ' + await r.text());
     const cid = (await r.json()).cliente.id;
