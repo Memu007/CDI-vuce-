@@ -1228,3 +1228,49 @@ reactivar 6/0; renovación prueba vencida 0/17 y active fuera de gracia 0/15
   rondas naturales con deadlock: alta 500 → 0 operaciones); la puerta
   forzada de ella tal cual (corrí la mía, ocupada en vez de ociosa); suite y
   `e2e_maria.sh` (sin producto).
+
+## Limpieza (sólo arnés): aceptada sobre `376c8adc` (2026-11-12 15:05 UTC)
+
+Informe `82ca5b45`, base `618efd8a`. Saca de `COLA-LIMPIEZA.md` las entradas
+de `_instalar` (96 → 9 líneas) y del SQL de «créditos al día».
+
+| corrida | rc | resultado | ella |
+|---|---|---|---|
+| `chequeo-6.py 618efd8a 376c8adc` | 0 | producto +0/−0, arnés +22/−5, historia vacía, 0 avisos | igual |
+| `sabotajes/conexiones1.sh 376c8adc` | 0 | 6 `BIEN`, 525 s | igual |
+| natural N=3, 1.ª corrida | 1 | totales 5 / 3 / 4 (deadlock / recargas perdidas / cuentas mal); el detalle por fila lo cortó mi `tail -15` | — |
+| natural N=3, 2.ª corrida (salida entera) | 1 | 10 / 3 / 5; filas con mal: recarga + alta vencidos 3/3, renovación prueba vencida 2/3, active fuera de gracia 3/3; todas las «al día» 0/3 deadlock y 0/3 mal | 8 / 3 / 5, mismas filas con mal |
+| pares, 2.ª corrida | 1 | «al día»: 28 `ok` (14 org, 14 usuario); vencidos: 5 `DEADLOCK`, todos org; «deadlocks: 5; rondas sin armar: 0» | igual |
+
+- Las filas con mal son las mismas que en K (recarga + alta vencidos por
+  D188; las dos de renovación por D205): la limpieza no cambió qué filas
+  dan mal. Los deadlocks cambian con el reparto de tiempos entre corridas.
+- **Una sola copia del SQL:** `grep "20 days" scripts/testing/*.py` da sólo
+  `conexiones1_creditos.py:71` (`AL_DIA`); `conexiones1_natural.py:29` y
+  `conexiones1_pares.py:16,33` lo usan.
+
+### Mi negativo: `_instalar` partida sin `_contar_registro`
+
+`sabotajes/conexiones1.sh` en un worktree de `376c8adc` con la línea
+`_contar_registro(c, m)` borrada de `conexiones1_sonda.py`:
+
+- **sin sabotaje: salida 2, «LA MEDICIÓN NO VALE»**, en vez de 0. Es el rojo
+  buscado: la función partida tiene que seguir contando los registros, o
+  las filas de `api_logs` no cierran. El negativo distingue.
+- Las cuatro corridas de close y sesión: `BIEN`, como debían (no dependen
+  de ese conteo).
+- **«pierde filas de api_logs»: no terminó.** Pasó por todos los casos hasta
+  `pico_gemini` y quedó quieto: el log de gunicorn sin moverse desde
+  14:45:16, las conexiones de Postgres ociosas (una «idle in transaction»)
+  y el medidor casi sin CPU. A las 15:00 lo corté con SIGTERM (salida 143,
+  la puse yo) y terminé por PID los dos gunicorn que quedaron. Una sola
+  corrida; causa sin establecer (el medidor espera con un plazo de 90 s, así
+  que no debería trabarse). No bloquea: el negativo ya distinguió en la
+  primera línea.
+
+### No corrido por la PM
+
+- natural N=10 (ella tampoco); el detalle por fila de mi primera corrida
+  natural y de pares (cortado por mi `tail`; la segunda va entera).
+- La línea trabada otra vez, sola.
+- Suite y `e2e_maria.sh` (sin producto).

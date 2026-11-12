@@ -87,6 +87,9 @@ El límite del producto sigue en pie.
   corren `sabotaje_sufijos1.sh` y no `sabotaje_maria9.sh`: **escape de la
   PM**, aceptar una pieza que cambia una firma sin correr los guiones que la
   anclan.
+  Corregido en `REPRODUCCION-D191-2026-11-12.md`: antes, VALOR-1c
+  (`3df999c8`) ya había cambiado las anclas 24, 27 y 28, y su acta tampoco
+  corrió este guion.
 - Quién llama a las cuatro pantallas: sus propios guiones de sabotaje
   (`sabotaje_maria9.sh`, `sabotaje_separadores1.sh`, `sabotajes/org1b.sh`,
   `sabotajes/validacion1.sh`), nada en `.github`. Ninguno ancla en la línea

@@ -58,11 +58,9 @@ def _contar_en_vuelo(c, clave, funcion):
     return envuelta
 
 
-def _instalar(c, modo, sabotaje):
+def _contar_registro(c, m):
     from sqlalchemy import event
-    from sqlalchemy.ext.asyncio import AsyncSession
 
-    import proyecto_maria.main as m
     from proyecto_maria.database.models import APILog
 
     event.listen(APILog, "init", lambda *a, **k: c.update(["apilog_creados"]))
@@ -100,6 +98,10 @@ def _instalar(c, modo, sabotaje):
 
     asyncio.create_task = create_task
 
+
+def _sabotear_close(c, modo, sabotaje):
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     cerrar = AsyncSession.close
     marcadas = weakref.WeakSet()
     retenidas = []
@@ -134,6 +136,8 @@ def _instalar(c, modo, sabotaje):
 
     AsyncSession.close = close
 
+
+def _frenar_lentos(c, modo, m):
     m.verify_password = _contar_en_vuelo(c, "bcrypt_en_vuelo", m.verify_password)
 
     sugerir = m._suggest_ncm_with_gemini
@@ -164,6 +168,8 @@ def _instalar(c, modo, sabotaje):
 
     migration_service._read_sheets = _contar_en_vuelo(c, "excel_en_vuelo", hojas)
 
+
+def _contar_cuerpo(c):
     from starlette.requests import Request
     leer_cuerpo = Request.body
 
@@ -180,6 +186,15 @@ def _instalar(c, modo, sabotaje):
             c["cuerpo_en_vuelo"] -= 1
 
     Request.body = body
+
+
+def _instalar(c, modo, sabotaje):
+    import proyecto_maria.main as m
+
+    _contar_registro(c, m)
+    _sabotear_close(c, modo, sabotaje)
+    _frenar_lentos(c, modo, m)
+    _contar_cuerpo(c)
 
 
 def post_worker_init(worker):

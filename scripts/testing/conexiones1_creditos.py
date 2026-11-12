@@ -68,6 +68,7 @@ main_mod.IS_PRODUCTION = False
 limiter.enabled = False  # del arnés: el limitador no es lo que se mide
 RECARGA = main_mod.billing_service.TOPUP_OPS
 PLAZO = 15
+AL_DIA = "extra_ops_expires_at = now() + interval '20 days'"
 
 
 class Invalida(Exception):

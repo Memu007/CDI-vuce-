@@ -3,55 +3,54 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## CONEXIONES-1 K: aceptada sobre `7dcfc5cc` e integrada (2026-11-12 13:43 UTC)
+## Limpieza de CONEXIONES-1: aceptada sobre `376c8adc` e integrada (2026-11-12 15:06 UTC)
 
-Integré `32b1161c`. Acta `REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección K.
+Integré `82ca5b45`. Acta `REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección
+«Limpieza». **Traé mi rama con `merge`.** Saqué de `COLA-LIMPIEZA.md` las dos
+entradas que cerraste.
 
-- **Reproducido:** `chequeo-6` igual (+0/−0, 0 avisos). Natural N=20, rc=1:
-  55 rondas con deadlock / 19 recargas perdidas / 32 cuentas mal (los tuyos,
-  54 / 20 / 31). Mi 19 contra tu 20 es la carrera de D188. Las cuentas mal
-  son todas de renovación (D205). Las rondas con deadlock de los pares de
-  alta no dejan nada a medias.
-- **Mis negativos:** `soltar()` con una conexión de la app ocupada (no
-  ociosa: `select pg_sleep(120)`) dice «active, espera Timeout:PgSleep, hace
-  15.9 s: select pg_sleep(120)». Un alta que da 200 sin guardar el ítem da
-  «CUENTA MAL» en las filas de alta (14 de 15; la otra fue un deadlock donde
-  el alta dio 500 y no dejó nada, que está bien). `conexiones1_soltar.py`
-  sobre `7dcfc5cc`: rc=0.
-- **Tu supuesto** (las filas recarga + alta también miden el alta):
-  aceptado.
-- **El rc=2 mío de J** no volvió a salir; queda abierto, y ahora traería su
-  causa.
-- **Una línea:** tu sesión mencionó un `tests/test_conexiones1.py` sin
-  subir. ¿Qué es? Si es descartable, borralo; si no, decímelo.
+- **Reproducido:** `chequeo-6` igual (+0/−0, 0 avisos). Control de la sonda:
+  6 `BIEN`, rc=0. Natural N=3: las filas con mal son las mismas que en K
+  (recarga + alta vencidos 3/3, las dos de renovación); todas las «al día»
+  0/3 deadlock y 0/3 mal. Pares: 28 `ok` «al día»; 5 `DEADLOCK`, todos de
+  org con créditos vencidos. El SQL vive sólo en `conexiones1_creditos.py`.
+- **Mi negativo:** sin `_contar_registro(c, m)` en la sonda, «sin sabotaje»
+  da salida 2, «LA MEDICIÓN NO VALE». La función partida sigue contando.
+  En esa corrida, la línea «pierde filas de api_logs» quedó quieta 15 min y
+  la corté yo: una vez, causa sin establecer. No te pido nada por eso.
 
-## D169: aceptada sobre `117c1d16` e integrada (2026-11-12 13:47 UTC)
+**`tests/test_conexiones1.py`: decidido por la PM.** Acepto tu oferta: la
+única copia está en tu contenedor, y el contenedor se puede perder. Sumalo
+como un parche nuevo `scripts/testing/conexiones1_tests.diff` (un archivo
+nuevo entero, que `git apply` crea), en un commit aparte de la próxima
+pieza. Que no entre como `tests/`: la CI lo correría y daría rojo sin el
+arreglo. Puerta: en un worktree limpio, `git apply --check` del parche da 0
+y el archivo que crea es igual al tuyo (`cmp`). D184 sigue: en la pieza de
+producto, el archivo entra en su commit de pruebas.
 
-Integré `027f5257`. **Tenías razón con la puerta:** la escribí contra un
-HEAD que no tenía el arreglo de MARIA. Ya integré su D149, así que mi rama
-lo trae. Con tu `foco_perfil.sh`: `832bf74` da `PIERDE` (rc=1); `48195cfe` y
-mi rama con las dos entregas (`57faa844`) dan `NO PIERDE` (rc=0). Línea en
-el acta de D149.
+## Tarea activa (2026-11-12 15:06 UTC): D190 de MARIA, sólo arnés
 
-## Tarea activa (2026-11-12 13:47 UTC): limpieza de CONEXIONES-1, sólo arnés
+Tus seis pantallas (`pantalla_cliente1.js`, `_despacho1a.js`,
+`_destino1.js`, `_estudio1.js`, `_estudio1b.js` y `_orden1.js`) tienen su
+propia copia de la IP inventada para `X-Forwarded-For`. Que usen
+`require('./_ip_nueva')`, el de MARIA, sin cambiarlo.
 
-**Primero traé mi rama con `merge`** (trae el arreglo de
-`pantalla_sesion1.js` de MARIA; no lo toques).
+**Puertas:**
+- `grep` que muestre que la IP inventada sólo se arma en `_ip_nueva.js`.
+- Cada guion que llama a una de las seis, entero y sobre tu SHA:
+  `sabotajes/cliente1.sh`, `foco_cliente1.sh`, `despacho1a.sh`,
+  `destino1.sh`, `estudio1.sh`, `estudio1b.sh`, `orden1.sh`, `orden1b.sh` y
+  `foco_perfil.sh`. Cada uno con su resultado esperado y su salida.
+- Un rojo: una de las seis con la IP fija (`'10.0.0.1'`), corrida varias
+  veces contra una sola base, falla cuando pasa el límite del registro; el
+  informe dice en qué corrida y cómo falla (un 429 o una espera vencida).
+  Con `_ip_nueva`, las mismas corridas pasan todas.
+- `chequeo-6` entero, con producto +0/−0.
 
-Dos entradas de `COLA-LIMPIEZA.md`:
+`pantalla_orden1.js:1344` arma otra IP (`'192.0.2.'`) para otra cosa:
+esa no entra, y el `grep` la va a mostrar; decí por qué queda.
 
-1. **El SQL de «créditos al día»** está en `conexiones1_natural.py`
-   (`CREDITOS`) y en `conexiones1_pares.py`: que quede en un solo lugar.
-   Puerta: natural y pares con N chico (vos decís cuál). Como son carreras,
-   no pido los mismos números: pido que las filas «al día» sigan en 0
-   perdidas y 0 mal, y que «recarga + alta, vencidos» siga mostrando
-   D188.
-2. **`_instalar` de `conexiones1_sonda.py`** (96 líneas) partida. Puerta:
-   un rojo conocido de la sonda después de partirla (uno que ya daba
-   antes), no sólo un verde igual. Decís cuál y lo mostrás.
-
-`chequeo-6` con producto +0/−0. Me decís qué entradas cerraste y las saco
-yo. Un informe en `PARA-PM.md`.
+No toques `_ip_nueva.js` ni las pantallas de MARIA: las está tocando ella.
 
 **Si Emi dice que sí a D182 o a D206 (a) mientras tanto,** dejás esto donde
 esté, lo decís en el informe y arrancás esa pieza. La pieza de D206 (a),
