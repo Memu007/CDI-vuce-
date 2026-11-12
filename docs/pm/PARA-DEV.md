@@ -3,95 +3,60 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## IDS-PYTEST: aceptada sobre `dd0eab7e` e integrada (2026-11-12 02:32 UTC)
+## CONEXIONES-1 C: aceptada como medición sobre `9ecfd2ac` e integrada (2026-11-12 03:29 UTC)
 
-Evidencia: `docs/pm/REPRODUCCION-BORRADOR-1-2026-11-10.md`, «IDS-PYTEST».
-Integré con `merge` exactamente `8d61bb09` (tu merge que trae `dd0eab7e` y
-el informe), no tu cabeza: CONEXIONES-1 C la reviso con su informe.
+Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección C.
+Integré con `merge` exactamente `9ecfd2ac`, no tu cabeza: FOCO-PERFIL va
+con su informe.
 
-- Igual a tu informe: `chequeo-6` (producto +0/−0, arnés +4/−2, avisos 0) y
-  los 7 ids que cambian entre 9.1.1 y 9.2.0. Con 9.2.0, `estudio1.sh` me dio
-  una vez 37 ROJO y rc=0, y otra vez 36 ROJO, 1 ROJO? y rc=1.
-- `disco1.sh` `[BBBB`: no hace falta pasárselo a MARIA, ya lo cambió a
-  `[descripcion-de-2001]` en `ab5b08c7`.
+- Igual a tu informe: hoy, la otra cuenta espera 30,02 s en sugerir y 30,0 s
+  en la subida (5,26 s con cuota), rc=4 las dos; con el arreglo, 0,32 s y
+  0,04 s (0,35 y 0,06 con cuota), rc=0. Control: cinco `BIEN`. `chequeo-6`
+  igual. Las ocho rutas de la dependencia, contadas.
+- Mi negativo, pico de 40 con el arreglo: rc=0, 0 × 500, la otra cuenta
+  hasta 2,29 s. La subida da 40/40 con 40 y 50/50 con 60, y la otra cuenta
+  no espera: leo pico, no retención, pero no está muestreado (abajo, D).
+- pytest con el arreglo: 201 passed. Sin el ajuste del inyector, tus 4 rojos.
+- **Hallazgo menor:** el diff de tu informe no entra con `git apply` (el hunk
+  de `main.py:10448` está cortado). Lo apliqué a mano. En el próximo, el diff
+  propuesto va completo y probado con `git apply --check`.
+- **D182: a Emi, de día**, con mi recomendación de (a). Si dice que sí, la
+  pieza es tuya entera (la dependencia es una sola), con lo que traiga D.
 
-**Agregado, después del informe de CONEXIONES-1 C** (si ya lo estás
-cerrando, terminalo primero). El ROJO? tiene causa y no es de tu arreglo:
+## Tarea activa: CONEXIONES-1 D, sólo arnés (2026-11-12 03:29 UTC)
 
-- `profile.js`, `open()`, mueve el foco a «Mi CUIT» 150 ms después de cargar.
-  `pantalla_estudio1.js`, paso 9, abre el modal y llena enseguida los campos
-  del estudio. Si el foco salta en medio del `fill`, el CUIT cae en «Mi
-  CUIT», el del estudio queda vacío y el alta da 400. Lo observé (usuario
-  recién registrado, sin CUIT en el perfil):
-  `["Estudio Inventado Tres", "", "30222222229", "pfCuit"]` antes del clic.
-  En el paso 2 es probable (una falla «el nombre no puede quedar vacío»),
-  no observado: verificalo.
-- **Pido:** las `pantalla_*.js` tuyas que abren el modal del perfil y
-  llenan campos (buscá `openProfileModal`: `estudio1` seguro; `cobro_mp1`
-  espera la carga, pero el foco cae 150 ms después: revisala) no pierden lo
-  escrito por ese foco. `sesion1` no: es de MARIA, le paso esto.
-- **Prueba:** una reproducción que dé el rojo **siempre** con el arnés de hoy
-  y verde con el arreglado, no una tanda de repeticiones (falla ~1 de 30).
-  Sin espera fija.
-- *Sugerencia* (no es criterio): para reproducir, demorar dentro de la página
-  la carga del perfil para que el foco caiga durante el `fill`; para
-  arreglar, esperar a que el foco inicial haya caído en `#pfCuit` antes de
-  llenar.
-- No toques `profile.js`: el foco en producto va a la cola.
+Sigue siendo medir, dentro de la fila abierta de CONEXIONES-1. Producto: nada.
+Tus D: D183 a D189.
 
-## CONEXIONES-1 B: aceptada como medición sobre `c57b645e` e integrada (2026-11-12 01:08 UTC)
+Lo que pido es comportamiento y prueba:
 
-Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`. Integré con
-`merge` exactamente `c57b645e`, no tu cabeza: `dd0eab7e` (los ids) lo reviso
-con su informe. Igual a tu informe: la corrida de 30 s número por número
-(`pico_pdf` 422 × 16 · 500 × 10 · 504 × 34, normales 30,01 / 30,07 / 3,68 s,
-`tomadas` 0, `close` 2968 = 2968), el control (cinco `BIEN`) y `chequeo-6` en
-los tres rangos; el AVISO de `_instalar` queda explicado. Mi negativo, con
-15 s, también rompe (500 × 6, 504 × 22, normales 30 s): confirma tu cuenta
-de «más de unos 10 s». `bcrypt_en_vuelo_max` me dio 36 y 40: es carrera, no
-cambia nada.
+1. **`/api/migrations/analyze`:** una fase del medidor en la que una cuenta
+   lo satura mientras la lectura del Excel es lenta, y se mide a la otra
+   cuenta. Hoy y con el diff propuesto. El adversario leyó que la ruta pasa
+   por `require_billing_vigente` y después lee el Excel (hasta 60 s); no
+   está medido si toma otra conexión durante la lectura.
+2. **`/api/operations/manual`:** lo mismo, con un cuerpo de pedido que llega
+   lento. El adversario cree que retiene la conexión mientras espera el
+   cuerpo; no está verificado.
+3. **La subida pública:** las conexiones tomadas muestreadas en el tiempo
+   (no sólo el máximo), para separar un pico al llegar de una retención.
+4. **El diff propuesto, completo y sin commitear:** el de C más lo que
+   encuentres retenido, con `git apply --check` limpio sobre tu cabeza y rc=0
+   en todas las fases. No toca `require_active_billing`: ahí
+   `can_create_operation` llama a `_expire_extra_ops`
+   (`services/billing_service.py:109-118`), que deja la cuenta cambiada en
+   memoria (vence los créditos extra), y un `commit` ahí lo guardaría antes
+   de la ruta.
+5. **Una prueba rápida que distinga:** un pytest (sin pico de 60) que dé rojo
+   con el código de hoy y verde con el diff propuesto, también sin commitear,
+   con las dos salidas en el informe. Si no se puede sin pico, decí por qué.
+6. **Control:** `sabotajes/conexiones1.sh` sigue con cinco `BIEN`; ninguna
+   espera fija nueva.
 
-Dos cosas que el medidor no separa, y que entran en la pieza de abajo:
-
-- Con el pool lleno imprime «QUEDAN CONEXIONES TOMADAS» y sale con 1 aunque
-  `tomadas` dé 0: junta pool lleno con fuga.
-- Los normales usan el mismo token que el pico: mide a la cuenta que carga,
-  no a otro usuario.
-
-- **D180: (a), decidido por la PM, con un criterio distinto del tuyo.** No
-  alcanza con «los 500 de PDF». `/api/ncm/sugerir` no tiene límite por minuto
-  ni cuota (no tiene decorador y el `Limiter` de `core/rate_limit.py:67` no
-  tiene límite por defecto), y `pico_gemini` con **un solo token** toma 50 de
-  50 conexiones: esa misma cuenta espera 30 s. A otra cuenta, no está medido. En la subida, la cuota de
-  producción (50 por día) es justo el pool, y la conexión ya está tomada
-  mientras espera el candado de validación, antes del 429 (leído, no
-  medido). Abajo, **CONEXIONES-1 C**: primero medir a otra cuenta.
-- **D181: (b).** A la cola de limpieza, con el caso que importa: muchas claves
-  malas a la vez desde **la misma IP** (el `5/minute` corta antes de entrar;
-  `abuso1` lo prueba en serie, en simultáneo no está corrido).
-
-## Tarea activa
-
-1. **CONEXIONES-1 C, sólo arnés** (es medir, dentro de CONEXIONES-1). El
-   arreglo de producto no entra sin el sí de Emi: la fila del roadmap dice
-   «arreglar sólo si las deja» y no quedan. Se lo propongo de día.
-   - **Medir a otra cuenta:** el medidor usa otra cuenta para los normales
-     y separa «pool lleno» de «fuga» en el texto y en el rc.
-   - **Corridas** sobre el código de hoy: `--pico 60 --lento 30` para la
-     subida pública de PDF y para `/api/ncm/sugerir`, y una más con la cuota
-     de producción (sin `AI_DAILY_PDF_LIMIT=100000`). El informe dice, para
-     la otra cuenta, cuántos 500 y la espera máxima.
-   - **El login queda afuera:** hoy da cero 500 y 3,1 a 3,7 s; sólo tiene
-     que no empeorar.
-   - **El arreglo, propuesto en el informe y sin commitear** (como en D134),
-     con el criterio que propongas: otra cuenta con cero 500 y espera máxima
-     de unos 5 s, y los pedidos de más con un error limpio (429, 503 o 504).
-     *Sugerencia:* soltar la conexión antes de esperar a Gemini o a la
-     lectura, o un tope de pedidos en vuelo por cuenta.
-   - **Si con otra cuenta no aparece el rojo** (cero 500 y menos de 5 s),
-     frená e informá: entonces no hay arreglo que proponer.
-   - La subida es de la zona de MARIA (D74): le aviso en su canal.
-2. **La carrera del foco del perfil** (arriba, en «IDS-PYTEST»).
+- Si una ruta no retiene con otra cuenta (0 × 500 y menos de 5 s), decilo y
+  no propongas nada para ella.
+- El informe, autosuficiente: estás cerca de compactar.
+- La subida es zona de MARIA (D74): le aviso en su canal.
 
 ## BORRADOR-1: aceptada sobre `c8733be` e integrada (2026-11-12 00:48 UTC)
 

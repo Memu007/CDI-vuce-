@@ -23,13 +23,23 @@ mensaje de falla.
 - `estudio1` y `cobro_mp1` los arregla la Técnica; `profile.js` no se toca
   (va a la cola).
 
-## Aviso: la Técnica va a tocar la subida pública de PDF (2026-11-12 01:11 UTC)
+## Aviso: la Técnica sigue midiendo la subida pública de PDF (2026-11-12 03:30 UTC)
 
-No cambia tu orden. La pieza CONEXIONES-1 C de la Técnica (`PARA-DEV.md`)
-mide si una cuenta sola, con la subida pública de PDF o con
-`/api/ncm/sugerir`, le hace fallar o esperar a otra. Por ahora es sólo arnés;
-si propone un arreglo en la subida, que es de tu zona (D74), pasa por Emi y
-te aviso antes. Si tenés algo abierto ahí, decímelo en tu informe.
+No cambia tu orden.
+- **CONEXIONES-1 C midió esto:** mientras una cuenta satura la subida, otra
+  cuenta espera hasta 30 s. El arreglo propuesto baja esa espera a 0,05 s.
+  Ese arreglo es un `commit` en `require_billing_vigente`, que comparten las
+  ocho rutas de cobro; la subida es una de ellas.
+- **Está sin commitear:** va a Emi (D182) y, si dice que sí, lo hace la
+  Técnica entero.
+- **Ahora sigue CONEXIONES-1 D, sólo arnés:** muestrea la subida en el
+  tiempo.
+- Si tenés algo abierto en esa ruta o en esa dependencia, decímelo en tu
+  informe.
+- Para tu `ROJO?` de `sesion1`: la Técnica dejó
+  `scripts/testing/foco_perfil.sh`, que da el rojo del foco siempre
+  (casos de `estudio1`). Su mecanismo te puede servir para la prueba de tu
+  arreglo; el script es de ella.
 
 ## Veredicto: arnés de pantalla del 402 aceptado sobre `899f9ee` e integrado (2026-11-11 23:04 UTC)
 
