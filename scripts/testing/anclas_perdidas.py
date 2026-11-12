@@ -10,10 +10,14 @@ revisión. Un `for` sobre palabras conocidas se recorre una vuelta por valor, y
 un `case`, por la rama de su valor.
 
 Límites: las ramas de un `if` se cuentan todas, también las que piden Postgres;
-un `while` y un bucle dentro de una función se recorren una sola vez; un ancla
-que sólo aparece después de un reemplazo anterior del guion se cuenta como
-perdida. Lo que no se puede saber sin ejecutar el guion, y lo que cambia `sed`,
-sale como «no medido», con el motivo.
+un `while` y un bucle dentro de una función se recorren una sola vez; dentro de
+una función que aplica un cambio no se miran sus `if` ni sus `case`, así que un
+ancla que el guion tolera que falte se cuenta como perdida; un ancla que sólo
+aparece después de un reemplazo anterior del guion se cuenta como perdida. Lo
+que no se puede saber sin ejecutar el guion, y lo que cambia `sed`, sale como
+«no medido», con el motivo. Un sabotaje que no reemplaza texto (pisa o borra un
+archivo) sólo deja fila, «sin ancla», si pasa por una función del guion. Los
+guiones que no son `.sh` no se leen.
 """
 import bisect
 import fnmatch
@@ -26,7 +30,10 @@ from collections import Counter
 
 CORTES = " \t\n;&|()<>"
 HEREDOC = re.compile(r"<<(-?)[ \t]*(['\"]?)\\?(\w+)\2")
-ANSI_C = {"n": "\n", "t": "\t", "\\": "\\", "'": "'", '"': '"', "r": "\r", "e": "\x1b", "0": "\0"}
+ESCAPE = re.compile(
+    r"\\(?:x([0-9a-fA-F]{1,2})|u([0-9a-fA-F]{1,4})|U([0-9a-fA-F]{1,8})|([0-7]{1,3})|(.))", re.S)
+ANSI_C = {"n": "\n", "t": "\t", "\\": "\\", "'": "'", '"': '"', "r": "\r", "e": "\x1b",
+          "a": "\a", "b": "\b", "f": "\f", "v": "\v"}
 CLAVES = {"if", "then", "else", "elif", "do", "!", "while", "until", "{", "time"}
 DECLARAN = {"local", "export", "readonly", "declare"}
 BLOQUES = {"for", "while", "until", "select", "case"}
@@ -45,8 +52,8 @@ class Palabra:
     """Trozos (tipo, dato). Tipos: lit, var (entre comillas), suelta (variable sin
     comillas), pos ($1), arit ($((…))), lista (los elementos de NOMBRE=(…)) y raro."""
 
-    def __init__(self, linea, columna):
-        self.linea, self.columna = linea, columna
+    def __init__(self, linea):
+        self.linea = linea
         self.partes = []
         self.crudo = ""
 
@@ -72,6 +79,13 @@ class Sentencia:
             palabras = palabras[1:]
         return palabras
 
+    def orden(self):
+        """Las palabras de la orden: sin las claves ni las NOMBRE=valor de adelante."""
+        palabras = self.sin_claves()
+        while palabras and re.match(r"[A-Za-z_]\w*=", palabras[0].crudo):
+            palabras = palabras[1:]
+        return palabras
+
 
 class Lector:
     """Parte un guion de bash en sentencias y palabras, sin ejecutarlo."""
@@ -93,6 +107,8 @@ class Lector:
             elif c == "#":
                 self.i = self._fin_de_linea()
             elif c in "<>":
+                if actual and actual[-1].crudo.isdigit() and t[self.i - 1].isdigit():
+                    actual.pop()  # el número pegado a una redirección es su descriptor
                 self._redireccion()
             elif c in "\n;&|()":
                 define = c == "(" and len(actual) == 1 and re.match(r"\(\s*\)", t[self.i:])
@@ -164,8 +180,7 @@ class Lector:
 
     def _palabra(self):
         t, desde = self.t, self.i
-        linea = bisect.bisect_right(self.inicios, desde)
-        p = Palabra(linea, desde - self.inicios[linea - 1])
+        p = Palabra(bisect.bisect_right(self.inicios, desde))
         while self.i < len(t) and t[self.i] not in CORTES:
             c = t[self.i]
             if c == "\\":
@@ -257,21 +272,21 @@ class Lector:
             self.i = i + 1
 
     def _ansi_c(self, p):
-        t = self.t
+        """$'…': los escapes dan bytes, que juntos se leen como UTF-8."""
+        t, crudo = self.t, bytearray()
         self.i += 2
         while t[self.i] != "'":
-            if t[self.i] != "\\":
-                p.literal(t[self.i])
-                self.i += 1
-            elif t[self.i + 1] in "xuU":
-                largo = {"x": 2, "u": 4, "U": 8}[t[self.i + 1]]
-                m = re.compile(r"[0-9a-fA-F]{1,%d}" % largo).match(t, self.i + 2)
-                p.literal(chr(int(m.group(), 16)))
-                self.i = m.end()
+            m = ESCAPE.match(t, self.i)
+            hexa, corto, largo, octal, otro = m.groups() if m else [None] * 5
+            if hexa or octal:
+                crudo.append(int(hexa or octal, 16 if hexa else 8) & 255)
+            elif corto or largo:
+                crudo += chr(int(corto or largo, 16)).encode()
             else:
-                p.literal(ANSI_C.get(t[self.i + 1], t[self.i:self.i + 2]))
-                self.i += 2
+                crudo += (ANSI_C.get(otro, "\\" + otro) if m else t[self.i]).encode()
+            self.i = m.end() if m else self.i + 1
         self.i += 1
+        p.literal(crudo.decode("utf-8", "replace"))
 
     def _fin_de_llave(self, i):
         t, hondo = self.t, 1
@@ -297,7 +312,7 @@ class Lector:
             elif c == "'":
                 self.i = t.index("'", self.i + 1) + 1
             elif c == '"':
-                self._comillas_dobles(Palabra(0, 0))
+                self._comillas_dobles(Palabra(0))
             elif c == "<" and HEREDOC.match(t, self.i) and not t.startswith("<<<", self.i):
                 self._redireccion()
             elif c == "\n":
@@ -331,7 +346,7 @@ def cuenta(expresion, entorno):
 
 def posicional(entorno, numero):
     argumentos = entorno.get("@")
-    if argumentos is None or VARIAS in argumentos[:numero]:
+    if argumentos is None or not numero or VARIAS in argumentos[:numero]:
         return None
     return argumentos[numero - 1] if numero <= len(argumentos) else ""
 
@@ -436,7 +451,7 @@ def asignar(palabras, entorno):
         m = re.match(r"([A-Za-z_]\w*)=", dato) if tipo == "lit" else None
         if not m:
             return palabras[lugar:]
-        resto = Palabra(palabra.linea, palabra.columna)
+        resto = Palabra(palabra.linea)
         resto.crudo = palabra.crudo
         resto.partes = [("lit", dato[m.end():])] + palabra.partes[1:]
         if palabra.partes[1:2] and palabra.partes[1][0] == "lista":
@@ -484,15 +499,18 @@ def reemplazos(cuerpo, argumentos):
         raise NoMedible("el programa que reemplaza lee sus argumentos de otra forma")
     veces = 2 if "n != 2" in plano else 1
     if "veces = int(sys.argv[4])" in plano and len(resto) > 2:
+        if not re.fullmatch(r"\d+", str(resto[2])):
+            raise NoMedible("las veces que se espera el ancla no son un número conocido")
         veces = int(resto[2])
     return archivo, [(resto[0], resto[1], veces)]
 
 
-def programa(sentencia, palabras):
+def programa(sentencia):
     """El texto del programa que la sentencia corre (heredoc de Python o `node -e`) y el
-    lugar de su primer argumento entre las palabras."""
+    lugar de su primer argumento entre las palabras de la orden."""
+    palabras = sentencia.orden()
     crudos = [palabra.crudo for palabra in palabras]
-    if sentencia.heredoc and re.search(r"PY|python", crudos[0]):
+    if sentencia.heredoc and crudos and re.search(r"PY|python", crudos[0]):
         return sentencia.heredoc, crudos.index("-") + 1 if "-" in crudos else 0
     if crudos[:2] == ["node", "-e"] and len(palabras) > 2 and palabras[2].partes[0][0] == "lit":
         return palabras[2].partes[0][1], 3
@@ -508,17 +526,25 @@ class Guion:
         self.aplican = self._las_que_aplican()
 
     def _cargar(self, ruta, leer):
-        abierta, cabecera = None, None
-        for s in Lector(leer(ruta)).sentencias():
-            if s.define:
-                abierta, cabecera = s.define, s.palabras[0].linea
-                self.funciones[abierta] = []
+        texto = leer(ruta)
+        if texto is None:
+            sys.exit(f"no está {ruta}, que un guion incluye")
+        abiertas = []  # [nombre, llaves sin cerrar] de cada función que sigue abierta
+        for s in Lector(texto).sentencias():
+            crudos = [p.crudo for p in s.palabras]
+            define = s.define or (crudos[1] if crudos[:1] == ["function"] and crudos[1:] else None)
+            if define:
+                abiertas.append([define, crudos.count("{")])
+                self.funciones[define] = []
                 continue
-            p = (s.palabras or [Palabra(0, -1)])[0]
-            if abierta and p.crudo == "}" and (p.columna == 0 or p.linea == cabecera):
-                abierta = None
-                continue
-            incluido = p.crudo in ("source", ".") and re.search(r"/(_\w+\.sh)\"?$", s.palabras[-1].crudo)
+            if abiertas:
+                abiertas[-1][1] += crudos[:len(crudos) - len(s.sin_claves())].count("{")
+                abiertas[-1][1] -= crudos[:1] == ["}"]
+                if crudos[:1] == ["}"] and abiertas[-1][1] <= 0:
+                    abiertas.pop()
+                    continue
+            abierta = abiertas[-1][0] if abiertas else None
+            incluido = crudos[:1] in (["source"], ["."]) and re.search(r"/(_\w+\.sh)\"?$", crudos[-1])
             if incluido:
                 self._cargar(ruta.rsplit("/", 1)[0] + "/" + incluido.group(1), leer)
             elif abierta:
@@ -533,7 +559,7 @@ class Guion:
             orden = palabras[0].crudo if palabras else ""
             if orden == "local":
                 locales |= {p.crudo.split("=")[0] for p in palabras[1:] if recibido(p.partes, locales)}
-            elif ".replace(" in programa(s, palabras)[0]:
+            elif ".replace(" in programa(s)[0]:
                 aplican.append(s)
             elif orden == '"$@"' or orden in conocidas and any(
                     recibido(p.partes, locales) for p in palabras[1:]):
@@ -566,7 +592,7 @@ class Guion:
         raise NoMedible("no se llegó al reemplazo")
 
     def _aplicar(self, sentencia, valores, entorno, vueltas):
-        cuerpo, desde = programa(sentencia, sentencia.sin_claves())
+        cuerpo, desde = programa(sentencia)
         if cuerpo:
             if not desde:
                 raise NoMedible("no se sabe dónde empiezan los argumentos del programa que reemplaza")
@@ -593,7 +619,7 @@ class Guion:
                 lugar = fin + 1
             elif orden == "sed" and len([p for p in palabras[1:] if not p.crudo.startswith("-")]) > 1:
                 yield palabras[0].linea, NoMedible(
-                    "cambia un archivo con sed, que busca una expresión regular")
+                    "arma el cambio con sed, que busca una expresión regular")
             elif orden in self.aplican:
                 try:
                     recibe = expandir_todas(palabras[1:], entorno)
@@ -604,13 +630,15 @@ class Guion:
     def _bloque(self, cabecera, cuerpo, entorno):
         """Un `case` corre la rama de su valor; un `for` sobre palabras conocidas, una vuelta por cada una."""
         if cabecera[0].crudo == "case":
-            yield from self._correr(rama(cuerpo, expandir(cabecera[1], entorno)[0]), entorno)
+            valor = (expandir(cabecera[1], entorno) or [""])[0] if cabecera[1:] else None
+            yield from self._correr(rama(cuerpo, valor), entorno)
             return
         valores = expandir_todas(cabecera[3:], entorno)
         if not valores or not all(isinstance(valor, str) for valor in valores):
             valores = [None]
         for valor in valores:
-            entorno[cabecera[1].crudo] = valor
+            # Un `for ((…))` no nombra una variable que se pueda seguir.
+            entorno.update({palabra.crudo: valor for palabra in cabecera[1:2]})
             yield from self._correr(cuerpo, entorno)
 
 
@@ -645,7 +673,7 @@ def _filas(guion, leer):
             # El par siguiente de la misma llamada se busca sobre el texto ya cambiado.
             a_ciegas = hay > 0 and nuevo is None
             if hay > 0 and nuevo is not None:
-                texto = texto.replace(viejo, nuevo, 1 if veces == 2 else -1)
+                texto = texto.replace(viejo, nuevo)
 
 
 CLASES = ["perdida, una línea", "perdida, varias líneas", "otra cantidad", "no medido", "sin ancla",
@@ -664,7 +692,9 @@ def clase(fila):
 def resumen(revision, guiones, filas):
     por_guion = Counter((fila[0], clase(fila)) for fila in filas)
     total = Counter(clase(fila) for fila in filas)
-    print(f"revisión {revision}: {len(guiones)} guiones, {len(filas)} anclas")
+    sin_medir = sum(1 for fila in filas if len(fila) == 3)
+    print(f"revisión {revision}: {len(guiones)} guiones, {len(filas) - sin_medir} anclas medidas"
+          f" y {sin_medir} llamadas sin medir")
     for nombre in CLASES:
         con = sum(1 for g in guiones if por_guion[g, nombre])
         print(f"  {nombre:<24}{total[nombre]:>5}   guiones: {con}")
@@ -672,6 +702,8 @@ def resumen(revision, guiones, filas):
     print(f"  perdidas de una línea sin repetir (archivo y texto): {len(distintas)}")
     for motivo, veces in Counter(str(fila[2]) for fila in filas if len(fila) == 3).most_common():
         print(f"  {veces:>5}  {motivo}")
+    sin_filas = [g for g in guiones if not any(por_guion[g, nombre] for nombre in CLASES)]
+    print(f"  guiones sin ninguna fila: {len(sin_filas)}" + "".join(f"\n    {g}" for g in sin_filas))
     print("\nguion: " + " | ".join(CLASES))
     for g in guiones:
         if any(por_guion[g, nombre] for nombre in CLASES[:-1]):
