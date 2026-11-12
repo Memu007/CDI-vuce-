@@ -1,8 +1,5 @@
 # D145 (a) de la Dev MARIA: reproducción de la PM (2026-11-12)
 
-**En curso (PM):** faltan las corridas de `maria9` antes y después y la de
-uvicorn sin `proxy_headers`.
-
 Entrega `08edd63` (base `46959d7`), informe `1b87d06` en `claude/dev-maria`.
 Sólo arnés: sus cuatro pantallas que registran varias veces contra una
 misma base mandan un `X-Forwarded-For` inventado distinto por registro, y la
@@ -27,10 +24,13 @@ de `sabotaje_separadores1.sh`, que igual dio 17 de 17.
 **El que no distinguía (queda dicho).** `validacion1.sh 08edd63` con
 `TRUSTED_PROXY_HOPS=0` dio lo mismo que sin él (7 `ROJO`, rc=0). Causa,
 medida: uvicorn, por defecto, toma la IP del cliente de `X-Forwarded-For`
-cuando el pedido viene de 127.0.0.1, así que con `TRUSTED_PROXY_HOPS=0` la
-IP sigue siendo la inventada (siete corridas de la pantalla nueva contra una
-API con `TRUSTED_PROXY_HOPS=0`: siete claves `registro:h:10.x.x.x` con 1
-cada una). No es un defecto de la pieza; no sirve como negativo.
+cuando el pedido viene de 127.0.0.1. Con `TRUSTED_PROXY_HOPS=0`, siete
+corridas de la pantalla nueva dejan siete claves `registro:h:10.x.x.x` con 1
+cada una; con `TRUSTED_PROXY_HOPS=0` y uvicorn con `--no-proxy-headers`, las
+mismas siete corridas dan `sale 0` ×5, `429` en la sexta y la séptima, y
+`[('registro:h:127.0.0.1', 7)]`. No es un defecto de la pieza; no sirve como
+negativo. El riesgo que la Dev anota («si alguien exporta
+`TRUSTED_PROXY_HOPS=0`, el 429 vuelve») no se da con uvicorn de fábrica.
 
 **El que distingue.** Una API de `08edd63` (SQLite propia,
 `TRUSTED_PROXY_HOPS` por defecto) y siete corridas seguidas de
@@ -48,6 +48,24 @@ corrida 1 a 7: sale 0
 siete claves registro:h:10.x.x.x, una por corrida
 ```
 
+Lo mismo con `pantalla_maria9.js`, la que no mira la respuesta del registro
+(supuesto 4 de la Dev):
+
+```
+pantalla de 46959d76 (sin header)
+corrida 1 a 5: sale 0
+corrida 6 sale 1 FALLA: page.waitForFunction: Timeout 30000ms exceeded.
+corrida 7 sale 1 FALLA: page.waitForFunction: Timeout 30000ms exceeded.
+[('registro:h:127.0.0.1', 7)]
+
+pantalla de 08edd63
+corrida 1 a 7: sale 0
+siete claves registro:h:10.x.x.x, una por corrida
+```
+
+Sin el header, `maria9` falla igual, pero por espera vencida y no por 429:
+quien lee el rojo no ve la causa. Queda como riesgo, no como devolución.
+
 El guion entero corre la pantalla 8 veces (base y siete sabotajes): sin el
 header, del sexto registro en adelante da 429, que son los 3 `ROJO?` que la
 Dev contaba antes.
@@ -64,10 +82,20 @@ El límite del producto sigue en pie.
 - **D191:** `usa_el_sufijo_de_la_operacion` hoy recibe sólo `items`
   (`maria_generator.py:463`), y `sabotaje_maria9.sh` busca la firma con
   `iva_adicional`. El guion no se toca desde `9f1e5b52` (2026-10-25).
+  `git log -S` da que la firma cambió en `fe95a49b` (SUFIJOS-1, 2026-10-25).
+  Las actas de SUFIJOS-1 (`REPRODUCCION-SUFIJOS-1-2026-10-27.md` y su vuelta)
+  corren `sabotaje_sufijos1.sh` y no `sabotaje_maria9.sh`: **escape de la
+  PM**, aceptar una pieza que cambia una firma sin correr los guiones que la
+  anclan.
+- Quién llama a las cuatro pantallas: sus propios guiones de sabotaje
+  (`sabotaje_maria9.sh`, `sabotaje_separadores1.sh`, `sabotajes/org1b.sh`,
+  `sabotajes/validacion1.sh`), nada en `.github`. Ninguno ancla en la línea
+  de `/auth/register` que cambió.
 
 ## No corrido
 
-- `sabotaje_maria9.sh` (roto por D191) y las seis corridas de `maria9` y
-  `separadores1` de la Dev contra una sola base: no las repetí; el negativo
-  de la PM mide lo mismo sobre `validacion1`.
+- `sabotaje_maria9.sh` (roto por D191).
+- Las seis corridas de `separadores1` contra una sola base: no las repetí;
+  `sabotaje_separadores1.sh` entero dio 17 de 17 y las de `maria9` y
+  `validacion1` miden la misma causa.
 - Suite y `e2e_maria.sh`: la pieza no toca producto.

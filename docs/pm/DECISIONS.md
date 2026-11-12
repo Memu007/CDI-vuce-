@@ -801,3 +801,10 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   las deja» y no quedan. El login queda afuera: no da rojo.
 - D181 (b): a la cola, con el caso de la misma IP en simultáneo.
 
+
+## 2026-11-12: D145 (a) de MARIA aceptada sobre `08edd63`
+
+- Sus cuatro pantallas que registran varias veces contra una base mandan una IP inventada por registro (`_ip_nueva.js`). Acta `REPRODUCCION-D145-2026-11-12.md`.
+- D190 (a), por la PM: las seis copias de la Técnica, a la cola.
+- D191 (a), por la PM: `sabotaje_maria9.sh` no corre entero desde `fe95a49b` (SUFIJOS-1 cambió la firma de `usa_el_sufijo_de_la_operacion`); lo reancla MARIA, sólo arnés, 30 de 30 en rojo.
+- Escape de la PM: SUFIJOS-1 se aceptó sin correr `sabotaje_maria9.sh`, que anclaba la firma que cambió. `sabotaje_maria9.sh` entero entra en «Antes de publicar».
