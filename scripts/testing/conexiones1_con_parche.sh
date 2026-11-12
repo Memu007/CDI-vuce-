@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Corre un caso de CONEXIONES-1 con conexiones1_parche_b.diff aplicado sobre
-# HEAD, en un worktree descartable que se borra al terminar.
+# Corre un caso de CONEXIONES-1 con un parche aplicado sobre HEAD (por defecto
+# conexiones1_parche_b.diff; PARCHE=conexiones1_parche_nokey.diff elige otro), en un
+# worktree descartable que se borra al terminar.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/conexiones1_con_parche.sh \
 #        scripts/testing/conexiones1_pares.py
@@ -12,5 +13,5 @@ WT="$(mktemp -d /tmp/cdi-parche.XXXXXX)"
 cerrar() { git -C "$RAIZ" worktree remove --force "$WT"; }
 trap cerrar EXIT
 git -C "$RAIZ" worktree add --detach "$WT" HEAD >/dev/null 2>&1
-git -C "$WT" apply "$RAIZ/scripts/testing/conexiones1_parche_b.diff"
+git -C "$WT" apply "$RAIZ/scripts/testing/${PARCHE:-conexiones1_parche_b.diff}"
 "$RAIZ/scripts/testing/con_pg16.sh" "${PY:-python3}" "$WT/$1"
