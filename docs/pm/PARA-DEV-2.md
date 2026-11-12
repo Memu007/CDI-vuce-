@@ -3,64 +3,57 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Veredicto: D145 (a) aceptada sobre `08edd63` e integrada (2026-11-12 14:05 UTC)
+## Veredicto: D191 (a), devuelta sobre `f1809e95`; D192 y D193 decididas (2026-11-12 14:55 UTC)
 
-**Aceptada.** Informe `1b87d06`. Acta: `REPRODUCCION-D145-2026-11-12.md`.
-La integré con `merge` de `1b87d06`. **Traé mi rama con `merge`.**
+**Todavía no la acepto ni la integro: la puerta es salida 0 y da 1.** Hiciste
+bien en devolver el 30 como D en vez de arreglarlo en el guion. Acta:
+`REPRODUCCION-D191-2026-11-12.md`.
 
-**Lo reproducido sobre `08edd63`:**
-- `chequeo-6` da lo mismo que tu informe.
-- `validacion1` da 7 `ROJO` y `FALLAS=0`.
-- `org1b` da 7 `ROJO` y «sabotajes sin rojo: 0».
-- `sabotaje_separadores1` da 17 de 17.
+**Lo reproducido sobre `f1809e95`:** `sabotaje_maria9.sh` entero da 29 `ROJO`,
+`FALLA endpoint_sin_procedencia: quedó verde` y rc=1, en 290 s. Es lo mismo
+que tu informe.
 
-**Lo reproducido sobre `46959d7`, el rojo de antes:**
-- `org1b` da 5 `ROJO` y 2 `ROJO?` por 429, lo mismo que contaste vos.
-- La pantalla vieja de `validacion1` da 429 desde el sexto registro.
-- La pantalla vieja de `maria9` vence su espera en la sexta y la séptima
-  corrida: falla, pero sin decir 429 (tu supuesto 4).
+**D192: (a), decidido por la PM, con un cambio de nombre.** Lo medí:
+- Con `items = _items_con_procedencia(request)` → `items = request.items`,
+  `test_maria3_antes_de_generar.py` y `test_punta_a_punta1.py` dan 22 failed,
+  igual que tu tabla. Con esa mutación, la prueba del 30 pasa.
+- Pero esa misma prueba, corrida sola, se pone roja con la mutación del 7 y
+  con la del 9. Con las del 2, 3, 8 y 10 pasa. Todavía distingue un defecto,
+  así que no se borra.
 
-Con la pantalla nueva, siete corridas dejan siete IPs `10.x` distintas,
-cada una con 1.
+Entonces:
+- Sacá el sabotaje 30 del guion, con su comentario `# 30.`. El final pasa a
+  decir «los 29».
+- La prueba queda, con un nombre que diga lo que mira: si cada renglón trae
+  su sufijo, el endpoint no pide el de la operación. El nombre lo elegís
+  vos; su comentario también se corrige.
 
-**Tu riesgo de `TRUSTED_PROXY_HOPS=0` no se da en local.** Con `0`, el header
-sigue contando: uvicorn reescribe la IP del cliente desde `X-Forwarded-For`
-cuando el pedido viene de 127.0.0.1. Con uvicorn en `--no-proxy-headers`
-sí vuelve el 429 en la sexta. No fijes nada por esto. El límite del producto sigue en
-pie: ocho `curl` sin header dan 200 ×5 y 429 ×3.
+**D193: (a), decidido por la PM.** `con_propio_usa_el_general` queda como
+está.
 
-**Tus supuestos 1 a 5:** aceptados.
+**El escape es más ancho de lo que dije en D145.** La última vez que
+`sabotaje_maria9.sh` dio 30 de 30 fue sobre `efa2e08` (VALOR-1b, acta del
+2026-10-25). Después, VALOR-1c (`3df999c8`) cambió las anclas 24, 27 y 28, y
+su acta (aceptada sobre `a099655`) no corrió este guion. Recién después,
+SUFIJOS-1 (`fe95a49b`) rompió las otras. Lo corrijo en `DECISIONS.md` y en
+el acta de D145. No cambia nada de lo que tenés que hacer.
 
-**D190: (a), decidido por la PM.** Va a `COLA-LIMPIEZA.md` como una sola
-entrada para las seis pantallas de la Técnica.
-
-**D191: (a), decidido por la PM.** Es tu próxima pieza, abajo.
-
-Lo rompió `fe95a49b` (SUFIJOS-1, 2026-10-25), que cambió la firma de
-`usa_el_sufijo_de_la_operacion`. Al aceptar SUFIJOS-1 no se corrió
-`sabotaje_maria9.sh`: es un escape mío y queda anotado. `sabotaje_maria9.sh`
-entero entra en «Antes de publicar».
-
-### Sigue: D191 (a), sólo arnés
-
-Actualizá las anclas de `scripts/testing/sabotaje_maria9.sh` a la forma de
-hoy. No se toca producto.
+### Sigue: la vuelta de D191, sólo arnés
 
 **Puertas:**
-- `sabotaje_maria9.sh <SHA>` entero, desde un worktree limpio: «OK: los 30
+- `sabotaje_maria9.sh <SHA>` entero, desde un worktree limpio: «OK: los 29
   sabotajes dan rojo por la razón esperada» y sale 0.
-- En el informe, una tabla con tres columnas: ancla vieja, ancla nueva y qué
-  prueba se pone roja.
-- Si un sabotaje no da rojo con su ancla nueva, no lo arreglás en el guion:
-  vuelve como D, porque puede ser un hueco del producto.
+- `tests/test_maria9_sufijo_operacion.py` entero da la misma cantidad de
+  `passed` que en `f1809e95`.
+- La prueba renombrada se pone roja con la mutación del 9: la salida va en
+  el informe.
+- La prueba y el guion van en commits separados.
 - `chequeo-6` entero, con producto +0/−0.
 
-**Apenas entregues:** hacé un conteo estático de las anclas de una línea que
-ya no están en HEAD, en todos los guiones de sabotaje de `scripts/testing/`
-(`sabotaje_*.sh` y `sabotajes/*.sh`). Va como D, con el comando que lo mide.
-No arreglás ninguno de esos guiones: lo decido yo con el número en la mano.
+**Apenas entregues:** sigue D194, el conteo estático de anclas. Si ya lo
+empezaste, dejalo y terminá antes esta vuelta: la devolución va primero.
 
-**Tu rango de D: D190 a D199** (la próxima libre es D192).
+**Tu rango de D: D190 a D199** (la próxima libre es D195).
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
