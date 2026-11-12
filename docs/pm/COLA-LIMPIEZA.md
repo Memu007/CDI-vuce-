@@ -143,7 +143,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   cada clave mala paga bcrypt antes del freno (D146 b, D181 b). CONEXIONES-1 B:
   60 claves malas desde 60 IPs no las corta nada; el caso que falta probar es
   muchas a la vez desde la misma IP (`abuso1` sólo lo prueba en serie).
-- `scripts/testing/conexiones1_sonda.py` `_instalar` (96 líneas): partirla.
 - `proyecto_maria/main.py` `delete_cliente`: la operación queda sin cliente con su
   `generated_file`, y el TXT se sigue bajando (fila 4 del code-review de INTEGRAR-1).
 - `proyecto_maria/main.py` tope de registro: el `or` corta antes y el intento
@@ -182,9 +181,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `proyecto_maria/main.py:2008` (`MetricsMiddleware`): `asyncio.create_task`
   sin guardar la referencia; Python podría recolectar la tarea y perder el
   registro en `api_logs`. No vista en ninguna corrida con gc forzado (D207).
-- `scripts/testing/conexiones1_natural.py` (`CREDITOS`) y `conexiones1_pares.py`:
-  el SQL de «créditos al día» está en los dos; sacarlo a un solo lugar
-  (CONEXIONES-1 J; asignado a la Técnica).
 - Sabotajes cuya ancla incluye un comentario (familia de las dos Devs,
   D168 de MARIA): `grep -nE "^ +[\$'\"].*( #|//) +[[:alnum:]ÁÉÍÓÚáéíóú]"
   scripts/testing/sabotajes/*.sh scripts/testing/sabotaje_*.sh` (aproximado:
@@ -198,4 +194,4 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `scripts/testing/pantalla_cliente1.js`, `_despacho1a.js`, `_destino1.js`,
   `_estudio1.js`, `_estudio1b.js` y `_orden1.js` (de la Técnica) tienen su
   propia copia de la IP inventada para `X-Forwarded-For`; pasar a
-  `require('./_ip_nueva')` (D190 de MARIA).
+  `require('./_ip_nueva')` (D190 de MARIA; asignado a la Técnica).
