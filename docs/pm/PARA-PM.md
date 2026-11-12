@@ -66,7 +66,14 @@ mías:
     - el paso de `tests/test_cobro_corte1.py:598`;
     - los docstrings de `tests/test_prelaunch_block2.py` (11, 499, 524) y
       `tests/test_prelaunch_block3.py` (12, 555, 561, 581). Sus casos le pegan
-      a la ruta y siguen valiendo.
+      a la ruta y siguen valiendo;
+    - `arbol()` de `scripts/testing/conexiones1_creditos.py:188`, que hace
+      `inspect.getsource(main_mod.require_active_billing)` antes de medir: sin
+      la función da `AttributeError` y el caso 5 no corre. En el commit de
+      pruebas pasa a mirar `require_billing_vigente`.
+
+    `grep -rn require_active_billing scripts/ tests/ docs/pm/herramientas`
+    no da otros (fuera de los `.pyc`); `conexiones1_medir.py` no la nombra.
 
     **Recomendada:** §6 pide restar.
   - (b) Dejarla.
@@ -86,6 +93,13 @@ mías:
     `_cuenta_con_suscripciones` (11804/11816).
   - Si el caso 6 da rojo en algún par con (a), (b) entra en la pieza con ese
     rojo. El caso espejo (webhook contra alta) no está medido.
+  - Los otros `with_for_update()` sin `of` también toman `users` u
+    `organizations`: `users` en `/auth/request-password-reset` (1833) y en
+    `DELETE /api/organizations/members/{username}` (10992); `organizations`
+    en `/auth/register` con invitación (3522) y en
+    `/api/organizations/invite` (10859). El de 7135 es `system_backups`.
+    Ninguno cuenta operaciones; no los medí contra el alta y quedan en el
+    riesgo de la FK.
 - **D204. `past_due` pisado por una renovación** (tu «leído, no medido»).
   También lo leí, sin medirlo.
   - El orden que temo: `require_billing_vigente` lee la cuenta sin candado;
@@ -93,7 +107,8 @@ mías:
     el medio, el webhook renueva y confirma. Después `_vencer_y_guardar`
     escribe `billing_status=past_due` sobre la cuenta ya renovada. Quedaría
     pagada y bloqueada.
-  - Pasa lo mismo hoy y con (b): (b) no toca esa lectura.
+  - (b) no cambia el código de esa lectura. Que la carrera exista hoy no
+    está medido.
   - El caso 7 lo mide primero sobre HEAD. Si no reproduce, lo digo así y no
     toco nada. Si reproduce:
     - (a) Arreglarlo en la pieza: vencer con un `UPDATE` condicional
@@ -104,8 +119,23 @@ mías:
 
 ## La forma: (b) más `FOR NO KEY UPDATE`
 
-`main.py` +22/−5 (con D201 (a), unas 20 líneas menos). Es el árbol que medí;
-cada parte con su caso:
+Lo medido (resultado 1 a 3) fue un árbol con `main.py` +22/−5 y
+`tests/test_cobro_corte1.py` +2/−1. La tabla de abajo no es ese árbol: le
+aplica D201 (a) y D202 (a). Lo que cambia:
+
+- En lo medido, vigente, `require_active_billing` y analyze tienen
+  `await db.commit()` directo; `_soltar_conexion` está sólo en NCM. Con
+  D202 (a), los tres puntos usan `_soltar_conexion`, y el de
+  `require_active_billing` se va con la función (D201 a).
+- **Un test de cobro cambia para que pase la forma.** `_commit_que_falla`
+  (`test_cobro_corte1.py:829`) hace fallar todo `commit` de `main.py`. Con el
+  `commit` nuevo de vigente, la ruta caía ahí y no en el que el caso quiere
+  romper, así que lo medido deja pasar el de `require_billing_vigente`. Con
+  D202 (a) el ajuste es el mismo, para `_soltar_conexion`. Lo que el caso
+  sigue exigiendo no cambia: un `commit` de la ruta que falla no da 200 con
+  datos perdidos.
+
+Cada parte con su caso:
 
 | Cambio | Por qué | Caso |
 |---|---|---|
@@ -142,7 +172,7 @@ esperando en `pg_stat_activity`. Captura el SQL con el evento
 | Camino | Qué usa | Caso o razón |
 |---|---|---|
 | `/api/operations/manual` | hoy `require_active_billing`; con (b), vigente + `_contar_operacion_bloqueada` | 2, 3, 5, 6, 8 |
-| `/api/clientes/{id}/operaciones` (guardar) | vigente + `_contar_operacion_bloqueada` | 6 (alta + guardado), 8 |
+| `/api/clientes/{id}/operaciones` (guardar) | vigente + `_cliente_con_cuenta_bloqueada` (8158) y, si la operación es nueva, `_contar_operacion_bloqueada` (8181) | 6 (alta + guardado), 8 |
 | `/generate_maria` y `/generate_maria_export` → `_contar_maria` | vigente + `_cuenta_bloqueada` + `_contar_en_la_cuenta` (`can_create_operation`) | cuentan bajo el mismo candado que el alta: la línea de `of=` los cubre. Van al caso 6 como dato: el par generar MARIA + recarga de la org, con su rojo sobre (b) sin `of=`. El conteo y el tope los cubren los casos existentes de `test_cobro_corte1.py` (370 a 530) |
 | `DELETE /api/clientes/public/{id}` (`_cliente_con_cuenta_bloqueada`) | toma `_cuenta_bloqueada` y no cuenta | no lleva caso propio: el candado es el mismo y lo cubre `of=`. El caso 6 mira el SQL de esa función |
 | `/process_operation/` (análisis de PDF), `/upload_pdf/public`, `/api/migrations/analyze`, `/api/migrations/{id}/confirm`, `/api/ncm/sugerir` | sólo `require_billing_vigente`; no cuentan | 1 (no retienen) y 4 (base caída, con `/process_operation/` como dato de vigente). No llaman a `can_create_operation` |
@@ -177,11 +207,27 @@ print(v, k(select(User).with_for_update()) == k(select(User).with_for_update(key
 # 2. Rutas por dependencia: tiene que mostrar 3755 con require_active_billing
 #    y 8 líneas con require_billing_vigente.
 grep -n -e "Depends(require_active_billing)" -e "Depends(require_billing_vigente)" proyecto_maria/main.py
+
+# 3. Quién cuenta y quién toma el candado: tiene que mostrar las 13 líneas
+#    de abajo, y ninguna en /process_operation/ ni en /api/migrations/.
+grep -n -e "_contar_operacion_bloqueada(" -e "_contar_maria(" -e "_contar_en_la_cuenta(" \
+  -e "_cliente_con_cuenta_bloqueada(" -e "record_operation_created(" proyecto_maria/main.py
 ```
 
 Salida de las dos, corridas acá: `2.0.25 True False`; `3755:    db_user: User
 = Depends(require_active_billing),` y 3840, 4611, 5032, 5296, 7147, 7245,
 8132 y 10335 con `_cobro=Depends(require_billing_vigente),`.
+
+La 3, corrida acá, da 2331, 2337, 2340, 2348, 3804, 5225, 5368, 6355, 6376,
+6423, 7769 y 8158, 8181. Por ruta:
+- `record_operation_created` sólo dentro de `_contar_en_la_cuenta` (2348);
+- `_contar_en_la_cuenta` desde `_contar_operacion_bloqueada` (2337) y
+  `_contar_maria` (6376);
+- `_contar_operacion_bloqueada` desde la manual (3804) y el guardado (8181);
+- `_contar_maria` desde `/generate_maria` (5225) y `/generate_maria_export`
+  (5368);
+- `_cliente_con_cuenta_bloqueada` desde el DELETE de cliente público (7769) y
+  el guardado (8158).
 
 Lo del resultado 1 a 3 (créditos, negativo y log de Postgres) lo corrí sobre
 árboles sin commitear. Se reproduce con los casos 5 y 6 de la pieza: hoy no
@@ -194,6 +240,9 @@ hay copiable.
 - Suite completa, `e2e_maria.sh`, revisiones y adversarios: van con la pieza.
 - El caso espejo: webhook o `_cuenta_con_suscripciones` contra el alta con
   `FOR NO KEY UPDATE`.
+- El par generar MARIA + recarga: su rojo sin `of=` es esperado (pasa por
+  `_cuenta_bloqueada`, como el alta), no visto.
+- El árbol con D201 (a) y D202 (a): lo medido es el de la sección «La forma».
 
 ## Riesgos
 
