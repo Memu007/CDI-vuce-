@@ -252,6 +252,20 @@ sabotaje "/mine: todo miembro es dueño" "$MINE" "" \
 sabotaje "/mine: quien pide es dueño" "$MINE" "" \
   "\"is_owner\": user[\"username\"] == org.owner_username," "\"is_owner\": True,"
 
+# El dueño no se saca a sí mismo, ni con otras mayúsculas, ni después de tocar Mercado Pago.
+YO="test_el_duenio_no_se_saca_a_si_mismo_y_el_estudio_queda_igual"
+GUARDA='    if username == org.owner_username:
+        raise HTTPException(status_code=400, detail="No podés removerte a vos mismo del estudio")
+'
+sabotaje "el dueño se saca a sí mismo" "$YO" "" "$GUARDA" ""
+sabotaje "la guarda va después de Mercado Pago" "$YO" "" "$GUARDA" "" \
+  "    member.organization_id = None
+" "$GUARDA    member.organization_id = None
+"
+sabotaje "sacar busca sin mayúsculas" "$YO" "" \
+  "select(User).where(User.username == username, User.organization_id == org.id)" \
+  "select(User).where(func.lower(User.username) == username.lower(), User.organization_id == org.id)"
+
 # El título de la columna del archivo de DESPACHO-1a.
 sabotaje "el archivo dice «Ultima vez»" "tests/test_despacho1a.py::test_el_archivo_se_abre_y_trae_lo_guardado" "" \
   "    (\"Última vez\", \"ultima_vez\")," "    (\"Ultima vez\", \"ultima_vez\"),"
