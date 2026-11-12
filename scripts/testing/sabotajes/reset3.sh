@@ -22,7 +22,7 @@ cd "$WT"
 export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
        DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=.
 FALLAS=0
-T=tests/test_abuso1.py::test_reset_tres_por_hora_por_cuenta_aunque_cambie_la_ip
+T=tests/test_abuso1.py::test_tres_por_hora_por_cuenta_aunque_cambie_la_ip[reset]
 
 casos_sqlite() {
   rm -f test.db
