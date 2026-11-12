@@ -176,5 +176,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   líneas; partirla (AVISO de `chequeo-6` aceptado en BORRADOR-1).
 - `proyecto_maria/static/v2/screens/profile.js` `open()`: mueve el foco a «Mi CUIT»
   150 ms después de cargar, aunque la persona ya esté escribiendo en otro
-  campo; con carga lenta, lo escrito cae ahí (leído, no corrido; acta de
-  BORRADOR-1, IDS-PYTEST).
+  campo; con carga lenta, lo escrito cae ahí (reproducido con
+  `scripts/testing/foco_perfil.sh`, acta de BORRADOR-1, FOCO-PERFIL). El
+  arreglo lleva en el mismo commit el cambio de `abrirMisEstudios` de
+  `pantalla_estudio1.js` (hoy espera ese foco) y actualiza o saca
+  `foco_perfil.sh`, que reemplaza ese `setTimeout` exacto.

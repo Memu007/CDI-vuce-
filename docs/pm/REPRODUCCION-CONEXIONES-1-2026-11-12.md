@@ -85,3 +85,85 @@ antes de entrar al login, con almacenamiento en memoria en un solo worker.
   CONEXIONES-1 C.
 - El caso de otro usuario, la cuota de 50 en producción y la misma IP en
   simultáneo (arriba).
+
+# Reproducción de CONEXIONES-1 C (2026-11-12, PM principal)
+
+Entrega `9ecfd2ac` (informe), arnés `33c61162` y `76b50666`, Dev técnica.
+Base `8d61bb09`. `chequeo-6 8d61bb09 76b50666`: producto +0/−0, arnés
++58/−27, historia vacía, 0 avisos.
+
+**Estado: aceptada como medición sobre `9ecfd2ac` e integrada.** D182 (el
+arreglo) va a Emi.
+
+Corrido en `/tmp/cdi-pm/wt-con1c` (`76b50666`) y en `/tmp/cdi-pm/wt-con1c-fix`
+(`76b50666` más el arreglo a mano), todo `--pico 60 --lento 30`, con
+`con_pg16.sh`. Mi arreglo es el del informe línea por línea; el diff del
+informe no entra con `git apply` porque el hunk de `main.py:10448` está
+cortado, y lo apliqué a mano. Lo que corrí:
+
+```diff
+@@ require_billing_vigente
++    # Termina la transacción de lectura: si no, la conexión queda tomada
++    # mientras el endpoint espera a la IA o a la lectura del PDF.
++    await db.commit()
+@@ sugerir_ncm, después de `limite = _segundos_de_entorno(...)`
++        await db.commit()
+@@ tests/test_cobro_corte1.py, _commit_que_falla
+-    if sys._getframe(1).f_code.co_filename != main.__file__:
++    quien = sys._getframe(1).f_code
++    if quien.co_filename != main.__file__ or quien.co_name == "require_billing_vigente":
+```
+
+## Lo corrido: la otra cuenta, espera máxima
+
+| Corrida | bcrypt | sugerir (Gemini) | subida de PDF | 500 en total | rc |
+|---|---|---|---|---|---|
+| hoy, sin cuota | 3,01 s | **30,02 s** | **30,0 s** | 10 (de la cuenta que satura) | 4 |
+| hoy, cuota de producción | 3,38 s | **30,04 s** | **5,26 s** | 0 | 4 |
+| arreglo, sin cuota | 2,89 s | 0,32 s | 0,04 s | 0 | 0 |
+| arreglo, cuota de producción | 2,81 s | 0,35 s | 0,06 s | 0 | 0 |
+
+- Igual al informe en la forma y en el orden de magnitud. La subida con
+  cuota me dio 5,26 s contra 6,51 s: es una carrera.
+- Con el arreglo, en sugerir, máxT/máxPG baja de 50/50 a 27/28 y 25/28;
+  `close_con_transaccion` baja de 280 a 105. Al final, `tomadas` 0 en las
+  cuatro.
+- **`sabotajes/conexiones1.sh 76b50666`:** cinco `BIEN` y rc=0 (sin sabotaje,
+  los dos `close` cancelados y los dos sabotajes de producto).
+- **Mi negativo, pico de 40 con el arreglo:** rc=0, «sin conexiones
+  tomadas», log limpio, 0 × 500. La otra cuenta espera 2,29 s (bcrypt),
+  0,25 s (sugerir) y 0,06 s (subida). La subida sigue en máxT/máxPG 40/40 con
+  un pico de 40 (con 60, 50/50): cada pedido toma una conexión, pero la otra
+  cuenta no espera. Pico momentáneo, no retención (inferido: no muestreé en el
+  tiempo).
+- **pytest con el arreglo** (`test_cobro_corte1.py` y `test_excel2b.py`): 201
+  passed. El rc=1 es sólo el piso de cobertura, que no aplica a una parte de
+  la suite.
+- **Sin el ajuste del inyector** (`test_cobro_corte1.py`): 4 failed, los cuatro
+  que nombra el informe. El ajuste es necesario.
+- **Ocho rutas con `Depends(require_billing_vigente)`:** las conté en
+  `main.py`; coinciden con la lista del informe.
+
+## El adversario (opus alto) y lo que verifiqué
+
+Verificado por mí:
+- `/api/migrations/analyze` pasa por la dependencia y
+  después lee el Excel (hasta 60 s). El arreglo suelta la conexión de la
+  dependencia, pero no medí si el análisis toma otra: a medir.
+
+Para medir, no verificados:
+- `/api/operations/manual` retendría la conexión mientras espera el cuerpo.
+- Cada pedido pide conexión dos veces (usuario y ruta).
+- El `commit` de `sugerir_ncm` no tiene manejo de error propio.
+- No copiar el `commit` a `require_active_billing` sin resolver
+  `_expire_extra_ops` (`billing_service.py:109-118`): es condición de la pieza.
+- Falta una prueba rápida que dé rojo sin los `commit`. El medidor ya
+  distingue (rc=4 hoy, rc=0 con el arreglo); falta un sabotaje con ancla en
+  código en `conexiones1.sh` y un pytest.
+
+## No corrido
+
+- `/security-review`, la suite completa y `e2e_maria.sh` con el arreglo: van en
+  la pieza de producto, si Emi dice que sí.
+- La subida muestreada en el tiempo y `/api/migrations/analyze` con otra
+  cuenta: CONEXIONES-1 D.
