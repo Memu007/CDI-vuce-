@@ -22,9 +22,14 @@ Después de cada fase no espera un tiempo fijo, sino condiciones:
   `pg_stat_activity` no tiene conexiones fuera de reposo ni más de las que el
   pool cree tener.
 
-Sale con 0 si no queda nada tomado, con 1 si queda algo o el log muestra una
-conexión perdida, y con 2 si la medición no vale (respuestas inesperadas, el
-worker se recicló o la app no arrancó).
+En cada pico, los pedidos rápidos son de otra cuenta: miden lo que espera un
+usuario que no carga nada mientras otro satura.
+
+Sale con 0 si no queda nada tomado y la otra cuenta no sufrió; con 1 si queda
+algo tomado o el log muestra una conexión perdida; con 2 si la medición no vale
+(respuestas inesperadas, el worker se recicló o la app no arrancó), y con 3 si
+nada quedó tomado pero el pool se llenó: algún 500, el aviso de QueuePool en el
+log o la otra cuenta esperando más de `--espera-otra`.
 """
 
 import argparse
@@ -55,15 +60,14 @@ import jwt
 
 RAIZ = Path.cwd()
 SONDA = Path(__file__).resolve().with_name("conexiones1_sonda.py")
-USUARIO = "medicion"
+USUARIO, OTRA = "medicion", "medicion_otra"
 DESCRIPCION = "taladro inalambrico de prueba"
 
-# Las dos primeras y la del pool lleno cuentan como fuga.
 SEÑALES_DE_FUGA = (
     "non-checked-in connection",
     "Task was destroyed but it is pending",
-    "QueuePool limit",
 )
+SEÑALES_DE_POOL_LLENO = ("QueuePool limit",)
 SEÑALES_A_LA_VISTA = (
     "CancelledError",
     "UnboundLocalError",
@@ -81,8 +85,10 @@ DETALLES_401 = {
     "revocado": {"Token revocado", "Sesión inválida o vencida"},
     "login_clave_mala": {"Credenciales inválidas"},
 }
-ESPERADO = {"normal": 200, "sugerir": 200, "pdf_sin_lector": 503,
+ESPERADO = {"normal": 200, "otra": 200, "sugerir": 200, "pdf_sin_lector": 503,
             "pico_gemini": 200, "pico_pdf": 422, "pico_bcrypt": 401}
+# Lo que el pico puede devolverle a la cuenta que lo carga sin que sea un rojo.
+LIMPIOS_DEL_PICO = {429, 503, 504}
 
 
 def argv_del_dockerfile(puerto: int) -> list:
@@ -157,7 +163,8 @@ class Medicion:
         self.puerto, self.secreto = puerto, secreto
         self.sonda_cli = httpx.AsyncClient(base_url=f"http://127.0.0.1:{puerto_sonda}", timeout=10)
         self.c = httpx.AsyncClient(base_url=f"http://127.0.0.1:{puerto}", timeout=90)
-        self.filas, self.invalida, self.fuga = [], False, False
+        self.filas, self.invalida, self.fuga, self.lleno = [], False, False, False
+        self.quinientos = 0
         self.pdf = pdf_en_blanco()
 
     async def sonda(self, ruta="/", **params) -> dict:
@@ -192,11 +199,12 @@ class Medicion:
 
     # --- pedidos -----------------------------------------------------------
 
-    def tokens(self, token):
+    def tokens(self, token, otra):
         exp = datetime.now(timezone.utc) + timedelta(hours=1)
         firmar = lambda datos, clave=self.secreto: jwt.encode(datos, clave, "HS256")
         self.t = {
             "normal": token,
+            "otra": otra,
             "mal_firmado": firmar({"sub": USUARIO, "jti": "x", "exp": exp}, "otra-" + self.secreto),
             "sin_sub": firmar({"jti": "x", "exp": exp}),
             "inexistente": firmar({"sub": "no-existe", "jti": "x", "exp": exp}),
@@ -301,10 +309,11 @@ class Medicion:
         await self.fase(nombre, [self.mandar(t, codigos) for t in tipos], len(tipos))
         self.revisar_codigos(nombre, codigos)
 
-    def revisar_codigos(self, nombre, codigos):
+    def revisar_codigos(self, nombre, codigos, aceptados=None):
         print(f"{nombre}: {dict(sorted(codigos.items()))}")
+        aceptados = aceptados or {}
         malos = {k: v for k, v in codigos.items()
-                 if k[1] != ESPERADO.get(k[0], 401) or k[2]}
+                 if k[1] != ESPERADO.get(k[0], 401) and k[1] not in aceptados.get(k[0], ()) or k[2]}
         if malos:
             print(f"  respuestas inesperadas: {malos}")
             self.invalida = True
@@ -338,13 +347,21 @@ class Medicion:
 
         async def rapidos():
             await self.esperar(self._subio, 30, clave, antes)
-            await asyncio.gather(*(self.mandar("normal", codigos, latencias) for _ in range(normales)))
+            await asyncio.gather(*(self.mandar("otra", codigos, latencias) for _ in range(normales)))
 
         await self.fase(nombre, [lentos(), rapidos()], n + normales)
         await self.sonda("/modo", **{k: 0 for k in modo})
+        espera = round(max(latencias, default=0), 2)
         self.filas[-1]["enviados"] = n + normales
-        self.filas[-1]["latencia_normal_max"] = round(max(latencias, default=0), 2)
-        self.revisar_codigos(nombre, codigos)
+        self.filas[-1]["latencia_otra_max"] = espera
+        quinientos = sum(v for (_, codigo, _), v in codigos.items() if codigo == 500)
+        self.quinientos += quinientos
+        print(f"{nombre}: la otra cuenta recibió {codigos[('otra', 500, '')]} × 500 "
+              f"y esperó hasta {espera} s; en total, {quinientos} × 500")
+        if quinientos or espera > self.a.espera_otra:
+            self.lleno = True
+        # El 500 es el rojo del pool lleno, no una medición que no vale.
+        self.revisar_codigos(nombre, codigos, {tipo: LIMPIOS_DEL_PICO | {500}, "otra": {500}})
 
     async def todas(self):
         a, f = self.a, functools.partial
@@ -381,14 +398,14 @@ class Medicion:
         print(f"{'fase':<23}{'env':>4}{'disp':>5}{'tlog':>5}{'filas':>6}{'máxT':>5}{'máxPG':>6}"
               f"{'quedan':>7}  {'quieto':<7}{'seg':>6}  extra")
         for f in self.filas:
-            extra = {k: f[k] for k in ("codigos_en_api_logs", "cancelados", "errores", "latencia_normal_max", "pendiente")
+            extra = {k: f[k] for k in ("codigos_en_api_logs", "cancelados", "errores", "latencia_otra_max", "pendiente")
                      if f.get(k)}
             print(f"{f['nombre']:<23}{f['enviados']:>4}{f['dispatch']:>5}{f['tareas_log']:>5}"
                   f"{f['filas']:>6}{f['max_tomadas']:>5}{f['max_pg']:>6}{f['quedaron']:>7}  "
                   f"{'sí' if f['quieta'] else 'NO':<7}{f['seg']:>6}  {extra} pg={f['pg_final']}")
 
 
-def entorno_de_la_app(url_base, puerto, puerto_sonda, secreto, tmp) -> dict:
+def entorno_de_la_app(url_base, puerto, puerto_sonda, secreto, tmp, cuota_de_produccion) -> dict:
     entorno = {
         k: v for k, v in os.environ.items()
         if not k.startswith(("PYTEST", "REDIS", "DATABASE", "JWT", "SECRET", "GEMINI", "BACKUP1A"))
@@ -399,10 +416,12 @@ def entorno_de_la_app(url_base, puerto, puerto_sonda, secreto, tmp) -> dict:
         FRONTEND_URL="http://127.0.0.1", CDI_DATA_DIR=str(tmp / "data"),
         VUCE_MODE="fake", TARIFAR_MODE="fake", AFIP_MODE="fake",
         DOLARAPI_BASE="http://127.0.0.1:9/v1/dolares", GEMINI_API_KEY="",
-        AI_DAILY_PDF_LIMIT="100000",
         PYTHONPATH=str(RAIZ), PYTHONUNBUFFERED="1", PYTHONDONTWRITEBYTECODE="1",
         CONEXIONES1_SONDA_PUERTO=str(puerto_sonda),
     )
+    entorno.pop("AI_DAILY_PDF_LIMIT", None)
+    if not cuota_de_produccion:
+        entorno["AI_DAILY_PDF_LIMIT"] = "100000"
     return entorno
 
 
@@ -424,17 +443,17 @@ async def arrancar(c, proc, log, med) -> bool:
         await asyncio.sleep(0.2)
 
 
-async def sembrar_y_entrar(med) -> str | None:
+async def sembrar_y_entrar(med, usuario) -> str | None:
     clave = secrets.token_urlsafe(16)
     await med.pg.execute(
         "insert into users (username, email, password, name, plan, roles, "
         "is_verified, billing_status, trial_ends_at) values "
         "($1, $2, $3, 'Medicion', 'premium', '[]'::json, true, 'active', $4)",
-        USUARIO, "medicion@ejemplo.test",
+        usuario, f"{usuario}@ejemplo.test",
         bcrypt.hashpw(clave.encode(), bcrypt.gensalt()).decode(),
         datetime.now(timezone.utc) + timedelta(days=3650),
     )
-    r = await med.c.post("/auth/login", json={"username": USUARIO, "password": clave},
+    r = await med.c.post("/auth/login", json={"username": usuario, "password": clave},
                          headers={"X-Forwarded-For": ip_al_azar()})
     if r.status_code != 200:
         print("no pude entrar con la cuenta sembrada:", r.status_code, r.text[:300])
@@ -447,11 +466,11 @@ async def medir(med, proc, log) -> None:
     if not await arrancar(med.c, proc, log, med):
         med.invalida = True
         return
-    token = await sembrar_y_entrar(med)
-    if token is None:
+    tokens = [await sembrar_y_entrar(med, u) for u in (USUARIO, OTRA)]
+    if None in tokens:
         med.invalida = True
         return
-    med.tokens(token)
+    med.tokens(*tokens)
     if os.environ.get("CONEXIONES1_SABOTAJE"):
         await med.sonda("/armar")
     pid0 = (await med.sonda())["pid"]
@@ -469,11 +488,16 @@ async def medir(med, proc, log) -> None:
 def leer_log(log, med) -> None:
     texto = log.read_text()
     print()
-    for s in SEÑALES_DE_FUGA + SEÑALES_A_LA_VISTA:
+    for s in SEÑALES_DE_FUGA + SEÑALES_DE_POOL_LLENO + SEÑALES_A_LA_VISTA:
         n = texto.count(s)
         print(f"log: {s!r}: {n}")
         if n and s in SEÑALES_DE_FUGA:
             med.fuga = True
+        if n and s in SEÑALES_DE_POOL_LLENO:
+            med.lleno = True
+        elif s in SEÑALES_DE_POOL_LLENO and med.quinientos:
+            print(f"  {med.quinientos} × 500 en los picos sin {s!r} en el log: no sé de qué son")
+            med.invalida = True
     print(f"log completo: {log}")
 
 
@@ -489,6 +513,10 @@ def parsear():
     ap.add_argument("--pico-normales", type=int, default=12)
     ap.add_argument("--lento", type=float, default=2.0, help="segundos de Gemini y del lector falsos")
     ap.add_argument("--plazo", type=float, default=90.0)
+    ap.add_argument("--espera-otra", type=float, default=5.0,
+                    help="segundos que la otra cuenta puede esperar en un pico")
+    ap.add_argument("--cuota-de-produccion", action="store_true",
+                    help="sin AI_DAILY_PDF_LIMIT: la cuota diaria de PDF de producción")
     a = ap.parse_args()
     if not a.pg_admin:
         sys.exit("falta la URL de Postgres (argumento o BACKUP1A_PG_URL)")
@@ -511,16 +539,18 @@ async def main() -> int:
         print("gunicorn:", " ".join(shlex.quote(x) for x in argv[1:]))
         with open(log, "w") as salida:
             proc = subprocess.Popen(argv, cwd=RAIZ, stdout=salida, stderr=subprocess.STDOUT,
-                                    env=entorno_de_la_app(url_base, puerto, puerto_sonda, secreto, tmp),
+                                    env=entorno_de_la_app(url_base, puerto, puerto_sonda, secreto, tmp,
+                                                          a.cuota_de_produccion),
                                     start_new_session=True)
         med = Medicion(a, pg, base, puerto, puerto_sonda, secreto)
         await medir(med, proc, log)
     finally:
         await cerrar(admin, pg, proc, med, base)
     leer_log(log, med)
-    codigo = 1 if med.fuga else 2 if med.invalida else 0
+    codigo = 1 if med.fuga else 2 if med.invalida else 3 if med.lleno else 0
     print({0: "sin conexiones tomadas", 1: "QUEDAN CONEXIONES TOMADAS",
-           2: "LA MEDICIÓN NO VALE"}[codigo])
+           2: "LA MEDICIÓN NO VALE",
+           3: "POOL LLENO: ninguna conexión quedó tomada, pero la otra cuenta o el log sufrieron"}[codigo])
     return codigo
 
 
