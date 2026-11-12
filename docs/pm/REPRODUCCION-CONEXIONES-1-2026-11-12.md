@@ -174,8 +174,13 @@ Entrega `c1311852` (informe), arnés `ebd2c1fd` y `f9962e6e`, merge `75349ca8`,
 Dev técnica. Base `18202930`. `chequeo-6 18202930 f9962e6e`: producto +0/−0,
 arnés +140/−21, historia vacía, 0 avisos.
 
-**Estado: en revisión.** Falta el adversario sobre `_leer_cuerpo` y el
-`commit` de analyze; el veredicto va en `PARA-DEV.md`.
+**Estado: aceptada como medición sobre `c1311852` e integrada.** D183 se suma
+a D182 para Emi, con una condición nueva (abajo, hallazgo 1).
+
+**Lo que cierra:** el pedido manual se frena sólo del lado del cliente (el
+medidor manda medio cuerpo; el producto no tiene nada inyectado). Con eso,
+**hoy una cuenta con sesión le hace dar 500 a otra cuenta**, sin IA ni PDF de
+por medio. Era el «no corrido» de B.
 
 Corrido en `/tmp/cdi-pm/wt-con1d` (`f9962e6e`) y en `/tmp/cdi-pm/wt-con1d-fix`
 (`f9962e6e` más el diff del informe, que entra con `git apply --check` rc=0),
@@ -202,8 +207,8 @@ todo `--pico 60 --lento 30` con `con_pg16.sh`.
   toman pedidos que esperan el candado de validación antes del lector. Con el
   arreglo, T=50 sólo en la muestra de llegada (~0,56 s) y después 0.
 - **Filas perdidas en `api_logs` (hoy, `pico_excel`):** 72 pedidos, 62
-  filas; las 10 que faltan coinciden con los 10 `Error logging metrics`.
-  Con el pool lleno, el supuesto del informe se sostiene.
+  filas. Los 10 `Error logging metrics` los conté en todo el log, no por
+  fase: que sean esas 10 es inferido.
 - `close_con_transaccion`: 434 hoy, 165 con el arreglo.
 - **`sabotajes/conexiones1.sh f9962e6e`:** cinco `BIEN`, rc=0.
 
@@ -216,3 +221,37 @@ todo `--pico 60 --lento 30` con `con_pg16.sh`.
   0 conexiones tomadas durante la lectura.
 - Las 1113 líneas «Task was destroyed» son anteriores al diff.
 
+
+## El adversario (opus alto) sobre `_leer_cuerpo` y el `commit` de analyze
+
+Corrió con SQLite y NullPool, no con Postgres. Suite tocada con el diff: 204
+passed.
+
+1. **Cliente que corta a mitad del cuerpo: 500 y ERROR con traza; hoy, 400
+   sin ruido. Reproducido por mí** (ASGI a mano en `wt-con1d-fix`, sesión
+   válida, dos trozos y `http.disconnect`): con `_leer_cuerpo`, `[500]
+   ClientDisconnect`; anulándola, `[400] Body JSON inválido`. Cualquier
+   cuenta con sesión lo provoca, también una impaga. No toca datos.
+   **Condición de la pieza de producto:** un corte a mitad del cuerpo
+   contesta como hoy, sin ERROR ni fila 500.
+2. **El cuerpo entero se lee antes del 402 y del 429** (del adversario, no
+   reproducido por mí): una cuenta impaga hace leer 32 MB antes del 402. El
+   401 y el 403 de CSRF siguen antes. El mismo vector ya existe sin sesión
+   en las rutas con cuerpo tipado (`/process_operation/`). **Riesgo**;
+   sugerencia para la pieza: un tope de tamaño.
+3. **analyze toma una conexión nueva al final** para guardar el respaldo;
+   con el pool lleno, la falla llega después de leer el Excel, con
+   rollback y 500. No pierde nada. Leído, no corrido. **Riesgo.**
+
+Lo que no rompe, según el adversario: el `commit` de analyze no confirma
+nada ajeno (`require_billing_vigente` y `_vencer_y_guardar` ya confirmaron);
+los clientes siguen usables (`expire_on_commit=False`); no hay carrera
+nueva (`confirm` relee con `FOR UPDATE`); la ruta no usa `SET LOCAL`.
+
+## No corrido
+
+- «Hoy, cuota de producción» en D (la de C sigue valiendo para sugerir y
+  la subida).
+- El adversario con Postgres; el hallazgo 3 corrido.
+- `/security-review`, la suite completa y `e2e_maria.sh` con el arreglo: van
+  en la pieza de producto, si Emi dice que sí.
