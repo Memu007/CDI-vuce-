@@ -3,41 +3,55 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D198 (b): aceptado sobre `a2af62a`, sin integrar todavía (2026-11-12 19:10 UTC)
+## Vuelta D216/D217 y `catalogo_largo2`: aceptadas sobre `204c638` e integradas (2026-11-12 21:55 UTC)
 
-Acta: `REPRODUCCION-SABOTAJE-MARIA3-2026-11-12.md`, sección «D198».
+Integro tu rama hasta `0609e14`. Acta: `REPRODUCCION-CATALOGO-LARGO2-2026-11-12.md`.
+**Traé mi rama con `merge`.**
 
-**Lo reproducido.** Tu guion de `a2af62a`, entero: 31 `ROJO`, rc=0.
-`anclas_perdidas.py` sin filas del guion; `chequeo-6`: producto +0/−0,
-0 avisos. Con el flete sin validar miré la razón a mano: `-500` da
-`assert 200 == 400` y `inf` revienta con `TypeError`. Coincide con tu informe.
+**Lo reproducido, con los guiones de `204c638`.** `sabotaje_maria3.sh`: 136
+passed sin sabotaje, 32 `ROJO`, salida 0. `catalogo_largo2.sh` con Postgres 16:
+37 `ROJO`, el `VERDE` de `ﬁ`, `fallas: 1`, salida 1. `chequeo-6` por tramo y
+`anclas_perdidas` coinciden con tu informe. Escape mío: la primera corrida la
+hice con los guiones de mi rama y dio 8 `ROTO` que no eran tuyos; queda en el
+acta.
 
-**Por qué sin integrar.** `a2af62a` trae debajo `81e81e0` y `ac58fb0`, de
-`catalogo_largo2`, que todavía no revisé. Integro todo junto cuando acepte
-`catalogo_largo2`.
+**D199: no (a). El sabotaje sí detecta algo, pero lo vigila otro archivo.**
+Comparé `NFD` y `NFKD` en `_normalize` para todo U+0080–U+2FFFF: la clave
+cambia en 5 caracteres, `ª º № ℠ ™` (los que `_compatible` deja sin NFKC;
+«Nº 5» pasa de `n 5` a `no 5`). Con la mutación, `tests/test_catalogo3.py` da
+5 failed: `[Tornillo Nº 8-Tornillo N° 8-exact]`, `[Bolt™ M8-Bolt M8-exact]`,
+dos ids de proveedor («Industrias García Nº1», «Hermanos 1ª SA») y
+`test_acelerar_no_cambia_ninguna_clave`. `catalogo_largo2.sh` corre sólo
+`test_catalogo_largo2.py` y por eso da verde. Puerta: esa mutación da rojo
+en un guion que corre la prueba que la ve, la línea de `catalogo_largo2` sale
+de `sabotajes-conocidos.txt`, y los guiones que toques salen 0 enteros.
+Sugerencia: mudarlo a `catalogo3.sh`, esperando el rojo del tornillo o de un
+id de proveedor.
 
-**Tenías razón en las dos.** Al pedir el sabotaje del flete no vi que el
-seguro, en la línea de al lado, tenía el mismo hueco, y pedí `flete-inf` sin
-mirar la razón de su rojo. Queda como escape mío.
+**D218: (a).** Confirmé el rojo: sin la tupla de `operation_items`,
+`catalogo3_postgres.py` da `FALLA | operation_items.origen pasa a text…`,
+salida 1.
 
-**D216: (b).** El sabotaje 31 espera `[/generate_maria/avisos-flete--500]`.
+**D219: (a).** Mi matiz lo leí, no lo corrí: `_migrate_catalogo_claves`
+rearma al arrancar los `vendor_id` largos desde `vendor_nombre`. Si lo usás
+en el comentario del caso, corrélo; si no, decí «leído».
 
-**D217: (a).** Un sabotaje 32 que saca sólo
-`importe_valido(request.seguro, "Seguro")` del endpoint y espera
-`[/generate_maria/avisos-seguro-nan]`. Los dos rojos del seguro son
-`TypeError`, no hay uno con 200: ahí lo aceptamos. Revisé el resto de la
-familia: sin la línea del endpoint, `gastos_fob` y `gastos_anteriores_fob`
-dan 136 passed, porque en esa ruta tienen otra defensa. No hacen falta más
-sabotajes.
+**D220: no es limpieza.** Lo confirmé (`ﬁna` se pierde en `_norm_desc`), pero
+cambiarlo cambia `descripcion_normalizada` ya guardada: es producto con
+migración y hoy nadie lo midió en facturas reales. Lo anoto como riesgo en
+`COLA-LIMPIEZA.md`, no como tarea.
 
-**Cómo sigue.**
-1. D216 y D217, en commits aparte. Puerta: el guion entero da 32 `ROJO` y
-   sale 0.
-2. Después, `catalogo_largo2`. Los entregás juntos, con un informe que separe
-   las dos cosas.
-3. Si en el medio llega la tarea de comparación, va primero.
+**Tus tres propuestas de limpieza** (contar los casos de `maria3` en `caso`,
+el ancla de transacción que copia toda la lista de tablas, los tres pares
+repetidos entre SQLite y PG) van a la cola.
 
-**Próxima D: D218.**
+**Cómo sigue, en este orden:**
+1. D199 (mudar el sabotaje) junto con `sabotaje_valor1.sh`, que ya empezaste
+   (`38ee8e1a`, sin revisar). Un informe; las dos cosas en commits aparte.
+2. D218 y D219, una pieza.
+3. Los vencidos que quedan en `sabotajes-conocidos.txt`, uno por pieza.
+
+**Próxima D: D221.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 

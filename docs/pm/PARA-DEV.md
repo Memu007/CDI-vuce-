@@ -3,53 +3,47 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## AUTOREMOVE: aceptada sobre `1368dff8` e integrada (2026-11-12 19:55 UTC)
+## SEPARADORES-1b-LIMPIEZA: aceptada sobre `bb0d3347` e integrada (2026-11-12 21:55 UTC)
 
-Integro tu rama hasta `77101b83`. Acta `REPRODUCCION-AUTOREMOVE-2026-11-12.md`.
-**Traé mi rama con `merge`.** Nada que decidir.
+Integro tu rama hasta `28236cc1`. Acta `REPRODUCCION-SEPARADORES-1b-LIMPIEZA-2026-11-12.md`.
+**Traé mi rama con `merge`.**
 
-- **Reproducido, igual a tu informe:** el caso, `test_org1.py` entero (87
-  passed), `chequeo-6` (+0/−0, 0 avisos) y tus cuatro sabotajes uno por uno,
-  cada uno rojo por un 200 «fue removido» o por las llamadas a Mercado Pago.
-  `org1.sh` entero, la copia que entregaste, con Postgres: 29 sabotajes, 39 ROJO (29
-  SQLite, 10 Postgres), `sabotajes sin rojo: 0`, salida 0. Tus cuatro del
-  dueño corrieron sólo en SQLite.
-- **Mi rojo, en otro borde:** la guarda movida después del `commit`. El 400
-  sale igual y el caso falla igual, porque mira la base: el dueño ya no es
-  miembro y su suscripción quedó vacía. Es la puerta «que mire el estado».
-- **Tu riesgo del plan, corrido:** la guarda sólo con plan premium, o sólo en
-  prueba gratis, da verde. Queda como riesgo: hoy nada la achica.
-- **Tus supuestos quedan:** los adversarios encontraron el hueco de los
-  espacios, y `remove_member` toca permisos y Mercado Pago. Cuando la tarea
-  diga «sin» algo y veas razón para hacerlo igual, lo hacés como esta vez:
-  arriba del informe, como supuesto reversible.
+Reproducido sobre `bb0d3347`, con tu guion de esa versión: 105 passed;
+`chequeo-6` producto +0/−0, arnés +11/−18, 0 avisos; `anclas_perdidas` sin
+nada del archivo; el guion entero da 12 `ROJO` y sale 0. Mi mutación, distinta
+de las tuyas (saqué sólo el espacio fino de la clase de `_monto_factura`), da
+un solo rojo y es la entrada `[4 500.000-,]`: cada separador tiene la suya.
+Tu supuesto de dejar las 4 entradas sin espacio: de acuerdo, quedan.
 
-Saqué la entrada de `COLA-LIMPIEZA.md`.
+## Tarea activa (2026-11-12 21:55 UTC): los dos casos de tope por email en `test_abuso1.py`, sólo tests
 
-## Tarea activa (2026-11-12 19:55 UTC): el caso del dueño también en Postgres, sólo arnés
+De `COLA-LIMPIEZA.md`. Lo miré (leído, no corrido): los dos topes salen del
+mismo `_tope_por_cuenta` de `main.py` (claves `recuperar:cuenta:` y
+`reset-cuenta:`). Además,
+`test_s6_recuperar_usuario_corta_en_silencio_por_email` (línea 296) y
+`test_reset_tres_por_hora_por_cuenta_aunque_cambie_la_ip` (línea 477) son casi
+el mismo caso: tres pedidos por hora por cuenta con variantes del email, el
+cuarto contesta igual y no manda, a los 59 minutos sigue cortado, pasada la
+hora pasa. Cambian la ruta, el mensaje, el prefijo del usuario y que el reset
+además cuenta links.
 
-Tu riesgo media: ningún pytest corre en Postgres y
-`scripts/testing/org1_postgres.py` no tiene el caso del dueño que se pide
-sacar.
+**Primero comprobá la premisa.** Si es la misma causa: un caso con las dos
+rutas como datos. Si no lo es (por ejemplo, un caso junto esconde algo que
+hoy se ve), decilo con la evidencia y la
+línea sale de la cola sin tocar el archivo.
 
 **Puertas:**
-- En `org1_postgres.py`, el dueño pide `DELETE /api/organizations/members/<su
-  nombre>`: 400, y mirado con `sql()`, sigue dueño y miembro, los otros
-  miembros iguales y su `mp_preapproval_id` intacto. Las variantes de
-  mayúsculas y espacios, como datos del mismo chequeo.
-- Mercado Pago nunca se llama de verdad: el dueño tiene un
-  `mp_preapproval_id` puesto por el guion (si no, «intacto» compara vacío con
-  vacío), y `_leer_suscripcion_mp` y `_cancelar_suscripcion_mp` se
-  reemplazan en `main_mod` por funciones que anotan; la lista queda vacía.
-  El informe dice cómo lo hiciste.
-- En `org1.sh`, el sabotaje «el dueño se saca a sí mismo» también rojo en
-  Postgres (con `PG=`): una línea `FALLA` del caso del dueño. El informe
-  muestra ese rojo una vez.
-- `org1.sh` entero con `PG=`: `sabotajes sin rojo: 0` y salida 0.
-- `chequeo-6` entero, producto +0/−0.
+- Con el tope por cuenta apagado en cada ruta (una por vez), el caso se pone
+  rojo en la entrada de esa ruta. El informe muestra los dos rojos una vez.
+- El chequeo de links del reset no se pierde.
+- `scripts/testing/sabotajes/reset3.sh`, `abuso2.sh` y `abuso1.sh` anclan en
+  este archivo: si cambia un id, el ancla cambia en el mismo commit; cada
+  guion que toques, entero, sin `ROTO`; `anclas_perdidas.py` sin nada de
+  este archivo.
+- `tests/test_abuso1.py` entero verde; `chequeo-6` entero, producto +0/−0.
 
-Sin cambios de producto; sin adversarios. Si en Postgres algo da distinto que
-en SQLite, no lo arregles: va como D con su evidencia.
+Sin adversarios. No toques las entradas de `test_email1` ni de
+`IS_PRODUCTION` de la cola: son de la comparación.
 
 Lo de D182 / D206 sigue igual: si Emi dice que sí, dejás esto donde esté.
 D205, D206 y D208 siguen con Emi. Tu rango libre: D209 a D215.

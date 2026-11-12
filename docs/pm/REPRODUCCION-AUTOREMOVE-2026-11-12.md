@@ -12,7 +12,7 @@ principal en un worktree aparte, sobre `1368dff8`.
 | `tests/test_org1.py` entero | `87 passed, 5 warnings in 48.75s`, rc=0 |
 | `chequeo-6.py 265a9cd6 1368dff8` | producto +0/−0, arnés +69/−28, historia vacía, avisos: 0 (igual al informe) |
 | `anclas_perdidas.py 1368dff8 \| grep -c org1` | `0` |
-| `org1.sh 1368dff8` entero, la copia entregada, con `PG=` (Postgres 16 local) | 29 sabotajes, 39 ROJO (29 en SQLite, 10 en Postgres), `sabotajes sin rojo: 0`, `salida 0`; de 19:25:39 a 19:52:46 UTC. Los cuatro del dueño corrieron sólo en SQLite: no tienen tercer argumento |
+| `org1.sh 1368dff8` entero, la copia entregada, con `PG=` (Postgres 16 local) | 29 sabotajes, 39 ROJO (28 en SQLite, 11 en Postgres; corregido en `REPRODUCCION-AUTOREMOVE-PG-2026-11-12.md`), `sabotajes sin rojo: 0`, `salida 0`; de 19:25:39 a 19:52:46 UTC. Los cuatro del dueño corrieron sólo en SQLite: no tienen tercer argumento |
 | lo que trae el merge (`git diff --stat HEAD origin/claude/dev-tecnica`, fuera de `docs/pm`) | sólo `org1.sh` +17 y `tests/test_org1.py` +31. El +69/−28 de `chequeo-6` suma además `sabotaje_maria3.sh` y `test_maria3_antes_de_generar.py`, que vienen de MARIA por mi rama (`e3d6be57`, ya aceptados) |
 
 ## Las mutaciones, una por una, contra el caso solo
