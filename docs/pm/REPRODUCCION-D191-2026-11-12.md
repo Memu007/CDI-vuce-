@@ -65,3 +65,35 @@ El acta de D145 nombraba sólo a SUFIJOS-1: queda corregida acá.
 - La suite y `e2e_maria.sh`: la pieza no toca producto.
 - `chequeo-6`: lo corrió la Dev (+0/−0, arnés +13/−13, 0 avisos); lo corro
   sobre la vuelta.
+
+## Vuelta: aceptada sobre `4723280` (2026-11-12 16:05 UTC)
+
+Commits: prueba `3dbf198`, `5f9a16e` y `4723280`; guion `63066ce`. Cada uno
+toca un solo archivo.
+
+- **El guion, entero.** Lo corrí con el `sabotaje_maria9.sh` de `4723280`
+  (`git show`, `cmp` igual al del worktree) y la venv `/tmp/cdi-pm/venv`,
+  de 15:56 a 16:00 UTC. Dio 29 `ROJO`, `VERDE pantalla sin sabotaje`,
+  «OK: los 29 sabotajes dan rojo por la razón esperada» y rc=0.
+- **`tests/test_maria9_sufijo_operacion.py`:** 27 passed.
+- **`chequeo-6`:**
+  - contra `c8247e95`, que incluye la primera entrega de D191: producto
+    +0/−0, arnés +16/−22, 0 avisos;
+  - la Dev midió contra la unión: +4/−10, 0 avisos. El producto es igual en
+    las dos, así que vale para la unión.
+- **La mutación del 9** (`if not sbt_raw and usa_el_general:` →
+  `if not sbt_raw:`): 2 failed, la renombrada y
+  `…los_renglones_con_propio_generan[]`.
+- **La de la Dev** (`"sufijo": None` en `_items_con_procedencia`, `main.py:4852`):
+  1 failed, sólo la renombrada. Reproduce su «única».
+- **Mi negativo:** saqué el sufijo de todo renglón sin `pais_procedencia`
+  propio, justo después de `_items_con_procedencia`. Dio 3 failed
+  (`…generan[ROJO]`, `…generan[]` y la renombrada).
+- `git grep` del nombre viejo de la prueba en `scripts`, `tests` y `.github`
+  de `4723280`: vacío.
+- **Error mío:** la primera corrida usó el guion de mi rama, que tiene las
+  anclas viejas. Dio `PATRON NO ENCONTRADO` en el 2 y rc=1. No es de la
+  entrega.
+
+No corrido: la suite y `e2e_maria.sh`, porque el producto no cambia; los
+otros guiones de sabotaje.

@@ -3,55 +3,29 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Veredicto: D191 (a), devuelta sobre `f1809e95`; D192 y D193 decididas (2026-11-12 14:55 UTC)
+## Vuelta de D191: aceptada sobre `4723280` e integrada (2026-11-12 16:05 UTC)
 
-**Todavía no la acepto ni la integro: la puerta es salida 0 y da 1.** Hiciste
-bien en devolver el 30 como D en vez de arreglarlo en el guion. Acta:
-`REPRODUCCION-D191-2026-11-12.md`.
+Acta: `REPRODUCCION-D191-2026-11-12.md`, sección «Vuelta».
 
-**Lo reproducido sobre `f1809e95`:** `sabotaje_maria9.sh` entero da 29 `ROJO`,
-`FALLA endpoint_sin_procedencia: quedó verde` y rc=1, en 290 s. Es lo mismo
-que tu informe.
+**Lo reproducido sobre `4723280`:**
+- `sabotaje_maria9.sh` de esa cabeza, entero: 29 `ROJO`, «OK: los 29…»,
+  sale 0.
+- El archivo de la prueba da 27 passed.
+- `chequeo-6`: producto +0/−0, 0 avisos.
+- Con la mutación del 9, caen la prueba renombrada y
+  `…los_renglones_con_propio_generan[]`, igual que tu tabla.
+- Tu mutación de `"sufijo": None` en `_items_con_procedencia` deja roja sólo
+  la renombrada: 1 failed, 26 passed.
+- Mi negativo saca el sufijo a todo renglón sin procedencia propia y deja 3
+  rojos, entre ellos la renombrada.
 
-**D192: (a), decidido por la PM, con un cambio de nombre.** Lo medí:
-- Con `items = _items_con_procedencia(request)` → `items = request.items`,
-  `test_maria3_antes_de_generar.py` y `test_punta_a_punta1.py` dan 22 failed,
-  igual que tu tabla. Con esa mutación, la prueba del 30 pasa.
-- Pero esa misma prueba, corrida sola, se pone roja con la mutación del 7 y
-  con la del 9. Con las del 2, 3, 8 y 10 pasa. Todavía distingue un defecto,
-  así que no se borra.
+**Tu punto 3: no va a la cola.** Que la prueba sea la única que ve esa
+mutación es justamente la razón para que quede.
 
-Entonces:
-- Sacá el sabotaje 30 del guion, con su comentario `# 30.`. El final pasa a
-  decir «los 29».
-- La prueba queda, con un nombre que diga lo que mira: si cada renglón trae
-  su sufijo, el endpoint no pide el de la operación. El nombre lo elegís
-  vos; su comentario también se corrige.
-
-**D193: (a), decidido por la PM.** `con_propio_usa_el_general` queda como
-está.
-
-**El escape es más ancho de lo que dije en D145.** La última vez que
-`sabotaje_maria9.sh` dio 30 de 30 fue sobre `efa2e08` (VALOR-1b, acta del
-2026-10-25). Después, VALOR-1c (`3df999c8`) cambió las anclas 24, 27 y 28, y
-su acta (aceptada sobre `a099655`) no corrió este guion. Recién después,
-SUFIJOS-1 (`fe95a49b`) rompió las otras. Lo corrijo en `DECISIONS.md` y en
-el acta de D145. No cambia nada de lo que tenés que hacer.
-
-### Sigue: la vuelta de D191, sólo arnés
-
-**Puertas:**
-- `sabotaje_maria9.sh <SHA>` entero, desde un worktree limpio: «OK: los 29
-  sabotajes dan rojo por la razón esperada» y sale 0.
-- `tests/test_maria9_sufijo_operacion.py` entero da la misma cantidad de
-  `passed` que en `f1809e95`.
-- La prueba renombrada se pone roja con la mutación del 9: la salida va en
-  el informe.
-- La prueba y el guion van en commits separados.
-- `chequeo-6` entero, con producto +0/−0.
-
-**Apenas entregues:** sigue D194, el conteo estático de anclas. Si ya lo
-empezaste, dejalo y terminá antes esta vuelta: la devolución va primero.
+**Sigue D194**, como la escribiste: el conteo estático de anclas de una línea
+perdidas en `scripts/testing/sabotaje_*.sh` y `sabotajes/*.sh`, con el
+comando que lo mide, sobre la cabeza de esta rama, sin arreglar ningún
+guion. Las anclas perdidas que encuentres van como dato, no como arreglo.
 
 **Tu rango de D: D190 a D199** (la próxima libre es D195).
 
