@@ -164,13 +164,13 @@ def en_curso(p: dict) -> dict:
 
 
 class Medicion:
-    def __init__(self, a, pg, base, puerto, puerto_sonda, secreto):
-        self.a, self.pg, self.base = a, pg, base
+    def __init__(self, a, pg, base, puerto, puerto_sonda, secreto, log):
+        self.a, self.pg, self.base, self.log = a, pg, base, log
         self.puerto, self.secreto = puerto, secreto
         self.sonda_cli = httpx.AsyncClient(base_url=f"http://127.0.0.1:{puerto_sonda}", timeout=10)
         self.c = httpx.AsyncClient(base_url=f"http://127.0.0.1:{puerto}", timeout=90)
         self.filas, self.invalida, self.fuga, self.lleno = [], False, False, False
-        self.quinientos = self.filas_perdidas = 0
+        self.quinientos = 0
         self.pdf = pdf_en_blanco()
 
     async def sonda(self, ruta="/", **params) -> dict:
@@ -296,6 +296,7 @@ class Medicion:
     async def fase(self, nombre, tareas, enviados_registrables=None):
         antes = await self.sonda()
         t0 = await self.pg.fetchval("select clock_timestamp()")
+        inicio_log = self.log.stat().st_size
         maximo, fin, serie = {"tomadas": 0, "pg": 0}, asyncio.Event(), []
         muestreo = asyncio.create_task(self.muestrear(maximo, fin, serie))
         resultados = await asyncio.gather(*tareas)
@@ -323,9 +324,14 @@ class Medicion:
             self.invalida = True
         if enviados_registrables is not None and filas != enviados_registrables:
             print(f"  {nombre}: {enviados_registrables} pedidos y {filas} filas nuevas en api_logs")
-            if filas > enviados_registrables:
+            # Una fila perdida vale sólo si en esta misma fase el registro de
+            # métricas avisó que no consiguió conexión con el pool lleno.
+            with open(self.log, "rb") as f:
+                f.seek(inicio_log)
+                explicadas = f.read().decode(errors="replace").count("Error logging metrics: QueuePool limit")
+            if filas > enviados_registrables or enviados_registrables - filas > explicadas:
+                print(f"  {nombre}: {explicadas} 'Error logging metrics' por el pool lleno no explican la diferencia")
                 self.invalida = True
-            self.filas_perdidas += max(0, enviados_registrables - filas)
         return resultados
 
     async def fase_de_pedidos(self, nombre, tipos):
@@ -444,6 +450,8 @@ class Medicion:
             f(self.fase_de_pedidos, "sugerir", ["sugerir"] * a.cortes),
             f(self.fase_de_pedidos, "pdf_sin_lector", ["pdf_sin_lector"] * 10),
             f(self.fase_de_cortes, "corte_cuerpo_a_medias", "login_clave_mala",
+              "dispatch_entradas", a.cortes, a_medias=True),
+            f(self.fase_de_cortes, "corte_manual_a_medias", "manual_lento",
               "dispatch_entradas", a.cortes, a_medias=True),
             f(self.fase_de_cortes, "corte_bcrypt", "corte_bcrypt", "bcrypt_en_vuelo_total", a.cortes),
             f(self.fase_de_cortes, "corte_gemini", "corte_gemini", "gemini_en_vuelo_total",
@@ -584,12 +592,6 @@ def leer_log(log, med) -> None:
         elif s in SEÑALES_DE_POOL_LLENO and med.quinientos:
             print(f"  {med.quinientos} × 500 en los picos sin {s!r} en el log: no sé de qué son")
             med.invalida = True
-    # Una fila perdida vale sólo si el log dice que el registro de métricas no
-    # consiguió conexión con el pool lleno; si no, no se sabe adónde fue.
-    errores = texto.count("Error logging metrics")
-    if med.filas_perdidas and (not med.lleno or errores < med.filas_perdidas):
-        print(f"  {med.filas_perdidas} filas de api_logs perdidas y {errores} 'Error logging metrics'")
-        med.invalida = True
     print(f"log completo: {log}")
 
 
@@ -634,7 +636,7 @@ async def main() -> int:
                                     env=entorno_de_la_app(url_base, puerto, puerto_sonda, secreto, tmp,
                                                           a.cuota_de_produccion),
                                     start_new_session=True)
-        med = Medicion(a, pg, base, puerto, puerto_sonda, secreto)
+        med = Medicion(a, pg, base, puerto, puerto_sonda, secreto, log)
         await medir(med, proc, log)
     finally:
         await cerrar(admin, pg, proc, med, base)
