@@ -115,12 +115,15 @@ async function simular(page, modo) {
   return sim;
 }
 
+// Cada registro entra con otra IP inventada: el registro tiene límite por IP, por hora y por día.
+const ipNueva = () => '10.' + [0, 0, 0].map(() => Math.floor(Math.random() * 256)).join('.');
+
 (async () => {
   const b = await chromium.launch();
   const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  const reg = await ctx.request.post(base + '/auth/register', { data: { username: 'val1_' + id, password: 'Clave-Inventada-123', email: 'val1' + id + '@ejemplo.test' } });
+  const reg = await ctx.request.post(base + '/auth/register', { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: 'val1_' + id, password: 'Clave-Inventada-123', email: 'val1' + id + '@ejemplo.test' } });
   if (!reg.ok()) throw new Error('no se pudo registrar: ' + reg.status());
   const perfil = await ctx.request.put(base + '/api/user/profile', { data: { cuit: '20999999998' } });
   if (!perfil.ok()) throw new Error('no se pudo cargar el CUIT del perfil: ' + perfil.status());

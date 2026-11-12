@@ -10,6 +10,8 @@
 const { chromium } = require('playwright');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const CLAVE = 'Clave-Inventada-123';
+// Cada contexto sin sesión entra con otra IP inventada: el registro tiene límite por IP, por hora y por día.
+const ipNueva = () => '10.' + [0, 0, 0].map(() => Math.floor(Math.random() * 256)).join('.');
 
 (async () => {
   const b = await chromium.launch();
@@ -31,7 +33,7 @@ const CLAVE = 'Clave-Inventada-123';
   // Abre la landing en un contexto nuevo (sin sesión) y espera a que la
   // pantalla termine de mirar la invitación, si la hay.
   async function abrir(query, rutaFalsa) {
-    const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+    const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, extraHTTPHeaders: { 'X-Forwarded-For': ipNueva() } });
     const page = await ctx.newPage();
     if (rutaFalsa) await page.route('**/api/invitations/**', rutaFalsa);
     const consulta = query
