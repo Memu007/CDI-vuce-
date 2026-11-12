@@ -74,7 +74,7 @@ echo "BASE   en verde: $(grep -E '[0-9]+ passed' <<<"$salida" | tail -1)"
 
 # 1. «4500.000» con la coma decimal vuelve a leerse 4500000
 reemplazar $P '        if sin_grupo and decimal != sin_grupo.group(1):' '        if False:'
-caso "factura_multiplica" "FAILED $T::test_en_la_factura_con_grupos_de_espacio_tambien[4 500.000-,]"
+caso "factura_multiplica" "FAILED $T::test_en_la_factura_con_la_pista_en_contra_queda_sin_leer[4 500.000-,]"
 
 # 2. la regla deja sin leer aunque la pista esté a favor
 reemplazar $P '        if sin_grupo and decimal != sin_grupo.group(1):' '        if sin_grupo:'
@@ -82,7 +82,7 @@ caso "factura_ignora_la_pista" "FAILED $T::test_en_la_factura_lo_demas_sigue_com
 
 # 2b. los grupos con espacio o apóstrofo se saltean la regla
 reemplazar $P "\\d{3}\", re.sub(r\"[ '\\u00a0\\u202f]\", '', t))" '\d{3}", t)'
-caso "factura_grupo_con_espacio" "FAILED $T::test_en_la_factura_con_grupos_de_espacio_tambien"
+caso "factura_grupo_con_espacio" "FAILED $T::test_en_la_factura_con_la_pista_en_contra_queda_sin_leer"
 
 # --- La pantalla
 

@@ -2,101 +2,69 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## AUTOREMOVE-PG: el caso del dueño, también en Postgres
+## SEPARADORES-1b-LIMPIEZA: el caso de la pista en contra distingue la regla sin_grupo
 
 | SHA | qué |
 |---|---|
-| `24788cf0` | base (tu merge, AUTOREMOVE aceptada) |
-| `6d370864` | `test:` el caso en `org1_postgres.py` y el rojo de Postgres en `org1.sh` |
-| este commit | `docs:` informe (y el merge de tu rama, sólo `NOW.md`) |
+| `d8383df2` | base (tu merge, AUTOREMOVE-PG aceptada) |
+| `bb0d3347` | `test:` el caso unido y las dos anclas de `sabotaje_separadores1b.sh` |
+| este commit | `docs:` informe |
 
-**Nada para decidir.** Producto +0/−0. Postgres da lo mismo que SQLite:
-- el nombre exacto da 400;
-- las tres variantes dan 404;
-- la base queda igual;
-- Mercado Pago no se llama.
+**Nada para decidir.** Producto +0/−0. Sin adversarios ni `/code-review`, como pedía la tarea.
 
-No corrí adversarios ni `/code-review`, como pedía la tarea.
+### Qué hice: unir los dos casos, con la familia como datos
 
-### A. El caso, en `org1_postgres.py`, sección 6
+- `FAMILIA` pasó a pares `(texto, pista en contra)`. Tiene las 4 entradas de antes, sin espacios, y las 5 del caso de grupos de espacio.
+- `test_en_la_factura_con_la_pista_en_contra_queda_sin_leer` recorre esa familia con sus dos aserciones de antes: con la pista en contra da None, y con la pista None también.
+- `test_en_la_factura_con_grupos_de_espacio_tambien` se retiró: sus entradas son ahora datos del caso unido.
+- Mantuve las 4 entradas sin espacios, aunque no distinguen la regla, para no perder cobertura del resultado de `_monto_factura`. Hoy, en otro caso, sólo están cubiertas en `_numero_factura` o de punta a punta. El comentario de `FAMILIA` dice cuáles frena cada cosa. **Supuesto reversible:** si preferís sacarlas, son 4 tuplas.
 
-- **Estudio:** es el mismo de la guarda anterior: el dueño y un miembro que entró con invitación.
-- **Suscripción:** con `sql()`, el dueño recibe `mp_preapproval_id = pend-<dueño>`.
-- **Mercado Pago:** `main_mod._leer_suscripcion_mp` y `main_mod._cancelar_suscripcion_mp` se reemplazan por funciones que sólo anotan en `a_mp`. La de leer contesta «pending». Las dos originales se restauran en un `finally`.
-- **Pedidos:** con la sesión del dueño, `DELETE /api/organizations/members/<nombre>` va una vez por variante:
-  - el nombre exacto;
-  - en mayúsculas;
-  - con un espacio adelante;
-  - con un espacio atrás.
-- **Un solo `chequear`:** «el dueño no se saca a sí mismo». Pasa sólo si se cumplen las cuatro condiciones:
-  - el nombre exacto da `(400, "No podés removerte a vos mismo del estudio")`;
-  - cada variante da esa misma respuesta o `(404, "Ese usuario no es miembro del estudio")`;
-  - la base queda igual que antes (lo de abajo);
-  - `a_mp == []`.
-- **Lo que se mira en la base, antes y después, con `sql()`:**
-  - `owner_username` del estudio, junto con el `mp_preapproval_id` del dueño;
-  - los usernames de los miembros del estudio, ordenados.
+### El rojo, una vez
 
-Salida en verde:
+Con la regla apagada (`if sin_grupo and decimal != sin_grupo.group(1):` → `if False:`) en un worktree descartable de `bb0d3347`, `tests/test_separadores1b.py` da:
+
 ```
-OK    | el dueño no se saca a sí mismo ([(400, 'No podés removerte a vos mismo del estudio'), (404, 'Ese usuario no es miembro del estudio'), (404, 'Ese usuario no es miembro del estudio'), (404, 'Ese usuario no es miembro del estudio')], True, [])
+FAILED tests/test_separadores1b.py::test_en_la_factura_con_la_pista_en_contra_queda_sin_leer[4 500.000-,]
+FAILED tests/test_separadores1b.py::test_en_la_factura_con_la_pista_en_contra_queda_sin_leer[4'500.000-,]
+FAILED tests/test_separadores1b.py::test_en_la_factura_con_la_pista_en_contra_queda_sin_leer[4 500.000-,]
+FAILED tests/test_separadores1b.py::test_en_la_factura_con_la_pista_en_contra_queda_sin_leer[4\xa0500.000-,]
+FAILED tests/test_separadores1b.py::test_en_la_factura_con_la_pista_en_contra_queda_sin_leer[12 345,250-.]
+================== 5 failed, 100 passed, 5 warnings in 32.89s ==================
 ```
 
-### B. El rojo, una vez
+Con la regla da 105 passed. Las 4 entradas sin espacios siguen verdes con la regla apagada, como medías vos.
 
-Sobre `6d370864`, en un worktree descartable, borré las dos líneas de la guarda y corrí `org1_postgres.py` contra un Postgres 16 local. Los nombres van tapados:
-```
-FALLA | el dueño no se saca a sí mismo ([(200, ''), (400, 'No pertenecés a un estudio'), (400, 'No pertenecés a un estudio'), (400, 'No pertenecés a un estudio')], False, [('leer', 'pend-o1d_…'), ('cancelar', 'pend-o1d_…')])
-```
-Qué muestra:
-- El dueño sale con 200.
-- La base cambia (`False`).
-- Mercado Pago se leyó y se canceló.
-- Las variantes ya ven al dueño fuera del estudio.
+### Puertas, sobre `bb0d3347`
 
-En `org1.sh` con `PG=`, el mismo sabotaje da:
-```
-ROJO  | el dueño se saca a sí mismo (SQLite): «FAILED tests/test_org1.py::test_el_duenio_no_se_saca_a_si_mismo_y_el_estudio_queda_igual» 
-ROJO  | el dueño se saca a sí mismo (Postgres): «FALLA | el dueño no se saca a sí mismo» 
-```
-
-### C. Puertas, sobre `6d370864`
-
-| puerta | resultado |
+| puerta | salida |
 |---|---|
-| `org1.sh` entero con `PG=` (Postgres 16 local, vía `con_pg16.sh`) | `BASE  \| verde sin sabotaje en 6d370864… (SQLite y Postgres)`; 40 ROJO, 28 de SQLite y 12 de Postgres; `sabotajes sin rojo: 0`; `salida 0` |
-| `chequeo-6.py 24788cf0 6d370864` | completo abajo |
-
-Los conteos de `org1.sh`:
-- Tiene 29 sabotajes.
-- Uno, «la regla 2 despierta a las marcadas vencidas», sólo tiene rojo en Postgres; por eso SQLite da 28.
-- En Postgres hay 12: los 11 que ya estaban más el nuevo.
-- Vos habías contado 29 + 10 sobre `1368dff8`. No sé de dónde sale la diferencia: en la base, el guion ya tenía 11 sabotajes con rojo de Postgres.
+| `tests/test_separadores1b.py` entero | `105 passed, 3 warnings in 32.23s` |
+| `sabotaje_separadores1b.sh bb0d3347 <venv>` | `BASE en verde: 265 passed`; `factura_multiplica: 5 failed, 260 passed`; `factura_grupo_con_espacio: 5 failed, 260 passed`; `OK: los 12 sabotajes dan rojo por la razón esperada`; salida 0 |
+| `anclas_perdidas.py HEAD` filtrado por `separadores1b` | nada (grep salió 1) |
+| `chequeo-6.py d8383df2 HEAD` | entero abajo |
 
 ```
-chequeo-6 24788cf0..6d370864e8a17136611ebb1bf3a77cec9d409dfd: avisos para mirar, no un veredicto
+chequeo-6 d8383df2..HEAD: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +27/−1
+arnés +11/−18
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
 ```
 
-### D. Comandos
+Las dos anclas del guion (1 y 2b) apuntan ahora al id del caso unido. Van en el mismo commit que el cambio de id.
+
+### Comandos para reproducir
 
 ```bash
-git fetch origin claude/dev-tecnica && git checkout <SHA de este informe>
-PY=<venv>/bin/python scripts/testing/con_pg16.sh bash -c \
-  'PG="${BACKUP1A_PG_URL%/postgres}" scripts/testing/sabotajes/org1.sh 6d370864'
-#   → BASE verde (SQLite y Postgres), «ROJO  | el dueño se saca a sí mismo (Postgres)», «sabotajes sin rojo: 0», salida 0
-python docs/pm/herramientas/chequeo-6.py 24788cf0 6d370864
-#   → producto +0/−0, avisos: 0
+python -m pytest -q --no-cov tests/test_separadores1b.py                # 105 passed
+bash scripts/testing/sabotaje_separadores1b.sh bb0d3347 <venv>          # termina en «OK: los 12 sabotajes dan rojo…», salida 0
+python scripts/testing/anclas_perdidas.py HEAD | grep separadores1b     # nada
+python docs/pm/herramientas/chequeo-6.py d8383df2 bb0d3347              # producto +0/−0, avisos: 0
 ```
 
-### E. No corrido y riesgos
-
-- Los otros tres sabotajes del dueño siguen sin rojo de Postgres: «la guarda va después de Mercado Pago», «sacar busca sin mayúsculas» y «sacar busca sin espacios». La tarea pedía sólo el primero. El caso nuevo los cubriría, pero eso no lo corrí.
-- No corrí la suite completa porque no hay cambios de producto.
+- No corrí la suite completa: la tarea pide este archivo, el guion y chequeo-6.
 - Archivos de producto tocados: ninguno.
+- Riesgos: ninguno nuevo.
 
-/compact conservar: Dev 1 técnica, rama claude/dev-tecnica; entregué AUTOREMOVE-PG (6d370864 + informe); nada para decidir; tests/test_conexiones1.py sin seguimiento (su copia está en el parche); espero veredicto.
+/compact conservar: Dev 1 técnica, rama claude/dev-tecnica; entregué SEPARADORES-1b-LIMPIEZA (bb0d3347 + informe); nada para decidir; tests/test_conexiones1.py sin seguimiento (su copia está en el parche); espero veredicto.
