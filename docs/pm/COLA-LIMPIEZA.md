@@ -195,3 +195,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - pytest muestra `PytestUnhandledThreadExceptionWarning` («Event loop is
   closed», de aiosqlite) en `test_despacho1b.py`: no rompe hoy, pero ensucia
   la salida que leen los guiones.
+- `scripts/testing/pantalla_cliente1.js`, `_despacho1a.js`, `_destino1.js`,
+  `_estudio1.js`, `_estudio1b.js` y `_orden1.js` (de la Técnica) tienen su
+  propia copia de la IP inventada para `X-Forwarded-For`; pasar a
+  `require('./_ip_nueva')` (D190 de MARIA).

@@ -3,44 +3,64 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Veredicto: D149 aceptada sobre `48195cfe` e integrada (2026-11-12 13:42 UTC)
+## Veredicto: D145 (a) aceptada sobre `08edd63` e integrada (2026-11-12 14:05 UTC)
 
-**Aceptada.** Informe `46959d76`. Acta: `REPRODUCCION-D149-2026-11-12.md`.
-Lo integré con `merge` de `46959d76`, no de tu cabeza. **Traé mi rama con
-`merge`.**
+**Aceptada.** Informe `1b87d06`. Acta: `REPRODUCCION-D145-2026-11-12.md`.
+La integré con `merge` de `1b87d06`. **Traé mi rama con `merge`.**
 
-**Lo reproducido sobre `48195cfe`:** `chequeo-6` igual a tu informe (+0/−0);
-`catalogolargo1` 11 `ROJO`, `datos1` 20, `disco1` 46 y `maria1b` 34, sin
-sabotaje sin rojo; `foco_perfil.sh` con tu caso `#pfEmail` da `PIERDE` en
-`832bf74` y `NO PIERDE` acá; `test_despacho1b.py` natural `285 passed` tres
-veces; el sabotaje de `4292e0f` rojo 15 de 15. Mis negativos: los 29
-argumentos de `no_debe` nombran un caso real, y el `no_debe` nuevo calla con
-la advertencia de aiosqlite y da `ANCHO` con un `FAILED` real.
+**Lo reproducido sobre `08edd63`:**
+- `chequeo-6` da lo mismo que tu informe.
+- `validacion1` da 7 `ROJO` y `FALLAS=0`.
+- `org1b` da 7 `ROJO` y «sabotajes sin rojo: 0».
+- `sabotaje_separadores1` da 17 de 17.
 
-**Vale como una corrida entera limpia de `despacho1b`, la tuya.** No la
-repetí; `cobro_mp2` entero no lo corrió nadie (queda en el acta).
+**Lo reproducido sobre `46959d7`, el rojo de antes:**
+- `org1b` da 5 `ROJO` y 2 `ROJO?` por 429, lo mismo que contaste vos.
+- La pantalla vieja de `validacion1` da 429 desde el sexto registro.
+- La pantalla vieja de `maria9` vence su espera en la sexta y la séptima
+  corrida: falla, pero sin decir 429 (tu supuesto 4).
 
-**D168: (b), decidido por la PM.** CR8 eran los tres de `datos1`. La familia
-va a `COLA-LIMPIEZA.md` como una entrada con tu grep; la paga cada Dev cuando
-vuelve a tocar el guion.
+Con la pantalla nueva, siete corridas dejan siete IPs `10.x` distintas,
+cada una con 1.
 
-**D169: (a).** La suma la Técnica: su caso tiene que dar `PIERDE` en
-`832bf74` y `NO PIERDE` en `48195cfe`. Vos no tocás `foco_perfil.sh`.
+**Tu riesgo de `TRUSTED_PROXY_HOPS=0` no se da en local.** Con `0`, el header
+sigue contando: uvicorn reescribe la IP del cliente desde `X-Forwarded-For`
+cuando el pedido viene de 127.0.0.1. Con uvicorn en `--no-proxy-headers`
+sí vuelve el 429 en la sexta. No fijes nada por esto. El límite del producto sigue en
+pie: ocho `curl` sin header dan 200 ×5 y 429 ×3.
 
-**`f2709a2`** (los cuatro guiones cortos que integré sin aceptar): aceptado
-con esta pieza.
+**Tus supuestos 1 a 5:** aceptados.
 
-**Tus supuestos 1 a 8:** aceptados. El 3 y el 4 (`sesion1.sh`) se apoyan
-en tu corrida sobre `54ba001`; no la repetí. Tus riesgos y la idea de guardar-uso
-(largo medido dos veces) quedan en el acta y en la cola.
+**D190: (a), decidido por la PM.** Va a `COLA-LIMPIEZA.md` como una sola
+entrada para las seis pantallas de la Técnica.
 
-### Sigue
+**D191: (a), decidido por la PM.** Es tu próxima pieza, abajo.
 
-**D145 (a):** en tus arneses, cada sabotaje registra con su propio
-`X-Forwarded-For`; `abuso1` sigue con una sola IP. La parte de la Técnica
-(`cliente1`, `foco_cliente1`, `destino1`, `despacho1a`) ya está aceptada.
+Lo rompió `fe95a49b` (SUFIJOS-1, 2026-10-25), que cambió la firma de
+`usa_el_sufijo_de_la_operacion`. Al aceptar SUFIJOS-1 no se corrió
+`sabotaje_maria9.sh`: es un escape mío y queda anotado. `sabotaje_maria9.sh`
+entero entra en «Antes de publicar».
 
-**Tu rango de D: D190 a D199.**
+### Sigue: D191 (a), sólo arnés
+
+Actualizá las anclas de `scripts/testing/sabotaje_maria9.sh` a la forma de
+hoy. No se toca producto.
+
+**Puertas:**
+- `sabotaje_maria9.sh <SHA>` entero, desde un worktree limpio: «OK: los 30
+  sabotajes dan rojo por la razón esperada» y sale 0.
+- En el informe, una tabla con tres columnas: ancla vieja, ancla nueva y qué
+  prueba se pone roja.
+- Si un sabotaje no da rojo con su ancla nueva, no lo arreglás en el guion:
+  vuelve como D, porque puede ser un hueco del producto.
+- `chequeo-6` entero, con producto +0/−0.
+
+**Apenas entregues:** hacé un conteo estático de las anclas de una línea que
+ya no están en HEAD, en todos los guiones de sabotaje de `scripts/testing/`
+(`sabotaje_*.sh` y `sabotajes/*.sh`). Va como D, con el comando que lo mide.
+No arreglás ninguno de esos guiones: lo decido yo con el número en la mano.
+
+**Tu rango de D: D190 a D199** (la próxima libre es D192).
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
