@@ -3,6 +3,7 @@
 ronda() toma la fila de la cuenta, larga los dos pedidos, espera verlos
 esperando y suelta. Mercado Pago es simulado.
 """
+import gc
 import os
 import sys
 import traceback
@@ -72,11 +73,20 @@ def ronda(c, a, b, de_org, ajuste):
         codigos = [f.result(h.PLAZO).status_code for f in futuros]
     # Un deadlock que la app atrapa no da 500. Postgres lo suma a pg_stat_database
     # sin plazo fijo, pero sí al cerrar la conexión: se cierran todas y se espera.
-    c.portal.call(engine.dispose)
-    if not h.hasta(lambda: h.sql(OTRAS)[0][0] == 0):
-        raise h.Invalida("la app no soltó sus conexiones")
+    soltar(c)
     return codigos, h.sql(DEADLOCKS)[0][0] - antes, consultas, cuenta
 
+
+def soltar(c):
+    """Cierra las conexiones de la app y espera a que Postgres no vea ninguna."""
+    # La app registra cada pedido en una tarea que sigue después de responder: si
+    # devuelve su conexión tras el dispose, cae en el pool descartado y sólo la cierra gc.
+    def libres():
+        c.portal.call(engine.dispose)
+        gc.collect()
+        return h.sql(OTRAS)[0][0] == 0
+    if not h.hasta(libres):
+        raise h.Invalida("la app no soltó sus conexiones")
 
 
 def correr(caso):
