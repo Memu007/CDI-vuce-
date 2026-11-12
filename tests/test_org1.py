@@ -695,25 +695,35 @@ def test_sacar_no_borra_al_usuario():
     assert r.status_code == 200, r.text
 
 
-def test_el_duenio_no_se_saca_a_si_mismo_y_el_estudio_queda_igual():
-    """Con otras mayúsculas el nombre no es el de nadie del estudio: 404, y tampoco sale."""
+def test_el_duenio_no_se_saca_a_si_mismo_y_el_estudio_queda_igual(monkeypatch):
+    """La guarda va antes de Mercado Pago: un dueño con la suscripción pendiente no la pierde.
+    Con otras mayúsculas también es el dueño: si la búsqueda las ignorara, la guarda no lo vería."""
     est = Estudio()
     _miembro(est)
-    _miembro(est)
+    suscripcion = f"pend-{est.dueno}"
+
+    async def con_suscripcion(s):
+        await s.execute(update(User).where(User.username == est.dueno).values(mp_preapproval_id=suscripcion))
+    _db(con_suscripcion)
+    a_mp = []
+    for funcion in ("_leer_suscripcion_mp", "_cancelar_suscripcion_mp"):
+        monkeypatch.setattr(main_mod, funcion, lambda *_, f=funcion: a_mp.append(f) or "pending")
 
     def estado():
         async def q(s):
-            return (await s.execute(select(Organization.owner_username)
-                                    .where(Organization.id == est.org_id))).scalar_one()
+            dueno = select(Organization.owner_username).where(Organization.id == est.org_id)
+            sus = select(User.mp_preapproval_id).where(User.username == est.dueno)
+            return (await s.execute(dueno)).scalar_one(), (await s.execute(sus)).scalar_one()
         return _db(q), _miembros(est.org_id)
 
     antes = estado()
-    assert antes[0] == est.dueno and est.dueno in antes[1] and len(antes[1]) == 3
-    for nombre, codigo, detalle in ((est.dueno, 400, "No podés removerte a vos mismo del estudio"),
-                                    (est.dueno.upper(), 404, "Ese usuario no es miembro del estudio")):
+    assert antes[0] == (est.dueno, suscripcion) and est.dueno in antes[1] and len(antes[1]) == 2
+    guarda = (400, "No podés removerte a vos mismo del estudio")
+    for nombre, aceptadas in ((est.dueno, {guarda}),
+                              (est.dueno.upper(), {guarda, (404, "Ese usuario no es miembro del estudio")})):
         r = est.quitar(nombre)
-        assert (r.status_code, r.json().get("detail")) == (codigo, detalle), (nombre, r.text)
-        assert estado() == antes, nombre
+        assert (r.status_code, r.json().get("detail")) in aceptadas, (nombre, r.text)
+        assert (estado(), a_mp) == (antes, []), nombre
 
 
 def test_mine_lista_sólo_los_miembros_del_estudio_y_quién_es_dueño():
