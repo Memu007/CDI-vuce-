@@ -30,7 +30,8 @@ const CLAVE = 'Clave-Inventada-123';
   async function abrirPerfil(email) {
     // El cierre esconde el modal un rato después y, ya cargado, el foco salta a «Mi CUIT»:
     // lo que se escriba antes de que pasen las dos cosas se puede perder.
-    await page.waitForFunction(() => document.getElementById('profileModal').hidden);
+    await page.waitForFunction(() => document.getElementById('profileModal').hidden)
+      .catch(() => falla('el perfil no terminó de cerrarse'));
     await page.evaluate(() => CDI.openProfileModal());
     await page.waitForFunction(m => document.getElementById('pfEmail').value === m
       && document.activeElement.id === 'pfCuit', email)
