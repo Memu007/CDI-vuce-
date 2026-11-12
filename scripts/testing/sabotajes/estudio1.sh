@@ -131,7 +131,7 @@ sabotaje $M "el nombre con un surrogate suelto da 500" \
   "FAILED $T::test_el_alta_rechaza_un_nombre_con_un_surrogate_suelto"
 sabotaje $M "el nombre de más de 200 entra" \
   'len(nombre) > 200' 'len(nombre) > 2000' \
-  "FAILED $T::test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve[xxxxx"
+  "FAILED $T::test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve[largo]"
 sabotaje $M "el mismo CUIT dos veces en la cuenta da 500" \
   $'    except IntegrityError:\n        # El mismo CUIT ya está en la cuenta' \
   $'    except ValueError:\n        # El mismo CUIT ya está en la cuenta' \

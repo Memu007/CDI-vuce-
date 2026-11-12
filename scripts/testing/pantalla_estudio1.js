@@ -36,10 +36,14 @@ const NOMBRE_HTML = '<img src=x onerror="window.__xss=1">Estudio Inventado Uno';
     });
   }
   async function hint() { return (await page.textContent('#estudioHint')).trim(); }
-  async function abrirMisEstudios() {
-    await page.evaluate(() => CDI.openProfileModal());
-    await page.waitForSelector('#pfEstudiosBlock', { state: 'visible' });
-    if (!await page.$eval('#pfEstudiosBlock', d => d.open)) await page.click('#pfEstudiosBlock summary');
+  // El perfil pone el foco en «Mi CUIT» después de cargar: si cae durante un fill,
+  // el texto va ahí. Se escribe recién cuando ya cayó.
+  async function abrirMisEstudios(p = page) {
+    await p.evaluate(() => CDI.openProfileModal());
+    await p.waitForFunction(() => document.activeElement && document.activeElement.id === 'pfCuit', null, { timeout: 10000 })
+      .catch(() => falla('el perfil no puso el foco en «Mi CUIT»'));
+    await p.waitForSelector('#pfEstudiosBlock', { state: 'visible' });
+    if (!await p.$eval('#pfEstudiosBlock', d => d.open)) await p.click('#pfEstudiosBlock summary');
   }
   async function filas() {
     return page.$$eval('#pfEstudiosList > div > span', s => s.map(x => x.textContent));
@@ -204,9 +208,7 @@ const NOMBRE_HTML = '<img src=x onerror="window.__xss=1">Estudio Inventado Uno';
   const avisos2 = () => p2.$eval('#validatingAvisosList', l => l.textContent);
   await p2.waitForFunction(() => document.getElementById('validatingAvisosList').textContent.includes('CDDTAGR'), null, { timeout: 10000 })
     .catch(async () => falla('sin estudio ni perfil, los avisos no piden el CDDTAGR: ' + await avisos2()));
-  await p2.evaluate(() => CDI.openProfileModal());
-  await p2.waitForSelector('#pfEstudiosBlock', { state: 'visible' });
-  if (!await p2.$eval('#pfEstudiosBlock', d => d.open)) await p2.click('#pfEstudiosBlock summary');
+  await abrirMisEstudios(p2);
   await p2.fill('#pfEstudioNombre', 'Estudio Inventado Tres');
   await p2.fill('#pfEstudioCuit', CUIT_UNO);
   await p2.click('#pfEstudioAlta');

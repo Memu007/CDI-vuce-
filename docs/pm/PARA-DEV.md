@@ -3,60 +3,78 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## CONEXIONES-1 B: aceptada como medición sobre `c57b645e` e integrada (2026-11-12 01:08 UTC)
+## FOCO-PERFIL: aceptada sobre `dc4cf077` e integrada (2026-11-12 03:37 UTC)
 
-Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`. Integré con
-`merge` exactamente `c57b645e`, no tu cabeza: `dd0eab7e` (los ids) lo reviso
-con su informe. Igual a tu informe: la corrida de 30 s número por número
-(`pico_pdf` 422 × 16 · 500 × 10 · 504 × 34, normales 30,01 / 30,07 / 3,68 s,
-`tomadas` 0, `close` 2968 = 2968), el control (cinco `BIEN`) y `chequeo-6` en
-los tres rangos; el AVISO de `_instalar` queda explicado. Mi negativo, con
-15 s, también rompe (500 × 6, 504 × 22, normales 30 s): confirma tu cuenta
-de «más de unos 10 s». `bcrypt_en_vuelo_max` me dio 36 y 40: es carrera, no
-cambia nada.
+Evidencia: `docs/pm/REPRODUCCION-BORRADOR-1-2026-11-10.md`, «FOCO-PERFIL».
+Integré con `merge` exactamente `365ee834`. Sin D.
 
-Dos cosas que el medidor no separa, y que entran en la pieza de abajo:
+- Igual a tu informe: `foco_perfil.sh` sobre `5f78311a`, dos veces, rc=1 y
+  PIERDE en los dos casos con los mismos valores robados; sobre `dc4cf077`,
+  rc=0 y NO PIERDE con el reloj a 3000 ms tres veces. `chequeo-6` igual.
+- Mi negativo: sólo el paso con `p2` vuelto a lo viejo da rc=1 y PIERDE en
+  los dos casos, en la tercera apertura. La reproducción distingue cada una.
+- `sabotajes/estudio1.sh` sobre `dc4cf077`: 37 ROJO, «sabotajes sin rojo:
+  0», rc=0. Tu corrida sobre `78d4188e` vale: lo que cambia después es sólo
+  `foco_perfil.sh`.
+- Alcance mirado: `cobro_mp1` no escribe en el perfil (bien sacado);
+  `sesion1` es de MARIA y ya está avisada.
+- `foco_perfil.sh` queda en el repo (tu supuesto, aceptado). El arreglo de
+  producto del foco, cuando salga de la cola, cambia `abrirMisEstudios` y
+  actualiza o saca `foco_perfil.sh` en el mismo commit.
 
-- Con el pool lleno imprime «QUEDAN CONEXIONES TOMADAS» y sale con 1 aunque
-  `tomadas` dé 0: junta pool lleno con fuga.
-- Los normales usan el mismo token que el pico: mide a la cuenta que carga,
-  no a otro usuario.
+## CONEXIONES-1 C: aceptada como medición sobre `9ecfd2ac` e integrada (2026-11-12 03:29 UTC)
 
-- **D180: (a), decidido por la PM, con un criterio distinto del tuyo.** No
-  alcanza con «los 500 de PDF». `/api/ncm/sugerir` no tiene límite por minuto
-  ni cuota (no tiene decorador y el `Limiter` de `core/rate_limit.py:67` no
-  tiene límite por defecto), y `pico_gemini` con **un solo token** toma 50 de
-  50 conexiones: esa misma cuenta espera 30 s. A otra cuenta, no está medido. En la subida, la cuota de
-  producción (50 por día) es justo el pool, y la conexión ya está tomada
-  mientras espera el candado de validación, antes del 429 (leído, no
-  medido). Abajo, **CONEXIONES-1 C**: primero medir a otra cuenta.
-- **D181: (b).** A la cola de limpieza, con el caso que importa: muchas claves
-  malas a la vez desde **la misma IP** (el `5/minute` corta antes de entrar;
-  `abuso1` lo prueba en serie, en simultáneo no está corrido).
+Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección C.
+Integré con `merge` exactamente `9ecfd2ac`.
 
-## Tarea activa
+- Igual a tu informe: hoy, la otra cuenta espera 30,02 s en sugerir y 30,0 s
+  en la subida (5,26 s con cuota), rc=4 las dos; con el arreglo, 0,32 s y
+  0,04 s (0,35 y 0,06 con cuota), rc=0. Control: cinco `BIEN`. `chequeo-6`
+  igual. Las ocho rutas de la dependencia, contadas.
+- Mi negativo, pico de 40 con el arreglo: rc=0, 0 × 500, la otra cuenta
+  hasta 2,29 s. La subida da 40/40 con 40 y 50/50 con 60, y la otra cuenta
+  no espera: leo pico, no retención, pero no está muestreado (abajo, D).
+- pytest con el arreglo: 201 passed. Sin el ajuste del inyector, tus 4 rojos.
+- **Hallazgo menor:** el diff de tu informe no entra con `git apply` (el hunk
+  de `main.py:10448` está cortado). Lo apliqué a mano. En el próximo, el diff
+  propuesto va completo y probado con `git apply --check`.
+- **D182: a Emi, de día**, con mi recomendación de (a). Si dice que sí, la
+  pieza es tuya entera (la dependencia es una sola), con lo que traiga D.
 
-1. **El informe del agregado de los ids** (`dd0eab7e`): lo de arriba, en
-   «BORRADOR-1», con tu versión de pytest.
-2. **CONEXIONES-1 C, sólo arnés** (es medir, dentro de CONEXIONES-1). El
-   arreglo de producto no entra sin el sí de Emi: la fila del roadmap dice
-   «arreglar sólo si las deja» y no quedan. Se lo propongo de día.
-   - **Medir a otra cuenta:** el medidor usa otra cuenta para los normales
-     y separa «pool lleno» de «fuga» en el texto y en el rc.
-   - **Corridas** sobre el código de hoy: `--pico 60 --lento 30` para la
-     subida pública de PDF y para `/api/ncm/sugerir`, y una más con la cuota
-     de producción (sin `AI_DAILY_PDF_LIMIT=100000`). El informe dice, para
-     la otra cuenta, cuántos 500 y la espera máxima.
-   - **El login queda afuera:** hoy da cero 500 y 3,1 a 3,7 s; sólo tiene
-     que no empeorar.
-   - **El arreglo, propuesto en el informe y sin commitear** (como en D134),
-     con el criterio que propongas: otra cuenta con cero 500 y espera máxima
-     de unos 5 s, y los pedidos de más con un error limpio (429, 503 o 504).
-     *Sugerencia:* soltar la conexión antes de esperar a Gemini o a la
-     lectura, o un tope de pedidos en vuelo por cuenta.
-   - **Si con otra cuenta no aparece el rojo** (cero 500 y menos de 5 s),
-     frená e informá: entonces no hay arreglo que proponer.
-   - La subida es de la zona de MARIA (D74): le aviso en su canal.
+## Tarea activa: CONEXIONES-1 D, sólo arnés (2026-11-12 03:29 UTC)
+
+Sigue siendo medir, dentro de la fila abierta de CONEXIONES-1. Producto: nada.
+Tus D: D183 a D189.
+
+Lo que pido es comportamiento y prueba:
+
+1. **`/api/migrations/analyze`:** una fase del medidor en la que una cuenta
+   lo satura mientras la lectura del Excel es lenta, y se mide a la otra
+   cuenta. Hoy y con el diff propuesto. El adversario leyó que la ruta pasa
+   por `require_billing_vigente` y después lee el Excel (hasta 60 s); no
+   está medido si toma otra conexión durante la lectura.
+2. **`/api/operations/manual`:** lo mismo, con un cuerpo de pedido que llega
+   lento. El adversario cree que retiene la conexión mientras espera el
+   cuerpo; no está verificado.
+3. **La subida pública:** las conexiones tomadas muestreadas en el tiempo
+   (no sólo el máximo), para separar un pico al llegar de una retención.
+4. **El diff propuesto, completo y sin commitear:** el de C más lo que
+   encuentres retenido, con `git apply --check` limpio sobre tu cabeza y rc=0
+   en todas las fases. No toca `require_active_billing`: ahí
+   `can_create_operation` llama a `_expire_extra_ops`
+   (`services/billing_service.py:109-118`), que deja la cuenta cambiada en
+   memoria (vence los créditos extra), y un `commit` ahí lo guardaría antes
+   de la ruta.
+5. **Una prueba rápida que distinga:** un pytest (sin pico de 60) que dé rojo
+   con el código de hoy y verde con el diff propuesto, también sin commitear,
+   con las dos salidas en el informe. Si no se puede sin pico, decí por qué.
+6. **Control:** `sabotajes/conexiones1.sh` sigue con cinco `BIEN`; ninguna
+   espera fija nueva.
+
+- Si una ruta no retiene con otra cuenta (0 × 500 y menos de 5 s), decilo y
+  no propongas nada para ella.
+- El informe, autosuficiente: estás cerca de compactar.
+- La subida es zona de MARIA (D74): le aviso en su canal.
 
 ## BORRADOR-1: aceptada sobre `c8733be` e integrada (2026-11-12 00:48 UTC)
 
@@ -70,8 +88,7 @@ navegación (ninguno con 429), `estudio1b`, `despacho1d`, `borrador1`,
 completa (`6077 passed, 110 skipped, 3 xfailed`) y, sobre el merge, el arnés 402 de MARIA
 (`118 passed`). Una diferencia, abajo.
 
-- **D149 (a):** aceptada en lo que pedía, salvo `estudio1.sh`, que queda
-  abierto hasta dar rc=0 con pytest 9.2.0 (el agregado de abajo).
+- **D149 (a):** aceptada; `estudio1.sh` quedó cerrado en IDS-PYTEST.
 - **D145 (a) y D173 (a):** aceptadas. Los dos commits de arnés en vez de uno,
   también: no hacía falta `push --force`.
 - **Supuesto de `destino1`** (manda la `X-Forwarded-For` pero no mira el
@@ -84,22 +101,7 @@ completa (`6077 passed, 110 skipped, 3 xfailed`) y, sobre el merge, el arnés 40
   no la empieces.
 - **La e2e de MARIA** sigue siendo puerta para lo que toque el recorrido
   MARIA o `static/v2`. Hoy da `E2E MARIA OK`: cualquier rojo es tuyo.
-- **La diferencia: `estudio1` me da 36 ROJO y 1 ROJO? (rc=1), vos informaste
-  37.** La causa está atada: el sabotaje «el nombre de más de 200 entra» sí
-  rompe la prueba, que falla como
-  `test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve[nombre4]`, y el guion
-  busca `[xxxxx`. Con pytest 9.2.0 (el de `requirements.txt`) un parámetro de
-  texto largo da id `[nombre+índice]`; con 9.1.1 daba el valor. Es la misma
-  causa de `disco1.sh` en MARIA. Con 9.1.1, `--collect-only` da ese caso
-  como `[xxxx…]`. El patrón es anterior a D149: no es devolución.
-
-**Agregado, decidido por la PM (no es devolución; te lo mandé por mensaje a
-las 00:43):** un commit de arnés aparte en el que ningún patrón
-de tus guiones dependa del id que pytest arma solo para un texto largo
-(sugerencia: `ids=` en el caso, o anclar en el nombre del caso sin el id).
-Mirá todos tus guiones, no sólo `estudio1`: yo corrí únicamente los de esta
-entrega. Mostrá el rojo de `estudio1` una vez con 9.2.0, y decí en el informe
-**qué versión de pytest tenés** (`python -m pytest --version`).
+- **La diferencia de `estudio1` (ids de pytest):** cerrada en IDS-PYTEST.
 
 **Tu rango de D: D180 a D189.**
 

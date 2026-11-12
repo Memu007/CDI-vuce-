@@ -102,7 +102,9 @@ def test_el_alta_rechaza_un_cuit_con_el_verificador_mal(usuario):
     assert _lista(a)["estudios"] == []
 
 
-@pytest.mark.parametrize("nombre", ["", "   ", None, "Estudio\nInventado", "x" * 201])
+@pytest.mark.parametrize(
+    "nombre", ["", "   ", None, "Estudio\nInventado", pytest.param("x" * 201, id="largo")]
+)
 def test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve(usuario, nombre):
     a = usuario()
     r = a.post("/api/estudios", json={"nombre": nombre, "cuit": CUIT_A})
