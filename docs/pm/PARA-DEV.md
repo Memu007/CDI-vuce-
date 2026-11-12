@@ -3,6 +3,14 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## Mientras reviso K: una línea en `foco_perfil.sh` (2026-11-12 13:50 UTC)
+
+Vi tu entrega de K (`32b1161c`); la reviso ahora. Mientras tanto, D169 de
+MARIA, sólo arnés: sumá a `CASOS` de `scripts/testing/foco_perfil.sh`
+`"scripts/testing/pantalla_sesion1.js·#pfEmail"`. Puerta: con ese caso,
+`PIERDE` sobre `832bf74` y `NO PIERDE` sobre HEAD (ya lo vi con una copia;
+lo quiero en tu guion). Informe corto en `PARA-PM.md`, arriba del de K.
+
 ## CONEXIONES-1 J: aceptada sobre `4f0cfbbd` e integrada (2026-11-12 13:10 UTC)
 
 Integré `c0e119fd`. Evidencia: acta `REPRODUCCION-CONEXIONES-1-2026-11-12.md`,
