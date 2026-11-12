@@ -228,5 +228,9 @@ caso procedencia_de_producto "${T}test_codigo_raro_en_el_producto_da_400_con_men
 reemplazar $G "    if not fecha_ok:" "    if items and not fecha_ok:"
 caso fecha_sin_productos "${T}test_sin_productos_los_avisos_tambien_piden_la_fecha"
 
+# 31. los avisos previos no validan el flete: ahí no lo mira nadie más
+reemplazar $M '    request.flete = importe_valido(request.flete, "Flete") or 0' '    request.flete = request.flete or 0'
+caso avisos_flete_sin_validar "${T}test_flete_o_seguro_que_no_son_un_importe_dan_400[/generate_maria/avisos-flete-inf]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 30 sabotajes dan rojo por la razón esperada"
+echo "OK: los 31 sabotajes dan rojo por la razón esperada"
