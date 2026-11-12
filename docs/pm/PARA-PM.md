@@ -2,255 +2,188 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CONEXIONES-1: plan de la pieza de producto (sin producto)
+## CONEXIONES-1 H: casos 6 y 7 sobre HEAD, como scripts (sólo arnés)
+
+**Hallazgo de producción: sí, hoy dan deadlock.** En HEAD, una org con
+créditos extra vencidos que guarda una operación a la vez que recarga, o que
+genera MARIA a la vez que recarga, recibe un 500 y Postgres cuenta un
+deadlock. El usuario ve «No se pudo guardar la operación al cliente: …
+DeadlockDetectedError» o «Error generando archivo MARIA: … deadlock
+detected». Lo mismo pasa con alta + guardado, alta + cancelar y alta +
+reactivar de esa org. Con un usuario suelto, o con créditos al día, no pasa.
+
+**D204 reproduce.** Si la renovación llega antes que el pedido que vence la
+cuenta, la cuenta queda `past_due` con el período por delante: pagó y queda
+bloqueada. Pasa con usuario y org, con prueba vencida y con `active` fuera de
+gracia: 4 de 8. El parche (b) no lo arregla. El arreglo lo decide Emi (D205).
 
 | SHA | Qué |
 |---|---|
-| este commit | `docs:` este plan |
+| `06695c86` | `test:` casos 6 y 7, `parche_b.diff`, `con_parche.sh` |
+| `cfc5f2af` | `test:` `PARCHE=` elige el parche; `parche_nokey.diff` |
+| `218069dc` | `test:` el contador no depende del 500; arnés roto sale 2 |
+| `7e55e35d` | `test:` docstring del caso 7 a 80 columnas |
+| este commit | `docs:` este informe |
 
-Producto +0/−0. **Emi no dijo que sí a D182**: según tu tarea, no arranco la
-pieza de producto. Pasame la siguiente de la cola.
-
-### Resultado
-
-1. **(b), tal como la medí, arma un deadlock que tu negativo no ve.** Con (b)
-   (`require_billing_vigente` + `commit` en la manual) y sin tocar
-   `_cuenta_bloqueada`, `conexiones1_creditos.py` da rc=2 en 3 de 3 corridas.
-   La fila es «NO VALE | organización, carrera: Invalida: alta 500 …», con
-   `asyncpg.exceptions.DeadlockDetectedError: deadlock detected`. El par que
-   choca es alta + recarga de la org, no alta + guardado. Tu negativo
-   (alta + guardado) sobre el mismo árbol da «carrera: alta 200, guardado 200,
-   deadlocks +0» en 3 de 3, igual que a vos.
-2. **Causa medida.** Es la FK `organizations.owner_username → users`. El
-   webhook hace un segundo `UPDATE` de la org en la misma transacción, y ese
-   `UPDATE` corre el trigger de la FK, que pide `FOR KEY SHARE` sobre la
-   dueña. Pero el alta tiene a la dueña con `FOR UPDATE` y espera a la org:
-   cada una espera a la otra. Postgres lo dice así: «Process 8692 waits for
-   ShareLock on transaction 785; blocked by process 8694». El 8692 es el
-   alta, en `SELECT organizations … FOR UPDATE`. Lo reproduje mínimo, sin la
-   app: con 2 `UPDATE` y el alta en `FOR UPDATE` hay deadlock; con
-   `FOR NO KEY UPDATE`, ok.
-3. **Arreglo medido:** `_cuenta_bloqueada` pasa a tomar los candados con
-   `FOR NO KEY UPDATE`, que no choca con `FOR KEY SHARE`.
-   - Créditos: rc=0 en 3 de 3, «pierden: 0; no valen: 0; sin carrera: 0», con
-     las 4 fases en «quedan 10 de 10 pagos».
-   - Tu negativo sobre el mismo árbol: 200/200 y deadlocks +0.
-4. **Trampa de SQLAlchemy 2.0.25** (`requirements.txt:92`). Para la cache,
-   `with_for_update()` y `with_for_update(key_share=True)` son la misma
-   consulta, porque a `ForUpdateArg` le falta `key_share` en la clave. El
-   alta reutiliza entonces el `FOR UPDATE` que ya compiló el webhook.
-   - `key_share=True` solo: el log de Postgres muestra 0 «FOR NO KEY UPDATE»
-     y los créditos siguen en rc=2.
-   - Con `of=User` / `of=Organization` la clave cambia: 6 «FOR NO KEY UPDATE
-     OF users…» y rc=0.
-   - La 2.0.57 lo arregla (D200).
+Producto +0/−0. Emi no dijo que sí a D182: sigo en H.
 
 ## Decisiones
 
-Para Emi siguen abiertas D182, D183, D186 y D188; D184 ya está decidida. Las
-mías:
+- **D205 (para Emi): el arreglo de D204.** Hoy quien vence lee la cuenta
+  sin candado y escribe `billing_status = 'past_due'` encima de la
+  renovación. Son dos lugares: `_vencer_y_guardar` (`main.py:2282`, desde
+  `require_billing_vigente`) y `get_current_user`
+  (`auth/dependencies.py:146`), que es el que escribe en las filas de
+  prueba vencida de un usuario.
+  - (a) **Recomendada.** Vencer con un `UPDATE … WHERE billing_status = <el
+    leído> AND trial_ends_at = <el leído>`. Si la renovación ya escribió, no
+    toca nada. Sin candado nuevo, así no suma otro orden de toma al de
+    D206. Son los dos lugares, una sola función.
+  - (b) Vencer bajo `FOR UPDATE` releyendo la fila. También arregla, pero
+    toma otro candado en cada pedido de una cuenta vencida.
+  - (c) No tocar: pasa sólo si los dos llegan en la misma ventana, y la
+    próxima renovación lo corrige, pero mientras tanto pagó y no puede
+    trabajar.
+- **D206 (para Emi): los deadlocks de hoy.**
+  - (a) **Recomendada.** Una pieza chica ya: las 2 líneas de
+    `parche_nokey.diff` (`FOR NO KEY UPDATE` con `of=`). Medido: arregla
+    recarga + guardado y recarga + MARIA, que son los que pidió saber. No
+    arregla alta + guardado, alta + cancelar ni alta + reactivar: esos
+    necesitan (b) entero, que espera D182.
+  - (b) Esperar D182 y entrar todo con la pieza de (b).
 
-- **D200. Cómo se pide `FOR NO KEY UPDATE`.**
-  - (a) Con `of=` en las dos consultas de `_cuenta_bloqueada` (2 líneas), más
-    el caso 6, que mira el SQL que llega a Postgres después de que el webhook
-    compiló el suyo. **Recomendada.**
-  - (b) Subir SQLAlchemy de 2.0.25 a 2.0.57 y usar `key_share` sin `of`, con
-    suite completa.
-  - Por qué (a): (b) cambia una dependencia de toda la app dentro de una pieza
-    de plata. La subida va a la cola, con su propia suite.
-- **D201. `require_active_billing` queda sin rutas con (b).** Hoy la usa sólo
-  la manual (`main.py:3755`).
-  - (a) Borrarla (~20 líneas), junto con lo que la nombra:
-    - el reemplazo en `tests/test_maria1b_controles.py:40/44`, que ya hoy no
-      hace nada, porque `/generate_maria` usa `require_billing_vigente`;
-    - el paso de `tests/test_cobro_corte1.py:598`;
-    - los docstrings de `tests/test_prelaunch_block2.py` (11, 499, 524) y
-      `tests/test_prelaunch_block3.py` (12, 555, 561, 581). Sus casos le pegan
-      a la ruta y siguen valiendo;
-    - `arbol()` de `scripts/testing/conexiones1_creditos.py:188`, que hace
-      `inspect.getsource(main_mod.require_active_billing)` antes de medir: sin
-      la función da `AttributeError` y el caso 5 no corre. En el commit de
-      pruebas pasa a mirar `require_billing_vigente`.
+## Resultados
 
-    `grep -rn require_active_billing scripts/ tests/ docs/pm/herramientas`
-    no da otros (fuera de los `.pyc`); `conexiones1_medir.py` no la nombra.
+Caso 6: 7 pares × 2 órdenes × usuario/org × créditos vencidos/al día = 56
+rondas. Caso 7: 2 órdenes × usuario/org × prueba vencida/`active` fuera de
+gracia = 8 rondas. Una vez cada uno, sobre `7e55e35d`, salvo el caso 6 en
+HEAD: corrió con el árbol que después fue `218069dc`; `7e55e35d` sólo
+cambia el docstring del caso 7.
 
-    **Recomendada:** §6 pide restar.
-  - (b) Dejarla.
-- **D202. Si la base se cae en el `commit` que suelta la conexión.** Los tres
-  `commit` (vigente, analyze y NCM) cierran una transacción de sólo lectura.
-  - (a) Uno solo, `_soltar_conexion(db)`, en los tres puntos: lo anota en el
-    log y la ruta sigue con lo ya leído. **Recomendada.**
-  - (b) Que el error suba en vigente y en analyze (500), como cualquier
-    caída.
-  - No medí en qué estado queda la sesión después de un `commit` fallido; lo
-    mide el caso 4. Si la ruta escribe después y esa escritura no queda, el
-    caso da rojo y paso a (b).
-- **D203. Hasta dónde llega `FOR NO KEY UPDATE`.**
-  - (a) Sólo en `_cuenta_bloqueada`. El caso 6 corre el par alta + aviso de
-    suscripción. **Recomendada.**
-  - (b) También en el candado del webhook (`main.py:11705`) y en
-    `_cuenta_con_suscripciones` (11804/11816).
-  - Si el caso 6 da rojo en algún par con (a), (b) entra en la pieza con ese
-    rojo. El caso espejo (webhook contra alta) no está medido.
-  - Los otros `with_for_update()` sin `of` también toman `users` u
-    `organizations`: `users` en `/auth/request-password-reset` (1833) y en
-    `DELETE /api/organizations/members/{username}` (10992); `organizations`
-    en `/auth/register` con invitación (3522) y en
-    `/api/organizations/invite` (10859). El de 7135 es `system_backups`.
-    Ninguno cuenta operaciones; no los medí contra el alta y quedan en el
-    riesgo de la FK.
-- **D204. `past_due` pisado por una renovación** (tu «leído, no medido»).
-  También lo leí, sin medirlo.
-  - El orden que temo: `require_billing_vigente` lee la cuenta sin candado;
-    `_vencer_si_corresponde` ve `active` vencida más allá de la gracia; en
-    el medio, el webhook renueva y confirma. Después `_vencer_y_guardar`
-    escribe `billing_status=past_due` sobre la cuenta ya renovada. Quedaría
-    pagada y bloqueada.
-  - (b) no cambia el código de esa lectura. Que la carrera exista hoy no
-    está medido.
-  - El caso 7 lo mide primero sobre HEAD. Si no reproduce, lo digo así y no
-    toco nada. Si reproduce:
-    - (a) Arreglarlo en la pieza: vencer con un `UPDATE` condicional
-      (`WHERE billing_status=… AND trial_ends_at < …`), o vencer bajo
-      `_cuenta_bloqueada`. Es la misma familia y la misma función.
-      **Recomendada.**
-    - (b) Pieza aparte.
+| Caso | Árbol | rc | Resultado |
+|---|---|---|---|
+| 6 | HEAD | 1 | `deadlocks: 5; rondas sin armar: 0` |
+| 6 | (b) completo | 0 | `deadlocks: 0; rondas sin armar: 0` |
+| 6 | sólo `FOR NO KEY UPDATE` | 1 | `deadlocks: 3; rondas sin armar: 0` |
+| 7 | HEAD | 1 | `cuentas mal: 4; rondas sin armar: 0` |
+| 7 | (b) completo | 1 | `cuentas mal: 4; rondas sin armar: 0` |
 
-## La forma: (b) más `FOR NO KEY UPDATE`
+Caso 6 en HEAD, las 5 rondas con deadlock, todas de org con créditos
+vencidos, `[200, 500]`:
 
-Lo medido (resultado 1 a 3) fue un árbol con `main.py` +22/−5 y
-`tests/test_cobro_corte1.py` +2/−1. La tabla de abajo no es ese árbol: le
-aplica D201 (a) y D202 (a). Lo que cambia:
-
-- En lo medido, vigente, `require_active_billing` y analyze tienen
-  `await db.commit()` directo; `_soltar_conexion` está sólo en NCM. Con
-  D202 (a), los tres puntos usan `_soltar_conexion`, y el de
-  `require_active_billing` se va con la función (D201 a).
-- **Un test de cobro cambia para que pase la forma.** `_commit_que_falla`
-  (`test_cobro_corte1.py:829`) hace fallar todo `commit` de `main.py`. Con el
-  `commit` nuevo de vigente, la ruta caía ahí y no en el que el caso quiere
-  romper, así que lo medido deja pasar el de `require_billing_vigente`. Con
-  D202 (a) el ajuste es el mismo, para `_soltar_conexion`. Lo que el caso
-  sigue exigiendo no cambia: un `commit` de la ruta que falla no da 200 con
-  datos perdidos.
-
-Cada parte con su caso:
-
-| Cambio | Por qué | Caso |
-|---|---|---|
-| `_cuenta_bloqueada`: `.with_for_update(key_share=True, of=User)` y `(key_share=True, of=Organization)` | el deadlock con la FK; `of=` por la cache de 2.0.25 | 5 y 6 |
-| `require_billing_vigente`: `_soltar_conexion(db)` después del 402 | la conexión no queda tomada mientras la ruta espera a la IA o al PDF | 1 y 4 |
-| `create_manual_operation`: `_cobro=Depends(require_billing_vigente)` en lugar de `require_active_billing` | el tope se cuenta una vez, bajo candado, en `_contar_operacion_bloqueada` (eso es (b)) | 2, 3, 5, 6 y 8 |
-| `analyze_client_migration`: `_soltar_conexion(db)` después de cargar los clientes; sin `db.refresh(batch)` | no retener la conexión mientras se lee el archivo; el `refresh` no se usaba | 1 y 4 |
-| `sugerir_ncm`: `_soltar_conexion(db)` antes de esperar a Gemini | igual | 1 y 4 |
-| `require_active_billing`: borrada (D201 a) | sin rutas | suite |
-
-## Casos (uno por causa; las familias van como datos)
-
-| # | Causa | Datos | Verde | Rojo mostrado una vez |
-|---|---|---|---|---|
-| 1 | La ruta espera sin retener conexión | las 9 rutas de `require_billing_vigente`, analyze incluida (`conexiones1_medir.py`) | ninguna conexión retenida mientras espera | sin el `_soltar_conexion` de vigente (su sabotaje, anclado en código) |
-| 2 | El corte de una cuenta al día da 400 | `test_cobro_corte1.py` como está | pasa | el de su script |
-| 3 | La impaga da 402 sin leer el cuerpo | cortado · JSON roto completo · 1×100 MB · 4×100 MB (`conexiones1_cuerpo.py`) | 402 y 0 retenidas; JSON roto completo sigue en 402 | leyendo el cuerpo antes del 402 (lo que hacía (a)) |
-| 4 | La base se cae en el `commit` que suelta | vigente (`/process_operation/`) · analyze · NCM | la ruta contesta como sin caída y nunca da 200 con datos perdidos; el pedido siguiente funciona. Lo que el caso le cambia al motor o a la sesión vuelve en `try/finally` | `_soltar_conexion` sin `try` da 500 |
-| 5 | Una recarga y un alta a la vez no pierden la recarga | `conexiones1_creditos.py`: usuario y org · control y carrera | rc=0, «quedan 10 de 10 pagos» | el arreglo revertido (hoy): rc=1, «quedan 0 de 10 pagos» |
-| 6 | Dos rutas a la vez sobre la misma cuenta no se trancan | pares: alta + guardado · alta + recarga · alta + aviso de suscripción · generar MARIA + recarga; cuentas: usuario y org; créditos vencidos y no vencidos | 200/200, deadlocks +0 (`pg_stat_database`) y el SQL de `_cuenta_bloqueada` en «FOR NO KEY UPDATE OF» | (i) verde sobre un árbol sin `commit` antes de contar (hoy o (a)): guardado 500 y deadlock, como tu negativo; (ii) (b) sin `key_share`/`of`: alta 500 en alta + recarga de org |
-| 7 | Una renovación no queda pisada por `past_due` | usuario y org; trial vencido y `active` fuera de gracia | se mide primero sobre HEAD (D204) | si reproduce, el rojo es HEAD |
-| 8 | El tope de 10 sigue con (b) | `test_prelaunch_block2.py` y el conteo bloqueado de la manual | pasa | contar sin `_contar_operacion_bloqueada` |
-
-El caso 6 es un script nuevo de ≤80 líneas sobre las funciones de
-`conexiones1_creditos.py`, sin esperas fijas: espera a ver las consultas
-esperando en `pg_stat_activity`. Captura el SQL con el evento
-`before_cursor_execute`. No va en SQLite, porque SQLite no emite
-`FOR UPDATE`.
-
-`sabotajes_f.py` entra al repo con `SUELTA` y `COBRO` anclados en código.
-
-## Los demás caminos de `require_active_billing` y `can_create_operation`
-
-| Camino | Qué usa | Caso o razón |
-|---|---|---|
-| `/api/operations/manual` | hoy `require_active_billing`; con (b), vigente + `_contar_operacion_bloqueada` | 2, 3, 5, 6, 8 |
-| `/api/clientes/{id}/operaciones` (guardar) | vigente + `_cliente_con_cuenta_bloqueada` (8158) y, si la operación es nueva, `_contar_operacion_bloqueada` (8181) | 6 (alta + guardado), 8 |
-| `/generate_maria` y `/generate_maria_export` → `_contar_maria` | vigente + `_cuenta_bloqueada` + `_contar_en_la_cuenta` (`can_create_operation`) | cuentan bajo el mismo candado que el alta: la línea de `of=` los cubre. Van al caso 6 como dato: el par generar MARIA + recarga de la org, con su rojo sobre (b) sin `of=`. El conteo y el tope los cubren los casos existentes de `test_cobro_corte1.py` (370 a 530) |
-| `DELETE /api/clientes/public/{id}` (`_cliente_con_cuenta_bloqueada`) | toma `_cuenta_bloqueada` y no cuenta | no lleva caso propio: el candado es el mismo y lo cubre `of=`. El caso 6 mira el SQL de esa función |
-| `/process_operation/` (análisis de PDF), `/upload_pdf/public`, `/api/migrations/analyze`, `/api/migrations/{id}/confirm`, `/api/ncm/sugerir` | sólo `require_billing_vigente`; no cuentan | 1 (no retienen) y 4 (base caída, con `/process_operation/` como dato de vigente). No llaman a `can_create_operation` |
-| Webhook de pagos (`main.py:11705`; recarga y suscripción) | su propio `with_for_update()` | 5 y 6 (pares con el alta); D203 |
-| `/billing/topup` (`recarga_entra`, 11779) | lee `_expire_extra_ops` sin escribir | sin caso: no escribe la cuenta; la recarga la aplica el webhook |
-| `cancel_billing`, `reactivate_billing`, `billing_checkout` (`_cuenta_con_suscripciones`) | `with_for_update()` sin `of` | no cuentan operaciones. Quedan como están por D203 (a); el caso espejo no está medido (riesgo) |
-| «Otros planes» | `can_create_operation` mira `plan` dentro de la misma función | el plan es un dato de la cuenta, no otro camino: lo cubren los casos 2 y 8 |
-
-## Puertas de la pieza (sobre el SHA que se entregue)
-
-- `pytest -q --no-cov` completo desde base limpia.
-- `scripts/testing/e2e_maria.sh`.
-- `smoke_friccion.sh` y `ataque_aislamiento.sh`.
-- `conexiones1_medir.py` con su sabotaje, `conexiones1_cuerpo.py`,
-  `conexiones1_creditos.py` y el caso 6.
-- `chequeo-6.py` entero.
-- `/code-review high` y `/security-review`.
-- Adversarios: Sonnet alto y Opus alto.
-- Todo lo que ponen los casos, más sus rojos, se muestra una vez.
-
-## Comandos copiables (probados sobre este SHA)
-
-```bash
-# 1. La trampa de la cache: tiene que mostrar «2.0.25 True False»
-#    (sin of= comparten clave; con of= no).
-DATABASE_URL=sqlite+aiosqlite:///:memory: ENVIRONMENT=test GEMINI_API_KEY=test-key PYTHONPATH=. python -c "
-from sqlalchemy import select, __version__ as v
-from proyecto_maria.database.models import User
-k = lambda s: s._generate_cache_key()
-print(v, k(select(User).with_for_update()) == k(select(User).with_for_update(key_share=True)), k(select(User).with_for_update()) == k(select(User).with_for_update(key_share=True, of=User)))"
-
-# 2. Rutas por dependencia: tiene que mostrar 3755 con require_active_billing
-#    y 8 líneas con require_billing_vigente.
-grep -n -e "Depends(require_active_billing)" -e "Depends(require_billing_vigente)" proyecto_maria/main.py
-
-# 3. Quién cuenta y quién toma el candado: tiene que mostrar las 13 líneas
-#    de abajo, y ninguna en /process_operation/ ni en /api/migrations/.
-grep -n -e "_contar_operacion_bloqueada(" -e "_contar_maria(" -e "_contar_en_la_cuenta(" \
-  -e "_cliente_con_cuenta_bloqueada(" -e "record_operation_created(" proyecto_maria/main.py
+```
+DEADLOCK | alta + guardado | org | créditos vencidos | [200, 500] | deadlocks +1
+DEADLOCK | recarga + guardado | org | créditos vencidos | [200, 500] | deadlocks +1
+DEADLOCK | recarga + maria | org | créditos vencidos | [200, 500] | deadlocks +1
+DEADLOCK | alta + cancelar | org | créditos vencidos | [200, 500] | deadlocks +1
+DEADLOCK | alta + reactivar | org | créditos vencidos | [200, 500] | deadlocks +1
 ```
 
-Salida de las dos, corridas acá: `2.0.25 True False`; `3755:    db_user: User
-= Depends(require_active_billing),` y 3840, 4611, 5032, 5296, 7147, 7245,
-8132 y 10335 con `_cobro=Depends(require_billing_vigente),`.
+Con sólo `FOR NO KEY UPDATE` quedan alta + guardado, alta + cancelar y alta +
+reactivar. Por D203, el rojo de alta + cancelar/reactivar con (a) es el que
+mete (b): con (b) completo dan 0.
 
-La 3, corrida acá, da 2331, 2337, 2340, 2348, 3804, 5225, 5368, 6355, 6376,
-6423, 7769 y 8158, 8181. Por ruta:
-- `record_operation_created` sólo dentro de `_contar_en_la_cuenta` (2348);
-- `_contar_en_la_cuenta` desde `_contar_operacion_bloqueada` (2337) y
-  `_contar_maria` (6376);
-- `_contar_operacion_bloqueada` desde la manual (3804) y el guardado (8181);
-- `_contar_maria` desde `/generate_maria` (5225) y `/generate_maria_export`
-  (5368);
-- `_cliente_con_cuenta_bloqueada` desde el DELETE de cliente público (7769) y
-  el guardado (8158).
+Línea que el caso 6 imprime del código de `_cuenta_bloqueada`:
+- HEAD: `_cuenta_bloqueada: with_for_update() | with_for_update()`
+- (b) y sólo NO KEY, igual: `_cuenta_bloqueada: with_for_update(key_share=True, of=User) | with_for_update(key_share=True, of=Organization)`. Lo demás de (b) está fuera de esa función.
 
-Lo del resultado 1 a 3 (créditos, negativo y log de Postgres) lo corrí sobre
-árboles sin commitear. Se reproduce con los casos 5 y 6 de la pieza: hoy no
-hay copiable.
+Caso 7 en HEAD. Con (b), las 4 MAL son iguales; en las ok cambia el código del
+guardado en dos filas (usuario con prueba vencida y org `active` fuera de
+gracia): `[200, 200]` en vez de `[402, 200]`. La cuenta termina igual,
+`active` con el período por delante; leo que con (b) ese guardado ya vio la
+renovación, pero no lo medí aparte.
 
-## No corrido
+```
+ok       | guardado + renovación | usuario | prueba vencida | [402, 200] | termina active, período por delante
+ok       | guardado + renovación | usuario | active fuera de gracia | [402, 200] | termina active, período por delante
+ok       | guardado + renovación | org | prueba vencida | [402, 200] | termina active, período por delante
+ok       | guardado + renovación | org | active fuera de gracia | [402, 200] | termina active, período por delante
+MAL      | renovación + guardado | usuario | prueba vencida | [200, 402] | termina past_due, período por delante
+MAL      | renovación + guardado | usuario | active fuera de gracia | [200, 402] | termina past_due, período por delante
+MAL      | renovación + guardado | org | prueba vencida | [200, 402] | termina past_due, período por delante
+MAL      | renovación + guardado | org | active fuera de gracia | [200, 402] | termina past_due, período por delante
+```
 
-- Los casos 4, 6 (con los pares de recarga y aviso de suscripción, y los
-  créditos no vencidos) y 7. Los rojos del caso 6 que no son tu negativo.
-- Suite completa, `e2e_maria.sh`, revisiones y adversarios: van con la pieza.
-- El caso espejo: webhook o `_cuenta_con_suscripciones` contra el alta con
-  `FOR NO KEY UPDATE`.
-- El par generar MARIA + recarga: su rojo sin `of=` es esperado (pasa por
-  `_cuenta_bloqueada`, como el alta), no visto.
-- El árbol con D201 (a) y D202 (a): lo medido es el de la sección «La forma».
+## Comandos
 
-## Riesgos
+Desde la raíz, con el venv del proyecto en `PY`. Cada uno tarda unos minutos.
 
-- Railway no espera a la CI. La CI deselecciona los presupuestos compartidos.
-- D185 sigue como estaba.
-- La FK de la dueña: cualquier transacción nueva que haga dos `UPDATE` de
-  una org mientras otra tiene a la dueña con `FOR UPDATE` puede trancarse.
-  Esa es la razón de D203.
-- La cache de 2.0.25: otro `with_for_update(key_share=True)` sin `of` en el
-  código no haría lo que dice. Hoy no hay ninguno; el caso 6 mira el SQL.
-- D204, si reproduce, es plata en producción hoy, como D188.
+```bash
+PY=$PWD/venv/bin/python   # o el tuyo
+# caso 6 en HEAD → 5 líneas DEADLOCK, «deadlocks: 5; rondas sin armar: 0», rc=1
+scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_pares.py; echo rc=$?
+# caso 6 con (b) → ninguna DEADLOCK, «deadlocks: 0; rondas sin armar: 0», rc=0
+PY=$PY scripts/testing/conexiones1_con_parche.sh scripts/testing/conexiones1_pares.py; echo rc=$?
+# caso 6 con sólo NO KEY → 3 DEADLOCK (alta + guardado/cancelar/reactivar), rc=1
+PARCHE=conexiones1_parche_nokey.diff PY=$PY scripts/testing/conexiones1_con_parche.sh scripts/testing/conexiones1_pares.py; echo rc=$?
+# caso 7 en HEAD y con (b) → 4 MAL, «cuentas mal: 4; rondas sin armar: 0», rc=1
+scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_renovacion.py; echo rc=$?
+PY=$PY scripts/testing/conexiones1_con_parche.sh scripts/testing/conexiones1_renovacion.py; echo rc=$?
+# parche que no aplica → rc=2
+PARCHE=no_existe.diff PY=$PY scripts/testing/conexiones1_con_parche.sh scripts/testing/conexiones1_pares.py; echo rc=$?
+git worktree list | grep -c cdi-parche   # → 0
+```
+
+Códigos de salida: 1 = deadlock o cuenta mal; 4 = alguna ronda no se armó;
+2 = el arnés falló o el parche no aplica; 0 = limpio. Un error de import o
+de `git worktree add` sale 1 igual, pero sin la última línea «deadlocks: N»
+o «cuentas mal: N»: así se distingue.
+
+## Puertas
+
+| Puerta | Salida |
+|---|---|
+| `chequeo-6 6001684..7e55e35d` | `producto +0/−0`, `arnés +323/−0`, historia vacía, `avisos: 0` |
+| caso 6 y 7, con y sin parche | la tabla de Resultados |
+| parche inexistente | rc=2 |
+| worktrees `cdi-parche` sueltos | 0 |
+| suite completa | **no corrida**: no hay producto |
+
+Salida entera de `chequeo-6`:
+
+```
+chequeo-6 6001684ccc1249bc5bfbf33e10e6d327d80c51b2..7e55e35dc2dffa98c36502431bcc3929c1723b72: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +323/−0
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+avisos: 0
+```
+
+## Cómo cuenta el arnés
+
+- El deadlock lo cuenta `pg_stat_database.deadlocks` antes y después de la
+  ronda. Postgres lo actualiza sin plazo fijo, pero sí al cerrar la conexión:
+  la ronda cierra el pool de la app y espera a que no le quede ninguna
+  conexión. Así cuenta también un deadlock que la app atrape y no dé 500
+  (`_vencer_y_guardar` hace `rollback` de cualquier excepción).
+- La ronda se arma cuando el segundo pedido está esperando el candado del
+  primero; si no se arma, la ronda sale «NO SE ARMÓ» y el caso da 4.
+
+## Revisión
+
+| Quién | Modelo y esfuerzo | Hallazgo | Qué hice |
+|---|---|---|---|
+| adversario | Sonnet, alto | Excepción del arnés salía 1, igual que un deadlock | Arreglado: sale 2 |
+| adversario | Sonnet, alto | Parche que no aplica salía 1 | Arreglado: sale 2 |
+| `/code-review` | high | El contador sólo esperaba si había un 500 | Arreglado: cierra el pool y espera siempre |
+| `/code-review` | high | El docstring del caso 7 no nombraba `get_current_user` | Arreglado |
+| `/code-review` | high | `.sh`: raíz relativa, trap, stderr tapado | Arreglado |
+| adversario | Sonnet, alto | El 0 es de (b) completo, no de NO KEY solo | Declarado: la tabla trae las 3 variantes |
+| adversario | Sonnet, alto | El caso 6 imprime el código fuente, no el SQL emitido, y corta «esperaba» a 110 caracteres: no se ve el modo del candado | Queda. La línea de `_cuenta_bloqueada` sí muestra el modo |
+| `/code-review` | high | `ronda` duplica `fase_carrera` de `conexiones1_creditos.py`; el loop de reporte se repite en los dos casos | Queda: `creditos.py` no lo toco en H. Va a la cola si la pieza de producto no lo absorbe |
+| adversario | Sonnet, alto | `parche_b.diff` contiene a `parche_nokey.diff` | Queda: son variantes completas, no se aplican juntas |
+| adversario | Sonnet, alto | Con NO KEY, la ronda puede armarse por una espera de FK y no por el candado | Queda: el arnés no distingue qué pedido espera |
+| adversario | Sonnet, alto | El argumento del `.sh` tiene que ser relativo a la raíz; el caso 7 no imprime el árbol | Queda: el uso lo dice |
+
+El adversario reprodujo por su cuenta los mismos números de HEAD, (b) y NO
+KEY antes del arreglo del contador.
+
+## Riesgos y lo no corrido
+
+- Cada caso corrió una vez por árbol. Es una carrera armada (el segundo
+  pedido espera el candado del primero), no un sorteo, pero no midió
+  frecuencia en producción.
+- Suite completa, e2e y arneses de otras piezas: no corridos; no hay
+  producto.
+- `tests/test_conexiones1.py` sigue sin seguimiento a propósito.
