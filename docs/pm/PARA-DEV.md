@@ -3,61 +3,55 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## CONEXIONES-1 D: aceptada como medición sobre `c1311852` e integrada (2026-11-12 05:37 UTC)
+## CONEXIONES-1 E: aceptada como arnés sobre `19714ecf` e integrada (2026-11-12 06:55 UTC)
 
-Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección D.
-Integré con `merge` exactamente `c1311852`: arnés solo, producto 0 líneas.
+Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección E.
+Integré con `merge` exactamente `19714ecf`. Es arnés solo; el producto
+tiene 0 líneas.
 
-- Igual a tu informe: hoy rc=4, la otra cuenta 12 × 500 en analyze y en
-  manual, hasta 30,25 s; con el diff, rc=0, 0 × 500 en todas las fases (con
-  y sin cuota). Mismos contadores del log (280/54/10/324). La serie de la
-  subida baja en escalones a los ~31, 61, 91 y 121 s, como decís.
-  `test_conexiones1.py`: 4 rojos hoy y 4 verdes con el diff. Control: cinco
-  `BIEN`. `chequeo-6` igual, 0 avisos.
-- Mis negativos: con `_leer_cuerpo` después de `require_active_billing`,
-  tu prueba da rojo (distingue el orden); analyze con un cliente existente
-  da 200 y 0 tomadas.
-- **Lo que cierra:** manual se frena sólo del lado del cliente, así que hoy
-  una cuenta con sesión le hace dar 500 a otra sin IA ni PDF de por medio.
-- **Hallazgo del adversario, reproducido por mí:** con `_leer_cuerpo`, un
-  cliente que corta a mitad del cuerpo recibe 500 (`ClientDisconnect`, con
-  ERROR y traza); hoy recibe 400 «Body JSON inválido». Es condición de la
-  pieza de producto (abajo, E).
-- Riesgos, sin pedido: el cuerpo entero se lee antes del 402 y del 429 (una
-  cuenta impaga hace leer 32 MB; el mismo vector ya existe sin sesión en las
-  rutas con cuerpo tipado); analyze toma una conexión nueva al final, y con
-  el pool lleno falla después de leer el Excel, sin perder nada.
-- **D183: a Emi, junto con D182, como una sola pregunta**, con mi
-  recomendación de (a), los cuatro lugares, con la condición del corte.
-- **D184: (a), decidido por la PM,** si Emi dice que sí: `test_conexiones1.py`
-  entra con el commit de pruebas de la pieza.
-- `f9962e6e` aceptado: con el pool lleno, una fila perdida es «pool lleno».
-  Los 10 `Error logging metrics` los conté en todo el log, no por fase.
+- **Coincide con tu informe:**
+  - el caso del corte da `assert 500 == 400` con el diff de D y `103 passed` con el revisado;
+  - el medidor con el revisado da rc=0, con `corte_manual_a_medias` {400: 15} y `pico_cuerpo_manual` 60 de 60 con 0 tomadas;
+  - el control da seis `BIEN`;
+  - `chequeo-6` da lo mismo, con 0 avisos.
+- **Mis negativos:** corté sin mandar nada y en tres trozos. Con el
+  `except` las dos formas dan 400 sin ERROR; sin él, 500.
+- **Leído:**
+  - el ancla es código;
+  - no hay espera fija nueva;
+  - el segmento de log de cada fase se lee después de que terminan sus tareas de registro. La sonda cuenta el fin en el callback y la app corre sin búfer, así que el rc=4 sin arreglo no depende del orden del log. Esa corrida no la repetí.
+- **D185: (a), decidido por la PM.** El tope de cuerpo no entra en esta fila. Va a
+  Emi como riesgo dentro del punto 13 y a la cola como pieza propia.
 
-## Tarea activa: CONEXIONES-1 E, sólo arnés (2026-11-12 05:37 UTC)
+## Tarea activa: CONEXIONES-1 F, casos y puertas con el diff revisado (2026-11-12 06:55 UTC)
 
-Sigue siendo medir y preparar, dentro de la fila abierta de CONEXIONES-1.
-Producto: nada. Tus D: D185 a D189.
+Seguimos en la fila abierta de CONEXIONES-1. No commiteás producto: el diff
+revisado sigue fuera de la rama, sólo en el informe. Tus D van de D186 a D189.
 
-1. **Filas perdidas sin explicación:** un sabotaje en
-   `sabotajes/conexiones1.sh` en el que se pierden filas de `api_logs` sin
-   `Error logging metrics`, y el medidor da rc=2 (medición inválida). El
-   ancla es código. Si el contador va por fase, mejor: decí cuál elegiste.
-2. **El diff propuesto, revisado:** un cliente que corta a mitad del cuerpo
-   en `/api/operations/manual` contesta como hoy (400, sin ERROR en el log ni
-   fila 500), y el pedido lento sigue sin retener conexiones. Completo, sin
-   commitear, con `git apply --check` limpio sobre tu cabeza.
-3. **Un caso, como dato dentro de `test_conexiones1.py`:** el corte a mitad
-   del cuerpo; rojo con el diff de D y verde con el revisado, con las dos
-   salidas en el informe.
-4. El medidor sigue con rc=0 en todas las fases con el diff revisado, y
-   cinco `BIEN` más el nuevo. Ninguna espera fija nueva.
+1. **Cuenta impaga y cuenta sin cuota.** Agregalas en `test_conexiones1.py`
+   como datos dentro de un caso. Para cada una:
+   - un corte a mitad del cuerpo contesta 400;
+   - el cuerpo completo contesta 402 la impaga y 429 la sin cuota.
 
-- Sugerencia, no criterio: un tope de tamaño para el cuerpo leído antes del
-  402 y del 429. `_leer_cuerpo_con_tope` (`main.py:2929`) consume el flujo;
-  si lo usás, decí cómo queda el cuerpo para la ruta.
-- Si Emi dice que sí a D182 mientras hacés E, te aviso: la pieza de producto
-  es tuya y E entra en ella.
+   Si te sale distinto, mostrá la salida y no lo arregles.
+2. **Hallazgo 3:** analyze con el pool lleno al guardar el respaldo. Medí qué
+   contesta y mostrá que en la base no queda nada a medias. Tiene que ser un
+   caso o una fase del medidor, sin espera fija nueva.
+3. **Con el diff revisado aplicado y sin commitear**, corré la suite completa
+   (`DOLARAPI_BASE` local, `ENVIRONMENT=testing`, `GEMINI_API_KEY` vacía) y
+   `e2e_maria.sh`. Poné las dos salidas en el informe. Esto no reemplaza la
+   puerta sobre el SHA que entregues en la pieza de producto: decilo así.
+4. **Para la pieza de producto, sin hacerlo ahora:** el texto «Body JSON
+   inválido» está repetido en dos lugares (§6). Proponé cómo queda en uno
+   solo, o explicá por qué no se puede sin cambiar la firma de la ruta.
+
+El diff revisado actualizado va en el informe, con `git apply --check`
+limpio sobre tu cabeza.
+
+**Apenas entregues:** si Emi ya dijo que sí a D182, empezá la pieza de
+producto de CONEXIONES-1, con E y F adentro y revisión fuerte. Si todavía no
+dijo nada, avisalo en una línea y quedate quieta: en mi vuelta te doy la
+siguiente.
 
 ## FOCO-PERFIL: aceptada sobre `dc4cf077` e integrada (2026-11-12 03:37 UTC)
 

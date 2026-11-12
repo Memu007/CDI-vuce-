@@ -255,3 +255,69 @@ nueva (`confirm` relee con `FOR UPDATE`); la ruta no usa `SET LOCAL`.
 - El adversario con Postgres; el hallazgo 3 corrido.
 - `/security-review`, la suite completa y `e2e_maria.sh` con el arreglo: van
   en la pieza de producto, si Emi dice que sí.
+
+## E (sólo arnés): aceptada sobre `19714ecf` (2026-11-12 06:55 UTC)
+
+Base `89d3fa3c`. Arnés +31/−21, producto 0. `chequeo-6`: igual al informe,
+historia vacía, 0 avisos.
+
+Leído en el diff:
+
+- El sabotaje nuevo se ancla en `session.add(log_entry)`, que es código.
+  Ninguna espera fija nueva: `grep '^+' | grep -i sleep` da vacío.
+- El contador de «Error logging metrics: QueuePool limit» va por fase. Cada
+  fase anota dónde termina el log al empezar y lo lee recién cuando
+  `_cerrada` dio vacío, es decir, cuando ya terminaron sus tareas de
+  registro. La sonda cuenta `log_tareas_fin` en el callback de fin de la
+  tarea (`conexiones1_sonda.py:98`), o sea después del print. La app corre
+  con `PYTHONUNBUFFERED=1`. Por eso una corrida sin arreglo no puede pasar
+  de rc=4 a rc=2 por el orden del log.
+- Una fase con menos avisos que filas perdidas queda inválida
+  (`enviados - filas > explicadas`). También queda inválida si hay filas de
+  más.
+
+Reproducido en un worktree:
+
+| corrida | resultado |
+|---|---|
+| producto de D + `test_conexiones1.py` de E | `1 failed, 4 passed`; body-400: `assert 500 == 400` |
+| diff revisado (`git apply --check` limpio) + `test_conexiones1` + `test_cobro_corte1` | `103 passed, 3 warnings in 61.50s` |
+| medidor con el diff revisado (`--pico 60 --lento 30`) | rc=0, «sin conexiones tomadas»; detalle abajo |
+| `sabotajes/conexiones1.sh 19714ecf` | rc=0, seis `BIEN`; el nuevo: «el producto pierde filas de api_logs sin avisar: salida 2, dice «no explican la diferencia»» |
+
+Detalle del medidor:
+
+- `corte_manual_a_medias`: {400: 15}, como máximo 1 conexión tomada.
+- `pico_cuerpo_manual`: «60 de 60 esperando el cuerpo a la vez (llegaron en
+  0.58 s, con 0 conexiones tomadas)». La otra cuenta recibió 0 × 500 y
+  esperó hasta 0,03 s.
+- En el log: «Exception in ASGI application», «Traceback», «QueuePool
+  limit» y «Error logging metrics» aparecen 0 veces. Hay 826 filas de
+  `api_logs` para 826 tareas de registro.
+
+**Mis negativos** cortan de otras dos formas: sin mandar nada del cuerpo,
+y en tres trozos antes de cortar. Con el `except ClientDisconnect` las dos
+dan 400 «Body JSON inválido», sin ERROR. Sin él dan 500, y el log dice
+«Excepcion no manejada en POST /api/operations/manual: ClientDisconnect».
+La condición del corte se cumple, y no sólo para el ejemplo del caso.
+
+**D185: (a), decidido por la PM.** Un tope de tamaño para el cuerpo leído
+antes del 402 y del 429 no entra en esta fila. Es exposición que crea el
+propio diff: una cuenta impaga o sin cuota hace leer el cuerpo entero.
+Por eso va a Emi como una línea de riesgo dentro del punto 13, y a la cola
+como pieza propia.
+
+**Lo que cambia para la pieza de producto:**
+
+- El diff tiene un trozo más, el import de `ClientDisconnect`.
+- Un corte de una cuenta impaga contesta 400 en vez de 402.
+- El cuerpo se lee antes del 402 y del 429.
+- El texto «Body JSON inválido» queda en dos lugares (§6, declarado por la
+  Dev).
+
+### No corrido por mí
+
+- El medidor sin el diff. La Dev informa rc=4. No hace falta que lo corra:
+  el corte del segmento de log espera a las tareas de registro (ver arriba).
+- Los adversarios, `/security-review`, la suite completa y `e2e_maria.sh`
+  con el diff revisado. Van en la pieza de producto.
