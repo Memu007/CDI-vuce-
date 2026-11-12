@@ -99,8 +99,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   en la app: hoy no limita nada; borrarlo o montarlo es decisión aparte (D111).
 - `main.py` todavía define `IS_PRODUCTION`; cuando ningún test lo parchee,
   sacarlo.
-- La guarda «No podés removerte a vos mismo» al sacar un miembro no tiene caso
-  que la frene si se borra.
 - Roles: normalizarlos al leerlos de la base (`/auth/me` los devuelve crudos;
   el arranque parte un texto en letras).
 - `ci.yml`: el comentario de «Suite completa» cuenta historia; y `CLAUDE.md` §5
