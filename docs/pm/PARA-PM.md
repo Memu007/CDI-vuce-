@@ -2,6 +2,52 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## D169 de MARIA: foco_perfil.sh mide pantalla_sesion1 en #pfEmail (sólo arnés)
+
+**Resultado.** El caso está en `CASOS` (117c1d16). La puerta se cumple sobre
+832bf74, pero **no sobre HEAD de esta rama**: el arreglo del arnés
+(bcd1f07d, «espera el foco antes de escribir») está sólo en
+`claude/dev-maria`. Ni tu rama ni la mía lo tienen, así que en nuestras HEAD
+`pantalla_sesion1.js` es el mismo que en 832bf74 (blob 2af1303d) y pierde.
+El verde se ve en la punta de MARIA (54ba0013). Supongo que tu «HEAD» era la
+de ella; si no, va a aparecer cuando integres MARIA.
+
+**Nada para decidir.** Esta pieza no integra la rama de MARIA: eso lo hacés vos.
+
+| SHA medido | caso `pantalla_sesion1.js·#pfEmail` | rc |
+|---|---|---|
+| 832bf742 | PIERDE | 1 |
+| 69d3ddbd (HEAD de esta rama antes del caso) | PIERDE | 1 |
+| 54ba0013 (punta de `claude/dev-maria`) | NO PIERDE | 0 |
+
+Los dos casos de `pantalla_estudio1` dan NO PIERDE en los tres SHAs.
+Las líneas del caso, copiadas del log (sin las de `pantalla_estudio1` y con los correos tapados):
+
+```
+== 832bf74 832bf742
+PIERDE      | scripts/testing/pantalla_sesion1.js·#pfEmail: lo escrito cayó en «Mi CUIT» (robado=%23pfEmail&valor=<MAIL>) · focos: foco=campo&ms=64
+FALLA: TimeoutError: page.waitForResponse: Timeout 30000ms exceeded while waiting for event "response"
+rc=1
+== HEAD 69d3ddbd
+PIERDE      | scripts/testing/pantalla_sesion1.js·#pfEmail: lo escrito cayó en «Mi CUIT» (robado=%23pfEmail&valor=<MAIL>) · focos: foco=campo&ms=49
+FALLA: TimeoutError: page.waitForResponse: Timeout 30000ms exceeded while waiting for event "response"
+rc=1
+== 54ba0013 54ba0013
+NO PIERDE   | scripts/testing/pantalla_sesion1.js·#pfEmail · focos: foco=reloj&ms=3000 foco=reloj&ms=3000 foco=reloj&ms=3000
+rc=0
+```
+
+`chequeo-6 69d3ddbd 117c1d16`: producto +0/−0, arnés +1/−0, historia vacía,
+avisos: 0.
+
+Sin revisión de subagentes ni `/code-review`: es una línea de datos de un
+arnés.
+
+```bash
+PY=<venv>/bin/python scripts/testing/foco_perfil.sh 832bf74;  echo rc=$?   # sesion1 PIERDE, rc=1
+PY=<venv>/bin/python scripts/testing/foco_perfil.sh 54ba0013; echo rc=$?   # sesion1 NO PIERDE, rc=0
+```
+
 ## CONEXIONES-1 K: soltar() dice qué hacen las conexiones; los pares de alta miden el estado final (sólo arnés)
 
 **Resultado.** Las dos puertas se cumplen.
@@ -184,4 +230,4 @@ grep -E 'mal$|^rondas' k.log
 python docs/pm/herramientas/chequeo-6.py f93c58c0 7dcfc5cc   # producto +0/−0, avisos: 0
 ```
 
-/compact conservar: Dev 1 técnica, rama claude/dev-tecnica; entregué CONEXIONES-1 K (2ddeb589 + 7dcfc5cc + informe); nada para decidir; espero veredicto, nada «apenas entregues».
+/compact conservar: Dev 1 técnica, rama claude/dev-tecnica; entregué CONEXIONES-1 K (32b1161c) y D169 de MARIA (117c1d16 + informe); nada para decidir; espero veredicto, nada «apenas entregues».
