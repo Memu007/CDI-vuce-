@@ -112,6 +112,12 @@ sabotaje $M "no se borran los presupuestos del cliente" \
 sabotaje $M "se borran también los presupuestos ajenos" \
   '                    PublicQuoteModel.operation_id.in_([o.id for o in operaciones])' '                    PublicQuoteModel.operation_id.isnot(None)' \
   "FAILED $T::test_borrar_cliente_borra_sus_presupuestos_y_no_los_ajenos" "assert 404 == 200"
+sabotaje $M "sólo se borra el presupuesto de la primera operación" \
+  'PublicQuoteModel.operation_id.in_([o.id for o in operaciones])' 'PublicQuoteModel.operation_id.in_([operaciones[0].id])' \
+  "FAILED $T::test_borrar_cliente_borra_sus_presupuestos_y_no_los_ajenos" "AssertionError: presupuesto de la operación 2" "assert 200 == 404"
+sabotaje $M "sólo se borran los ítems de la primera operación" \
+  'OperationItemModel.operation_id.in_([o.id for o in operaciones])' 'OperationItemModel.operation_id.in_([operaciones[0].id])' \
+  "FAILED $T::test_borrar_cliente_borra_sus_presupuestos_y_no_los_ajenos" "AssertionError: ítems de la operación 2" "assert 1 == 0"
 sabotaje $M "el borrado no es una sola transacción" \
   $'        await db.delete(client)\n        await db.commit()\n        return {\n            "success": True,\n            "message": "Cliente eliminado",' \
   $'        await db.commit()\n        await db.delete(client)\n        await db.commit()\n        return {\n            "success": True,\n            "message": "Cliente eliminado",' \

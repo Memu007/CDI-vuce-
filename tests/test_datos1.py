@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from proyecto_maria.database.connection import AsyncSessionLocal
-from proyecto_maria.database.models import Operation, PublicQuote
+from proyecto_maria.database.models import Operation, OperationItem, PublicQuote
 from proyecto_maria.main import app, get_current_user, get_db
 from tests.conftest import cuenta_de_prueba
 from tests.test_maria7_rechazos_24_10 import _pedido
@@ -157,6 +157,12 @@ async def _presupuestos_de(op_id):
         return len(res.scalars().all())
 
 
+async def _items_de(op_id):
+    async with AsyncSessionLocal() as s:
+        res = await s.execute(select(OperationItem).where(OperationItem.operation_id == op_id))
+        return len(res.scalars().all())
+
+
 def _usuario_nuevo(base, prefijo):
     u = dict(base)
     u["username"] = u["effective_owner"] = f"{prefijo}_{uuid.uuid4().hex[:8]}"
@@ -197,21 +203,31 @@ async def test_borrar_cliente_borra_sus_presupuestos_y_no_los_ajenos(
 ):
     c = cliente_http
     _como(otro_usuario)
-    _, _, token_ajeno = _cliente_con_presupuesto(c, creados)
+    _, op_ajena, token_ajeno = _cliente_con_presupuesto(c, creados)
     _como(dueno)
     cid, op, token = _cliente_con_presupuesto(c, creados)
-    _, _, token_otro_cliente = _cliente_con_presupuesto(c, creados)
-    assert c.get(f"/api/quotes/public/{token}").status_code == 200
+    _, op_otro_cliente, token_otro_cliente = _cliente_con_presupuesto(c, creados)
+    r = _guardar(c, cid)
+    assert r.status_code == 200, r.text
+    op2 = r.json()["operation_id"]
+    borradas = {1: (op, token), 2: (op2, _compartir(c, op2))}
+    quedan = {"otro cliente": (op_otro_cliente, token_otro_cliente),
+              "otro dueño": (op_ajena, token_ajeno)}
+    for o, t in [*borradas.values(), *quedan.values()]:
+        assert c.get(f"/api/quotes/public/{t}").status_code == 200
+        assert await _items_de(o) > 0
 
     r = c.delete(f"/api/clientes/{cid}")
     assert r.status_code == 200, r.text
 
     assert c.get(f"/api/clientes/{cid}").status_code == 404
-    assert c.get(f"/api/quotes/public/{token}").status_code == 404
-    assert await _presupuestos_de(op) == 0
-    # Los de otro cliente del mismo dueño y los de otro dueño siguen andando.
-    assert c.get(f"/api/quotes/public/{token_otro_cliente}").status_code == 200
-    assert c.get(f"/api/quotes/public/{token_ajeno}").status_code == 200
+    for n, (o, t) in borradas.items():
+        assert c.get(f"/api/quotes/public/{t}").status_code == 404, f"presupuesto de la operación {n}"
+        assert await _presupuestos_de(o) == 0, f"presupuesto de la operación {n}"
+        assert await _items_de(o) == 0, f"ítems de la operación {n}"
+    for quien, (o, t) in quedan.items():
+        assert c.get(f"/api/quotes/public/{t}").status_code == 200, quien
+        assert await _items_de(o) > 0, quien
 
 
 def test_otro_dueno_no_borra_el_cliente_ni_su_presupuesto(
