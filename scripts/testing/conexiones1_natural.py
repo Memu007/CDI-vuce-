@@ -2,8 +2,8 @@
 
 Cada fila de FILAS es un par con la org puesta de una forma. Por ronda: deadlock y
 quién perdió, si la recarga quedó entera y vigente (con un reintento firmado si perdió
-el aviso) y si la renovación que dio 200 dejó la cuenta active con el período por delante.
-Los pares sin recarga ni renovación miden sólo deadlock y códigos, no el estado final.
+el aviso), si la renovación que dio 200 dejó la cuenta active con el período por delante
+y, en los pares de alta, si lo que dio 200 quedó entero y lo que no, no dejó nada.
 uso: [N=rondas, 10 si no] scripts/testing/con_pg16.sh python scripts/testing/conexiones1_natural.py
 Sale 1 si algo de eso falló, 2 si falló el arnés o una ronda sin deadlock dio un código
 que la fila no admite, y 0 si no.
@@ -23,6 +23,9 @@ from tests.mp_firma import aviso_firmado  # noqa: E402
 N = int(os.environ.get("N", "10"))
 ESTADO = ("select (select estado from mp_pagos_aplicados where payment_id = %s),"
           " extra_ops_remaining, extra_ops_expires_at > now() from organizations where id = %s")
+OPERACIONES = ("select o.id, count(i.id) from operations o left join operation_items i on i.operation_id = o.id"
+               " where o.owner_username = (select owner_username from organizations where id = %s) group by o.id")
+CUENTA = "select ops_used_this_period, billing_status from organizations where id = %s"
 CREDITOS = {"créditos vencidos": None, "créditos al día": "extra_ops_expires_at = now() + interval '20 days'"}
 # (a, b, rótulo, cómo queda la org además de los créditos extra vencidos, códigos que b puede dar sin deadlock)
 FILAS = [("recarga", b, *c, {200}) for b in ("guardado", "maria", "alta") for c in CREDITOS.items()] + [
@@ -37,6 +40,18 @@ def recarga_quedo(pid, org, esperados):
     return bien, f"pago {estado or 'sin fila'}, créditos {creditos}/{esperados} {'vigentes' if vigentes else 'vencidos'}"
 
 
+def alta_quedo(org, antes, r_a, b, r_b):
+    """La operación del alta con su ítem, la del guardado, una cuenta por operación y el
+    plan que dijo cancelar o reactivar: nada más que lo que dio 200."""
+    ops, (usadas, plan) = dict(h.sql(OPERACIONES, org)), h.sql(CUENTA, org)[0]
+    alta = r_a.json()["operation_id"] if r_a.status_code == 200 else None
+    guardadas = len(ops) - (alta in ops)
+    plan_esperado = r_b.json()["billing_status"] if b != "guardado" and r_b.status_code == 200 else antes[1]
+    bien = (not alta or ops.get(alta) == 1) and guardadas == (b == "guardado" and r_b.status_code == 200) \
+        and usadas - antes[0] == len(ops) and plan == plan_esperado
+    return bien, f"{len(ops)} operaciones, {usadas - antes[0]} contadas, plan {plan}"
+
+
 def ronda(c, a, b, rotulo, ajuste, admite):
     sesion, cliente, ref, (_, _, org) = h.preparar(c, True)
     if ajuste:
@@ -44,6 +59,7 @@ def ronda(c, a, b, rotulo, ajuste, admite):
     if "recarga" in (a, b):
         _, previos, vigentes = h.sql(ESTADO, None, org)[0]
         esperados = h.RECARGA + (previos if vigentes else 0)
+    cuenta_antes = h.sql(CUENTA, org)[0]
     antes, barrera, pid = h.sql(DEADLOCKS)[0][0], threading.Barrier(2, timeout=h.PLAZO), []
 
     def pedir(nombre):
@@ -67,6 +83,9 @@ def ronda(c, a, b, rotulo, ajuste, admite):
             r = c.post("/api/payments/webhook", **aviso_firmado("payment", pid[0], "secreto-de-prueba"))
             bien, quedo = recarga_quedo(pid[0], org, esperados)
             linea += f" | reintento {r.status_code}: {quedo}"
+    if a == "alta":
+        bien, quedo = alta_quedo(org, cuenta_antes, r_a, b, r_b)
+        linea += f" | {quedo}"
     if a == "renovación":
         estado, delante = h.sql("select billing_status, trial_ends_at > now() from organizations where id = %s", org)[0]
         bien = r_a.status_code != 200 or (estado == "active" and delante)
