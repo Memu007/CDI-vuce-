@@ -24,11 +24,12 @@ Dos cosas que el medidor no separa, y que entran en la pieza de abajo:
 
 - **D180: (a), decidido por la PM, con un criterio distinto del tuyo.** No
   alcanza con «los 500 de PDF». `/api/ncm/sugerir` no tiene límite por minuto
-  ni cuota, y `pico_gemini` con **un solo token** toma 50 de 50 conexiones:
-  una cuenta sola deja a todos esperando 30 s. En la subida, la cuota de
+  ni cuota (no tiene decorador y el `Limiter` de `core/rate_limit.py:67` no
+  tiene límite por defecto), y `pico_gemini` con **un solo token** toma 50 de
+  50 conexiones: esa misma cuenta espera 30 s. A otra cuenta, no está medido. En la subida, la cuota de
   producción (50 por día) es justo el pool, y la conexión ya está tomada
   mientras espera el candado de validación, antes del 429 (leído, no
-  medido). Va como pieza **CONEXIONES-1 C**, abajo.
+  medido). Abajo, **CONEXIONES-1 C**: primero medir a otra cuenta.
 - **D181: (b).** A la cola de limpieza, con el caso que importa: muchas claves
   malas a la vez desde **la misma IP** (el `5/minute` corta antes de entrar;
   `abuso1` lo prueba en serie, en simultáneo no está corrido).
@@ -37,24 +38,25 @@ Dos cosas que el medidor no separa, y que entran en la pieza de abajo:
 
 1. **El informe del agregado de los ids** (`dd0eab7e`): lo de arriba, en
    «BORRADOR-1», con tu versión de pytest.
-2. **CONEXIONES-1 C** (en el roadmap: CONEXIONES-1 prevé el arreglo si se
-   rompe). Transversal: sesión de base, login y rutas con plata de Gemini.
-   - **Comportamiento:** una cuenta sola no le hace fallar ni esperar a otra.
-     Con `--pico 60 --lento 30`, los pedidos de **otra cuenta**: cero 500 y
-     espera máxima de **5 s** (el pico de bcrypt hoy da 3,1 a 3,7 s). Los
-     pedidos de más del pico reciben un error limpio (429, 503 o 504), nunca
-     500.
-   - **Alcance:** la subida pública de PDF, `/api/ncm/sugerir` y el login.
-   - **Prueba:** el medidor usa otra cuenta para los normales y separa «pool
-     lleno» de «fuga» en el texto y en el rc. El rojo antes del arreglo, con
-     esa medición sobre el código de hoy; el verde después. Una corrida más
-     con la cuota de producción (sin `AI_DAILY_PDF_LIMIT=100000`).
-   - **Revisión fuerte** (§3): sabotaje propio, adversario y
-     `/security-review`.
-   - *Sugerencia, no criterio:* soltar la conexión antes de esperar a Gemini
-     o a la lectura, o un tope de pedidos en vuelo por cuenta.
-   - La subida es de la zona de MARIA (D74): le aviso en su canal. Si tocás
-     algo que ella tenga abierto, decilo en el informe.
+2. **CONEXIONES-1 C, sólo arnés** (es medir, dentro de CONEXIONES-1). El
+   arreglo de producto no entra sin el sí de Emi: la fila del roadmap dice
+   «arreglar sólo si las deja» y no quedan. Se lo propongo de día.
+   - **Medir a otra cuenta:** el medidor usa otra cuenta para los normales
+     y separa «pool lleno» de «fuga» en el texto y en el rc.
+   - **Corridas** sobre el código de hoy: `--pico 60 --lento 30` para la
+     subida pública de PDF y para `/api/ncm/sugerir`, y una más con la cuota
+     de producción (sin `AI_DAILY_PDF_LIMIT=100000`). El informe dice, para
+     la otra cuenta, cuántos 500 y la espera máxima.
+   - **El login queda afuera:** hoy da cero 500 y 3,1 a 3,7 s; sólo tiene
+     que no empeorar.
+   - **El arreglo, propuesto en el informe y sin commitear** (como en D134),
+     con el criterio que propongas: otra cuenta con cero 500 y espera máxima
+     de unos 5 s, y los pedidos de más con un error limpio (429, 503 o 504).
+     *Sugerencia:* soltar la conexión antes de esperar a Gemini o a la
+     lectura, o un tope de pedidos en vuelo por cuenta.
+   - **Si con otra cuenta no aparece el rojo** (cero 500 y menos de 5 s),
+     frená e informá: entonces no hay arreglo que proponer.
+   - La subida es de la zona de MARIA (D74): le aviso en su canal.
 
 ## BORRADOR-1: aceptada sobre `c8733be` e integrada (2026-11-12 00:48 UTC)
 

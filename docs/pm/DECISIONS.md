@@ -793,9 +793,11 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   `REPRODUCCION-CONEXIONES-1-2026-11-12.md`. No se cierra CONEXIONES-1.
 - D180 (a), con criterio propio: no es «los 500 de PDF» sino que una cuenta
   sola no le haga fallar ni esperar a otra. `/api/ncm/sugerir` no tiene tope y
-  un solo token toma 50 de 50 conexiones (normales a 30 s). Pieza
-  CONEXIONES-1 C a la Técnica: subida pública, sugerir y login; otra cuenta
-  con cero 500 y hasta 5 s; el medidor separa pool lleno de fuga; revisión
-  fuerte.
+  un solo token toma 50 de 50 conexiones (la misma cuenta espera 30 s).
+  CONEXIONES-1 C a la Técnica, **sólo arnés**: medir a otra cuenta (subida
+  pública y sugerir), separar pool lleno de fuga, corrida con la cuota de
+  producción, y el arreglo propuesto sin commitear (como D134). El arreglo de
+  producto es **propuesta a Emi**: la fila del roadmap dice «arreglar sólo si
+  las deja» y no quedan. El login queda afuera: no da rojo.
 - D181 (b): a la cola, con el caso de la misma IP en simultáneo.
 

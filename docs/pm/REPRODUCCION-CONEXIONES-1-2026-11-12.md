@@ -5,7 +5,8 @@ técnica. Producto igual a `c8733be`: `git diff c8733be c57b645e -- proyecto_mar
 Dockerfile requirements.txt` da 0 líneas.
 
 **Estado: aceptada como medición sobre `c57b645e` e integrada.** D180 (a):
-el arreglo va en una pieza aparte, CONEXIONES-1 C. D181 (b).
+CONEXIONES-1 C, sólo arnés (medir a otra cuenta); el arreglo de producto es
+propuesta a Emi. D181 (b).
 
 Corrido en `/tmp/cdi-pm/wt-con1` (`c57b645e`), con el venv de la PM:
 gunicorn 26.2.0 y uvicorn 0.54.0. Medidor con `ENVIRONMENT=production`,
@@ -50,7 +51,8 @@ Leído en el código, con la configuración de producción (un worker, una
 réplica: `Dockerfile`, `railway.json`; pool 20 + 30):
 
 - **`/api/ncm/sugerir`** (`main.py:10331`) no tiene límite por minuto ni cuota
-  por cuenta. Retiene la conexión hasta 30 s (`NCM_GEMINI_TIMEOUT_S`) mientras
+  por cuenta (sin decorador; el `Limiter` de `core/rate_limit.py:67` no trae
+  límite por defecto). Retiene la conexión hasta 30 s (`NCM_GEMINI_TIMEOUT_S`) mientras
   espera a Gemini. `pico_gemini` usa un solo token: **una cuenta sola llega a
   50 de 50 conexiones** y los normales esperan 30 s. Medido, sin 500.
 - **`/upload_pdf/public`**: la cuota de producción es 50 PDFs por día y por
@@ -63,8 +65,11 @@ réplica: `Dockerfile`, `railway.json`; pool 20 + 30):
   producción: **no corrido**. Lo medido es que lo hace esperar unos 30 s, en el
   borde de `pool_timeout`.
 
-Por eso, (a), decidido por la PM: hay camino de hoy para «una cuenta deja a
-todos esperando unos 30 s», y con un poco más, 500.
+Por eso, (a), decidido por la PM: hay camino de hoy para que una cuenta sola
+tome todo el pool. Falta medir si eso hace esperar o fallar a **otra**
+cuenta: es CONEXIONES-1 C, sólo arnés. El arreglo de producto va a Emi,
+porque la fila del roadmap dice «arreglar sólo si las deja» y no quedan
+(consejero). El login queda afuera: cero 500 y 3,1 a 3,7 s.
 
 ## D181: (b)
 

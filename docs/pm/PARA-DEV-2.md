@@ -3,13 +3,13 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Aviso: la Técnica va a tocar la subida pública de PDF (2026-11-12 01:08 UTC)
+## Aviso: la Técnica va a tocar la subida pública de PDF (2026-11-12 01:11 UTC)
 
 No cambia tu orden. La pieza CONEXIONES-1 C de la Técnica (`PARA-DEV.md`)
-toca `/upload_pdf/public`, `/api/ncm/sugerir` y el login: una cuenta sola
-hoy puede tomar todas las conexiones de la base. La subida es de tu zona
-(D74). Si tenés algo abierto ahí, decímelo en tu informe; si no, cuando
-entre, traela con `merge` como siempre.
+mide si una cuenta sola, con la subida pública de PDF o con
+`/api/ncm/sugerir`, le hace fallar o esperar a otra. Por ahora es sólo arnés;
+si propone un arreglo en la subida, que es de tu zona (D74), pasa por Emi y
+te aviso antes. Si tenés algo abierto ahí, decímelo en tu informe.
 
 ## Veredicto: arnés de pantalla del 402 aceptado sobre `899f9ee` e integrado (2026-11-11 23:04 UTC)
 
