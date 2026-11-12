@@ -3,6 +3,26 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
+## Dato para tu `ROJO?` de `sesion1`: el foco del perfil (2026-11-12 02:32 UTC)
+
+No cambia tu orden. Vi tu hipótesis (el cierre del guardado esconde el modal
+ya reabierto). Hay otra causa posible en el mismo modal, observada en
+`estudio1`: `profile.js`, `open()`, mueve el foco a «Mi CUIT» 150 ms
+**después** de cargar, y lo que se está escribiendo en ese momento cae ahí
+(`["Estudio Inventado Tres", "", "30222222229", "pfCuit"]` antes del clic;
+acta de BORRADOR-1, «IDS-PYTEST»). `abrirPerfil` de `pantalla_sesion1.js`
+espera a `#pfEmail`, que llega antes de ese foco. Si el email cae en «Mi
+CUIT», el email no cambia y el campo de la clave no aparece: es tu mismo
+mensaje de falla.
+
+- En `sesion1` no lo observé. Tu reproducción registra, en el momento de la
+  falla, `document.activeElement.id`, el valor de `#pfCuit` y si el modal
+  está visible, y el informe dice cuál de las dos causas fue (o las dos).
+- La prueba del arreglo: el rojo **siempre** con el arnés de hoy y verde con
+  el arreglado, no una tanda de repeticiones. Sin espera fija.
+- `estudio1` y `cobro_mp1` los arregla la Técnica; `profile.js` no se toca
+  (va a la cola).
+
 ## Aviso: la Técnica va a tocar la subida pública de PDF (2026-11-12 01:11 UTC)
 
 No cambia tu orden. La pieza CONEXIONES-1 C de la Técnica (`PARA-DEV.md`)

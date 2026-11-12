@@ -53,8 +53,8 @@ de 200 entra» sí rompe la prueba: falla como
 `disco1.sh` de MARIA (acta del arnés 402). El patrón ya estaba antes de D149:
 `b7db6f65` no lo tocó. Con pytest 9.1.1 sobre las mismas dependencias,
 `--collect-only` de `tests/test_estudio1.py` da ese caso como `[xxxxxxxx…]`,
-que es lo que busca el guion. La Técnica informó 37 ROJO; su versión de pytest
-**no está comprobada**: que la explique es una inferencia.
+que es lo que busca el guion. La Técnica informó 37 ROJO; después informó que su entorno tiene pytest
+9.1.1 (ver «IDS-PYTEST»).
 
 D149 (a) queda aceptada en lo que pedía; `estudio1.sh` entero queda abierto
 hasta dar rc=0 con 9.2.0 (agregado en `PARA-DEV.md`), igual que `disco1.sh`.
@@ -183,3 +183,63 @@ pasar.
 - **D171:** pieza nueva para Emi, juntando los hallazgos 1 y 3. Recomiendo que sí.
 - **D172:** a la cola de limpieza (`recuperar(b)`).
 - **D173 (a):** ya decidida a las 13:48. La Técnica la hizo en `4e7da21f`.
+
+## IDS-PYTEST, arnés `dd0eab7e` (padre `c57b645e`), 2026-11-12
+
+**Aceptada sobre `dd0eab7e`** e integrada con el merge de la Técnica `8d61bb09`.
+
+- El arreglo: `pytest.param("x" * 201, id="largo")` y `estudio1.sh` busca
+  `[largo]`. El id ya no depende de la versión de pytest.
+- `chequeo-6.py c57b645e dd0eab7e`: producto +0/−0, arnés +4/−2, historia
+  vacío, avisos 0.
+- `--collect-only` de `tests/` con 9.2.0 y con 9.1.1: los 7 ids que cambian y
+  sus patrones coinciden con la tabla del informe. El barrido de los 237
+  patrones de los guiones queda informado y no reproducido.
+- `estudio1.sh` con 9.2.0, dos corridas sobre `dd0eab7e`:
+  - primera: 36 ROJO, 1 ROJO?, rc=1;
+  - segunda: 37 ROJO, `sabotajes sin rojo: 0`, rc=0.
+- El 37 ROJO con 9.1.1 está informado; no lo corrí.
+
+**El ROJO? de la primera corrida no es del arreglo: es una carrera de la
+prueba.** Sabotaje «un alta o un borrado no refresca los avisos», falla «sin
+perfil, el estudio no aparece en la lista».
+
+- Causa: `profile.js` (`static/v2/screens/profile.js:135`), `open()`,
+  termina con `setTimeout(() => cuitInput && cuitInput.focus(), 150)`
+  después de cargar perfil, facturación y estudios. `pantalla_estudio1.js`,
+  paso 9, abre el modal y llena enseguida `#pfEstudioNombre` y
+  `#pfEstudioCuit`. Si el foco salta durante el `fill`, el CUIT cae en «Mi
+  CUIT (despachante)», el del estudio queda vacío y el POST da 400.
+- **Observado** en una copia instrumentada (registra nombre, CUIT del
+  estudio, «Mi CUIT» y elemento con foco antes del clic de alta), 3
+  pantallas a la vez, 10 rondas: 29 bien, 1 mal. En la mala:
+  `["Estudio Inventado Tres", "", "30222222229", "pfCuit"]` y POST
+  `{"cuit":""}` → 400. El usuario del paso 9 se registra en la prueba sin
+  CUIT, y el valor de «Mi CUIT» es exactamente `CUIT_UNO`: es lo escrito.
+  Fue en la ronda 1, con varios 429 antes; el GET 500 de `/api/estudios` lo
+  fuerza la propia prueba.
+- Todas las tandas (11 fallas; logs en el scratchpad de la PM):
+  - 8 a la vez, 3 rondas: 19 bien, 5 mal;
+  - 3 a la vez, 8 rondas: 22 bien, 2 mal;
+  - 8 a la vez, 3 rondas: 13 bien, 11 mal, de las que 8 son ECONNREFUSED de
+    la ronda 1 (servidor no listo) y no cuentan;
+  - 3 a la vez, 10 rondas: 29 bien, 1 mal.
+- Por familia:
+  - foco en «Mi CUIT» y CUIT del estudio vacío, observado: 3 (en la primera
+    de ellas el registro no traía el valor de «Mi CUIT»);
+  - compatibles sólo por el mensaje «CUIT del estudio no es válido»: 2;
+  - paso 2, «el nombre del estudio no puede quedar vacío» donde se esperaba
+    el error del CUIT corto: 1, compatible con el mismo foco, no observado;
+  - sin clasificar: 2;
+  - 500 del servidor (perfil, TXT, registro), con 8 a la vez: 3; otra
+    causa, carga.
+- La corrida original queda «compatible, estado no capturado».
+- No lo introduce `dd0eab7e`: la prueba y el frente no cambiaron desde
+  `c8733be`. Arreglo de la prueba a la Técnica (`estudio1`, `cobro_mp1`) con
+  reproducción que dé el rojo siempre; dato a MARIA para su `sesion1`.
+- Observación de producto, leída y no corrida: con carga lenta, a quien ya
+  escribe en otro campo el foco le salta a «Mi CUIT». Va a la cola de
+  limpieza.
+
+**No corrido:** adversarios (arnés, sin dinero, sesión ni permisos);
+`estudio1.sh` con 9.1.1; el barrido de 237 patrones.
