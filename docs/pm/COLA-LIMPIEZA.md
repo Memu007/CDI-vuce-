@@ -46,8 +46,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `CLAUDE.md` §5 dice que la CI deselecciona tests de presupuestos, pero
   `ci.yml:45` corre `python -m pytest --no-cov` sin `--deselect`. Lo corrige
   quien pueda tocar `CLAUDE.md` (decide Emi).
-- `test_maria1b_devolucion` y `test_excel2.py:512` usan una ruta fija en
-  `/tmp`: pasarlas a `tmp_path`.
 - `_migrate_add_user_cuit_column` (`main.py:470`) no tiene `lock_timeout`: el
   arranque espera detrás de un `sugerir` que tiene abierta la transacción
   mientras habla con Gemini (medido: 28,5 s).
@@ -70,9 +68,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   carga siguiente en el spinner.
 - `_escribir_y_confirmar` (`main.py:5933-5941`): si falla el commit y también
   restaurar `.anterior`, se pierde el archivo ya entregado (falla doble).
-- `con_pg16.sh` guarda su puerto en `PUERTO`, que pisa el exportado por
-  `cobro_corte1.sh`, `cobro_mp1.sh`, `cobro_mp2.sh` y `backup1a.sh`:
-  renombrar a `PG_PUERTO`.
 - `_migrate_catalogo_claves`: con choque, la fila que se mueve sale sin
   `ORDER BY` y la otra queda con su clave latina; el log «quedan por un
   choque» se repite en cada arranque.
