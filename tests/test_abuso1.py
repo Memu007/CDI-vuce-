@@ -293,31 +293,6 @@ def test_los_limites_por_ip_duran_quince_minutos(ruta, cuerpo, pasa, reloj):
     assert r.status_code == pasa, (r.status_code, r.text)
 
 
-def test_s6_recuperar_usuario_corta_en_silencio_por_email(token, monkeypatch, reloj):
-    """Tres pedidos por hora para un mismo email, cuente como venga escrito;
-    el cuarto contesta lo mismo pero no manda el mail. Desde EMAIL-1 cada
-    variante encuentra la cuenta y el mail va a la dirección guardada. La
-    ventana es de una hora."""
-    enviados = []
-    monkeypatch.setattr(main_mod, "send_email", lambda to, *a, **k: enviados.append(to) or True)
-    email = f"{token[0]}@ejemplo.test"
-    c = TestClient(app)
-    for variante in (email.upper(), email.capitalize(), email):
-        r = c.post(RECUPERAR, json={"email": variante}, headers=_xff(_ip()))
-        assert r.status_code == 200 and r.json() == {"message": MSJ_RECUPERAR}, r.text
-    assert enviados == [email] * 3
-    r = c.post(RECUPERAR, json={"email": email}, headers=_xff(_ip()))
-    assert r.status_code == 200 and r.json() == {"message": MSJ_RECUPERAR}, r.text
-    assert enviados == [email] * 3, "el cuarto pedido de la hora mandó el mail"
-    reloj()
-    reloj(59 * 60)
-    c.post(RECUPERAR, json={"email": email}, headers=_xff(_ip()))
-    assert enviados == [email] * 3, "a los 59 minutos ya mandó otro"
-    reloj(2 * 60)
-    c.post(RECUPERAR, json={"email": email}, headers=_xff(_ip()))
-    assert enviados == [email] * 4, "pasada la hora no volvió a mandar"
-
-
 def _registrar(c, real):
     u = "ab1r_" + uuid.uuid4().hex[:8]
     return c.post("/auth/register", headers=_xff(real, _ip()),
@@ -474,9 +449,14 @@ def _links_de_reset(username):
     return asyncio.run(_correr())
 
 
-def test_reset_tres_por_hora_por_cuenta_aunque_cambie_la_ip(monkeypatch, reloj):
-    """Cada pedido llega de otra IP, así que el tope por IP no corta. El
-    cuarto de la hora contesta lo mismo, no manda el mail ni crea un link:
+@pytest.mark.parametrize("ruta,msj,links_por_mail", [
+    (RECUPERAR, MSJ_RECUPERAR, 0),
+    (RESET, MSJ_RESET, 1),
+], ids=("recuperar", "reset"))
+def test_tres_por_hora_por_cuenta_aunque_cambie_la_ip(ruta, msj, links_por_mail, monkeypatch, reloj):
+    """Cada pedido llega de otra IP, así que el tope por IP no corta. Cada
+    variante del email encuentra la cuenta y el mail va a la dirección guardada.
+    El cuarto de la hora contesta lo mismo, no manda el mail ni crea un link:
     un link nuevo anularía al usarse el que la persona sí pidió."""
     enviados = []
     monkeypatch.setattr(main_mod, "send_email", lambda to, *a, **k: enviados.append(to) or True)
@@ -485,18 +465,24 @@ def test_reset_tres_por_hora_por_cuenta_aunque_cambie_la_ip(monkeypatch, reloj):
     email = f"{u}@ejemplo.test"
     assert c.post("/auth/register", headers=_xff(_ip()), json={
         "username": u, "password": CLAVE, "email": email, "name": "Ab"}).status_code == 200
-    for variante in (email.upper(), email.capitalize(), email, email):
-        r = c.post(RESET, json={"email": variante}, headers=_xff(_ip()))
-        assert r.status_code == 200 and r.json() == {"message": MSJ_RESET}, r.text
+
+    def pedir(variante=email):
+        r = c.post(ruta, json={"email": variante}, headers=_xff(_ip()))
+        assert r.status_code == 200 and r.json() == {"message": msj}, r.text
+
+    for variante in (email.upper(), email.capitalize(), email):
+        pedir(variante)
+    assert enviados == [email] * 3
+    pedir()
     assert enviados == [email] * 3, "el cuarto pedido de la hora mandó el mail"
-    assert _links_de_reset(u) == 3, "el cuarto pedido de la hora creó un link"
+    assert _links_de_reset(u) == 3 * links_por_mail, "el cuarto pedido de la hora creó un link"
     reloj()
     reloj(59 * 60)
-    c.post(RESET, json={"email": email}, headers=_xff(_ip()))
-    assert (enviados, _links_de_reset(u)) == ([email] * 3, 3), "a los 59 minutos ya mandó otro"
+    pedir()
+    assert (enviados, _links_de_reset(u)) == ([email] * 3, 3 * links_por_mail), "a los 59 minutos ya mandó otro"
     reloj(2 * 60)
-    c.post(RESET, json={"email": email}, headers=_xff(_ip()))
-    assert (enviados, _links_de_reset(u)) == ([email] * 4, 4), "pasada la hora no volvió a mandar"
+    pedir()
+    assert (enviados, _links_de_reset(u)) == ([email] * 4, 4 * links_por_mail), "pasada la hora no volvió a mandar"
 
 
 def test_reset_una_ip_inventada_no_gasta_el_tope_de_la_cuenta(monkeypatch):

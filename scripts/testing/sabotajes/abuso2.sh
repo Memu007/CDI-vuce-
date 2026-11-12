@@ -117,7 +117,7 @@ sabotaje $M "la IP olvida a las 23,5 h" "$P[la_ip_recuerda_un_dia]" \
 # --- recuperar usuario: el tope va por la cuenta, no por el texto
 T=tests/test_abuso1.py
 sabotaje $M "el tope de recuperar va por el texto pedido" \
-  "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email" \
+  "FAILED $T::test_tres_por_hora_por_cuenta_aunque_cambie_la_ip[recuperar]" \
   'f"recuperar:cuenta:{user.username}"' 'f"recuperar:cuenta:{request.email}"'
 if [ -n "$PG_URL" ]; then
   correr() { "$PY" scripts/testing/abuso2_postgres.py "$PG_URL" 2>&1; }

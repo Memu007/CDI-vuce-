@@ -134,11 +134,11 @@ sabotaje $M "recuperar usuario sin límite por IP" \
   "FAILED $T::test_los_limites_por_ip_duran_quince_minutos[/auth/recover-username-cuerpo2-200]" "[200, 200, 200, 200, 200, 200]"
 sabotaje $M "recuperar usuario: 4 por hora por cuenta" \
   'contar(db, clave, 3600) > 3' 'contar(db, clave, 3600) > 4' \
-  "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email" "el cuarto pedido de la hora mandó el mail"
+  "FAILED $T::test_tres_por_hora_por_cuenta_aunque_cambie_la_ip[recuperar]" "el cuarto pedido de la hora mandó el mail"
 sabotaje $M "recuperar usuario: pasado el tope por cuenta manda igual" \
   $'    if await _tope_por_cuenta(db, f"recuperar:cuenta:{user.username}"):\n        return mensaje' \
   $'    if await _tope_por_cuenta(db, f"recuperar:cuenta:{user.username}"):\n        pass' \
-  "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email" "el cuarto pedido de la hora mandó el mail"
+  "FAILED $T::test_tres_por_hora_por_cuenta_aunque_cambie_la_ip[recuperar]" "el cuarto pedido de la hora mandó el mail"
 
 # --- C9: registro
 sabotaje $M "registro: 6 por hora" \
@@ -209,7 +209,7 @@ sabotaje $M "recuperar usuario: el corte por IP dura un minuto" \
   "FAILED $T::test_los_limites_por_ip_duran_quince_minutos[/auth/recover-username-cuerpo2-200]"
 sabotaje $M "recuperar usuario: la ventana por cuenta es de un minuto" \
   'contar(db, clave, 3600) > 3' 'contar(db, clave, 60) > 3' \
-  "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email"
+  "FAILED $T::test_tres_por_hora_por_cuenta_aunque_cambie_la_ip[recuperar]"
 
 # --- un surrogate suelto o un NUL no da 500
 for campo in "    username: TextoCodificable@/auth/login" \
