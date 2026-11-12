@@ -5,6 +5,7 @@ esperando y suelta. Mercado Pago es simulado.
 """
 import os
 import sys
+import traceback
 import uuid
 from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
@@ -13,6 +14,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import conexiones1_creditos as h  # noqa: E402
 import psycopg2  # noqa: E402
+from proyecto_maria.database.connection import engine  # noqa: E402
 from tests.mp_firma import aviso_firmado  # noqa: E402
 from tests.test_maria7_rechazos_24_10 import _pedido  # noqa: E402
 
@@ -44,6 +46,8 @@ PEDIDOS = {
     "reactivar": lambda c, ref, s, cl: c.post("/api/billing/reactivate", headers=s),
 }
 DEADLOCKS = "select deadlocks from pg_stat_database where datname = current_database()"
+OTRAS = ("select count(*) from pg_stat_activity where datname = current_database()"
+         " and backend_type = 'client backend' and pid <> pg_backend_pid()")
 
 
 def ronda(c, a, b, de_org, ajuste):
@@ -66,7 +70,19 @@ def ronda(c, a, b, de_org, ajuste):
         finally:
             candado.rollback()
         codigos = [f.result(h.PLAZO).status_code for f in futuros]
-    if max(codigos) >= 500:  # pg_stat_database se entera cuando el pedido suelta la conexión
-        h.hasta(lambda: h.sql(DEADLOCKS)[0][0] > antes)
+    # Un deadlock que la app atrapa no da 500. Postgres lo suma a pg_stat_database
+    # sin plazo fijo, pero sí al cerrar la conexión: se cierran todas y se espera.
+    c.portal.call(engine.dispose)
+    if not h.hasta(lambda: h.sql(OTRAS)[0][0] == 0):
+        raise h.Invalida("la app no soltó sus conexiones")
     return codigos, h.sql(DEADLOCKS)[0][0] - antes, consultas, cuenta
 
+
+
+def correr(caso):
+    """Da lo que da el caso, o 2 si el arnés falló y la medición no vale."""
+    try:
+        return caso()
+    except Exception:
+        traceback.print_exc()
+        return 2

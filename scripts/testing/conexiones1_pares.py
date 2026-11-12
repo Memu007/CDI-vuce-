@@ -3,7 +3,8 @@
 Cada par va en los dos órdenes, con usuario y con org, con créditos extra
 vencidos y al día.
 uso: scripts/testing/con_pg16.sh python scripts/testing/conexiones1_pares.py
-Sale 1 si hubo algún deadlock, 4 si alguna ronda no se armó y 0 si no.
+Sale 1 si hubo algún deadlock, 4 si alguna ronda no se armó, 2 si el arnés
+falló y 0 si no.
 """
 import inspect
 import itertools
@@ -12,7 +13,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from conexiones1_rondas import m, ronda  # noqa: E402
+from conexiones1_rondas import correr, m, ronda  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 PARES = [("alta", "guardado"), ("alta", "recarga"), ("guardado", "recarga"), ("maria", "recarga"),
@@ -39,4 +40,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(correr(main))

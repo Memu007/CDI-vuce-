@@ -5,13 +5,13 @@
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/conexiones1_con_parche.sh \
 #        scripts/testing/conexiones1_pares.py
-# Sale con el código del caso, o con el de git si el parche no aplica.
+# Sale con el código del caso, o 2 si el parche no aplica.
 set -euo pipefail
 [ "$#" -eq 1 ] || { echo "uso: $0 scripts/testing/<caso>.py" >&2; exit 2; }
-RAIZ="$(git rev-parse --show-toplevel)"
+RAIZ="$(cd "$(dirname "$0")/../.." && pwd)"
 WT="$(mktemp -d /tmp/cdi-parche.XXXXXX)"
-cerrar() { git -C "$RAIZ" worktree remove --force "$WT"; }
+cerrar() { git -C "$RAIZ" worktree remove --force "$WT" || true; }
 trap cerrar EXIT
-git -C "$RAIZ" worktree add --detach "$WT" HEAD >/dev/null 2>&1
-git -C "$WT" apply "$RAIZ/scripts/testing/${PARCHE:-conexiones1_parche_b.diff}"
+git -C "$RAIZ" worktree add --detach "$WT" HEAD >/dev/null
+git -C "$WT" apply "$RAIZ/scripts/testing/${PARCHE:-conexiones1_parche_b.diff}" || exit 2
 "$RAIZ/scripts/testing/con_pg16.sh" "${PY:-python3}" "$WT/$1"

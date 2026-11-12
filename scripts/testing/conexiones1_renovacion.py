@@ -1,11 +1,12 @@
 """Caso 7: la renovación de la suscripción llega mientras otro pedido vence la cuenta.
 
-require_billing_vigente lee la cuenta sin candado y, si está vencida, la pasa a
-past_due; el aviso de renovación la deja active con 30 días más. Con usuario y
+Quien vence lee la cuenta sin candado y la pasa a past_due: get_current_user si
+es la prueba de un usuario, require_billing_vigente en los demás. El aviso de renovación la deja active con 30 días más. Con usuario y
 org, con prueba vencida y con active fuera de gracia, en los dos órdenes. La
 cuenta tiene que terminar active y con el período por delante.
 uso: scripts/testing/con_pg16.sh python scripts/testing/conexiones1_renovacion.py
-Sale 1 si alguna cuenta terminó mal, 4 si alguna ronda no se armó y 0 si no.
+Sale 1 si alguna cuenta terminó mal, 4 si alguna ronda no se armó, 2 si el
+arnés falló y 0 si no.
 """
 import itertools
 import os
@@ -13,7 +14,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import conexiones1_creditos as h  # noqa: E402
-from conexiones1_rondas import m, ronda  # noqa: E402
+from conexiones1_rondas import correr, m, ronda  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 VENCIDAS = {
@@ -42,4 +43,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(correr(main))
