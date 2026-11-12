@@ -122,16 +122,33 @@ La corrida anterior sobre `c8733be3`, con el control de `9c6f721f`, dio las cuat
   - `main.py:10129`
   - 11 en `client_service.py`
   - `core/ncm_service.py:46` y `:85`
+- **Una cancelación de verdad.** uvicorn no cancela al cortar el cliente (hallazgo 6), así que ninguna fase cancela un `close()` en el producto. Lo que prueba que el medidor la vería es el control.
 - **Un solo worker.** Es la configuración del `Dockerfile`. Con más workers, el tope de Postgres se multiplica por cada uno; no lo medí.
 
 ## Hallazgos del adversario
 
-ADVERSARIO_TABLA
+Un adversario Opus, esfuerzo alto, sólo lectura. Lo que tomé de cada hallazgo:
+
+| # | Hallazgo | Severidad que le dio | Qué hice |
+|---|---|---|---|
+| 1 | `/api/ncm/sugerir` tiene la conexión tomada mientras espera a Gemini, hasta 30 s (`NCM_GEMINI_TIMEOUT_S`, `main.py:10450`), y no tiene límite por minuto | media-alta | Lo medí con 30 s de demora (sección de arriba). Va a la D180 |
+| 2 | La subida pública de PDF tiene la conexión tomada mientras espera el candado por usuario y valida; la cuota de 50 por día se mira después, así que una cuenta sin cuota igual toma una conexión antes del 429 | media-alta | No lo medí: el lector falso no pasa por la cuota. Va a la D180 |
+| 3 | Con un worker y `--max-requests 1000`, al reiniciarse el worker los pedidos nuevos esperan a que termine el pedido lento en vuelo | media, condicional | No lo reproduje. Va a riesgos |
+| 4 | Un `close()` cancelado sí deja la conexión tomada hasta que pasa el recolector de basura; lo reprodujo con aiosqlite | baja hoy | Es lo que el control prueba que el medidor ve (las dos líneas `close_cancelado`). Lo que lo hace inalcanzable hoy es el punto 6 |
+| 5 | El rollback del `except` de `get_async_session` no corre en los pedidos: el envoltorio `get_db` manda el cierre a una tarea aparte | baja, no es fuga | No lo toqué: es producto y no deja conexiones tomadas. A la cola de limpieza si querés |
+| 6 | uvicorn no cancela el pedido cuando el cliente corta: marca `disconnected` y sigue | baja | Confirmado en `uvicorn/protocols/http/httptools_impl.py`, `connection_lost` (líneas 116-128 del venv). Los cortes en vuelo son de verdad, pero el producto no se entera: termina el pedido y cierra normal. `corte_cuerpo_a_medias` corta antes de tocar la base |
+| 7 | `enrich-items` abre una sesión por NCM, sin tope, en un `gather` | baja-media | Fuera de `get_async_session`; está en «Lo que no cubre» |
+| 8 | Login: bcrypt con la conexión tomada | baja | Es la D181 |
+| 9 | `resend_verification` tiene la conexión tomada mientras manda el mail | baja | No lo medí. Va a riesgos |
+
+También anotó que las versiones de gunicorn y uvicorn no están fijas (el `Dockerfile` instala `gunicorn uvicorn[standard]` sin versión) y que el comentario de `conexiones1_medir.py:109` dice «primer valor de XFF» cuando `get_client_ip` usa el último que agregó el proxy; con un solo valor da lo mismo.
 
 ## Riesgos
 
 - **El aviso de las pruebas sigue.** Que no queden conexiones tomadas en esta medición no prueba que no queden en otras rutas o con otros tiempos. La medición cubre las rutas de arriba con un worker.
 - **Las causas de los topes en vuelo, sin verificar.** Gemini llega a 8 en vuelo y el lector de PDF a 4, y no comprobé de dónde sale cada número. Hay candidatos (`_HILOS_MP` en `main.py:11211` y semáforos en `despacho_lector.py:699` y `:725`), pero no los afirmo.
+- **Reinicio del worker** por `--max-requests` con un pedido lento en vuelo (hallazgo 3): sin reproducir.
+- **Versiones sin fijar** de gunicorn y uvicorn en el `Dockerfile`: si una versión nueva de uvicorn cancela al cortar el cliente, el hallazgo 4 pasa a ser alcanzable.
 - **Demoras falsas.** Gemini y el lector de PDF son falsos y demoran lo que dice `--lento`. Un Gemini real puede demorar más; la espera de los normales crece con eso.
 
 ## Para reproducir
