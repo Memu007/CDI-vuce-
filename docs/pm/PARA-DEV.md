@@ -22,17 +22,24 @@ igual.
   no corre las dos rutas a la vez.
 - **D188: a Emi, de día** (plata). Le llevo tu (a): arreglarlo dentro de la
   pieza de producto, con tu medidor como puerta.
-- **D189: (b), decidido por la PM.** Verde no entra. El criterio es el
-  comportamiento, no el arreglo:
-  - el caso de las dos rutas a la vez (alta y guardado, el mismo usuario, en
-    una org) da 200/200 y deadlocks +0;
+- **D189: (b), decidido por la PM.** Verde no entra como está: arma el
+  deadlock cuando la dependencia sigue con la org tomada mientras la ruta
+  cuenta (hoy y (a)). Con (b) no lo vi, en el único estado probado. El
+  criterio es el comportamiento:
+  - un caso de las dos rutas a la vez (alta y guardado, el mismo usuario),
+    con usuario y org y con créditos vencidos y no vencidos como datos: da
+    200/200 y deadlocks +0;
   - `conexiones1_creditos.py` da rc=0;
-  - el rojo de las dos cosas se muestra una vez con verde tal como está.
+  - dos rojos mostrados una vez: créditos con el arreglo revertido; las dos
+    rutas con verde sobre un árbol donde la dependencia no hace `commit`
+    antes de contar (hoy o (a)).
   - *Sugerencia:* tomar los candados con `_cuenta_bloqueada` (usuario →
     org), o un `UPDATE` condicional que no lea antes.
 - **D186: se lo llevo a Emi como (b).** Cuerpos: (b) no lee el cuerpo antes
-  del 402, (a) sí. El deadlock no separa (a) de (b): el orden de candados es
-  condición de la pieza en las dos.
+  del 402, (a) sí.
+- **D184 ya está decidida (a, por la PM, en D):** no la listes como abierta
+  para Emi. Siguen de Emi D182 y D183.
+- Limpieza de `conftest.py`: vista en tu informe, gracias.
 - **Leído, no medido:** `_vencer_y_guardar` escribe
   `billing_status=past_due` desde una lectura sin candado. Un aviso de pago
   de suscripción a la vez podría pisarse igual que la recarga. Va como caso
@@ -54,7 +61,7 @@ comandos copiables, con (b) como forma. Tus D van de D200 a D209.
   comentarios (§6), cuando el script entre al repo.
 - La impaga con JSON roto completo sigue en 402, o el cambio va declarado.
 - Créditos: `conexiones1_creditos.py` rc=0, más el caso de las dos rutas a la
-  vez de D189 (usuario y org como datos).
+  vez de D189, con sus datos y sus dos rojos.
 - `billing_status` con un aviso de suscripción a la vez: un caso de la familia.
 - Los demás caminos que usan `require_active_billing` o
   `can_create_operation` (análisis de PDF, otros planes): listados en el plan,

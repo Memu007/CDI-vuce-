@@ -542,9 +542,10 @@ dice `DeadlockDetectedError` en `save_client_operation`. No verifiqué qué
 quedó guardado ni contado después del 500. El ciclo pide dos pedidos del
 mismo usuario a la vez (`_cuenta_bloqueada` bloquea el usuario que pide).
 Cuentas sin org: no corrido (por lectura, una sola fila no arma ciclo).
-Conclusión: verde como está no puede entrar. Cualquier arreglo toma los
-candados en el orden usuario → org. Lo que separa (a) de (b) es la memoria
-de arriba, no esto.
+Conclusión: verde como está no entra; arma el ciclo cuando la dependencia
+sigue con la org tomada mientras la ruta cuenta. El negativo no tenía
+créditos vencidos (`extra_ops_remaining = 0`, sin vencimiento): el caso de la
+pieza los lleva como datos. Lo que separa (a) de (b) es la memoria de arriba.
 
 ### Leído
 
