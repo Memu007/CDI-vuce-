@@ -7,11 +7,13 @@ Dockerfile. `post_worker_init` corre en el worker antes del primer pedido y:
   fila en `api_logs`, cuántas terminaron y cómo;
 - cuenta los `APILog` creados, las tareas que los guardan y los
   `AsyncSession.close()` empezados, terminados y cancelados;
-- cuenta cuántos bcrypt, Gemini y lecturas de PDF están en vuelo, para que el
-  medidor corte al cliente justo ahí sin esperas fijas;
+- cuenta cuántos bcrypt, Gemini, lecturas de PDF y de Excel, y cuerpos de
+  pedido sin terminar de llegar están en vuelo, para que el medidor actúe justo
+  ahí sin esperas fijas;
 - levanta un servidor HTTP aparte (`CONEXIONES1_SONDA_PUERTO`) que devuelve
-  todo eso y los contadores del pool. `GET /modo?gemini=S&pdf=S` pone Gemini
-  y el lector de PDF falsos que tardan S segundos (0 los saca); `GET /armar`
+  todo eso y los contadores del pool. `GET /modo?gemini=S&pdf=S&excel=S` pone
+  Gemini y el lector de PDF falsos, y la lectura del Excel, que tardan S
+  segundos (0 los saca); `GET /armar`
   arma el sabotaje.
 
 `CONEXIONES1_SABOTAJE` es el control que tiene que dar rojo:
@@ -153,13 +155,39 @@ def _instalar(c, modo, sabotaje):
 
     m.process_pdf = _contar_en_vuelo(c, "pdf_en_vuelo", leer_pdf)
 
+    from proyecto_maria.services import migration_service
+    leer_hojas = migration_service._read_sheets
+
+    def hojas(*args, **kwargs):
+        time.sleep(modo["excel"])
+        return leer_hojas(*args, **kwargs)
+
+    migration_service._read_sheets = _contar_en_vuelo(c, "excel_en_vuelo", hojas)
+
+    from starlette.requests import Request
+    leer_cuerpo = Request.body
+
+    async def body(self):
+        # Sólo cuenta la primera lectura, la que espera al cliente.
+        if hasattr(self, "_body"):
+            return await leer_cuerpo(self)
+        c["cuerpo_en_vuelo"] += 1
+        c["cuerpo_en_vuelo_total"] += 1
+        c["cuerpo_en_vuelo_max"] = max(c["cuerpo_en_vuelo_max"], c["cuerpo_en_vuelo"])
+        try:
+            return await leer_cuerpo(self)
+        finally:
+            c["cuerpo_en_vuelo"] -= 1
+
+    Request.body = body
+
 
 def post_worker_init(worker):
     from proyecto_maria.database.connection import engine
 
     pool = engine.pool
     c = Counter()
-    modo = {"armado": False, "gemini": 0.0, "pdf": 0.0}
+    modo = {"armado": False, "gemini": 0.0, "pdf": 0.0, "excel": 0.0}
     sabotaje = os.environ.get("CONEXIONES1_SABOTAJE", "")
     _instalar(c, modo, sabotaje)
 

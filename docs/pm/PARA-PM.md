@@ -2,110 +2,407 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## FOCO-PERFIL (sólo arnés): la reproducción da el rojo siempre en la base y verde con el arreglo. El paso 2 pierde el nombre (confirmado) y el paso 9 pierde su propio CUIT. Nada para decidir
+## CONEXIONES-1 E (sólo arnés): el corte en manual da 400 con el diff revisado y el medidor queda en rc=0. Decide la PM: D185
 
 | Qué | SHA |
 |---|---|
-| Base | `5f78311a` |
-| `pantalla_estudio1.js` espera el foco del perfil antes de escribir; reproducción `foco_perfil.sh` | `639b7262` |
-| La reproducción lista cada apertura que perdió lo escrito | `78d4188e` |
-| La reproducción no deja la API viva, rechaza un puerto ocupado, corre en modo fake y saca `cobro_mp1` | `dc4cf077` |
-| Informe | el commit `docs:` encima de `dc4cf077` |
+| Arnés: una fila de api_logs perdida sin aviso del pool lleno invalida la medición | `aa35f9bd` |
+| Arnés: el sabotaje de filas perdidas exige el motivo, no sólo el rc 2 | `8c067a32` |
+| Arnés: el medidor corta a mitad del cuerpo también en `/api/operations/manual` | `299e0ee8` |
+| Este informe | el commit `docs:` que lo trae |
 
-`producto +0/−0`. No toqué `profile.js`.
+Base: `89d3fa3c` (tu merge). Producto tocado: ninguno. El diff revisado va
+abajo, completo y sin commitear.
 
-### Resultado
+## Resultado, en corto
 
-Salida de `foco_perfil.sh` sobre la base `5f78311a` (rc=1), copiada del log:
+1. **Filas perdidas sin aviso:** sabotaje nuevo en `sabotajes/conexiones1.sh`.
+   El ancla es `session.add(log_entry)` del registro de métricas, y descarta
+   tres filas de 401 sin imprimir nada. El medidor da rc=2 con «no explican la
+   diferencia». **Elegí el contador por fase:** cada fase cuenta los
+   «Error logging metrics: QueuePool limit» del tramo de log que escribió esa
+   fase. Si no alcanzan para explicar las filas que faltan, la medición no
+   vale. El contador global del final se fue.
+2. **Diff revisado:** `_leer_cuerpo` atrapa `ClientDisconnect` y contesta
+   400 «Body JSON inválido», igual que el `except` de la ruta. El corte en
+   manual da `{400: 15}` en `api_logs`. El medidor no cuenta ningún 500 ni
+   Traceback, y en el pico la espera del cuerpo llega con 0 conexiones
+   tomadas.
+   - `git apply --check` limpio sobre `299e0ee8`, en un árbol limpio.
+   - En el repo principal falla, porque ahí `tests/test_conexiones1.py` ya
+     existe sin seguimiento: es el mismo archivo que el diff crea.
+3. **Caso:** una fila nueva en `RUTAS` de `test_conexiones1.py`: `body-400`,
+   que corta a mitad del cuerpo en manual.
+   - Con el diff de D: **rojo**, `assert 500 == 400`, «1 failed, 4 passed in
+     5.46s».
+   - Con el revisado: **verde**, «5 passed in 5.42s».
+4. **Medidor con el diff revisado:** rc=0, «sin conexiones tomadas», todas
+   las fases quietas y sin conexiones que queden. El control dio seis `BIEN`
+   (los cinco de antes y el nuevo). Ninguna espera fija nueva: el corte nuevo
+   reusa `fase_de_cortes` como `corte_cuerpo_a_medias`.
+
+## Decisiones
+
+- **D185.** ¿Tope de tamaño para el cuerpo que `_leer_cuerpo` lee antes del
+  402 y del 429? Hoy, con el diff, una cuenta sin pago o pasada de cuota
+  puede mandar un cuerpo grande a manual y el servidor lo lee entero antes de
+  contestarle.
+  - (a) **Nada en esta fila** (recomendada). Va a la cola, como pieza propia.
+    - No lo pide ningún criterio de E.
+    - Hace falta sesión: `get_current_user` va antes.
+    - A una cuenta con pago, hoy `request.json()` ya le lee el cuerpo entero
+      sin tope, y no hay tope global en `main.py`. Lo nuevo es que también
+      se le lee a la cuenta que recibe 402 o 429: sin el diff, a esa no se le
+      leía.
+    - `_leer_cuerpo_con_tope` (`main.py:2926`, no 2929) consume `stream()`,
+      y entonces la ruta tendría que tomar el cuerpo de la dependencia y no
+      de `request.json()`. Cambia la firma de la ruta y suma un caso de 413
+      con su sabotaje.
+  - (b) Tope en `_leer_cuerpo` con `_leer_cuerpo_con_tope`, guardando el
+    resultado en `request._body` para que `request.json()` lo encuentre.
+    Usa un atributo privado de Starlette. Suma ~6 líneas de producto y un
+    caso.
+  - (c) Tope por `Content-Length` en el middleware. Es más amplio que esta
+    fila: toca todas las rutas.
+- Siguen en Emi: **D182** (si el arreglo entra), **D183** (los cuatro hunks)
+  y **D184** (`test_conexiones1.py` con el commit de pruebas, ya decidida
+  (a) por vos si Emi dice que sí). Con E, el diff tiene un hunk más (el
+  import de `ClientDisconnect`) y el test, un caso más.
+
+## Declarado
+
+- **En `299e0ee8` sin ningún diff, `body-400` también falla,** pero por
+  otro motivo: «conexiones tomadas en body: [1]». Hoy el corte da 400 (el
+  `except Exception` de la ruta), pero con la conexión tomada mientras
+  espera el cuerpo.
+  - Ese rojo distingue la retención, no el 500.
+  - El que distingue el 500 es el rojo con el diff de D, de arriba.
+- **Con el diff, el cuerpo se lee antes del 402 y del 429.** Una cuenta sin
+  pago que corta a mitad del cuerpo recibe 400 y no 402, y así queda en
+  `api_logs`.
+  - Con el cuerpo completo, la respuesta no cambia: la dependencia sólo
+    lee, y el 402 y el 429 llegan después igual que hoy.
+  - No lo cubre ningún caso nuevo.
+- **§6, chequeo repetido:** el 400 «Body JSON inválido» del corte queda en
+  dos lugares, la dependencia y el `except` de la ruta.
+  - No se puede poner una vez: la dependencia ve el corte y la ruta ve el
+    JSON mal formado.
+  - Unificarlos sería que la dependencia parsee el JSON, y entonces la ruta
+    cambia de firma.
+- `corte_manual_a_medias` usa el client_id 999999999. Con el cuerpo
+  completo, manual contesta 404 (`manual_lento`, como en el pico): no crea
+  operaciones.
+
+## Medidor: con el diff revisado y sin diff
+
+Mismo `299e0ee8`, `--pico 60 --lento 30`, PG16 por `con_pg16.sh`.
+
+| | Con el diff revisado | Sin diff |
+|---|---|---|
+| Veredicto | rc=0, «sin conexiones tomadas» | rc=4, «POOL LLENO: ninguna conexión quedó tomada, pero la otra cuenta o el log sufrieron» |
+| `corte_manual_a_medias` | máxT 1, `{400: 15}` | máxT 2, `{400: 15}` |
+| `pico_bcrypt` | otra: 0 × 500, hasta 4.17 s | otra: 0 × 500, hasta 2.88 s |
+| `pico_gemini` | otra: 0 × 500, hasta 0.42 s | otra: 0 × 500, hasta 30.1 s |
+| `pico_pdf` | otra: 0 × 500, hasta 0.05 s; en total 0 × 500 | otra: 0 × 500, hasta 29.99 s; en total 10 × 500 |
+| `pico_excel` | otra: 0 × 500, hasta 0.1 s; en total 0 × 500 | otra: 12 × 500, hasta 30.14 s; en total 22 × 500; «72 pedidos y 62 filas nuevas en api_logs» |
+| `pico_cuerpo_manual` | «60 de 60 esperando el cuerpo a la vez (llegaron en 1.02 s, con 0 conexiones tomadas)»; otra: 0 × 500 | «50 de 60 esperando el cuerpo a la vez (no llegaron en 10.05 s, con 50 conexiones tomadas)»; otra: 12 × 500, hasta 30.1 s |
+| Log: Exception in ASGI application · Error logging metrics · Traceback | 0 · 0 · 0 | 54 · 10 · 324 |
+
+Sin diff, las 10 filas que faltan en `pico_excel` las explican los 10
+«Error logging metrics» de esa fase: por eso da rc=4 y no rc=2. Es el
+contador por fase funcionando del lado bueno.
+
+## Rojo y verde del caso
+
+Con el diff de D (el de mi informe en `c1311852`) más el `test_conexiones1.py` de E:
 
 ```
-PIERDE      | scripts/testing/pantalla_estudio1.js·#pfEstudioNombre: lo escrito cayó en «Mi CUIT» (robado=%23pfEstudioNombre&valor=20-11111111-2Estudio+Inventado) · focos: foco=campo&ms=202
-FALLA: error del CUIT corto: El nombre del estudio no puede quedar vacío, pasar de 200 caracteres ni tener saltos de línea ni caracteres invisibles.
-PIERDE      | scripts/testing/pantalla_estudio1.js·#pfEstudioCuit: lo escrito cayó en «Mi CUIT» (robado=%23pfEstudioCuit&valor=20-11111111-230-2222 robado=%23pfEstudioCuit&valor=30222222229) · focos: foco=campo&ms=182 foco=campo&ms=286
-FALLA: sin perfil, el estudio no aparece en la lista
+E   assert 500 == 400
+FAILED tests/test_conexiones1.py::test_la_espera_no_retiene_conexiones[body-400]
+========================= 1 failed, 4 passed in 5.46s ==========================
 ```
 
-- **Paso 2:** el nombre del estudio llega vacío porque «Estudio Inventado» cayó en «Mi CUIT».
-- **Paso 9:** la segunda señal (`valor=30222222229`) es el CUIT que escribe el paso 9. Lo pierde él mismo; no arrastra lo del paso 2.
+Con el diff revisado: `5 passed in 5.42s`.
 
-Sobre `dc4cf077` (rc=0):
+## Control del medidor (`sabotajes/conexiones1.sh 299e0ee8`, rc=0)
 
 ```
-NO PIERDE   | scripts/testing/pantalla_estudio1.js·#pfEstudioNombre · focos: foco=reloj&ms=3000 foco=reloj&ms=3000 foco=reloj&ms=3000
-NO PIERDE   | scripts/testing/pantalla_estudio1.js·#pfEstudioCuit · focos: foco=reloj&ms=3000 foco=reloj&ms=3000 foco=reloj&ms=3000
+BIEN  | sin sabotaje: salida 0, dice «sin conexiones tomadas»
+BIEN  | close_cancelado: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+BIEN  | close_cancelado_suelto: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+BIEN  | el producto guarda la sesión sin cerrar: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+BIEN  | el producto suelta la sesión sin cerrar: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+BIEN  | el producto pierde filas de api_logs sin avisar: salida 2, dice «no explican la diferencia»
 ```
 
-Corrí la base tres veces (`5f78311a` con las tres versiones del script): las tres PIERDE en los dos casos. El arreglo dio verde en `639b7262`, `78d4188e` y `dc4cf077`.
+## Diff revisado (completo, sin commitear)
 
-### Cómo da el rojo siempre, sin espera fija
+Producto: `main.py` +17/−0. Pruebas: `test_cobro_corte1.py` y
+`test_conexiones1.py` (nuevo, 124 líneas).
 
-- **Tu palanca sugerida no mueve la carrera.** `open()` espera `Promise.all` de las tres cargas y recién después programa el foco a 150 ms; `CDI.openProfileModal` es ese `open`, así que el `evaluate` del arnés vuelve después de las cargas. Demorar la carga corre las dos cosas juntas.
-- **Lo que hace la reproducción.** En un worktree descartable cambia, con reemplazo exacto de una sola vez, el `setTimeout(...focus, 150)` de `profile.js` por un reloj que pone el foco en `#pfCuit` una vez por apertura, en lo primero que pase:
-  - que el arnés entre al campo del caso: el foco salta en una microtarea del `focusin`, antes de que Playwright inserte el texto;
-  - o que pasen 3000 ms.
-- Un arnés que escribe sin esperar el foco lo pierde siempre. Uno que espera el foco lo recibe a los 3000 ms y sigue. La página avisa por `GET /health?foco=…` y `?robado=…`, y el script lo lee del log de la API. Nada de esto entra al producto.
-- **Margen:** en las bases el arnés entró al campo entre 80 y 286 ms después de cargar; el reloj recién dispara a 3000.
+```diff
+diff --git a/proyecto_maria/main.py b/proyecto_maria/main.py
+index 52fe473f..6fcc0dff 100644
+--- a/proyecto_maria/main.py
++++ b/proyecto_maria/main.py
+@@ -386,6 +386,7 @@ app = FastAPI(
+ # Configurar CORS (OWASP A5 - Broken Access Control)
+ from starlette.middleware.cors import CORSMiddleware
+ from starlette.exceptions import HTTPException as StarletteHTTPException
++from starlette.requests import ClientDisconnect
+ 
+ # CORS + cookies: la especificacion prohibe combinar allow_origins=["*"]
+ # con allow_credentials=True (los browsers rechazan la cookie). Como la
+@@ -2303,6 +2304,9 @@ async def require_billing_vigente(
+     await _vencer_y_guardar(db, entidad)
+     if not billing_service.tiene_acceso(entidad):
+         raise HTTPException(status_code=402, detail=_detalle_402(entidad))
++    # Termina la transacción de lectura: si no, la conexión queda tomada
++    # mientras el endpoint espera a la IA o a la lectura del PDF.
++    await db.commit()
+     return db_user
+ 
+ 
+@@ -3746,11 +3750,21 @@ async def simulate_charge(user=Depends(get_current_user), db: AsyncSession = Dep
+     }
+ 
+ 
++async def _leer_cuerpo(request: Request):
++    # Con el cuerpo ya leído, un cliente lento no retiene la conexión de las
++    # dependencias que vienen después.
++    try:
++        await request.body()
++    except ClientDisconnect:
++        raise HTTPException(status_code=400, detail="Body JSON inválido")
++
++
+ @app.post("/api/operations/manual")
+ @limiter.limit(get_dynamic_rate_limit)
+ async def create_manual_operation(
+     request: Request,
+     user=Depends(get_current_user),
++    _cuerpo=Depends(_leer_cuerpo),
+     db: AsyncSession = Depends(get_db),
+     db_user: User = Depends(require_active_billing),
+ ):
+@@ -7172,6 +7186,8 @@ async def analyze_client_migration(
+         )
+     )
+     existing_clients = existing_result.scalars().all()
++    # Suelta la conexión mientras se lee el archivo; los clientes quedan cargados.
++    await db.commit()
+     mapper = GeminiMigrationHeaderMapper(username=user["username"])
+     try:
+         # Con tiempo máximo, como leer un PDF (EXCEL-1).
+@@ -10448,6 +10464,7 @@ async def sugerir_ncm(
+         # (RENDIMIENTO-1). Si no contesta a tiempo, se sigue sin sus sugerencias.
+         import asyncio
+         limite = _segundos_de_entorno("NCM_GEMINI_TIMEOUT_S", 30.0)
++        await db.commit()
+         try:
+             de_gemini = await asyncio.wait_for(
+                 asyncio.to_thread(_suggest_ncm_with_gemini, descripcion, 5 - len(sugerencias)),
+diff --git a/tests/test_cobro_corte1.py b/tests/test_cobro_corte1.py
+index cfb81a79..9775df77 100644
+--- a/tests/test_cobro_corte1.py
++++ b/tests/test_cobro_corte1.py
+@@ -828,7 +828,8 @@ _confirmar = main.AsyncSession.commit
+ 
+ async def _commit_que_falla(self):
+     # La autenticación confirma antes de la ruta: falla sólo el de main.py.
+-    if sys._getframe(1).f_code.co_filename != main.__file__:
++    quien = sys._getframe(1).f_code
++    if quien.co_filename != main.__file__ or quien.co_name == "require_billing_vigente":
+         return await _confirmar(self)
+     raise RuntimeError("la base se cayó al confirmar")
+ 
+diff --git a/tests/test_conexiones1.py b/tests/test_conexiones1.py
+new file mode 100644
+index 00000000..e5d0187f
+--- /dev/null
++++ b/tests/test_conexiones1.py
+@@ -0,0 +1,124 @@
++"""Ninguna ruta lenta retiene una conexión a la base mientras espera.
++
++Cada ruta se frena en su punto lento (la IA, el lector de PDF, la lectura del
++Excel, el cuerpo del pedido) y ahí se cuentan las conexiones que tiene tomadas
++el pedido. Con el pool de producción, cada una tomada ahí es un lugar menos
++para las otras cuentas mientras dura la espera.
++"""
++import asyncio
++import io
++import uuid
++
++import pytest
++from fastapi.testclient import TestClient
++from pypdf import PdfWriter
++from sqlalchemy import event
++from starlette.requests import Request
++
++from proyecto_maria import main
++from proyecto_maria.database import connection as _conn
++from proyecto_maria.services import migration_service
++
++CLAVE = "Clave-Segura-123"
++
++
++def _pdf():
++    escritor, salida = PdfWriter(), io.BytesIO()
++    escritor.add_blank_page(100, 100)
++    escritor.write(salida)
++    return salida.getvalue()
++
++
++@pytest.fixture
++def tomadas():
++    """Cuántas conexiones hay tomadas ahora, sin las del registro de métricas,
++    que corre en su propia tarea."""
++    duenas = {}
++
++    def al_tomar(_dbapi, registro, _proxy):
++        try:
++            duenas[id(registro)] = asyncio.current_task()
++        except RuntimeError:
++            duenas[id(registro)] = None
++
++    def al_devolver(_dbapi, registro):
++        duenas.pop(id(registro), None)
++
++    motor = _conn.engine.sync_engine
++    event.listen(motor, "checkout", al_tomar)
++    event.listen(motor, "checkin", al_devolver)
++    yield lambda: sum(1 for t in duenas.values()
++                      if t is None or "log_request_background" not in t.get_coro().__qualname__)
++    event.remove(motor, "checkout", al_tomar)
++    event.remove(motor, "checkin", al_devolver)
++
++
++def _sesion(monkeypatch):
++    from proyecto_maria.core.rate_limit import limiter
++    monkeypatch.setattr(limiter, "enabled", False)
++    # Un 500 vuelve como respuesta y no como excepción del cliente de prueba.
++    c = TestClient(main.app, raise_server_exceptions=False)
++    nombre = f"conex1_{uuid.uuid4().hex[:10]}"
++    r = c.post("/auth/register", json={"username": nombre, "password": CLAVE, "name": nombre,
++                                       "email": f"{nombre}@cdi.test"})
++    assert r.status_code in (200, 201), r.text
++    r = c.post("/auth/login", json={"username": nombre, "password": CLAVE})
++    assert r.status_code == 200, r.text
++    return c
++
++
++def _lector_falso(*_a, **_k):
++    raise main.DocumentoNoAdmitido("lector falso")
++
++
++def _cortar_a_mitad(pedido):
++    """El cliente manda parte del cuerpo y se desconecta."""
++    mensajes = iter([{"type": "http.request", "body": b'{"client_id": "9', "more_body": True},
++                     {"type": "http.disconnect"}])
++
++    async def recibir():
++        return next(mensajes)
++    pedido._receive = recibir
++
++
++# (punto lento, dónde está, qué hace en lugar de esperar, pedido, código esperado)
++RUTAS = [
++    ("_suggest_ncm_with_gemini", main, lambda *_a, **_k: [],
++     ("/api/ncm/sugerir", {"json": {"descripcion": "notebook de 14 pulgadas"}}), 200),
++    ("process_pdf", main, _lector_falso,
++     ("/upload_pdf/public", {"files": {"file": ("a.pdf", _pdf(), "application/pdf")}}), 422),
++    ("_read_sheets", migration_service, None,
++     ("/api/migrations/analyze",
++      {"files": {"file": ("clientes.csv", b"cuit,nombre\n20123456786,Cliente Uno\n", "text/csv")}}), 200),
++    ("body", Request, None,
++     ("/api/operations/manual", {"json": {"client_id": "999999999", "items": [
++         {"descripcion": "notebook", "cantidad": 1, "valor_unitario": 10}]}}), 404),
++    ("body", Request, _cortar_a_mitad,
++     ("/api/operations/manual", {"json": {"client_id": "999999999", "items": []}}), 400),
++]
++
++
++@pytest.mark.parametrize("punto, modulo, reemplazo, pedido, codigo", RUTAS,
++                         ids=[f"{r[0]}-{r[4]}" for r in RUTAS])
++def test_la_espera_no_retiene_conexiones(monkeypatch, tomadas, punto, modulo, reemplazo, pedido, codigo):
++    c = _sesion(monkeypatch)
++    vistas = []
++    original = getattr(modulo, punto)
++    if modulo is Request:
++        async def frenar(self):
++            if not hasattr(self, "_body"):
++                vistas.append(tomadas())
++                if reemplazo:
++                    reemplazo(self)
++            return await original(self)
++    else:
++        def frenar(*a, **k):
++            vistas.append(tomadas())
++            return (reemplazo or original)(*a, **k)
++    monkeypatch.setattr(modulo, punto, frenar)
++    monkeypatch.setattr(main, "lectura_automatica_disponible", lambda: True)
++    ruta, datos = pedido
++    with c:
++        r = c.post(ruta, **datos)
++    assert r.status_code == codigo, r.text
++    assert vistas and max(vistas) == 0, f"conexiones tomadas en {punto}: {vistas}"
+```
 
-### Alcance
+## Comandos copiables
 
-- `openProfileModal` aparece en tres pantallas: `pantalla_estudio1.js` (mía, la arreglé), `pantalla_cobro_mp1.js` (mía) y `pantalla_sesion1.js` (de MARIA, no la toqué).
-- `pantalla_cobro_mp1.js` no escribe en el perfil: no tiene ningún `fill`, `type` ni `press`, sólo abre secciones. El foco no le saca nada. Lo tenía como tercer caso y daba verde siempre, así que no distinguía: lo saqué en `dc4cf077`.
-- Costo: cada apertura del perfil en `estudio1` espera ahora el foco real (~150 ms después de cargar).
-
-### Supuestos reversibles
-
-- `foco_perfil.sh` queda en el repo como reproducción para que la corras vos. §6 dice que fuera de lo de revisión fuerte alcanza con mostrar el rojo una vez; lo dejé porque pediste una reproducción y no corresponde pedirte pasos a mano. Si no lo querés en el repo, se borra sin tocar nada más.
-- Si `profile.js` deja de poner el foco en «Mi CUIT» (el arreglo de producto está en la cola), `estudio1` falla con «el perfil no puso el foco en «Mi CUIT»» en vez de esperar sin fin. El arreglo de producto tiene que llevar el cambio del arnés en el mismo commit.
-
-### Comandos
+Desde la raíz del repo con la rama traída, con el entorno de pytest de siempre.
+El diff sale del informe en la rama (el worktree en `299e0ee8` tiene el
+informe de D).
 
 ```bash
-git fetch origin claude/dev-tecnica && git checkout dc4cf077   # o el SHA del informe
-PY=<venv>/bin/python scripts/testing/foco_perfil.sh 5f78311a; echo rc=$?
-#  dos líneas PIERDE con robado=…, «El nombre del estudio no puede quedar vacío…» y «sin perfil, el estudio no aparece en la lista»; rc=1
-PY=<venv>/bin/python scripts/testing/foco_perfil.sh dc4cf077; echo rc=$?
-#  dos líneas NO PIERDE con foco=reloj&ms=3000 tres veces cada una; rc=0
-PY=<venv>/bin/python PUERTO=8852 scripts/testing/sabotajes/estudio1.sh dc4cf077; echo rc=$?
-#  termina con «sabotajes sin rojo: 0»; rc=0
+git fetch origin claude/dev-tecnica
+git show origin/claude/dev-tecnica:docs/pm/PARA-PM.md | awk '/^```diff$/{f=1;next} /^```$/{f=0} f' > /tmp/e.diff
+git show c1311852:docs/pm/PARA-PM.md | awk '/^```diff$/{f=1;next} /^```$/{f=0} f' > /tmp/d.diff
+git worktree add --detach /tmp/e 299e0ee8 && cd /tmp/e
+# rojo: producto de D + test de E
+git apply --exclude=tests/test_conexiones1.py /tmp/d.diff && git apply --include=tests/test_conexiones1.py /tmp/e.diff
+python -m pytest -q --no-cov tests/test_conexiones1.py        # → 1 failed, 4 passed; assert 500 == 400 en body-400
+git checkout -- . && rm tests/test_conexiones1.py
+# verde: el diff revisado
+git apply --check /tmp/e.diff && echo limpio && git apply /tmp/e.diff   # → limpio
+python -m pytest -q --no-cov tests/test_conexiones1.py        # → 5 passed
+python -m pytest -q --no-cov tests/test_conexiones1.py tests/test_cobro_corte1.py   # → 103 passed
+scripts/testing/con_pg16.sh python scripts/testing/conexiones1_medir.py --pico 60 --lento 30   # → rc=0, «sin conexiones tomadas»
+git checkout -- . && rm tests/test_conexiones1.py
+scripts/testing/con_pg16.sh python scripts/testing/conexiones1_medir.py --pico 60 --lento 30   # sin diff → rc=4, «POOL LLENO…»
+PY=python scripts/testing/sabotajes/conexiones1.sh 299e0ee8   # → seis BIEN, rc=0
 ```
 
-### Puertas
+El control corre el medidor con sus valores por defecto (`--pico 30
+--lento 2`): con 30 pedidos lentos el pool de 50 no se llena, y por eso «sin
+sabotaje» da 0 sobre `299e0ee8` sin diff, mientras que con `--pico 60 --lento
+30` el mismo SHA da rc=4.
+
+## Puertas
 
 | Puerta | Resultado |
 |---|---|
-| `foco_perfil.sh 5f78311a` | rc=1, PIERDE en los dos casos (3 de 3 corridas) |
-| `foco_perfil.sh dc4cf077` | rc=0, NO PIERDE en los dos casos |
-| `sabotajes/estudio1.sh 78d4188e` | 37 ROJO, «sabotajes sin rojo: 0», rc=0 |
-| Suite pytest | no corrida: no cambió producto ni tests de Python |
+| `pytest tests/test_conexiones1.py tests/test_cobro_corte1.py`, con el diff | 103 passed, 5 warnings in 79.11s, rc=0 |
+| Medidor con el diff | rc=0 |
+| Medidor sin diff | rc=4 |
+| `sabotajes/conexiones1.sh` | seis BIEN, rc=0 |
+| `git apply --check` en árbol limpio | rc=0 |
+| chequeo-6 `89d3fa3c..299e0ee8` | producto +0/−0, avisos 0 |
 
-`sabotajes/estudio1.sh` lo corrí sobre `78d4188e`; `dc4cf077` cambia sólo `foco_perfil.sh`, que ese script no usa.
+**No corrido:** la suite completa (sólo esos dos archivos), los subagentes
+adversariales y `/code-review`. E es sólo arnés y un diff sin commitear; si
+D182 dice que entra, esos van con la pieza de producto.
 
-### `/code-review high` sobre `5f78311a..78d4188e`
-
-| # | Hallazgo | Qué hice |
-|---|---|---|
-| 1 | La API arrancaba dentro de `$(...)`: si se cortaba el script, quedaba viva ocupando el puerto | arreglado en `dc4cf077` |
-| 2 | Si el puerto ya respondía, el arnés corría contra otra API | arreglado: rechaza un puerto ocupado |
-| 3 | El caso `cobro_mp1` no podía dar PIERDE | arreglado: se sacó (ver Alcance) |
-| 4 | La espera del foco podría pasar con un `#pfCuit` enfocado de una apertura anterior | no reproduce: si pasara antes de tiempo, el arnés entraría al campo antes de los 3000 ms y el reloj marcaría `campo`; en el arreglo marcó `reloj` las 6 veces |
-| 5 | ILEGIBLE (salida 2) gana a PIERDE (salida 1) | queda: un caso ilegible invalida la corrida; la línea PIERDE se imprime igual |
-| 6 | `estudio1` depende de que el producto ponga el foco | riesgo, en Supuestos |
-| 7 | La API no iba en modo fake | arreglado: `VUCE_MODE`, `TARIFAR_MODE` y `AFIP_MODE` en fake |
-| 8 | Si queda algo extra en el temporal, `rmdir` falla y lo deja | queda: no uso `rm -rf` con variables; lo que puede sobrar es un archivo auxiliar de SQLite tras un corte |
-| 9 | Repite código de `_entorno_comun.sh` | queda: ese archivo es para pytest (`test.db`, `juzgar`); no levanta uvicorn ni corre node |
-| 10 | §6 sobre guiones de sabotaje propios | en Supuestos |
-
-Subagentes adversariales: ninguno. Es sólo arnés, sin producto ni datos.
-
-<details><summary>chequeo-6 5f78311a..dc4cf077</summary>
+<details><summary>chequeo-6 89d3fa3c..299e0ee8</summary>
 
 ```
-chequeo-6 5f78311a..dc4cf077: avisos para mirar, no un veredicto
+chequeo-6 89d3fa3c..299e0ee8: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +112/−7
+arnés +31/−21
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
+rc=0
 ```
 
 </details>
