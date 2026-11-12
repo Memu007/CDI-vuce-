@@ -249,6 +249,17 @@ if [ -n "$PG_URL" ]; then
       "FALLA | 2000 caracteres CJK por catálogo" "FALLA | 2000 caracteres CJK por guardar-uso" \
       "FALLA | 2000 caracteres CJK por cambiar la descripción"
   fi
+  # operation_items sólo lo mira catalogo3_postgres.py
+  CORRE=("$PY" -I scripts/testing/catalogo3_postgres.py "$PG_URL")
+  git checkout -q -- proyecto_maria/
+  if ! "${CORRE[@]}" >/dev/null 2>&1; then
+    echo "BASE  | catalogo3_postgres.py ya está en rojo sin sabotaje"; FALLAS=$((FALLAS+1))
+  else
+    sabotaje $M "el arranque no pasa el origen de los ítems a text" \
+      '                            ("operation_items", ("origen",))):' \
+      '                            ):' \
+      "FALLA | operation_items.origen pasa a text y la fila vieja queda igual"
+  fi
 else
   echo "SALTO | sin PG_URL: la migración no se midió"
 fi
