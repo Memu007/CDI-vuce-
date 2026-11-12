@@ -1,9 +1,10 @@
 """Caso 7: la renovación de la suscripción llega mientras otro pedido vence la cuenta.
 
 Quien vence lee la cuenta sin candado y la pasa a past_due: get_current_user si
-es la prueba de un usuario, require_billing_vigente en los demás. El aviso de renovación la deja active con 30 días más. Con usuario y
-org, con prueba vencida y con active fuera de gracia, en los dos órdenes. La
-cuenta tiene que terminar active y con el período por delante.
+es la prueba de un usuario, require_billing_vigente en los demás. El aviso de
+renovación la deja active con 30 días más. Con usuario y org, con prueba vencida
+y con active fuera de gracia, en los dos órdenes. La cuenta tiene que terminar
+active y con el período por delante.
 uso: scripts/testing/con_pg16.sh python scripts/testing/conexiones1_renovacion.py
 Sale 1 si alguna cuenta terminó mal, 4 si alguna ronda no se armó, 2 si el
 arnés falló y 0 si no.
