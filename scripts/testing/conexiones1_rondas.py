@@ -48,8 +48,12 @@ PEDIDOS = {
     "reactivar": lambda c, ref, s, cl: c.post("/api/billing/reactivate", headers=s),
 }
 DEADLOCKS = "select deadlocks from pg_stat_database where datname = current_database()"
-OTRAS = ("select count(*) from pg_stat_activity where datname = current_database()"
-         " and backend_type = 'client backend' and pid <> pg_backend_pid()")
+DE_LA_APP = (" from pg_stat_activity where datname = current_database()"
+             " and backend_type = 'client backend' and pid <> pg_backend_pid()")
+OTRAS = "select count(*)" + DE_LA_APP
+QUE_HACEN = ("select state, coalesce(wait_event_type || ':' || wait_event, 'nada'),"
+             " round(extract(epoch from now() - state_change)::numeric, 1),"
+             " left(regexp_replace(query, '\\s+', ' ', 'g'), 80)" + DE_LA_APP)
 
 
 def ronda(c, a, b, de_org, ajuste):
@@ -96,7 +100,8 @@ def soltar(c):
             raise h.Invalida(f"la app dejó conexiones sin devolver al pool: {fugas[0][:90]}")
         return h.sql(OTRAS)[0][0] == 0
     if not h.hasta(libres):
-        raise h.Invalida("la app no soltó sus conexiones")
+        quedan = "; ".join(f"{e}, espera {w}, hace {t} s: {q}" for e, w, t, q in h.sql(QUE_HACEN))
+        raise h.Invalida(f"la app no soltó sus conexiones: {quedan or 'ya no queda ninguna'}")
 
 
 def correr(caso):
