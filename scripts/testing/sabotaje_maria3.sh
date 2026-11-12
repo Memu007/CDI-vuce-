@@ -235,7 +235,7 @@ caso fecha_sin_productos "${T}test_sin_productos_los_avisos_tambien_piden_la_fec
 
 # 31. los avisos previos no validan el flete: ahí no lo rechaza nadie más
 sin_flete_en_el_endpoint
-caso avisos_flete_sin_validar "${T}test_flete_o_seguro_que_no_son_un_importe_dan_400[/generate_maria/avisos-flete-inf]"
+caso avisos_flete_sin_validar "${T}test_flete_o_seguro_que_no_son_un_importe_dan_400[/generate_maria/avisos-flete--500]"
 
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
 echo "OK: los 31 sabotajes dan rojo por la razón esperada"
