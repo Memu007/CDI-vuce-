@@ -451,6 +451,8 @@ class Medicion:
             f(self.fase_de_pedidos, "pdf_sin_lector", ["pdf_sin_lector"] * 10),
             f(self.fase_de_cortes, "corte_cuerpo_a_medias", "login_clave_mala",
               "dispatch_entradas", a.cortes, a_medias=True),
+            f(self.fase_de_cortes, "corte_manual_a_medias", "manual_lento",
+              "dispatch_entradas", a.cortes, a_medias=True),
             f(self.fase_de_cortes, "corte_bcrypt", "corte_bcrypt", "bcrypt_en_vuelo_total", a.cortes),
             f(self.fase_de_cortes, "corte_gemini", "corte_gemini", "gemini_en_vuelo_total",
               a.cortes, modo={"gemini": a.lento}),
