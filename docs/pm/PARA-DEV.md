@@ -3,61 +3,55 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## D190: aceptada sobre `0b92e6d8` e integrada (2026-11-12 17:41 UTC)
+## AUTOREMOVE: aceptada sobre `1368dff8` e integrada (2026-11-12 19:55 UTC)
 
-Integro tu rama hasta `5a1a5a8b`. Acta `REPRODUCCION-D190-2026-11-12.md`.
-**Traé mi rama con `merge`.** Nada que decidir, y tu informe no traía D.
+Integro tu rama hasta `77101b83`. Acta `REPRODUCCION-AUTOREMOVE-2026-11-12.md`.
+**Traé mi rama con `merge`.** Nada que decidir.
 
-- **Reproducido:** `grep`, `node --check`, `chequeo-6` (+0/−0, 0 avisos) y
-  `git apply --check` del parche, iguales a tu informe. Corrí el parche sin
-  el arreglo: 7 rojos y 1 verde, como se espera.
-- **Mi rojo, en otro borde:** `pantalla_estudio1.js` (dos registros por
-  corrida) cuatro veces sobre una base. Con IP fija falla en la corrida 3
-  con 429 de `/auth/register`; con `_ip_nueva` pasan las cuatro y no hay
-  ningún 429 de registro.
-- **El `192.0.2.` de `orden1`:** acepto tus razones. La corrí cuatro veces
-  seguidas sobre una base: las cuatro rc=0, ningún 429 de `/auth/login`.
-  Es sólo una observación: cada corrida tarda ~9 min y el límite es por
-  minuto, así que esa repetición no podía chocar. Las otras cuatro pantallas, una vez cada
-  una sobre base nueva, también pasan.
-- **No corrí** tus 9 guiones (corrí las pantallas solas) ni el `cmp` del
-  parche (el original está en tu contenedor).
+- **Reproducido, igual a tu informe:** el caso, `test_org1.py` entero (87
+  passed), `chequeo-6` (+0/−0, 0 avisos) y tus cuatro sabotajes uno por uno,
+  cada uno rojo por un 200 «fue removido» o por las llamadas a Mercado Pago.
+  `org1.sh` entero, la copia que entregaste, con Postgres: 29 sabotajes, 39 ROJO (29
+  SQLite, 10 Postgres), `sabotajes sin rojo: 0`, salida 0. Tus cuatro del
+  dueño corrieron sólo en SQLite.
+- **Mi rojo, en otro borde:** la guarda movida después del `commit`. El 400
+  sale igual y el caso falla igual, porque mira la base: el dueño ya no es
+  miembro y su suscripción quedó vacía. Es la puerta «que mire el estado».
+- **Tu riesgo del plan, corrido:** la guarda sólo con plan premium, o sólo en
+  prueba gratis, da verde. Queda como riesgo: hoy nada la achica.
+- **Tus supuestos quedan:** los adversarios encontraron el hueco de los
+  espacios, y `remove_member` toca permisos y Mercado Pago. Cuando la tarea
+  diga «sin» algo y veas razón para hacerlo igual, lo hacés como esta vez:
+  arriba del informe, como supuesto reversible.
 
-Saqué de `COLA-LIMPIEZA.md` dos entradas que ya estaban resueltas:
-`con_pg16.sh` usa `PG_PUERTO` desde que se creó, y los dos tests de `/tmp`
-ya usan `tmp_path`.
+Saqué la entrada de `COLA-LIMPIEZA.md`.
 
-## Tarea activa (2026-11-12 17:41 UTC): un caso para «No podés removerte a vos mismo», sólo tests
+## Tarea activa (2026-11-12 19:55 UTC): el caso del dueño también en Postgres, sólo arnés
 
-En `remove_member` (`DELETE /api/organizations/members/{username}`, cerca
-de `main.py:10987`) está la guarda que impide que el dueño del estudio se
-saque a sí mismo. Ningún caso falla si se borra. Es la entrada de
-`COLA-LIMPIEZA.md`. Lo comprobé: con la guarda borrada, `test_org1.py` y
-`test_cobro_mp2.py` dan 208 passed, y el dueño sale con 200 y el estudio
-queda sin él. Producto +0/−0: la revisión son estas puertas, sin
-adversarios ni guion de sabotaje.
+Tu riesgo media: ningún pytest corre en Postgres y
+`scripts/testing/org1_postgres.py` no tiene el caso del dueño que se pide
+sacar.
 
 **Puertas:**
-- Un caso nuevo en `tests/` (donde ya se prueba sacar miembros, por
-  ejemplo `tests/test_org1.py`): el dueño pide sacarse a sí mismo; da 400
-  y, mirado en la base, sigue siendo dueño y miembro de su estudio, con los
-  otros miembros intactos. Que mire el estado, no sólo el código de
-  respuesta.
-- El rojo una vez: con la guarda borrada en una copia local, el caso falla
-  y el informe dice cómo (qué queda en la base).
-- Los tests del archivo que tocás, enteros, verdes sobre tu SHA.
-- `chequeo-6` entero, con producto +0/−0.
+- En `org1_postgres.py`, el dueño pide `DELETE /api/organizations/members/<su
+  nombre>`: 400, y mirado con `sql()`, sigue dueño y miembro, los otros
+  miembros iguales y su `mp_preapproval_id` intacto. Las variantes de
+  mayúsculas y espacios, como datos del mismo chequeo.
+- Mercado Pago nunca se llama de verdad: el dueño tiene un
+  `mp_preapproval_id` puesto por el guion (si no, «intacto» compara vacío con
+  vacío), y `_leer_suscripcion_mp` y `_cancelar_suscripcion_mp` se
+  reemplazan en `main_mod` por funciones que anotan; la lista queda vacía.
+  El informe dice cómo lo hiciste.
+- En `org1.sh`, el sabotaje «el dueño se saca a sí mismo» también rojo en
+  Postgres (con `PG=`): una línea `FALLA` del caso del dueño. El informe
+  muestra ese rojo una vez.
+- `org1.sh` entero con `PG=`: `sabotajes sin rojo: 0` y salida 0.
+- `chequeo-6` entero, producto +0/−0.
 
-Sin cambios de producto. Si al probar encontrás que la guarda no alcanza
-(por ejemplo, otro camino deja al estudio sin dueño), no lo arregles: va
-como D con su evidencia.
+Sin cambios de producto; sin adversarios. Si en Postgres algo da distinto que
+en SQLite, no lo arregles: va como D con su evidencia.
 
-**Si Emi dice que sí a D182 o a D206 (a) mientras tanto,** dejás esto donde
-esté, lo decís en el informe y arrancás esa pieza. La pieza de D206 (a),
-además de la revisión fuerte: el caso que detecta D188 corrido con el
-arreglo y en HEAD (si da peor que HEAD, frenás y me lo decís), y
-`e2e_maria.sh`, porque toca el guardado y MARIA.
-
+Lo de D182 / D206 sigue igual: si Emi dice que sí, dejás esto donde esté.
 D205, D206 y D208 siguen con Emi. Tu rango libre: D209 a D215.
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)

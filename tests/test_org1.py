@@ -695,6 +695,37 @@ def test_sacar_no_borra_al_usuario():
     assert r.status_code == 200, r.text
 
 
+def test_el_duenio_no_se_saca_a_si_mismo_y_el_estudio_queda_igual(monkeypatch):
+    """La guarda va antes de Mercado Pago: un dueño con la suscripción pendiente no la pierde.
+    Con otras mayúsculas o espacios también es el dueño: si la búsqueda los ignorara, la guarda no lo vería."""
+    est = Estudio()
+    _miembro(est)
+    suscripcion = f"pend-{est.dueno}"
+
+    async def con_suscripcion(s):
+        await s.execute(update(User).where(User.username == est.dueno).values(mp_preapproval_id=suscripcion))
+    _db(con_suscripcion)
+    a_mp = []
+    for funcion in ("_leer_suscripcion_mp", "_cancelar_suscripcion_mp"):
+        monkeypatch.setattr(main_mod, funcion, lambda *_, f=funcion: a_mp.append(f) or "pending")
+
+    def estado():
+        async def q(s):
+            dueno = select(Organization.owner_username).where(Organization.id == est.org_id)
+            sus = select(User.mp_preapproval_id).where(User.username == est.dueno)
+            return (await s.execute(dueno)).scalar_one(), (await s.execute(sus)).scalar_one()
+        return _db(q), _miembros(est.org_id)
+
+    antes = estado()
+    assert antes[0] == (est.dueno, suscripcion) and est.dueno in antes[1] and len(antes[1]) == 2
+    guarda = (400, "No podés removerte a vos mismo del estudio")
+    parecidos = {guarda, (404, "Ese usuario no es miembro del estudio")}
+    for nombre in (est.dueno, est.dueno.upper(), f" {est.dueno}", f"{est.dueno} "):
+        r = est.quitar(nombre)
+        assert (r.status_code, r.json().get("detail")) in ({guarda} if nombre == est.dueno else parecidos), (nombre, r.text)
+        assert (estado(), a_mp) == (antes, []), nombre
+
+
 def test_mine_lista_sólo_los_miembros_del_estudio_y_quién_es_dueño():
     est, otro = Estudio(), Estudio()
     usuario = _azar("o1u_")
