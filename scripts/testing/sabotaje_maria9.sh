@@ -70,11 +70,11 @@ reemplazar $F '    def sufijo_de_la_operacion():' '    limpiar_sufijo((sbt_sufij
 caso "analiza_siempre" "FAILED $T::test_el_de_la_operacion_frena_sólo_si_alguien_lo_usa[renglones_con_propio]"
 
 # 2. los avisos no anticipan el error
-reemplazar $F '        usa_el_general = usa_el_sufijo_de_la_operacion(items)' '        usa_el_general = False'
+reemplazar $F '        if usa_el_general:' '        if False:'
 caso "sin_aviso" "FAILED $T::test_los_avisos_anticipan_el_error_sólo_si_alguien_lo_usa[item_entero]"
 
 # 3. los avisos lo anticipan aunque nadie lo use
-reemplazar $F '        usa_el_general = usa_el_sufijo_de_la_operacion(items)' '        usa_el_general = True'
+reemplazar $F '        if usa_el_general:' '        if True:'
 caso "aviso_siempre" "FAILED $T::test_los_avisos_anticipan_el_error_sólo_si_alguien_lo_usa[renglones_con_propio]"
 
 # 4. el aviso no tiene el texto del error
@@ -95,7 +95,7 @@ caso "subitem_sin_propio_no_cuenta" "FAILED $T::test_los_avisos_anticipan_el_err
 reemplazar $F '        elif sin_propio(item.get("sufijo")):' '        elif True:'
 caso "con_propio_usa_el_general" "FAILED $T::test_los_avisos_anticipan_el_error_sólo_si_alguien_lo_usa[item_entero_con_propio]"
 
-# 8. un renglón sin propio no cuenta
+# 8. un ítem o renglón sin propio no cuenta
 reemplazar $F '        elif sin_propio(item.get("sufijo")):' '        elif False:'
 caso "renglon_sin_propio_no_cuenta" "FAILED $T::test_los_avisos_anticipan_el_error_sólo_si_alguien_lo_usa[un_renglon_sin_propio]"
 
