@@ -40,14 +40,14 @@ def recarga_quedo(pid, org, esperados):
     return bien, f"pago {estado or 'sin fila'}, créditos {creditos}/{esperados} {'vigentes' if vigentes else 'vencidos'}"
 
 
-def alta_quedo(org, antes, r_a, b, r_b):
+def alta_quedo(org, antes, r):
     """La operación del alta con su ítem, la del guardado, una cuenta por operación y el
     plan que dijo cancelar o reactivar: nada más que lo que dio 200."""
     ops, (usadas, plan) = dict(h.sql(OPERACIONES, org)), h.sql(CUENTA, org)[0]
-    alta = r_a.json()["operation_id"] if r_a.status_code == 200 else None
-    guardadas = len(ops) - (alta in ops)
-    plan_esperado = r_b.json()["billing_status"] if b != "guardado" and r_b.status_code == 200 else antes[1]
-    bien = (not alta or ops.get(alta) == 1) and guardadas == (b == "guardado" and r_b.status_code == 200) \
+    dieron = {n for n, x in r.items() if x.status_code == 200}
+    alta = r["alta"].json()["operation_id"] if "alta" in dieron else None
+    plan_esperado = next((r[n].json()["billing_status"] for n in ("cancelar", "reactivar") if n in dieron), antes[1])
+    bien = (not alta or ops.get(alta) == 1) and len(ops) - (alta in ops) == ("guardado" in dieron) \
         and usadas - antes[0] == len(ops) and plan == plan_esperado
     return bien, f"{len(ops)} operaciones, {usadas - antes[0]} contadas, plan {plan}"
 
@@ -59,7 +59,8 @@ def ronda(c, a, b, rotulo, ajuste, admite):
     if "recarga" in (a, b):
         _, previos, vigentes = h.sql(ESTADO, None, org)[0]
         esperados = h.RECARGA + (previos if vigentes else 0)
-    cuenta_antes = h.sql(CUENTA, org)[0]
+    if "alta" in (a, b):
+        cuenta_antes = h.sql(CUENTA, org)[0]
     antes, barrera, pid = h.sql(DEADLOCKS)[0][0], threading.Barrier(2, timeout=h.PLAZO), []
 
     def pedir(nombre):
@@ -75,25 +76,25 @@ def ronda(c, a, b, rotulo, ajuste, admite):
     pierde = [n for n, r, ok in ((a, r_a, {200}), (b, r_b, admite)) if r.status_code not in ok]
     linea = f"{'DEADLOCK' if dl else 'ok      '} | {a} + {b} | {rotulo} | {a} {r_a.status_code}, {b} " \
             f"{r_b.status_code}{' | pierde ' + ' y '.join(pierde) if dl and pierde else ''}"
-    bien = True
+    recarga_bien = cuenta_bien = True
     if pid:
-        bien, quedo = recarga_quedo(pid[0], org, esperados)
+        recarga_bien, quedo = recarga_quedo(pid[0], org, esperados)
         linea += f" | {quedo}"
         if pid[1].status_code != 200:
             r = c.post("/api/payments/webhook", **aviso_firmado("payment", pid[0], "secreto-de-prueba"))
-            bien, quedo = recarga_quedo(pid[0], org, esperados)
+            recarga_bien, quedo = recarga_quedo(pid[0], org, esperados)
             linea += f" | reintento {r.status_code}: {quedo}"
-    if a == "alta":
-        bien, quedo = alta_quedo(org, cuenta_antes, r_a, b, r_b)
+    if "alta" in (a, b):
+        cuenta_bien, quedo = alta_quedo(org, cuenta_antes, {a: r_a, b: r_b})
         linea += f" | {quedo}"
     if a == "renovación":
         estado, delante = h.sql("select billing_status, trial_ends_at > now() from organizations where id = %s", org)[0]
-        bien = r_a.status_code != 200 or (estado == "active" and delante)
+        cuenta_bien = r_a.status_code != 200 or (estado == "active" and delante)
         linea += f" | termina {estado}, período {'por delante' if delante else 'vencido'}"
-    print(linea + ("" if bien else " | RECARGA PERDIDA" if pid else " | CUENTA MAL"), flush=True)
+    print(linea + ("" if recarga_bien else " | RECARGA PERDIDA") + ("" if cuenta_bien else " | CUENTA MAL"), flush=True)
     if not dl and (r_a.status_code != 200 or r_b.status_code not in admite):
         raise h.Invalida("ronda sin carrera: un pedido dio un código que la fila no admite, sin deadlock")
-    return bool(dl), int(not bien and bool(pid)), int(not bien and not pid)
+    return bool(dl), int(not recarga_bien), int(not cuenta_bien)
 
 
 def main():
