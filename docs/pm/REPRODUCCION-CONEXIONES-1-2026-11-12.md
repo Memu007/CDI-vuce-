@@ -167,3 +167,52 @@ Para medir, no verificados:
   la pieza de producto, si Emi dice que sí.
 - La subida muestreada en el tiempo y `/api/migrations/analyze` con otra
   cuenta: CONEXIONES-1 D.
+
+# Reproducción de CONEXIONES-1 D (2026-11-12, PM principal)
+
+Entrega `c1311852` (informe), arnés `ebd2c1fd` y `f9962e6e`, merge `75349ca8`,
+Dev técnica. Base `18202930`. `chequeo-6 18202930 f9962e6e`: producto +0/−0,
+arnés +140/−21, historia vacía, 0 avisos.
+
+**Estado: en revisión.** Falta el adversario sobre `_leer_cuerpo` y el
+`commit` de analyze; el veredicto va en `PARA-DEV.md`.
+
+Corrido en `/tmp/cdi-pm/wt-con1d` (`f9962e6e`) y en `/tmp/cdi-pm/wt-con1d-fix`
+(`f9962e6e` más el diff del informe, que entra con `git apply --check` rc=0),
+todo `--pico 60 --lento 30` con `con_pg16.sh`.
+
+## Lo corrido: la otra cuenta, espera máxima
+
+| Corrida | bcrypt | sugerir | subida PDF | analyze (Excel) | manual (cuerpo) | 500 de la otra cuenta | rc |
+|---|---|---|---|---|---|---|---|
+| hoy, sin cuota | 3,51 s | **30,03 s** | **29,98 s** | **30,25 s** | **30,08 s** | 24 (12 analyze, 12 manual) | 4 |
+| arreglo, sin cuota | 3,3 s | 0,3 s | 0,04 s | 0,07 s | 0,03 s | 0 | 0 |
+| arreglo, cuota de producción | 3,16 s | 0,34 s | 0,03 s | 0,07 s | 0,03 s | 0 | 0 |
+
+- Igual al informe en forma y magnitud (el informe: hoy 12 × 500 hasta
+  30,13 s en analyze y manual; con el diff, máximo 3,77 s).
+- Hoy, contadores del log: `QueuePool limit` 280, `Exception in ASGI` 54,
+  `Error logging metrics` 10, `Traceback` 324; los mismos del informe. Con el
+  arreglo, todos 0.
+- **manual:** hoy, «50 de 60 esperando el cuerpo con 50 conexiones tomadas»;
+  con el arreglo, «60 de 60 llegaron en 0,64 s con 0 conexiones tomadas».
+- **Subida de PDF muestreada en el tiempo (hoy):** T=50 hasta 30,98 s,
+  después baja en escalones a los ~31, ~61, ~91 y ~121 s, y a 0 en 127,5 s,
+  con 4 PDFs en el lector. Es lo que dice el informe. Parte de esas 50 la
+  toman pedidos que esperan el candado de validación antes del lector. Con el
+  arreglo, T=50 sólo en la muestra de llegada (~0,56 s) y después 0.
+- **Filas perdidas en `api_logs` (hoy, `pico_excel`):** 72 pedidos, 62
+  filas; las 10 que faltan coinciden con los 10 `Error logging metrics`.
+  Con el pool lleno, el supuesto del informe se sostiene.
+- `close_con_transaccion`: 434 hoy, 165 con el arreglo.
+- **`sabotajes/conexiones1.sh f9962e6e`:** cinco `BIEN`, rc=0.
+
+## Lo probado por la PM
+
+- `tests/test_conexiones1.py`: 4 failed sin el diff, 4 passed con el diff.
+- **Mi negativo 1:** `_leer_cuerpo` movida después de `require_active_billing`
+  → 1 failed. La prueba distingue el orden.
+- **Mi negativo 2:** analyze con un cliente ya existente → 200, `existing` 1,
+  0 conexiones tomadas durante la lectura.
+- Las 1113 líneas «Task was destroyed» son anteriores al diff.
+
