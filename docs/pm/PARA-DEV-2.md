@@ -3,52 +3,45 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D194: aceptada sobre `f507763` e integrada (2026-11-12 16:45 UTC)
+## `sabotaje_maria3.sh`: aceptado sobre `29880ee` e integrado (2026-11-12 18:00 UTC)
 
-Acta: `REPRODUCCION-D194-2026-11-12.md`.
+Acta: `REPRODUCCION-SABOTAJE-MARIA3-2026-11-12.md`. Unión: `e3d6be57`.
 
 **Lo reproducido:**
-- `anclas_perdidas.py` sobre `f507763` da 18 anclas de una línea perdidas en
-  8 guiones; sobre `3ff4e77` da 28 en 9. Las dos cuentas coinciden con tu
-  informe.
-- Tus pruebas: 27 passed. `chequeo-6`: producto +0/−0, 0 avisos.
-- Mis dos negativos movieron la cuenta en los dos sentidos:
-  - saqué un ancla y subió a 19;
-  - repuse una y dupliqué otra, y bajó a 17 con «otra cantidad (está 2)».
-- `sabotaje_maria7.sh` corrido: frena en `PATRON NO ENCONTRADO` justo en la
-  fila 97, rc=1.
-- Las dos anclas de `doc1` dan 0 y 0, como contaste a mano.
+- El guion entero sobre `29880ee`: 136 passed sin sabotaje, 30 `ROJO`,
+  rc=0. `anclas_perdidas.py` sin filas del guion. `chequeo-6`: producto
+  +0/−0, 0 avisos.
+- La razón del rojo, a mano, en 13 (`assert 200 == 401`) y 27 (el
+  `ValueError` de «inf» se escapa sin 400).
+- Mi negativo para D196 con otro dato: «0100» con la mutación 18 da 2 failed.
 
-**D195: (a), decidido por la PM.**
-- Los 10 guiones ya están en `herramientas/sabotajes-conocidos.txt`, con
-  dueña vos y salida «reescribirlo».
-- Cada guion es una pieza de arnés aparte.
-- La publicación pendiente toca justo esos archivos, así que (b) sería lo
-  mismo que (a), sólo que más tarde.
+**D196: (a).** El dato «100» queda.
 
-**Supuestos:**
-1. La herramienta y sus pruebas quedan.
-2. Las clases extra quedan.
-3. Un archivo que ya no existe cuenta como perdida.
+**D197: ninguna de las dos.** Es una mutación equivalente: en
+`origen_iso2`, después del chequeo el código se busca en
+`_iso2_por_codigo_maria()`, que sólo tiene códigos de la tabla (194, 0
+fuera). Sacarlo no cambia nada que un caso pueda ver. No hay pieza ni riesgo
+que anotar.
 
-**Sigue: re-anclar `sabotaje_maria3.sh`** (7 anclas perdidas). Es sólo
-arnés y el producto queda en +0/−0.
-- Ancla por ancla, mirá si la protección que ataca el sabotaje sigue
-  existiendo en el código de hoy:
-  - si sigue, re-anclalo al texto de hoy;
-  - si no, ese sabotaje no se toca y va como D que propone retirarlo.
-- Puerta: el guion entero sobre la cabeza da todos `ROJO` y sale 0, y
-  `anclas_perdidas.py` no da ninguna fila perdida para ese guion. Al
-  entregar, sacá su línea de `sabotajes-conocidos.txt`.
-- Si algún sabotaje va como D de retirarlo, el guion commiteado lo sigue
-  teniendo y su línea queda en `sabotajes-conocidos.txt` hasta que decida.
-  La puerta pasa a ser: una corrida con ese sabotaje salteado sólo en una
-  copia local (no en el commit) da `ROJO` en todos los demás y sale 0; las
-  únicas filas perdidas son las de ese D.
-- Después siguen `catalogo_largo2` y los demás, uno por pieza.
-- Si en el medio te llega la tarea de comparación, va primero.
+**D198: (b), y va primero.** Lo comprobé: sacando sólo la validación del
+endpoint fallan los dos casos de avisos y los de generar siguen verdes.
+- Un sabotaje más en `sabotaje_maria3.sh`: saca sólo
+  `importe_valido(request.flete, "Flete")` del endpoint y espera
+  `[/generate_maria/avisos-flete-inf]`.
+- Puerta: el guion entero da 31 `ROJO` y sale 0.
+- Commit aparte, antes de seguir con `catalogo_largo2`. Informe corto en
+  `PARA-PM-2.md`; si ya tenés commits de `catalogo_largo2`, quedan para la
+  entrega siguiente.
 
-**Tu rango de D: D190 a D199** (la próxima libre es D196).
+**Supuestos 1 a 4:** quedan. El riesgo de la segunda copia del lector sin
+sabotaje de la fecha queda anotado en el acta, sin pieza.
+
+**Después:** `catalogo_largo2` y los demás de `sabotajes-conocidos.txt`, uno
+por pieza, con la misma puerta que este. Si en el medio te llega la tarea de
+comparación, va primero.
+
+**Tu rango de D pasa a D216–D225** (D199 queda libre también). La Técnica
+usa D209–D215.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
