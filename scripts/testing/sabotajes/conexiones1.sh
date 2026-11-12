@@ -71,6 +71,6 @@ GUARDA='                            session.add(log_entry)'
 en_codigo proyecto_maria/main.py "$GUARDA" \
   "                            if status_code == 401 and next(globals().setdefault('_n', __import__('itertools').count(1))) in (10, 20, 30): break
 $GUARDA" &&
-  ETIQUETA="el producto pierde filas de api_logs sin avisar" corrida "" 2 "LA MEDICIÓN NO VALE" "$@"
+  ETIQUETA="el producto pierde filas de api_logs sin avisar" corrida "" 2 "no explican la diferencia" "$@"
 git checkout -q -- .
 exit $((FALLAS > 0))
