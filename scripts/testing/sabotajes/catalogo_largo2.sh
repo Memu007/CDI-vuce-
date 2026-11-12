@@ -208,15 +208,15 @@ if [ -n "$PG_URL" ]; then
     sabotaje $M "el arranque no pasa el origen a text" \
       '("product_key", "descripcion", "origen", "vendor_nombre")' \
       '("product_key", "descripcion", "vendor_nombre")' \
-      "arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
+      "FALLA | primer arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
     sabotaje $M "el arranque no pasa el proveedor a text" \
       '("product_key", "descripcion", "origen", "vendor_nombre")' \
       '("product_key", "descripcion", "origen")' \
-      "arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
+      "FALLA | primer arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
     sabotaje $M "el arranque no pasa el origen de la memoria del cliente a text" \
       '                            ("client_product_history", ("origen_frecuente",)),' \
       '' \
-      "arranque: las columnas son text" "FALLA | guardar-uso con cliente guarda enteros"
+      "FALLA | primer arranque: las columnas son text" "FALLA | guardar-uso con cliente guarda enteros"
     sabotaje $M "el arranque traba las tablas en una transacción" \
       '    for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "origen", "vendor_nombre")),
                             ("client_product_history", ("origen_frecuente",)),
