@@ -697,7 +697,7 @@ def test_sacar_no_borra_al_usuario():
 
 def test_el_duenio_no_se_saca_a_si_mismo_y_el_estudio_queda_igual(monkeypatch):
     """La guarda va antes de Mercado Pago: un dueño con la suscripción pendiente no la pierde.
-    Con otras mayúsculas también es el dueño: si la búsqueda las ignorara, la guarda no lo vería."""
+    Con otras mayúsculas o espacios también es el dueño: si la búsqueda los ignorara, la guarda no lo vería."""
     est = Estudio()
     _miembro(est)
     suscripcion = f"pend-{est.dueno}"
@@ -719,10 +719,10 @@ def test_el_duenio_no_se_saca_a_si_mismo_y_el_estudio_queda_igual(monkeypatch):
     antes = estado()
     assert antes[0] == (est.dueno, suscripcion) and est.dueno in antes[1] and len(antes[1]) == 2
     guarda = (400, "No podés removerte a vos mismo del estudio")
-    for nombre, aceptadas in ((est.dueno, {guarda}),
-                              (est.dueno.upper(), {guarda, (404, "Ese usuario no es miembro del estudio")})):
+    parecidos = {guarda, (404, "Ese usuario no es miembro del estudio")}
+    for nombre in (est.dueno, est.dueno.upper(), f" {est.dueno}", f"{est.dueno} "):
         r = est.quitar(nombre)
-        assert (r.status_code, r.json().get("detail")) in aceptadas, (nombre, r.text)
+        assert (r.status_code, r.json().get("detail")) in ({guarda} if nombre == est.dueno else parecidos), (nombre, r.text)
         assert (estado(), a_mp) == (antes, []), nombre
 
 

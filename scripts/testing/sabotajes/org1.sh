@@ -265,6 +265,9 @@ sabotaje "la guarda va después de Mercado Pago" "$YO" "" "$GUARDA" "" \
 sabotaje "sacar busca sin mayúsculas" "$YO" "" \
   "select(User).where(User.username == username, User.organization_id == org.id)" \
   "select(User).where(func.lower(User.username) == username.lower(), User.organization_id == org.id)"
+sabotaje "sacar busca sin espacios" "$YO" "" \
+  "select(User).where(User.username == username, User.organization_id == org.id)" \
+  "select(User).where(func.trim(User.username) == username.strip(), User.organization_id == org.id)"
 
 # El título de la columna del archivo de DESPACHO-1a.
 sabotaje "el archivo dice «Ultima vez»" "tests/test_despacho1a.py::test_el_archivo_se_abre_y_trae_lo_guardado" "" \
