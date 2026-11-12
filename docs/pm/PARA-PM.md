@@ -2,90 +2,60 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ABUSO1-LIMPIEZA: los dos topes por cuenta de `test_abuso1.py` en un caso
+## DATOS1-DOS-OPERACIONES: borrar un cliente con dos operaciones
 
 | SHA | qué |
 |---|---|
-| `00ac6b29` | base |
-| `c193af5d` | `test:` un caso con las dos rutas como datos, y las anclas de `reset3.sh`, `abuso1.sh` y `abuso2.sh` |
+| `50124c63` | base |
+| `53bd7df1` | `test:` el caso de borrar cliente con dos operaciones, y dos sabotajes en `datos1.sh` |
 | este commit | `docs:` informe |
 
 **Nada para decidir.** Producto +0/−0. No hubo adversarios, como pedía la tarea. El nombre de la pieza lo puse yo, porque la tarea no traía uno.
 
-**Supuesto reversible: la rama de reset ahora controla más.** El caso de reset de antes mandaba 4 pedidos seguidos con la misma variante. No veía este caso: que una variante del email (por ejemplo, en mayúsculas) no encontrara la cuenta y aun así llegaran 3 mails. El caso unido toma la forma del de recuperar. Primero pide con `EMAIL`, `Email` y `email`, y comprueba que llegaron 3 mails a la dirección guardada. Recién después hace el cuarto pedido. Así, la rama de reset controla eso también.
+**Cómo quedó.** Seguí tu sugerencia: extendí `test_borrar_cliente_borra_sus_presupuestos_y_no_los_ajenos`, sin cambiarle el nombre, así no se mueve ninguna ancla.
+- El cliente borrado tiene dos operaciones, cada una con su presupuesto compartido y un ítem. Van como datos: `borradas = {1: ..., 2: ...}`.
+- Antes de borrar, se comprueba que las cuatro operaciones del caso tienen el link en 200 y al menos un ítem. Así, «0 ítems después» no puede salir de un guardado que nunca creó ítems.
+- Después de borrar, para cada operación del cliente: el link da 404, quedan 0 presupuestos y 0 ítems. Cada aserción lleva el número de la operación en el mensaje.
+- Lo del otro cliente del mismo dueño y lo del otro dueño sigue: link en 200 y sus ítems.
+- Sumé `_items_de(op_id)` al lado de `_presupuestos_de`, y el import de `OperationItem`.
 
-### La premisa: es la misma causa
+**Supuesto reversible:** el caso también comprueba que los ítems de las operaciones ajenas siguen. La tarea decía «lo de otro cliente sigue» sin nombrar los ítems; lo tomé como incluido.
 
-Medí sobre `00ac6b29`, en un worktree descartable, apagando el tope de una ruta por vez: `return mensaje` → `pass` después de `_tope_por_cuenta`.
+### Comandos para reproducir
 
-| tope apagado | `tests/test_abuso1.py` |
+```bash
+PY=<venv>/bin/python scripts/testing/sabotajes/datos1.sh 53bd7df1   # 22 líneas ROJO, ninguna ROTO/VERDE/ROJO?, «sabotajes sin rojo: 0», salida 0
+python scripts/testing/anclas_perdidas.py 53bd7df1                   # ninguna línea de datos1.sh
+python docs/pm/herramientas/chequeo-6.py 50124c63 53bd7df1           # producto +0/−0, avisos: 0
+```
+
+### Puertas sobre `53bd7df1`
+
+| puerta | resultado (copiado de la salida) |
 |---|---|
-| reset | `FAILED tests/test_abuso1.py::test_reset_tres_por_hora_por_cuenta_aunque_cambie_la_ip` · `1 failed, 73 passed, 5 warnings in 28.33s` |
-| recuperar | `FAILED tests/test_abuso1.py::test_s6_recuperar_usuario_corta_en_silencio_por_email` · `1 failed, 73 passed, 3 warnings in 28.81s` |
-| ninguno | `74 passed, 3 warnings in 28.80s` |
-
-Los dos topes salen del mismo `_tope_por_cuenta`, y cada caso era el único que cuidaba su ruta. Por eso armé un solo caso, `test_tres_por_hora_por_cuenta_aunque_cambie_la_ip[recuperar|reset]`. Recibe la ruta, el mensaje y los links que crea cada mail (0 en recuperar, 1 en reset).
-
-El chequeo de links del reset sigue. Con el cuarto pedido, a los 59 minutos y pasada la hora, se compara `_links_de_reset(u)` con `n × links_por_mail`. En recuperar ese número es 0, así que la misma línea comprueba que recuperar nunca crea un link.
-
-### Los dos rojos, sobre `c193af5d`
-
-Con el mismo sabotaje, en un worktree descartable que ya retiré:
+| `tests/test_datos1.py`, SQLite | `11 passed, 3 warnings in 10.46s` |
+| `datos1.sh 53bd7df1` | 22 `ROJO`, `sabotajes sin rojo: 0`, `rc=0` |
+| sabotaje nuevo: presupuesto sólo de la primera operación | `ROJO  \| sólo se borra el presupuesto de la primera operación: «FAILED tests/test_datos1.py::test_borrar_cliente_borra_sus_presupuestos_y_no_los_ajenos» «AssertionError: presupuesto de la operación 2» «assert 200 == 404»` |
+| sabotaje nuevo: ítems sólo de la primera operación | `ROJO  \| sólo se borran los ítems de la primera operación: «FAILED tests/test_datos1.py::test_borrar_cliente_borra_sus_presupuestos_y_no_los_ajenos» «AssertionError: ítems de la operación 2» «assert 1 == 0»` |
+| los dos sabotajes de antes sobre este caso | siguen en `ROJO` con su texto: `assert 200 == 404` y `assert 404 == 200` |
+| `anclas_perdidas.py 53bd7df1` | `rc=0`; ninguna línea de `datos1.sh` (las únicas `SIN ANCLA` son `limpieza1.sh:181` y `:185`, que ya estaban) |
+| `chequeo-6.py 50124c63 53bd7df1` | ver abajo |
 
 ```
-== tope por cuenta apagado sólo en: reset
-FAILED tests/test_abuso1.py::test_tres_por_hora_por_cuenta_aunque_cambie_la_ip[reset]
-================== 1 failed, 73 passed, 3 warnings in 29.87s ===================
-== tope por cuenta apagado sólo en: recuperar
-FAILED tests/test_abuso1.py::test_tres_por_hora_por_cuenta_aunque_cambie_la_ip[recuperar]
-================== 1 failed, 73 passed, 3 warnings in 30.56s ===================
-== sin sabotaje
-======================= 74 passed, 3 warnings in 29.79s ========================
-```
-
-### Puertas, sobre `c193af5d`
-
-| puerta | salida |
-|---|---|
-| `tests/test_abuso1.py` entero | `74 passed, 3 warnings in 29.79s` |
-| `reset3.sh c193af5d` | `BASE \| 74 passed, 5 warnings in 30.73s`; 7 `ROJO`; `SALTO \| sin PG_URL: que contar no suelte la traba no se midió`; `sabotajes sin rojo: 0`; `rc=0` |
-| `abuso1.sh c193af5d` | 34 `ROJO`; `sabotajes sin rojo: 0`; `rc=0` |
-| `abuso2.sh c193af5d` | `BASE  \| en verde`; 19 `ROJO`; `SIN PG\| el sabotaje de la İ necesita PG_URL: no se corrió`; `fallas: 0`; `rc=0` |
-| `ROTO`, `VERDE \|` o `ROJO?` en los tres logs | 0 |
-| `anclas_perdidas.py c193af5d` | nada de `test_abuso1.py`. Lo que lista es ajeno a esta pieza: `guardar2.sh:74` (PERDIDA) y seis `SIN ANCLA` de `limpieza1.sh` |
-| `chequeo-6.py 00ac6b29 c193af5d` | entero abajo |
-
-```
-chequeo-6 00ac6b2954f4c842cf3961360a60893689a8ea8c..c193af5dd50d2e7b8e1576a1e9814c8430e7df79: avisos para mirar, no un veredicto
+chequeo-6 50124c63..53bd7df1: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +27/−41
+arnés +31/−9
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
 ```
 
-Las anclas re-apuntadas están en el mismo commit que el cambio de id:
+Cada sabotaje nuevo ancla en `PublicQuoteModel.operation_id.in_(...)` o en `OperationItemModel.operation_id.in_(...)`. El texto `.in_([o.id for o in operaciones])` está dos veces en `delete_cliente`, y con el nombre del modelo cada reemplazo encuentra una sola. El rojo de cada uno es por su razón: el de presupuesto cae en el 404 del link de la operación 2; el de ítems pasa el link y los presupuestos, y cae en `ítems de la operación 2`.
 
-- `reset3.sh:25` apunta a `[reset]`.
-- `abuso1.sh` (en tres lugares) y `abuso2.sh:120` apuntan a `[recuperar]`.
+### Lo que no se corrió y riesgos
 
-Cada uno de esos sabotajes da su rojo con el texto esperado: por ejemplo, «el cuarto pedido de la hora mandó el mail», «creó un link», «a los 59 minutos ya mandó otro» y «pasada la hora no volvió a mandar».
-
-### Comandos para reproducir
-
-```bash
-python -m pytest -q --no-cov tests/test_abuso1.py                        # 74 passed
-PY=python bash scripts/testing/sabotajes/reset3.sh c193af5d              # sabotajes sin rojo: 0, sin ROTO
-PY=python bash scripts/testing/sabotajes/abuso1.sh c193af5d              # sabotajes sin rojo: 0, sin ROTO
-PY=python bash scripts/testing/sabotajes/abuso2.sh c193af5d              # fallas: 0, sin ROTO
-python scripts/testing/anclas_perdidas.py c193af5d | grep test_abuso1    # nada
-python docs/pm/herramientas/chequeo-6.py 00ac6b29 c193af5d               # producto +0/−0, avisos: 0
-```
-
-- **No corrido:**
-  - Sin `PG_URL`: el sabotaje de Postgres de `reset3.sh` y el de la İ de `abuso2.sh`.
-  - La suite completa: la tarea pide este archivo, los guiones y chequeo-6.
+- **No corrido:** la suite completa, los adversarios y Postgres. La tarea pide este archivo, el guion, las anclas y chequeo-6.
 - **Archivos de producto tocados:** ninguno.
-- **Riesgos:** ninguno nuevo. Que la rama de reset ahora controle más es el supuesto de arriba.
+- **Riesgo bajo, sólo del guion:** `delete_cliente` trae las operaciones sin `order_by`, y el sabotaje usa `operaciones[0]`. En SQLite viene primero la operación 1, y por eso el rojo esperado nombra la 2. Si el orden se diera vuelta, el caso seguiría en rojo (comprueba las dos operaciones), pero el guion marcaría `ROJO?` porque el mensaje diría «operación 1». No da un verde falso.
 
-/compact conservar: Dev 1 técnica, rama claude/dev-tecnica; entregué ABUSO1-LIMPIEZA (c193af5d + informe); nada para decidir; tests/test_conexiones1.py sin seguimiento (su copia está en el parche); espero veredicto.
+/compact conservar: Dev 1 técnica, rama claude/dev-tecnica; entregué DATOS1-DOS-OPERACIONES (53bd7df1 + informe); nada para decidir; tests/test_conexiones1.py sin seguimiento (su copia está en el parche); espero veredicto.
