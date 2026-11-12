@@ -195,7 +195,7 @@ caso sin_aviso_futura "${T}test_fecha_futura_o_vieja_se_avisa[40-futura]"
 
 # 24. cifras que no son 0-9 llegan a int()
 reemplazar $G 'm = re.fullmatch(r"0?([0-9]{3})(?:' 'm = re.fullmatch(r"0?(\d{3})(?:'
-caso cifras_raras "${T}test_procedencia_no_reconocida_se_rechaza[/generate_maria/avisos-٢٢٢]"
+caso cifras_raras "${T}test_procedencia_no_reconocida_se_rechaza[/generate_maria/avisos-\u0662\u0662\u0662]"
 
 # 25. una procedencia de producto en blanco pisa la de la operación
 reemplazar $G '        valor = str(item.get(clave) or "").strip()' '        valor = str(item.get(clave) or "")'
