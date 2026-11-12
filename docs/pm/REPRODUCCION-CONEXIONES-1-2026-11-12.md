@@ -1062,3 +1062,133 @@ if __name__ == "__main__":
 ```
 
 </details>
+
+## J (sólo arnés): aceptada sobre `4f0cfbbd` (2026-11-12 13:10 UTC)
+
+Informe `c0e119fd` (sólo `docs/pm/PARA-PM.md` sobre `4f0cfbbd`).
+`chequeo-6.py d958df7a 4f0cfbbd`: producto +0/−0, arnés +53/−38, historia
+vacío, 0 avisos; igual al informe. Caso natural reproducido en un worktree
+de `4f0cfbbd` con N=20.
+
+| corrida | rc | rondas con deadlock / recargas perdidas / cuentas mal | ella |
+|---|---|---|---|
+| natural, HEAD | 1 | 65 / 20 / 33 | 60 / 20 / 37 |
+| natural, NO KEY | 1 | 27 / 19 / 29 | 28 / 18 / 31 |
+| negativo PM `pm_serie_j.py` (recarga y alta en serie, vencidos, los dos órdenes, N=5) | 0 | series perdidas 0/10, siempre «créditos 10/10 vigentes» | — |
+| negativo PM `pm_serie_d205.py` (renovación y guardado en serie, las dos cuentas vencidas, los dos órdenes, N=5) | 0 | series mal 0/20, siempre «active, por delante» | — |
+
+Por fila, HEAD (NO KEY): recarga + guardado vencidos 17/20 deadlock (0);
+recarga + MARIA vencidos 17/20 (0); al día 0/20 en las tres; alta + guardado
+8/20 (11/20); alta + cancelar 13/20 (11/20); alta + reactivar 10/20 (5/20);
+renovación + guardado 17/20 y 16/20 mal (14/20 y 15/20).
+
+- **D188, lo que dicen las 20 líneas de HEAD:** «recarga 200, alta 200 |
+  pago aplicado, créditos 0/10 vencidos | RECARGA PERDIDA». Mercado Pago
+  recibe 200, así que no reintenta: la persona pagó y los créditos quedan
+  en 0. Pasa en 20 de 20 rondas **cuando los dos pedidos llegan en el mismo
+  instante**; no es una frecuencia de producción. En serie, 0 de 10: es
+  una carrera. NO KEY no lo arregla.
+- **D205:** las 33 cuentas mal son «renovación 200, guardado 402 | termina
+  past_due, período por delante». En serie, 0 de 20: también es carrera.
+  NO KEY no lo arregla.
+- **Pares de alta:** NO KEY no los arregla. Las diferencias entre HEAD y
+  NO KEY, y entre mis números y los suyos, son ruido de carrera con N=20.
+  Las filas de alta no miden el estado final: sólo se puede decir «error,
+  hay que reintentar», no «no se pierde nada».
+- **Las 92 líneas (§6, ~80):** aceptadas: amplía un caso existente, 0
+  avisos, y ella lo explicó. Una línea en `COLA-LIMPIEZA.md`.
+- **D208:** va a Emi (la opción b es una pieza nueva del roadmap). La PM
+  recomienda (b), dentro del punto 13.
+- **Rojo de entorno sin causa (abierto):** la primera corrida de
+  `pm_serie_j.py` salió rc=2, «la app no soltó sus conexiones», en el
+  primer `soltar()` de la corrida, mientras corrían en paralelo los dos
+  naturales N=20. No se repitió en 6 corridas más (una N=5 y cuatro N=1
+  con diagnóstico, con la misma carga) ni en las 520 rondas de los
+  naturales. Hipótesis, no probada: la carga hizo que una conexión de la
+  app tardara más que el plazo de 15 s. No es del diff de J y falla a la
+  vista. La tarea K pide que `soltar()` diga qué hacen las conexiones que
+  quedan, para tener la causa la próxima vez.
+- **No corrido:** suite y `e2e_maria.sh`: J no toca producto.
+
+<details><summary>Negativos de la PM: <code>pm_serie_j.py</code> y <code>pm_serie_d205.py</code></summary>
+
+```python
+"""Negativo PM de J: recarga y alta EN SERIE (sin carrera), créditos extra vencidos.
+Si en serie también se pierde la recarga, el 20/20 de D188 no es una carrera sino un
+defecto determinista y la medición lo rotularía mal. Sale 1 si alguna serie pierde."""
+import os, sys
+sys.path.insert(0, os.path.join(os.getcwd(), "scripts/testing"))
+import conexiones1_creditos as h
+from conexiones1_natural import ESTADO, recarga_quedo
+from conexiones1_rondas import correr, m, soltar
+from fastapi.testclient import TestClient
+
+N = int(os.environ.get("N", "5"))
+
+
+def main():
+    malas = 0
+    with TestClient(m.app, raise_server_exceptions=False) as c:
+        for orden in ("recarga→alta", "alta→recarga"):
+            for _ in range(N):
+                sesion, cliente, ref, (_, _, org) = h.preparar(c, True)
+                _, previos, vigentes = h.sql(ESTADO, None, org)[0]
+                esperados = h.RECARGA + (previos if vigentes else 0)
+                if orden == "recarga→alta":
+                    pid, r1 = h.recargar(c, ref); r2 = h.alta(c, sesion, cliente)
+                else:
+                    r2 = h.alta(c, sesion, cliente); pid, r1 = h.recargar(c, ref)
+                try:
+                    soltar(c)
+                except h.Invalida:
+                    print(h.sql("select state, wait_event_type, wait_event, left(query,150), now()-state_change from pg_stat_activity where datname=current_database() and backend_type='client backend' and pid<>pg_backend_pid()"), flush=True); raise
+                bien, quedo = recarga_quedo(pid, org, esperados)
+                malas += not bien
+                print(f"{orden} | previos {previos} {'vigentes' if vigentes else 'vencidos'} | "
+                      f"recarga {r1.status_code}, alta {r2.status_code} | {quedo} | {'ok' if bien else 'PERDIDA'}", flush=True)
+    print(f"series perdidas: {malas}/{2 * N}")
+    return 1 if malas else 0
+
+
+if __name__ == "__main__":
+    sys.exit(correr(main))
+```
+
+```python
+"""Negativo PM de J: renovación y guardado EN SERIE (sin carrera), con la cuenta vencida.
+Si en serie la cuenta también termina past_due con el período por delante, D205 no es
+una carrera. Sale 1 si alguna serie termina mal."""
+import os, sys
+sys.path.insert(0, os.path.join(os.getcwd(), "scripts/testing"))
+import conexiones1_creditos as h
+from conexiones1_renovacion import VENCIDAS
+from conexiones1_rondas import PEDIDOS, correr, m, soltar
+from fastapi.testclient import TestClient
+
+N = int(os.environ.get("N", "5"))
+
+
+def main():
+    malas = 0
+    with TestClient(m.app, raise_server_exceptions=False) as c:
+        for rotulo, ajuste in VENCIDAS.items():
+            for orden in (("renovación", "guardado"), ("guardado", "renovación")):
+                for _ in range(N):
+                    sesion, cliente, ref, (_, _, org) = h.preparar(c, True)
+                    h.sql(f"update organizations set {ajuste} where id = %s", org)
+                    r = {n: PEDIDOS[n](c, ref, sesion, cliente) for n in orden}
+                    soltar(c)
+                    estado, delante = h.sql("select billing_status, trial_ends_at > now() from organizations where id = %s", org)[0]
+                    bien = r["renovación"].status_code != 200 or (estado == "active" and delante)
+                    malas += not bien
+                    print(f"{' → '.join(orden)} | {rotulo} | renovación {r['renovación'].status_code}, guardado "
+                          f"{r['guardado'].status_code} | {estado}, {'por delante' if delante else 'vencido'} | {'ok' if bien else 'MAL'}", flush=True)
+    print(f"series mal: {malas}/{4 * N}")
+    return 1 if malas else 0
+
+
+if __name__ == "__main__":
+    sys.exit(correr(main))
+```
+
+</details>
