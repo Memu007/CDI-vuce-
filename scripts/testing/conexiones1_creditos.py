@@ -14,10 +14,12 @@ vencimiento. Mercado Pago es simulado.
 
 uso: scripts/testing/con_pg16.sh python scripts/testing/conexiones1_creditos.py
 Sale 0 si no se pierde nada, 1 si se pierde una recarga, 2 si la medición no
-vale (un pedido no dio lo esperado) y 3 si la carrera no se armó.
+vale (un pedido no dio lo esperado, o quedan más créditos que los pagos) y 4
+si la carrera no se armó (3 lo usa con_pg16.sh cuando Postgres no arranca).
 """
 import inspect
 import os
+from contextlib import closing
 import sys
 import time
 import uuid
@@ -27,7 +29,8 @@ from urllib.parse import urlparse
 
 URL = os.environ.get("BACKUP1A_PG_URL", "")
 if urlparse(URL).hostname not in ("127.0.0.1", "localhost"):
-    sys.exit("uso: scripts/testing/con_pg16.sh python scripts/testing/conexiones1_creditos.py")
+    print("uso: scripts/testing/con_pg16.sh python scripts/testing/conexiones1_creditos.py", file=sys.stderr)
+    sys.exit(2)
 
 os.environ.update(
     DATABASE_URL=URL, ENVIRONMENT="testing", EMAIL_VERIFICATION_REQUIRED="false",
@@ -72,14 +75,21 @@ class Invalida(Exception):
 
 
 def sql(consulta, *args):
-    with psycopg2.connect(URL) as con, con.cursor() as cur:
+    with closing(psycopg2.connect(URL)) as con, con, con.cursor() as cur:
         cur.execute(consulta, args)
         return cur.fetchall() if cur.description else None
 
 
-def esperando():
-    return [q for (q,) in sql("""select query from pg_stat_activity
-                                  where datname = current_database() and wait_event_type = 'Lock'""")]
+def esperando(candado):
+    """Consultas que esperan, directa o encadenadamente, a la fila que tiene el arnés."""
+    filas = sql("select pid, query, pg_blocking_pids(pid) from pg_stat_activity "
+                "where datname = current_database() and wait_event_type = 'Lock'")
+    trabados = {candado}
+    while True:
+        nuevos = {pid for pid, _, bloquean in filas if pid not in trabados and trabados & set(bloquean)}
+        if not nuevos:
+            return [q for pid, q, _ in filas if pid in trabados]
+        trabados |= nuevos
 
 
 def hasta(condicion):
@@ -153,29 +163,30 @@ def fase_control(c, de_org):
 def fase_carrera(c, de_org):
     sesion, cliente, ref, cuenta = preparar(c, de_org)
     tabla, clave, valor = cuenta
-    candado = psycopg2.connect(URL)
-    try:
-        with candado.cursor() as cur:
-            cur.execute(f"select 1 from {tabla} where {clave} = %s for update", (valor,))
-        with ThreadPoolExecutor(2) as hilos:
+    # El candado se suelta antes de cerrar el pool: si no, el pool espera a la
+    # recarga y la recarga espera al candado.
+    with ThreadPoolExecutor(2) as hilos, closing(psycopg2.connect(URL)) as candado:
+        try:
+            with candado.cursor() as cur:
+                cur.execute(f"select 1 from {tabla} where {clave} = %s for update", (valor,))
+                cur.execute("select pg_backend_pid()")
+                mio = cur.fetchone()[0]
             aviso = hilos.submit(recargar, c, ref)
-            if not hasta(lambda: len(esperando()) >= 1):
+            if not hasta(lambda: len(esperando(mio)) >= 1):
                 raise Invalida("carrera: la recarga no llegó a esperar el candado")
             pedido = hilos.submit(alta, c, sesion, cliente)
-            if not hasta(lambda: len(esperando()) >= 2):
+            if not hasta(lambda: len(esperando(mio)) >= 2):
                 raise Invalida(f"carrera: el alta no llegó a esperar (terminó: {pedido.done()})")
-            consultas = [" ".join(q.split())[:90] for q in esperando()]
+            consultas = [" ".join(q.split())[:90] for q in esperando(mio)]
+        finally:
             candado.rollback()
-            pid, r_aviso = aviso.result(PLAZO)
-            return pid, r_aviso, pedido.result(PLAZO), consultas, cuenta
-    finally:
-        candado.rollback()
-        candado.close()
+        pid, r_aviso = aviso.result(PLAZO)
+        return pid, r_aviso, pedido.result(PLAZO), consultas, cuenta
 
 
 def arbol():
     fuente = inspect.getsource(main_mod.require_active_billing)
-    return (f"{main_mod.__file__}; require_active_billing con commit: {'db.commit()' in fuente}; "
+    return (f"{main_mod.__file__}; db.commit() escrito en require_active_billing: {'db.commit()' in fuente}; "
             f"_leer_cuerpo: {hasattr(main_mod, '_leer_cuerpo')}")
 
 
@@ -189,23 +200,26 @@ def main():
                 try:
                     pid, r_aviso, r_alta, consultas, (tabla, clave, valor) = fase(c, de_org)
                     validar(pid, r_aviso, r_alta)
-                except Invalida as e:
-                    carrera = str(e).startswith("carrera:")
+                except Exception as e:  # cualquier falla de la fase la invalida; no es pérdida
+                    carrera = isinstance(e, Invalida) and str(e).startswith("carrera:")
                     sin_carrera += carrera
                     invalidas += not carrera
-                    print(f"NO VALE | {que}: {e}")
+                    print(f"NO VALE | {que}: {type(e).__name__}: {e}")
                     continue
-                quedan, vence = sql(f"select coalesce(extra_ops_remaining, 0), extra_ops_expires_at "
-                                    f"from {tabla} where {clave} = %s", valor)[0]
-                perdio = max(RECARGA - quedan, 0)
-                ok = quedan == RECARGA and vence is not None
-                perdidas += not ok
-                print(f"{'OK   ' if ok else 'PIERDE'} | {que}: quedan {quedan} de {RECARGA} pagos "
-                      f"(perdidos {perdio}), vencimiento {'sí' if vence else 'no'}")
+                quedan, vigente = sql(f"select coalesce(extra_ops_remaining, 0), "
+                                      f"coalesce(extra_ops_expires_at > now(), false) "
+                                      f"from {tabla} where {clave} = %s", valor)[0]
+                pierde = quedan < RECARGA or not vigente
+                sobra = quedan > RECARGA
+                perdidas += pierde
+                invalidas += sobra and not pierde
+                marca = "PIERDE" if pierde else "SOBRA " if sobra else "OK    "
+                print(f"{marca} | {que}: quedan {quedan} de {RECARGA} pagos "
+                      f"(perdidos {max(RECARGA - quedan, 0)}), vencimiento futuro {'sí' if vigente else 'no'}")
                 for q in consultas:
                     print(f"        esperaba: {q}")
     print(f"pierden: {perdidas}; no valen: {invalidas}; sin carrera: {sin_carrera}")
-    return 1 if perdidas else 2 if invalidas else 3 if sin_carrera else 0
+    return 1 if perdidas else 2 if invalidas else 4 if sin_carrera else 0
 
 
 if __name__ == "__main__":
