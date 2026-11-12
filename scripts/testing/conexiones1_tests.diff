@@ -1,0 +1,266 @@
+diff --git a/tests/test_conexiones1.py b/tests/test_conexiones1.py
+new file mode 100644
+index 00000000..99caa2d3
+--- /dev/null
++++ b/tests/test_conexiones1.py
+@@ -0,0 +1,260 @@
++"""Las rutas lentas de RUTAS no retienen una conexión a la base mientras esperan.
++
++Cada ruta se frena en su punto lento (la IA, el lector de PDF, la lectura del
++Excel, el cuerpo del pedido) y ahí se cuentan las conexiones que tiene tomadas
++el pedido. Con el pool de producción, cada una tomada ahí es un lugar menos
++para las otras cuentas mientras dura la espera.
++"""
++import asyncio
++import io
++import uuid
++
++import aiosqlite
++import pytest
++from fastapi.testclient import TestClient
++from pypdf import PdfWriter
++from sqlalchemy import event, func, select, update
++from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
++from sqlalchemy.pool import AsyncAdaptedQueuePool
++from starlette.requests import Request
++
++from proyecto_maria import main
++from proyecto_maria.core import rate_limit
++from proyecto_maria.database import connection as _conn
++from proyecto_maria.database.models import SystemBackup, User
++from proyecto_maria.services import migration_service
++
++CLAVE = "Clave-Segura-123"
++
++
++def _pdf():
++    escritor, salida = PdfWriter(), io.BytesIO()
++    escritor.add_blank_page(100, 100)
++    escritor.write(salida)
++    return salida.getvalue()
++
++
++@pytest.fixture
++def tomadas():
++    """Cuántas conexiones hay tomadas ahora, sin las del registro de métricas,
++    que corre en su propia tarea."""
++    duenas = {}
++
++    def al_tomar(_dbapi, registro, _proxy):
++        try:
++            duenas[id(registro)] = asyncio.current_task()
++        except RuntimeError:
++            duenas[id(registro)] = None
++
++    def al_devolver(_dbapi, registro):
++        duenas.pop(id(registro), None)
++
++    motor = _conn.engine.sync_engine
++    event.listen(motor, "checkout", al_tomar)
++    event.listen(motor, "checkin", al_devolver)
++    yield lambda: sum(1 for t in duenas.values()
++                      if t is None or "log_request_background" not in t.get_coro().__qualname__)
++    event.remove(motor, "checkout", al_tomar)
++    event.remove(motor, "checkin", al_devolver)
++
++
++def _sesion(monkeypatch):
++    monkeypatch.setattr(rate_limit.limiter, "enabled", False)
++    # Un 500 vuelve como respuesta y no como excepción del cliente de prueba.
++    c = TestClient(main.app, raise_server_exceptions=False)
++    nombre = f"conex1_{uuid.uuid4().hex[:10]}"
++    r = c.post("/auth/register", json={"username": nombre, "password": CLAVE, "name": nombre,
++                                       "email": f"{nombre}@cdi.test"})
++    assert r.status_code in (200, 201), r.text
++    r = c.post("/auth/login", json={"username": nombre, "password": CLAVE})
++    assert r.status_code == 200, r.text
++    return c, nombre
++
++
++def _lector_falso(*_a, **_k):
++    raise main.DocumentoNoAdmitido("lector falso")
++
++
++def _cortar_a_mitad(pedido):
++    """El cliente manda parte del cuerpo y se desconecta."""
++    mensajes = iter([{"type": "http.request", "body": b'{"client_id": "9', "more_body": True},
++                     {"type": "http.disconnect"}])
++
++    async def recibir():
++        return next(mensajes)
++    pedido._receive = recibir
++
++
++# (punto lento, dónde está, qué hace en lugar de esperar, pedido, código esperado)
++RUTAS = [
++    ("_suggest_ncm_with_gemini", main, lambda *_a, **_k: [],
++     ("/api/ncm/sugerir", {"json": {"descripcion": "notebook de 14 pulgadas"}}), 200),
++    ("process_pdf", main, _lector_falso,
++     ("/upload_pdf/public", {"files": {"file": ("a.pdf", _pdf(), "application/pdf")}}), 422),
++    ("_read_sheets", migration_service, None,
++     ("/api/migrations/analyze",
++      {"files": {"file": ("clientes.csv", b"cuit,nombre\n20123456786,Cliente Uno\n", "text/csv")}}), 200),
++    ("body", Request, None,
++     ("/api/operations/manual", {"json": {"client_id": "999999999", "items": [
++         {"descripcion": "notebook", "cantidad": 1, "valor_unitario": 10}]}}), 404),
++    ("body", Request, _cortar_a_mitad,
++     ("/api/operations/manual", {"json": {"client_id": "999999999", "items": []}}), 400),
++]
++
++
++@pytest.mark.parametrize("punto, modulo, reemplazo, pedido, codigo", RUTAS,
++                         ids=[f"{r[0]}-{r[4]}" for r in RUTAS])
++def test_la_espera_no_retiene_conexiones(monkeypatch, tomadas, punto, modulo, reemplazo, pedido, codigo):
++    c, _ = _sesion(monkeypatch)
++    vistas = []
++    original = getattr(modulo, punto)
++    if modulo is Request:
++        async def frenar(self):
++            if not hasattr(self, "_body"):
++                vistas.append(tomadas())
++                if reemplazo:
++                    reemplazo(self)
++            return await original(self)
++    else:
++        def frenar(*a, **k):
++            vistas.append(tomadas())
++            return (reemplazo or original)(*a, **k)
++    monkeypatch.setattr(modulo, punto, frenar)
++    monkeypatch.setattr(main, "lectura_automatica_disponible", lambda: True)
++    ruta, datos = pedido
++    with c:
++        r = c.post(ruta, **datos)
++    assert r.status_code == codigo, r.text
++    assert vistas and max(vistas) == 0, f"conexiones tomadas en {punto}: {vistas}"
++
++
++def _impaga(nombre):
++    async def guardar():
++        async with _conn.AsyncSessionLocal() as db:
++            await db.execute(update(User).where(User.username == nombre).values(billing_status="past_due"))
++            await db.commit()
++    asyncio.run(guardar())
++
++
++def _sin_cuota(monkeypatch):
++    def gastar(c):
++        assert c.post("/api/operations/manual", json=MANUAL).status_code == 404
++    monkeypatch.setattr(rate_limit.settings, "rate_limit_basic", "1/minute")
++    monkeypatch.setattr(rate_limit.limiter, "enabled", True)
++    return gastar
++
++
++MANUAL = {"client_id": "999999999", "items": [{"descripcion": "notebook", "cantidad": 1, "valor_unitario": 10}]}
++# (cuenta, cómo queda sin poder cargar, código con el cuerpo completo)
++CUENTAS = [
++    ("impaga", lambda nombre, _mp: _impaga(nombre), 402),
++    ("sin cuota", lambda _nombre, mp: _sin_cuota(mp), 429),
++]
++
++
++def test_cuenta_que_no_puede_cargar_y_corta_el_cuerpo(monkeypatch, tomadas):
++    """El corte se contesta antes que el plan o la cuota, sin tomar conexión."""
++    leer, vieron = Request.body, []
++    for cuenta, preparar, codigo in CUENTAS:
++        with monkeypatch.context() as mp:
++            c, nombre = _sesion(mp)
++            gastar = preparar(nombre, mp)
++            vistas = []
++            # Un corte por pedido, en orden: gastar la cuota, el cortado, el completo.
++            cortes = ([False] if gastar else []) + [True, False]
++
++            async def frenar(self):
++                if not hasattr(self, "_body"):
++                    vistas.append(tomadas())
++                    if cortes.pop(0):
++                        _cortar_a_mitad(self)
++                return await leer(self)
++            mp.setattr(Request, "body", frenar)
++            try:
++                with c:
++                    if gastar:
++                        gastar(c)
++                    cortado = c.post("/api/operations/manual", json=MANUAL)
++                    completo = c.post("/api/operations/manual", json=MANUAL)
++            finally:
++                rate_limit.limiter.reset()
++        vieron.append((cuenta, cortado.status_code, completo.status_code, max(vistas, default="sin leer")))
++    assert vieron == [(cuenta, 400, codigo, 0) for cuenta, _p, codigo in CUENTAS]
++
++
++def _respaldos(nombre):
++    async def contar():
++        async with AsyncSession(_conn.engine) as db:
++            return await db.scalar(select(func.count()).select_from(SystemBackup)
++                                   .where(SystemBackup.owner_username == nombre))
++    return asyncio.run(contar())
++
++
++def test_analyze_con_el_pool_lleno_no_deja_nada_a_medias(monkeypatch):
++    """Si otra cuenta toma todas las conexiones mientras se lee el Excel, el
++    respaldo no se guarda y contesta 500; si las toma recién después de
++    guardarlo, contesta 200. Nunca un 500 con el respaldo guardado."""
++    c, nombre = _sesion(monkeypatch)
++    leer, guardar = migration_service.analyze_migration_file_async, AsyncSession.commit
++    archivo = {"file": ("clientes.csv", b"cuit,nombre\n20123456786,Cliente Uno\n", "text/csv")}
++    estado = {}
++
++    async def llenar(momento):
++        if estado["momento"] == momento and not estado["otras"]:
++            motor = estado["motor"]
++            while motor.pool.checkedout() < motor.pool.size():
++                estado["otras"].append(await motor.connect())
++
++    async def leer_y_llenar(*a, **k):
++        estado["leido"] = True
++        await llenar("al leer")
++        return await leer(*a, **k)
++
++    async def guardar_y_llenar(self, *a, **k):
++        await guardar(self, *a, **k)
++        if estado["leido"]:
++            await llenar("al guardar")
++
++    monkeypatch.setattr(migration_service, "analyze_migration_file_async", leer_y_llenar)
++    monkeypatch.setattr(AsyncSession, "commit", guardar_y_llenar)
++    vieron = []
++    for momento in ("al leer", "al guardar"):
++        # pool_timeout=0 no sirve: wait_for(…, 0) corta aunque haya una conexión libre.
++        motor = create_async_engine(_conn.DATABASE_URL, poolclass=AsyncAdaptedQueuePool,
++                                    pool_size=5, max_overflow=0, pool_timeout=0.05)
++        estado.update(momento=momento, motor=motor, otras=[], leido=False)
++        antes = _respaldos(nombre)
++        _conn.AsyncSessionLocal.configure(bind=motor)
++        try:
++            with c:
++                lleno = c.post("/api/migrations/analyze", files=archivo)
++                quedaron = _respaldos(nombre) - antes
++                for otra in estado["otras"]:
++                    c.portal.call(otra.close)
++                libre = c.post("/api/migrations/analyze", files=archivo)
++                c.portal.call(motor.dispose)
++        finally:
++            _conn.AsyncSessionLocal.configure(bind=_conn.engine)
++        vieron.append((momento, lleno.status_code, lleno.json().get("detail", "").split(".")[0],
++                       quedaron, libre.status_code, _respaldos(nombre) - antes))
++    assert vieron == [("al leer", 500, "No pudimos procesar tu solicitud", 0, 200, 1),
++                      ("al guardar", 200, "", 1, 200, 2)]
++
++
++def test_ncm_con_la_base_caida_al_soltarla_sigue_sugiriendo(monkeypatch):
++    """Si la conexión se cae después de la última lectura, soltarla antes de
++    la IA no corta el pedido: se sugiere con lo que ya se leyó."""
++    c, _ = _sesion(monkeypatch)
++    mirar = main._looks_like_ncm_code_query
++
++    def caer_y_mirar(descripcion):
++        async def caida(*a, **k):
++            raise RuntimeError("conexión caída")
++        monkeypatch.setattr(aiosqlite.Connection, "commit", caida)
++        monkeypatch.setattr(aiosqlite.Connection, "rollback", caida)
++        return mirar(descripcion)
++    monkeypatch.setattr(main, "_looks_like_ncm_code_query", caer_y_mirar)
++    monkeypatch.setattr(main, "_suggest_ncm_with_gemini",
++                        lambda *a, **k: [{"ncm": "8471.30.12", "desc": "notebook", "source": "ia"}])
++    r = c.post("/api/ncm/sugerir", json={"descripcion": "notebook de 14 pulgadas"})
++    assert (r.status_code, [s["ncm"] for s in r.json().get("sugerencias", [])]) == (200, ["8471.30.12"])
