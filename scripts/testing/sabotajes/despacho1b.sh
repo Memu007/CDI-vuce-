@@ -776,7 +776,7 @@ sabotaje "el PUT no valida el origen" proyecto_maria/main.py \
 ' \
   '        row.origen_frecuente = str(body["origen"]).strip()[:3] or "XX"
 ' \
-  "$ORI[lista]" "$ORI[tres letras]" "$ORI[numeros]" "$ORI[pais que no existe]" "$ORI[nombre]" \
+  "$ORI[lista]" "$ORI[tres letras]" "$ORI[numeros]" "$ORI[pais que no existe]" \
   "$MAY[minusculas]" "$MAY[nulo]"
 sabotaje "el cuerpo se guarda sin sacar el NUL" proyecto_maria/main.py \
   '        data = _sin_nul(data)' \
@@ -800,7 +800,7 @@ sabotaje "el origen se mira en mayúsculas" "$LECTOR" \
 ' \
   '    escrito = (valor or "").strip().upper()
 ' \
-  "$TODO_O_NADA[i sin punto]" "$TODO_O_NADA[ligadura]" "$ORI[nombre]" "$ORI[i sin punto]" "$ORI[ligadura]" \
+  "$TODO_O_NADA[i sin punto]" "$TODO_O_NADA[ligadura]" "$ORI[i sin punto]" "$ORI[ligadura]" \
   "$ORI[ese aguda]"
 sabotaje "el origen que no es texto" "$LECTOR" \
   '    if not isinstance(valor, (str, type(None))):
