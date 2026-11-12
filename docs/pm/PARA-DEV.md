@@ -25,24 +25,33 @@ Integré `32b1161c`. Acta `REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección K.
 - **Una línea:** tu sesión mencionó un `tests/test_conexiones1.py` sin
   subir. ¿Qué es? Si es descartable, borralo; si no, decímelo.
 
-## Tarea activa (2026-11-12 13:43 UTC): D169 de MARIA y limpieza de CONEXIONES-1, sólo arnés
+## D169: aceptada sobre `117c1d16` e integrada (2026-11-12 13:47 UTC)
 
-**Primero traé mi rama con `merge`:** trae el arreglo de
-`pantalla_sesion1.js` de MARIA, que tu rama no tiene. No toques ese archivo.
+Integré `027f5257`. **Tenías razón con la puerta:** la escribí contra un
+HEAD que no tenía el arreglo de MARIA. Ya integré su D149, así que mi rama
+lo trae. Con tu `foco_perfil.sh`: `832bf74` da `PIERDE` (rc=1); `48195cfe` y
+mi rama con las dos entregas (`57faa844`) dan `NO PIERDE` (rc=0). Línea en
+el acta de D149.
 
-1. **D169:** sumá a `CASOS` de `scripts/testing/foco_perfil.sh`
-   `"scripts/testing/pantalla_sesion1.js·#pfEmail"`. Puerta: con ese caso,
-   `PIERDE` sobre `832bf74` y `NO PIERDE` sobre `48195cfe` y sobre tu HEAD
-   después del `merge`.
-2. **Limpieza de `COLA-LIMPIEZA.md`, entradas de CONEXIONES-1:** el SQL de
-   «créditos al día» está en `conexiones1_natural.py` (`CREDITOS`) y en
-   `conexiones1_pares.py`: que quede en un solo lugar. Y `_instalar` de
-   `conexiones1_sonda.py` (96 líneas) partida. Puerta: los casos que usan
-   esos archivos dan lo mismo que antes (decís cuáles corriste y con qué N),
-   `chequeo-6` con producto +0/−0. Me decís qué entradas de la cola
-   cerraste y las saco yo.
+## Tarea activa (2026-11-12 13:47 UTC): limpieza de CONEXIONES-1, sólo arnés
 
-Un informe para las dos en `PARA-PM.md`.
+**Primero traé mi rama con `merge`** (trae el arreglo de
+`pantalla_sesion1.js` de MARIA; no lo toques).
+
+Dos entradas de `COLA-LIMPIEZA.md`:
+
+1. **El SQL de «créditos al día»** está en `conexiones1_natural.py`
+   (`CREDITOS`) y en `conexiones1_pares.py`: que quede en un solo lugar.
+   Puerta: natural y pares con N chico (vos decís cuál). Como son carreras,
+   no pido los mismos números: pido que las filas «al día» sigan en 0
+   perdidas y 0 mal, y que «recarga + alta, vencidos» siga mostrando
+   D188.
+2. **`_instalar` de `conexiones1_sonda.py`** (96 líneas) partida. Puerta:
+   un rojo conocido de la sonda después de partirla (uno que ya daba
+   antes), no sólo un verde igual. Decís cuál y lo mostrás.
+
+`chequeo-6` con producto +0/−0. Me decís qué entradas cerraste y las saco
+yo. Un informe en `PARA-PM.md`.
 
 **Si Emi dice que sí a D182 o a D206 (a) mientras tanto,** dejás esto donde
 esté, lo decís en el informe y arrancás esa pieza. La pieza de D206 (a),

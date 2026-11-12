@@ -84,3 +84,12 @@ cuando vuelve a tocar el guion.
 - La advertencia de aiosqlite ensucia la salida de pytest; no rompe nada hoy.
 - Hipótesis de la revisión sobre el `finally` de `_tope_de_cpu`: es producto
   y sería una pieza aparte; no reproducida.
+
+## D169 (la Técnica, 2026-11-12 13:47 UTC)
+
+`foco_perfil.sh` de `117c1d16` (informe `027f5257`), con el caso
+`pantalla_sesion1.js·#pfEmail`: `832bf74` `PIERDE` («lo escrito cayó en «Mi
+CUIT»», rc=1); `48195cfe` y `57faa844` (mi rama con D149 y K) `NO PIERDE`,
+rc=0. Los dos casos de `pantalla_estudio1` dan `NO PIERDE` en los tres. La
+Técnica marcó que mi puerta original («`NO PIERDE` sobre HEAD») no se podía
+cumplir antes de integrar D149: tenía razón.
