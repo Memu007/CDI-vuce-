@@ -3,31 +3,48 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Vuelta de D191: aceptada sobre `4723280` e integrada (2026-11-12 16:05 UTC)
+## D194: aceptada sobre `f507763` e integrada (2026-11-12 16:50 UTC)
 
-Acta: `REPRODUCCION-D191-2026-11-12.md`, sección «Vuelta».
+Acta: `REPRODUCCION-D194-2026-11-12.md`.
 
-**Lo reproducido sobre `4723280`:**
-- `sabotaje_maria9.sh` de esa cabeza, entero: 29 `ROJO`, «OK: los 29…»,
-  sale 0.
-- El archivo de la prueba da 27 passed.
-- `chequeo-6`: producto +0/−0, 0 avisos.
-- Con la mutación del 9, caen la prueba renombrada y
-  `…los_renglones_con_propio_generan[]`, igual que tu tabla.
-- Tu mutación de `"sufijo": None` en `_items_con_procedencia` deja roja sólo
-  la renombrada: 1 failed, 26 passed.
-- Mi negativo saca el sufijo a todo renglón sin procedencia propia y deja 3
-  rojos, entre ellos la renombrada.
+**Lo reproducido:**
+- `anclas_perdidas.py` sobre `f507763` da 18 anclas de una línea perdidas en
+  8 guiones; sobre `3ff4e77` da 28 en 9. Las dos cuentas coinciden con tu
+  informe.
+- Tus pruebas: 27 passed. `chequeo-6`: producto +0/−0, 0 avisos.
+- Mis dos negativos movieron la cuenta en los dos sentidos:
+  - saqué un ancla y subió a 19;
+  - repuse una y dupliqué otra, y bajó a 17 con «otra cantidad (está 2)».
+- `sabotaje_maria7.sh` corrido: frena en `PATRON NO ENCONTRADO` justo en la
+  fila 97, rc=1.
+- Las dos anclas de `doc1` dan 0 y 0, como contaste a mano.
 
-**Tu punto 3: no va a la cola.** Que la prueba sea la única que ve esa
-mutación es justamente la razón para que quede.
+**D195: (a), decidido por la PM.**
+- Los 10 guiones ya están en `herramientas/sabotajes-conocidos.txt`, con
+  dueña vos y salida «reescribirlo».
+- Cada guion es una pieza de arnés aparte.
+- La publicación pendiente toca justo esos archivos, así que (b) sería lo
+  mismo que (a), sólo que más tarde.
 
-**Sigue D194**, como la escribiste: el conteo estático de anclas de una línea
-perdidas en `scripts/testing/sabotaje_*.sh` y `sabotajes/*.sh`, con el
-comando que lo mide, sobre la cabeza de esta rama, sin arreglar ningún
-guion. Las anclas perdidas que encuentres van como dato, no como arreglo.
+**Supuestos:**
+1. La herramienta y sus pruebas quedan.
+2. Las clases extra quedan.
+3. Un archivo que ya no existe cuenta como perdida.
 
-**Tu rango de D: D190 a D199** (la próxima libre es D195).
+**Sigue: re-anclar `sabotaje_maria3.sh`** (7 anclas perdidas). Es sólo
+arnés y el producto queda en +0/−0.
+- Ancla por ancla, mirá si la protección que ataca el sabotaje sigue
+  existiendo en el código de hoy:
+  - si sigue, re-anclalo al texto de hoy;
+  - si no, ese sabotaje no se toca y va como D que propone retirarlo.
+- Puerta: el guion entero sobre la cabeza da todos `ROJO` y sale 0, y
+  `anclas_perdidas.py` no da ninguna fila perdida para ese guion.
+- Al entregar, sacá su línea de `sabotajes-conocidos.txt` (o dejala, si
+  queda algún sabotaje esperando el D de retirarlo).
+- Después siguen `catalogo_largo2` y los demás, uno por pieza.
+- Si en el medio te llega la tarea de comparación, va primero.
+
+**Tu rango de D: D190 a D199** (la próxima libre es D196).
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
