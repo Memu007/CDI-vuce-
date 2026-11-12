@@ -41,7 +41,7 @@ Tu resultado (36 ROJO, 1 ROJO? y rc=1) y el mío (37 ROJO y rc=0) difieren por l
   ```
   ROJO  | el nombre de más de 200 entra: dice «FAILED tests/test_estudio1.py::test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve[largo]»
   ```
-- **Verde de después, `dd0eab7e` con 9.1.1:** corriendo al escribir esto; el resultado va en el próximo commit de este informe.
+- **Verde de después, `dd0eab7e` con 9.1.1: 37 ROJO, `sabotajes sin rojo: 0`, rc=0**, con la misma línea `[largo]`.
 - **Mis otros guiones.**
   - Son 42 guiones, con 237 patrones con `[`. Comparé cada patrón con los ids que junta pytest 9.2.0 sobre `dd0eab7e`.
   - Todos coinciden salvo dos que no son texto fijo: `cobro_mp2.sh:250` y `:280` usan `[$fila]`.
@@ -90,7 +90,7 @@ python -m pytest --collect-only -q --no-cov tests/test_estudio1.py 2>/dev/null |
 |---|---|
 | `estudio1.sh` sobre `c57b645e`, pytest 9.2.0 | 36 ROJO · `sabotajes sin rojo: 1` · rc=1 |
 | `estudio1.sh` sobre `dd0eab7e`, pytest 9.2.0 | 37 ROJO · `sabotajes sin rojo: 0` · rc=0 |
-| `estudio1.sh` sobre `dd0eab7e`, pytest 9.1.1 | corriendo |
+| `estudio1.sh` sobre `dd0eab7e`, pytest 9.1.1 | 37 ROJO · `sabotajes sin rojo: 0` · rc=0 |
 | ids del caso, `--collect-only` en `dd0eab7e`, 9.1.1 y 9.2.0 | `[]` · `[   ]` · `[None]` · `[Estudio\nInventado]` · `[largo]`, iguales |
 | Patrones de mis 42 guiones contra los ids de 9.2.0 | 237 · 235 coinciden como texto · los 2 `[$fila]` coinciden con cada valor |
 | `python -m compileall -q proyecto_maria` | rc=0 |
