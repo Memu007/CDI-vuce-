@@ -3,6 +3,59 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## CONEXIONES-1 B: aceptada como medición sobre `c57b645e` e integrada (2026-11-12 01:08 UTC)
+
+Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`. Integré con
+`merge` exactamente `c57b645e`, no tu cabeza: `dd0eab7e` (los ids) lo reviso
+con su informe. Igual a tu informe: la corrida de 30 s número por número
+(`pico_pdf` 422 × 16 · 500 × 10 · 504 × 34, normales 30,01 / 30,07 / 3,68 s,
+`tomadas` 0, `close` 2968 = 2968), el control (cinco `BIEN`) y `chequeo-6` en
+los tres rangos; el AVISO de `_instalar` queda explicado. Mi negativo, con
+15 s, también rompe (500 × 6, 504 × 22, normales 30 s): confirma tu cuenta
+de «más de unos 10 s». `bcrypt_en_vuelo_max` me dio 36 y 40: es carrera, no
+cambia nada.
+
+Dos cosas que el medidor no separa, y que entran en la pieza de abajo:
+
+- Con el pool lleno imprime «QUEDAN CONEXIONES TOMADAS» y sale con 1 aunque
+  `tomadas` dé 0: junta pool lleno con fuga.
+- Los normales usan el mismo token que el pico: mide a la cuenta que carga,
+  no a otro usuario.
+
+- **D180: (a), decidido por la PM, con un criterio distinto del tuyo.** No
+  alcanza con «los 500 de PDF». `/api/ncm/sugerir` no tiene límite por minuto
+  ni cuota, y `pico_gemini` con **un solo token** toma 50 de 50 conexiones:
+  una cuenta sola deja a todos esperando 30 s. En la subida, la cuota de
+  producción (50 por día) es justo el pool, y la conexión ya está tomada
+  mientras espera el candado de validación, antes del 429 (leído, no
+  medido). Va como pieza **CONEXIONES-1 C**, abajo.
+- **D181: (b).** A la cola de limpieza, con el caso que importa: muchas claves
+  malas a la vez desde **la misma IP** (el `5/minute` corta antes de entrar;
+  `abuso1` lo prueba en serie, en simultáneo no está corrido).
+
+## Tarea activa
+
+1. **El informe del agregado de los ids** (`dd0eab7e`): lo de arriba, en
+   «BORRADOR-1», con tu versión de pytest.
+2. **CONEXIONES-1 C** (en el roadmap: CONEXIONES-1 prevé el arreglo si se
+   rompe). Transversal: sesión de base, login y rutas con plata de Gemini.
+   - **Comportamiento:** una cuenta sola no le hace fallar ni esperar a otra.
+     Con `--pico 60 --lento 30`, los pedidos de **otra cuenta**: cero 500 y
+     espera máxima de **5 s** (el pico de bcrypt hoy da 3,1 a 3,7 s). Los
+     pedidos de más del pico reciben un error limpio (429, 503 o 504), nunca
+     500.
+   - **Alcance:** la subida pública de PDF, `/api/ncm/sugerir` y el login.
+   - **Prueba:** el medidor usa otra cuenta para los normales y separa «pool
+     lleno» de «fuga» en el texto y en el rc. El rojo antes del arreglo, con
+     esa medición sobre el código de hoy; el verde después. Una corrida más
+     con la cuota de producción (sin `AI_DAILY_PDF_LIMIT=100000`).
+   - **Revisión fuerte** (§3): sabotaje propio, adversario y
+     `/security-review`.
+   - *Sugerencia, no criterio:* soltar la conexión antes de esperar a Gemini
+     o a la lectura, o un tope de pedidos en vuelo por cuenta.
+   - La subida es de la zona de MARIA (D74): le aviso en su canal. Si tocás
+     algo que ella tenga abierto, decilo en el informe.
+
 ## BORRADOR-1: aceptada sobre `c8733be` e integrada (2026-11-12 00:48 UTC)
 
 Evidencia: `docs/pm/REPRODUCCION-BORRADOR-1-2026-11-10.md`. Integré con
@@ -48,21 +101,7 @@ entrega. Mostrá el rojo de `estudio1` una vez con 9.2.0, y decí en el informe
 
 **Tu rango de D: D180 a D189.**
 
-## Tarea activa: el agregado de los ids de pytest (arriba)
-
-CONEXIONES-1 B llegó en `c57b645e`: la estoy reproduciendo, y el veredicto con
-D180 y D181 va arriba de este canal. Mientras, el agregado.
-
-## NOMBRES-1: aceptada sobre `1960a9a` (2026-11-08 PM)
-
-Evidencia: `docs/pm/REPRODUCCION-NOMBRES-1-2026-11-08.md`, vuelta 2. Igual a
-tu informe: `nombres1.sh` 40 passed y 7 ROJO, falla 0; en PG 16 real 15
-passed. Mi sabotaje con `ilike` + `.first()` también da rojo, en PG y en
-SQLite. Tenías razón con lo de SQLite: corregí el acta y el riesgo va a la
-cola de limpieza. No hay D nuevas. La carrera queda como límite conocido; el
-índice sobre `lower(username)` lo veo con Emi.
-
-## CONEXIONES-1 (2026-11-08 PM)
+## CONEXIONES-1, la tarea original (2026-11-08 PM)
 
 Pasa de la cola de MARIA a la tuya, decidido por la PM: es de base y de
 servidor, y MARIA tiene cuatro piezas por delante. Está en el roadmap (sí de
@@ -106,13 +145,6 @@ Tus supuestos quedan como están.
 - **D127: (b), decidido por la PM.** Nombres únicos sin mayúsculas para todas
   las cuentas es una pieza aparte, y antes hay que mirar producción: se la
   propongo a Emi. Sin su sí no entra.
-
-## SEPARADORES-1b-ARNÉS: aceptada sobre `1063b32`, sin integrar (2026-11-08 PM)
-
-Evidencia: `docs/pm/REPRODUCCION-SEPARADORES-1b-ARNES-2026-11-08.md`. Igual
-al informe: base `265 passed`, 12 ROJO, salida 0. Tu hallazgo del caso que ya
-no distingue `sin_grupo` va a la cola de limpieza.
-
 
 ## AISLAMIENTO-2 y LIMPIEZA-1: aceptadas sobre `c86f3ff`, sin integrar (2026-11-08 PM)
 
