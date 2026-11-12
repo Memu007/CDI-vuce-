@@ -118,9 +118,9 @@ reemplazar $JS '        op.seguro_calculado = true;
 ' ''
 caso "seguro_sin_marca" "FAILED $T::test_el_boton_del_seguro_pone_el_sugerido_y_pide_las_cuentas_de_nuevo"
 
-# 13. un ajuste mal escrito viaja como texto (daría 422 al generar)
-reemplazar $JS '        return isFinite(n) ? n : null;' '        return isFinite(n) ? n : v;'
-caso "ajuste_texto_al_pedido" "FAILED $T::test_el_pedido_manda_los_ajustes_y_nunca_algo_que_frene_el_txt"
+# 13. un ajuste mal escrito viaja vacío y el servidor no lo puede decir
+reemplazar $JS '        return r.error ? String(v).trim() : r.valor;' '        return r.error ? null : r.valor;'
+caso "ajuste_mal_escrito_vacio" "FAILED $T::test_el_pedido_manda_los_ajustes_y_nunca_algo_que_frene_el_txt"
 
 # 14. el pedido no manda el ajuste a deducir
 reemplazar $JS '            ajustes_deducir: ajusteDelPedido(op.ajustes_deducir),
@@ -128,14 +128,11 @@ reemplazar $JS '            ajustes_deducir: ajusteDelPedido(op.ajustes_deducir)
 caso "pedido_sin_deducir" "FAILED $T::test_el_pedido_manda_los_ajustes_y_nunca_algo_que_frene_el_txt"
 
 # 15. un seguro escrito a mano sigue marcado como calculado
-reemplazar $RV "        if (el.name === 'seguro') delete op.seguro_calculado;
-" ''
+reemplazar $RV '            delete op.seguro_calculado; delete op.seguro_dejado;' '            delete op.seguro_dejado;'
 caso "seguro_a_mano_marcado" "FAILED $T::test_un_seguro_escrito_a_mano_deja_de_ser_el_calculado"
 
 # 16. la base del seguro no sale de BASE_SEGURO_SUGERIDO
-reemplazar $F '}[BASE_SEGURO_SUGERIDO]
-    return {' '}["fob_factura"]
-    return {'
+reemplazar $F '"fob_factura": fob_factura}[BASE_SEGURO_SUGERIDO]' '"fob_factura": fob_factura}["fob_factura"]'
 caso "base_fija_en_la_cuenta" "FAILED $T::test_la_base_del_seguro_se_cambia_en_un_solo_lugar"
 
 # 17. el botón nombra una base fija en vez de la del servidor
@@ -192,11 +189,12 @@ reemplazar $JS '        if (seq !== avisosSeq) return;   // llegó uno más nuev
 caso "respuesta_vieja" "FAILED $T::test_una_respuesta_vieja_no_pisa_las_cuentas_nuevas"
 
 # 29. un número que el campo no entiende no se marca
-reemplazar $JS "input.validity && input.validity.badInput ? 'mal escrito' : input.value" 'input.value'
-caso "bad_input_sin_marca" "FAILED $T::test_un_numero_que_el_campo_no_entiende_queda_marcado_y_a_la_vista"
+reemplazar $JS "        if (ajusteMalEscrito(op.ajustes_incluir)) errores.push('Ajustes a incluir: ' + ajusteMalEscrito(op.ajustes_incluir));
+" ''
+caso "mal_escrito_sin_marca" "FAILED $T::test_un_numero_que_el_campo_no_entiende_queda_marcado_y_a_la_vista"
 
 # 30. con error en las cuentas, el botón pone un seguro igual
-reemplazar $JS '        if (!ultimoValor || ultimoValor.error) return;' '        if (!ultimoValor) return;'
+reemplazar $JS '        if (!ultimoValor || ultimoValor.error || ultimoValor.seguro_en_el_precio) return;' '        if (!ultimoValor || ultimoValor.seguro_en_el_precio) return;'
 caso "seguro_con_error" "FAILED $T::test_con_error_en_las_cuentas_no_se_calcula_el_seguro"
 
 # 31. las cuentas no guardan con qué pedido se hicieron y el botón no hace nada
