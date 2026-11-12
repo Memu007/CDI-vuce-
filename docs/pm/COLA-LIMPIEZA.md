@@ -143,8 +143,10 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `ultima_vez` nula («sin fecha pierde» sólo lo prueba el acta de la PM):
   un caso con la fila sin fecha en los dos órdenes, con su rojo.
 - `proyecto_maria/main.py` login: el límite cuenta después de `verify_password`;
-  cada clave mala paga bcrypt antes del freno. Contar antes, si CONEXIONES-1 B
-  muestra que pesa (D146 b).
+  cada clave mala paga bcrypt antes del freno (D146 b, D181 b). CONEXIONES-1 B:
+  60 claves malas desde 60 IPs no las corta nada; el caso que falta probar es
+  muchas a la vez desde la misma IP (`abuso1` sólo lo prueba en serie).
+- `scripts/testing/conexiones1_sonda.py` `_instalar` (96 líneas): partirla.
 - `proyecto_maria/main.py` `delete_cliente`: la operación queda sin cliente con su
   `generated_file`, y el TXT se sigue bajando (fila 4 del code-review de INTEGRAR-1).
 - `proyecto_maria/main.py` tope de registro: el `or` corta antes y el intento
@@ -167,3 +169,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `tests/test_datos1.py`: un caso con dos operaciones en el cliente que se
   borra; hoy, si `delete_cliente` borra sólo los links de la primera, queda
   verde (A2 del informe de PRESUPUESTO-CLIENTE-1).
+- `scripts/testing/pantalla_destino1.js`: manda la `X-Forwarded-For` pero no
+  mira el status del registro; si falla, sigue sin decir por qué (supuesto de
+  la Técnica en BORRADOR-1).
+- `scripts/testing/pantalla_cliente1.js:27`: la función anónima tiene 297
+  líneas; partirla (AVISO de `chequeo-6` aceptado en BORRADOR-1).

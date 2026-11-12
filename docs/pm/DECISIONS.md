@@ -786,3 +786,18 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   el umbral viejo (144000) compactaba cada ~5 minutos, porque después de
   compactar quedaba en ~150k. Para la rutina de la PM, la alarma de MARIA es
   que compacte seguido, no el tamaño.
+
+## 2026-11-12 01:08 UTC — CONEXIONES-1 B aceptada como medición; D180 (a) y D181 (b) (PM, con el consejero)
+
+- Aceptada sobre `c57b645e` e integrada (merge exacto, sin producto). Acta
+  `REPRODUCCION-CONEXIONES-1-2026-11-12.md`. No se cierra CONEXIONES-1.
+- D180 (a), con criterio propio: no es «los 500 de PDF» sino que una cuenta
+  sola no le haga fallar ni esperar a otra. `/api/ncm/sugerir` no tiene tope y
+  un solo token toma 50 de 50 conexiones (la misma cuenta espera 30 s).
+  CONEXIONES-1 C a la Técnica, **sólo arnés**: medir a otra cuenta (subida
+  pública y sugerir), separar pool lleno de fuga, corrida con la cuota de
+  producción, y el arreglo propuesto sin commitear (como D134). El arreglo de
+  producto es **propuesta a Emi**: la fila del roadmap dice «arreglar sólo si
+  las deja» y no quedan. El login queda afuera: no da rojo.
+- D181 (b): a la cola, con el caso de la misma IP en simultáneo.
+

@@ -83,8 +83,8 @@ sabotaje $M "el uso se anota antes de generar" \
   $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    if estudio is not None:\n        estudio.last_used_at = datetime.now(timezone.utc)\n        await db.commit()\n    if not request.items:' \
   "FAILED $T::test_los_avisos_y_un_txt_que_no_se_genera_no_cuentan_como_uso"
 sabotaje $M "los avisos anotan el uso" \
-  $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    items = _items_con_procedencia(request)\n' \
-  $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    if estudio is not None:\n        estudio.last_used_at = datetime.now(timezone.utc)\n        await db.commit()\n    items = _items_con_procedencia(request)\n' \
+  $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    _textos_como_van_al_txt(request)\n' \
+  $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    if estudio is not None:\n        estudio.last_used_at = datetime.now(timezone.utc)\n        await db.commit()\n    _textos_como_van_al_txt(request)\n' \
   "FAILED $T::test_los_avisos_y_un_txt_que_no_se_genera_no_cuentan_como_uso"
 sabotaje $M "el uso no se anota" \
   '                estudio.last_used_at = datetime.now(timezone.utc)' \
@@ -202,7 +202,7 @@ sabotaje $J "lo elegido pasa a la operación siguiente" \
   "        if (false) {   // otra operación" \
   "FALLA: en la operación siguiente queda lo elegido en la anterior"
 sabotaje $F "generar no espera la lista de estudios" \
-  "        if (CDI.estudios) await CDI.estudios.listo();   // ESTUDIO-1" "" \
+  "        if (CDI.estudios) await CDI.estudios.listo();" "" \
   "FALLA: generar antes de la lista manda estudio_id"
 sabotaje $J "un alta o un borrado no refresca los avisos" \
   "        if (antes !== despues) wrap.dispatchEvent(new Event('change'));" "" \

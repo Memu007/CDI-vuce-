@@ -2,315 +2,265 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## INTEGRAR-1 vuelta 2: todo lo que no se había corrido ya está corrido. Tres ROTO son del merge, con el mismo comportamiento; D145 a D149 las decidís vos
+## CONEXIONES-1 parte B sobre lo integrado (cierra D134). Rojo: con lectores de PDF de 30 s el pool se agota y hay 500. Ninguna corrida termina con conexiones tomadas. Dos D para decidir
 
 | Qué | SHA |
 |---|---|
-| Entrega (este informe) | los commits de este informe, encima de `f9ec94e0` |
-| Merge de INTEGRAR-1 | `b9db0ad3` (^1 `0d829b8a` dev-tecnica, ^2 `4db641b0` dev-maria, base `30533fe4`) |
-| Producto de esta vuelta | `d26d477b`: `main.py` −2. `register` ya no importa `re` |
-| Pruebas y sabotajes de esta vuelta | `e2f923fe` y `2e775aa4` (D140 a), `56756f84`, `f614bafb`, `9b639146`, `6d6efb86`, `ed8d9769`, `1c36ef2a` |
-| Suite completa | `cbbd37b2`, con pypdf 6.21.4: `git diff cbbd37b2 HEAD -- proyecto_maria tests scripts` da vacío |
+| Entrega (este informe) | el commit de este informe, encima de `37c11eb4` |
+| Arnés | `ff2e2aae` (medidor, sonda y control), `9c6f721f` (dos sabotajes de producto en el control), `37c11eb4` (el control corta cada corrida apenas tiene su rojo) |
+| Medición base | `c8733be3` (merge de tu rama). `git diff c8733be3 37c11eb4 -- proyecto_maria Dockerfile requirements.txt` da 0 líneas: es el mismo producto que entrego |
+| Control y mediciones con pico 60 (demora falsa de 2 s, 8 s y 30 s) | `37c11eb4` |
+
+**Producto tocado: ninguno.** `git rev-list --no-merges ff2e2aae^..37c11eb4 --not origin/claude/practical-shannon-szpwkn -- proyecto_maria` da sólo `524a8f00`, `6c2b3383` y `cc8b834b`, que son de BORRADOR-1 (pieza anterior).
 
 **Resultado**
-- Del merge vienen tres ROTO: patrones de arnés que quedaron viejos, con el comportamiento igual. Ningún control se perdió:
-  - `despacho1c`;
-  - `despacho1d`;
-  - uno de `estudio1`.
-- Los demás rojos se reparten así:
-  - previos de MARIA: patrones viejos, 429 del límite de registro y el smoke;
-  - de la base: los arneses de navegador y un patrón mío de `cobro_mp1`;
-  - de entorno: pypdf.
-- Sin resultado completo: un sabotaje de `rendimiento1b` murió por OOM (código 137) y no lo repetí; está en «No corrido».
-
-**Puertas en verde**
-- Suite completa sobre `cbbd37b2`, con pypdf 6.21.4: 5907 passed.
-- Ataques sobre Postgres real: 47 OK, 0 FUGA.
-- D140 (a) hecha.
-
-**Mi pedido**
-- Necesito un rango de D nuevo. Usé de D144 a D149. Revisé que ninguna de esas aparece en `docs/pm` fuera de este canal y de la línea «Próxima D tuya: D144».
-
-`0231eee` de dev-maria sigue fuera del merge, como dice la tarea.
+- **La medición con 30 s de demora termina en rc=1, «QUEDAN CONEXIONES TOMADAS».** En `pico_pdf` (60 subidas públicas de PDF a la vez, lector falso de 30 s) dio 422 × 16 · 500 × 10 · 504 × 34. Las 10 respuestas 500 son «Excepcion no manejada en POST /upload_pdf/public: TimeoutError: QueuePool limit of size 20 overflow 30 reached, connection timed out, timeout 30.00».
+- **Ese rojo es pool agotado, no conexiones perdidas.** El medidor cuenta 'QueuePool limit' en el log como señal de fuga, y por eso sale 1. Pero en todas las fases `quedan` da 0, al final hay 0 tomadas y 20 libres, `close_empezados` = `close_terminados` (2968) y Postgres queda en `{'idle': 20}`. No cambié el medidor.
+- **De dónde sale.** `get_current_user` llama a `sesion_de_la_request`, que consulta el usuario (`auth/dependencies.py:94`) y con eso toma la conexión. La subida la tiene tomada durante toda la lectura del PDF, que tiene 4 hilos (`PDF_READ_WORKERS`). Con 60 subidas, 50 toman las 50 conexiones (20 + 30 de desborde). Las otras 10 esperan su primera conexión más de `pool_timeout` (30 s) y dan 500.
+- **Los números cierran con las constantes.** 10 = 60 − 50. 16 = 4 hilos × 4 tandas de 30 s dentro de `PDF_READ_TIMEOUT_S` (120 s, cuenta también la cola). 34 = 50 − 16, que dan 504 por ese plazo.
+- **Con 8 s de demora, rc=0.** Sin 500, `quedan` 0 en todo, y los normales esperaron hasta 16,2 s.
+- **Ninguna corrida termina con conexiones tomadas, y todo `close()` que empezó terminó.** Probé 401 de seis tipos, normales, mezcla, `/api/ncm/sugerir`, la subida pública de PDF, cuatro tipos de corte en vuelo y picos de bcrypt, Gemini y PDF.
+- **Un `close()` cancelado no lo pude provocar en el producto.** uvicorn no cancela el pedido cuando el cliente corta (hallazgo 6). Forzado a propósito, sí deja la conexión tomada (hallazgo 4), y el medidor lo ve: es el control.
+- **El control da rojo cuando la sesión no se cierra.** Lo probé con dos sabotajes de la sonda (cancelar el `close` a propósito, guardando la sesión o soltándola) y dos del producto (el `finally` de `get_async_session` no cierra, guardando la sesión o soltándola).
+- **No arreglé nada en esta pieza.** La tarea dice «si quedan conexiones tomadas: arreglo». Lo que quedó es el pool lleno de pedidos vivos, no conexiones tomadas después de cerrar. Si eso entra en «quedan» lo decidís en la D180. El producto sigue igual, y el aviso de las pruebas sigue en riesgos.
 
 ## Decisiones
 
-**D144. `despacho1a` da rojo en la BASE**
-- Es la misma causa que D143 (`36aba873`): la llamada a `goTo` que hace el arranque llega tarde y pisa la navegación de la pantalla.
-- Ya tenés tu respuesta en D143 (a) / BORRADOR-1. No hay nada nuevo que decidir. La numero sólo para que quede contestada.
+**D180. Con trabajo lento, el pool se agota y hay 500.**
+- Opciones:
+  - (a) Contarlo como «quedan conexiones tomadas» y hacer una pieza aparte, con su rojo antes. Esa pieza suelta la conexión antes del trabajo lento (lector de PDF, Gemini, bcrypt) o limita cuántos de esos esperan con una conexión tomada. El rojo sale de esta misma medición: `--pico 60 --lento 30`, que hoy da 500 × 10 en `pico_pdf`.
+  - (b) No contarlo así: queda como riesgo anotado y CONEXIONES-1 cierra sin arreglo.
+- Recomiendo (a).
+  - Con 60 subidas a la vez y un lector de 30 s, hay 500 de verdad, para usuarios con sesión válida.
+  - En `pico_pdf`, los pedidos normales esperan 29,97 s. Eso es casi `pool_timeout` (30 s), sobre 12 pedidos normales: están al borde, no a salvo.
+  - La subida pública de PDF es zona de MARIA (D74). Si va (a), vos decidís quién la toma.
+- Datos, todos con pico 60 sobre `37c11eb4`:
 
-**D145. Los arneses de MARIA chocan con el límite de registro (429)**
-- **Qué pasa:**
-  - `orden1` y `orden1b` dan 429 en la BASE;
-  - `org1b` tiene 2 ROJO?, `validacion1` 3 y `estudio1` 9 de 9;
-  - en todos aparece `registro: 429 {"detail":"Demasiados registros desde esta conexión. Intente más tarde."}`.
-- **Por qué:**
-  - el límite es `registro:h:{ip}` (más de 5 por hora) o `registro:d:{ip}` (más de 20 por día), en `main.py:3385`;
-  - todos los sabotajes registran desde 127.0.0.1;
-  - dentro del proceso, conftest y datos1 apagan el limitador; con uvicorn aparte, el arnés no puede hacerlo sin un interruptor en el producto, y ese interruptor no va.
-- **Opciones:**
-  - (a) Que cada sabotaje del arnés mande su propio `X-Forwarded-For`. `get_client_ip` (`core/rate_limit.py:47`) toma la última entrada cuando `TRUSTED_PROXY_HOPS` es 1, que es el valor por defecto. No hay cambio de producto.
-  - (b) Que el arnés reuse una cuenta que ya registró.
-  - (c) Dejar esos 429 como ROJO?.
-- **Recomiendo (a):** es lo más chico, deja el control de producción igual y cada sabotaje vuelve a mostrar su rojo propio.
-- Los arneses son de MARIA: la decisión es a quién se la das.
+| Demora falsa | rc | `pico_pdf` | Espera máxima de un normal en `pico_pdf` |
+|---|---|---|---|
+| 2 s | 0 | 422 × 60 · 200 × 12 | 6,79 s |
+| 8 s | 0 | 422 × 60 · 200 × 12 | 16,2 s |
+| 30 s | 1 | 422 × 16 · 500 × 10 · 504 × 34 · 200 × 12 | 29,97 s |
 
-**D146. El límite de login cuenta después de bcrypt**
-- Viene del code-review de esta vuelta, fila 1.
-- El login entra en `main.py:3197` y `verify_password` corre en `:3238`, antes de sumar al límite.
-- Con una clave mala, cada intento paga bcrypt antes de que el límite lo frene. El costo es de CPU, no de acceso: el límite sigue cortando.
-- **Opciones:**
-  - (a) contar antes de verificar, en una pieza propia con su rojo;
-  - (b) dejarlo y anotarlo en la cola de limpieza.
-- **Recomiendo (b)** hasta que CONEXIONES-1 mida bcrypt bajo carga. Si la medida muestra que pesa, (a).
+  - **Dónde se rompe, calculado y sin correr.** Las 10 que esperan necesitan 10 conexiones libres en menos de 30 s. Con 4 hilos son 3 tandas (ceil(10/4)), así que se rompe con lecturas de más de unos 10 s cuando hay 60 subidas. Con 8 s pasó, porque 3 × 8 = 24 s. No corrí `--lento 15`.
+  - Con un solo worker (el `Dockerfile`), el tope es 50 conexiones. Hacen falta más de 50 pedidos lentos a la vez.
+  - **El pico de Gemini a 30 s no da 500, pero no está a salvo.** Dio 200 × 72 y los normales esperaron 30,12 s. Ahí compiten tres plazos de 30 s: la demora falsa, `NCM_GEMINI_TIMEOUT_S` y `pool_timeout`. El log de toda la corrida tiene 75 «Gemini no contestó a tiempo»: la mayoría de esos 200 son la respuesta vacía del plazo, no una sugerencia. No afirmo que Gemini esté bien.
 
-**D147. `_LIMITE_AVISOS_MP` vive en cada worker**
-- Está en `main.py:11520`, `parse_limite("60/minute")`, y se usa en `:11529` con `limiter.limiter.hit`.
-- Sin `REDIS_URL`, `core/rate_limit.py` usa `MemoryStorage`, uno por worker: con N workers el tope real es N×60.
-- **Opciones:**
-  - (a) dejarlo así y anotar que el tope es por worker;
-  - (b) exigir `REDIS_URL` en producción para este límite.
-- **Recomiendo (a):** el webhook sin firma ya no cambia nada (COBRO-MP-3), así que el tope sólo protege CPU. Si Railway corre con Redis, ni hace falta.
+**D181. D146 con los números de bcrypt.** Pediste mantener D146 en la cola de limpieza hasta tener esta medida.
+- Opciones:
+  - (a) Contar antes de verificar, en una pieza propia.
+  - (b) Dejarlo en la cola de limpieza.
+- Recomiendo (b).
+- Por qué:
+  - 60 claves malas en paralelo para la misma cuenta, cada una desde otra IP, dieron 60 × 401 y ningún 429. El límite va por IP (`login:{ip}`) y por IP y cuenta (`cuenta:{username}:login:{ip}`), así que con IPs distintas ninguno de los dos corta, se cuente antes o después de bcrypt.
+  - La IP que usa el límite la arma el último proxy de confianza (`get_client_ip`, `core/rate_limit.py`). En el medidor la pone el cliente, porque no hay proxy delante. En producción, esto equivale a un atacante con 60 IPs propias, no a alguien que la invente.
+  - Lo que esos 60 sí hacen es tomar el pool: llega a 50 de 50. Los pedidos normales esperaron hasta 3,14 s con la demora de 2 s, 4,05 s con 8 s y 3,65 s con 30 s; bcrypt es el real en las tres, así que la demora falsa no lo toca. Ningún 500.
+  - bcrypt corre en el grupo de hilos de anyio (`run_in_threadpool`). Ese grupo tiene un tope de 40, y lo medí: `bcrypt_en_vuelo_max` dio 40. Los que esperan hilo igual tienen su conexión tomada.
+  - Eso es la D180, no D146. Contar antes no lo cambia.
 
-**D148. `sesion1` es previo de MARIA**
-- Es un arnés de MARIA (SESION-1: `539b55b9`, `ce7cd9dd`, `2e62761c`; los tres están sólo en `4db641b0`). En lab3 sobre `56756f84` dio rc=1 en 1845 s.
-- **Los dos ROTO y el ROJO? son patrones viejos; los controles siguen en el producto:**
-  - ROTO «resetear la clave vuelve a poner active_jti en NULL»: RESET-1 `816eab90` cambió `revocar_sesiones(user)` por `guardar_si_la_clave_sigue(..., active_jti=uuid.uuid4().hex)`.
-  - ROJO? «revocar escribe NULL y resucita las viejas»: es la misma causa.
-  - ROTO «un email mal escrito»: ENTRADAS-1 `5001831f` llevó el chequeo a `_email_valido(raw_email)`.
-- **El VERDE es un hueco del arnés:**
-  - «limpiar abre su propia conexión» da VERDE porque ABUSO-2 `1f0bfb04` cambió `limpiar` por `descontar` en el login, así que el sabotaje apunta a un camino por el que ningún caso pasa.
-  - No medí si otro caso lo ve.
-- Sólo te pido que confirmes la clasificación. Arreglar el arnés le toca a MARIA.
+## Cómo se midió
 
-**D149. Patrones de sabotaje que quedaron viejos**
-- **Qué abarca.** Son dos grupos:
-  - patrones de arneses de MARIA que su propia rama ya había movido;
-  - patrones que el merge dejó equivalentes.
-- **Causa.** En todos los casos el control sigue en el producto y lo que quedó viejo es la línea que busca el sabotaje. La lista está en la tabla de arneses, con la marca «D149».
-- **Opciones:**
-  - (a) que cada dueña ponga al día sus patrones: MARIA los suyos, y yo `cobro_mp1` (g) y los tres que el merge dejó equivalentes;
-  - (b) que se anoten en la cola de limpieza.
-- **Recomiendo (a) para los míos:** son 4 líneas de arnés, y las hago apenas me lo digas.
+Usé gunicorn con las mismas opciones del `Dockerfile` y Postgres 16 descartable (`con_pg16.sh`). La sonda (`conexiones1_sonda.py`) se carga con `-c` y expone por HTTP los contadores del pool y de `close()`.
 
-## D140 (a): hecha
+Las condiciones de la D46:
+- **Sin tiempos fijos.** Cada fase espera hasta que `api_logs` tiene una fila por pedido. La columna `filas` es igual a `env` en todas.
+- **Cortes en vuelo de verdad.** El cliente corta el socket a mitad del pedido, mientras el servidor está en bcrypt, en Gemini o en el lector de PDF, o con el cuerpo a medias. Cada corte da «15 de 15 cortados con el pedido en vuelo».
+- **Gemini sin clave real y sin red.** Hay un Gemini falso que demora `--lento` segundos. El lector de PDF falso demora lo mismo.
+- **bcrypt es el real.**
 
-- `e2f923fe` (prueba): el webhook sin `MP_WEBHOOK_SECRET` queda cerrado también en desarrollo.
-- `2e775aa4` (sabotajes): los sabotajes del webhook siguen al rechazo en cualquier entorno.
-- El producto ya rechazaba así en el merge. En esta pieza no hubo commit de producto.
+Columnas: `máxT` es el máximo de `pool.checkedout()` y `máxPG` el máximo de conexiones en `pg_stat_activity`.
 
-## Arneses
+### Medición base (`c8733be3`, pico 30): «sin conexiones tomadas», rc=0
 
-Están los 56 nombres de la lista «No corrido» de la vuelta 1, más `cobro_mp1` y `cobro_corte1` enteros. Además corrí abuso1, catalogolargo1 y nombres1.
+Las seis fases de 401, `normal`, `mezcla`, `sugerir` y `pdf_sin_lector` dan 0 en `quedan`. Sus códigos en `api_logs` son los esperados: 401 × 40 en cada tipo de 401, 200 × 40, «{401: 72, 200: 12}», 200 × 15 y 503 × 10.
 
-**Dónde corrió cada tanda**
+| Fase | Códigos en `api_logs` | máxT | máxPG | quedan | seg | Espera máxima de un normal |
+|---|---|---|---|---|---|---|
+| `login_clave_mala` | 401 × 40 | 40 | 40 | 0 | 0.0 | — |
+| `corte_cuerpo_a_medias` | 400 × 15 | 1 | 20 | 0 | 0.06 | — |
+| `corte_bcrypt` | 401 × 15 | 11 | 20 | 0 | 0.5 | — |
+| `corte_gemini` | 200 × 15 | 9 | 20 | 0 | 2.02 | — |
+| `corte_pdf` | 422 × 15 | 5 | 20 | 0 | 1.99 | — |
+| `pico_bcrypt` | 401 × 30 · 200 × 12 | 42 | 42 | 0 | 0.0 | 2.31 |
+| `pico_gemini` | 200 × 42 | 42 | 42 | 0 | 0.06 | 0.62 |
+| `pico_pdf` | 422 × 30 · 200 × 12 | 42 | 42 | 0 | 0.06 | 0.34 |
 
-| Tanda | SHA |
+Sonda al final:
+- `apilog_creados` 576 y «filas en api_logs: 576».
+- `close_empezados` 2508 y `close_terminados` 2508.
+- `close_con_transaccion` 220.
+- `tomadas` 0, `libres` 20, `desborde` 0.
+- `bcrypt_en_vuelo_max` 20, `gemini_en_vuelo_max` 8, `pdf_en_vuelo_max` 4.
+
+Estas cadenas aparecen 0 veces en el log de gunicorn: 'non-checked-in connection', 'Task was destroyed but it is pending', 'QueuePool limit', 'CancelledError', 'UnboundLocalError', 'Exception in ASGI application', 'Error logging metrics' y 'Traceback'.
+
+### Pico 60 (`37c11eb4`, `--pico 60`): «sin conexiones tomadas», rc=0
+
+Las fases anteriores a los picos dan lo mismo que la base, salvo diferencias de uno en `máxT` (por ejemplo, `corte_bcrypt` 10 y `corte_cuerpo_a_medias` 0).
+
+| Fase | Códigos en `api_logs` | máxT | máxPG | quedan | Espera máxima de un normal |
+|---|---|---|---|---|---|
+| `pico_bcrypt` | 401 × 60 · 200 × 12 | 50 | 50 | 0 | 3.14 |
+| `pico_gemini` | 200 × 72 | 50 | 50 | 0 | 3.99 |
+| `pico_pdf` | 422 × 60 · 200 × 12 | 50 | 50 | 0 | 6.79 |
+
+Sonda al final:
+- `apilog_creados` 666 y «filas en api_logs: 666».
+- `close_empezados` 2988 y `close_terminados` 2988.
+- `tomadas` 0, `libres` 20, `desborde` 0.
+- `bcrypt_en_vuelo_max` 40, `gemini_en_vuelo_max` 8, `pdf_en_vuelo_max` 4.
+
+Las ocho cadenas del log dan 0, también 'QueuePool limit'. Ningún 500.
+
+### Pico 60 con 8 s de demora (`37c11eb4`, `--pico 60 --lento 8 --plazo 240`): «sin conexiones tomadas», rc=0
+
+Corrida de 00:20:21 a 00:24:21 UTC. Las fases anteriores a los picos dan 0 en `quedan` y `{'idle': 20}`. `corte_gemini` tarda 7.99 s y `corte_pdf` 8.03 s, y cada corte da «15 de 15 cortados con el pedido en vuelo».
+
+| Fase | Códigos en `api_logs` | máxT | máxPG | quedan | Espera máxima de un normal |
+|---|---|---|---|---|---|
+| `pico_bcrypt` | 401 × 60 · 200 × 12 | 50 | 50 | 0 | 4.05 |
+| `pico_gemini` | 200 × 72 | 50 | 50 | 0 | 16.03 |
+| `pico_pdf` | 422 × 60 · 200 × 12 | 50 | 50 | 0 | 16.2 |
+
+Sonda al final:
+- `apilog_creados` 666 y «filas en api_logs: 666».
+- `close_empezados` 2988 y `close_terminados` 2988.
+- `tomadas` 0, `libres` 20, `desborde` 0.
+- `bcrypt_en_vuelo_max` 40, `gemini_en_vuelo_max` 8, `pdf_en_vuelo_max` 4.
+
+Las ocho cadenas del log dan 0. Ningún 500.
+
+### Pico 60 con 30 s de demora (`37c11eb4`, `--pico 60 --lento 30 --plazo 600`): «QUEDAN CONEXIONES TOMADAS», rc=1
+
+Corrida de 00:24:37 a 00:32:01 UTC. Las fases anteriores a los picos dan 0 en `quedan` y `{'idle': 20}`. `corte_gemini` tarda 30.04 s y `corte_pdf` 30.02 s, y cada corte da «15 de 15 cortados con el pedido en vuelo».
+
+| Fase | Códigos en `api_logs` | máxT | máxPG | quedan | seg | Espera máxima de un normal |
+|---|---|---|---|---|---|---|
+| `pico_bcrypt` | 200 × 12 · 401 × 60 | 50 | 50 | 0 | 0.0 | 3.65 |
+| `pico_gemini` | 200 × 72 | 50 | 50 | 0 | 29.97 | 30.12 |
+| `pico_pdf` | 200 × 12 · 422 × 16 · 500 × 10 · 504 × 34 | 50 | 50 | 0 | 22.18 | 29.97 |
+
+En `pico_pdf` el medidor anota `'errores': {'TimeoutError': 10}` y «respuestas inesperadas: {('pico_pdf', 500, ''): 10, ('pico_pdf', 504, ''): 34}».
+
+Sonda al final:
+- `apilog_creados` 666 y «filas en api_logs: 666».
+- `close_empezados` 2968 y `close_terminados` 2968.
+- `close_con_transaccion` 280.
+- `dispatch_entradas` 666: `dispatch_ok` 656 y `dispatch_error_TimeoutError` 10.
+- `tomadas` 0, `libres` 20, `desborde` 0.
+- `bcrypt_en_vuelo_max` 40, `gemini_en_vuelo_max` 8, `pdf_en_vuelo_max` 4.
+
+En el log de gunicorn:
+
+| Cadena | Veces |
 |---|---|
-| lab2 | `2e775aa4`: primera tanda. Todo lo que corrió ahí se volvió a correr en otra tanda |
-| lab3 | `56756f84` |
-| lab5, lab5rep, lab6 y lab14 | `c9e9a69c` |
-| lab8 | `6d6efb86` (excel1 y observabilidad1, después de arreglar sus arneses) |
-| lab10 | `ed8d9769` (punta_a_punta1, después de arreglar su arnés) |
-| sab_lab | `80c1afbc`: commit de laboratorio fuera de la rama, padre `50682549`. Su producto es el de `c9e9a69c` con el `import re` que saca `d26d477b`; abuso1, catalogolargo1 y cliente1 no cambian entre los dos |
-| lab15 | `4899fc51` |
-| lab4, lab6, lab7, lab9, lab11, lab13 | `0d829b8a` y `4db641b0` por separado, y la bisección de `30533fe4..ebe7b97a`: sirven para clasificar, no son la corrida del SHA final |
+| 'non-checked-in connection' | 0 |
+| 'Task was destroyed but it is pending' | 0 |
+| 'QueuePool limit' | 50 líneas, de 10 pedidos |
+| 'CancelledError' | 0 |
+| 'UnboundLocalError' | 0 |
+| 'Exception in ASGI application' | 10 |
+| 'Error logging metrics' | 0 |
+| 'Traceback' | 60 |
+| 'Gemini no contestó a tiempo' | 75 |
 
-**Por qué valen sobre el SHA final**
-- De `56756f84` a `c9e9a69c`, en scripts y tests sólo cambiaron excel1, observabilidad1 y punta_a_punta1, y los tres se volvieron a correr (lab8 y lab10).
-- En el producto sólo cambió `d26d477b`.
-- Ninguno de esos arneses cambió después.
+Los 10 tracebacks de 500 terminan en la consulta del usuario de `sesion_de_la_request` (`auth/dependencies.py:94`), que llama `get_current_user`, esperando su primera conexión.
 
-**Cómo leer las marcas**
-- «ROTO»: el sabotaje no encontró su patrón.
-- «ROJO?»: dio rojo, pero no con el texto esperado.
+### Control: el medidor da rojo cuando una sesión no se cierra
 
-**Limpios (rc=0, ningún sabotaje con falla)**
+Corrida sobre `37c11eb4` (00:06:55 → 00:14:16 UTC), rc=0:
 
-| Arnés | Dónde | Nota |
-|---|---|---|
-| datos1, csrf1, csrf2, csrf3, org1, pa1, permisos1, permisos2, reset1, seguro1, seguro2, sufijos2, excel2, excel2b, excel2c, excel2d, excel3 | lab3 | 17 de 17 |
-| front422, guardar2, limpieza1, disco1, email1, entorno1, entorno2, entorno3, entorno4, entradas2, entradas3, entradas4, cobro_mp3, cobro_mp4 | lab5 | entorno2 se volvió a lanzar después de un reinicio del contenedor |
-| cobro_corte1 entero | lab5rep | 5271 s, 88 ROJO, BASE, pantalla y lock en verde |
-| rendimiento1, rendimiento1d | lab5rep | 11 y 12 ROJO |
-| rendimiento1c | lab6 | 18 ROJO con pypdf 6.21.4 (ver Entorno) |
-| nombres1 | lab14 | «sabotajes con falla: 0» |
-| conexiones1 | lab6 | close_cancelado y close_cancelado_suelto: 1 cada uno |
-| observabilidad1, excel1 | lab8 | «sabotajes sin rojo: 0; no corridos: 0» y «sabotajes con falla: 0» |
-| punta_a_punta1 | lab10 | «sabotajes con falla: 0» |
-| guardar1 | lab6 | «sabotajes con falla: 0» después de arreglar el arnés en `1c36ef2a` (ver merge) |
+```
+BIEN  | sin sabotaje: salida 0, dice «sin conexiones tomadas»
+BIEN  | close_cancelado: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+BIEN  | close_cancelado_suelto: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+BIEN  | el producto guarda la sesión sin cerrar: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+BIEN  | el producto suelta la sesión sin cerrar: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+```
 
-**Merge: el patrón del arnés quedó viejo y el comportamiento es el mismo**
+La corrida anterior sobre `c8733be3`, con el control de `9c6f721f`, dio las cuatro primeras líneas BIEN y terminó con `rc=124`: se le acabó el `timeout` en la quinta. No se colgó. El medidor seguía todas las fases aunque el rojo ya estuviera, y con la sesión soltada sin cerrar cada fase esperaba su plazo. `37c11eb4` corta la corrida apenas aparece el rojo. Por eso hay tres commits de arnés y no uno.
 
-| Arnés | Tanda | Qué dio | Causa |
+## Lo que no cubre
+
+- Hay sesiones que no se abren con `get_async_session`, y la medición no pasa por ellas:
+  - `main.py:10129`
+  - 11 en `client_service.py`
+  - `core/ncm_service.py:46` y `:85`
+- **Una cancelación de verdad.** uvicorn no cancela al cortar el cliente (hallazgo 6), así que ninguna fase cancela un `close()` en el producto. Lo que prueba que el medidor la vería es el control.
+- **Un solo worker.** Es la configuración del `Dockerfile`. Con más workers, el tope de Postgres se multiplica por cada uno; no lo medí.
+
+## Hallazgos del adversario
+
+Un adversario Opus, esfuerzo alto, sólo lectura. Lo que tomé de cada hallazgo:
+
+| # | Hallazgo | Severidad que le dio | Qué hice |
 |---|---|---|---|
-| despacho1c | lab5 | 1 ROTO «el plan vencido no avisa que no se guardó» | MARIA tiraba `Error('payment_required')` con `err.motivo`. El merge quedó con la forma de dev-tecnica, `err.code='payment_required'`, y `finalize.js:1338-1341` y `upload.js:438` la leen igual. D149 |
-| despacho1d | lab5 | 1 ROTO «la operación vuelve a esperar al catálogo» | Es la misma llamada con más argumentos: `saveOperationToHistory(items, data, carga, foto).then(r => {` en `finalize.js:779`. D149 |
-| estudio1 | lab5 | 1 de sus 2 ROTO «generar no espera la lista de estudios» | El patrón incluye el comentario `// ESTUDIO-1`, que el merge sacó (§6). La línea `if (CDI.estudios) await CDI.estudios.listo();` es igual. D149 |
-| guardar1 | lab5; arreglado, lab6 | 1 ROTO «el NUL vuelve a llegar a la base» | Es un arnés mío: ENTRADAS-2 (`a91c7b8f`) cambió `data = _sin_nul(await request.json())` por `data = _sin_nul(data)`. Ya lo arreglé en `1c36ef2a` y quedó limpio |
+| 1 | `/api/ncm/sugerir` tiene la conexión tomada mientras espera a Gemini, hasta 30 s (`NCM_GEMINI_TIMEOUT_S`, `main.py:10450`), y no tiene límite por minuto | media-alta | Reproducido a medias. Con 30 s, `pico_gemini` llega a 50 de 50 y los normales esperan 30,12 s, sin 500. En toda la corrida hay 75 «Gemini no contestó a tiempo», así que la mayoría de esas respuestas son el vacío del plazo. Va a la D180 |
+| 2 | La subida pública de PDF tiene la conexión tomada mientras espera el candado por usuario y valida; la cuota de 50 por día se mira después, así que una cuenta sin cuota igual toma una conexión antes del 429 | media-alta | Reproducido: con 30 s, `pico_pdf` da 500 × 10 por «QueuePool limit» y 504 × 34. La parte de la cuota no la medí, porque el lector falso no pasa por ella. Va a la D180 |
+| 3 | Con un worker y `--max-requests 1000`, al reiniciarse el worker los pedidos nuevos esperan a que termine el pedido lento en vuelo | media, condicional | No lo reproduje. Va a riesgos |
+| 4 | Un `close()` cancelado sí deja la conexión tomada hasta que pasa el recolector de basura; lo reprodujo con aiosqlite | baja hoy | Es lo que el control prueba que el medidor ve (las dos líneas `close_cancelado`). Lo que lo hace inalcanzable hoy es el punto 6 |
+| 5 | El rollback del `except` de `get_async_session` no corre en los pedidos: el envoltorio `get_db` manda el cierre a una tarea aparte | baja, no es fuga | No lo toqué: es producto y no deja conexiones tomadas. A la cola de limpieza si querés |
+| 6 | uvicorn no cancela el pedido cuando el cliente corta: marca `disconnected` y sigue | baja | Confirmado en `uvicorn/protocols/http/httptools_impl.py`, `connection_lost` (líneas 116-128 del venv). Los cortes en vuelo son de verdad, pero el producto no se entera: termina el pedido y cierra normal. `corte_cuerpo_a_medias` corta antes de tocar la base |
+| 7 | `enrich-items` abre una sesión por NCM, sin tope, en un `gather` | baja-media | Fuera de `get_async_session`; está en «Lo que no cubre» |
+| 8 | Login: bcrypt con la conexión tomada | baja | Es la D181 |
+| 9 | `resend_verification` tiene la conexión tomada mientras manda el mail | baja | No lo medí. Va a riesgos |
 
-**Previos de MARIA: el arnés o el comportamiento ya estaban así en `4db641b0`**
+También anotó que las versiones de gunicorn y uvicorn no están fijas (el `Dockerfile` instala `gunicorn uvicorn[standard]` sin versión) y que el comentario de `conexiones1_medir.py:109` dice «primer valor de XFF» cuando `get_client_ip` usa el último que agregó el proxy; con un solo valor da lo mismo.
 
-| Arnés | Tanda | Qué dio | Causa |
-|---|---|---|---|
-| maria1b | lab5 | rc=4, 4 ROTO | SEGURO-1 `4e4a58ba` pasó el saneo a una función. ENTRADAS-2 `28c72f84` pasó los números a `_numero_de_afuera`. D149 |
-| despacho1b | lab5 | rc=1, 6815 s: 8 ROTO + 2 VACÍO + 3 ROJO? | Los 8 patrones tampoco están en `4db641b0` (ENTRADAS-2: `_entero_de_afuera`, `_cuerpo_guardable`). Los 2 VACÍO vienen detrás de su ROTO. D149. Los 3 ROJO? de CPU están en «No corrido» |
-| entradas1 | lab5 | 1 ROTO «los ítems de agrupar sin validar» | En `4db641b0` ya es `Field(default=[], max_length=10000)`, en `main.py:8216`. D149 |
-| estudio1 | lab5 | 26 ROJO, 1 ROTO, 9 ROJO? | Los 9 ROJO? son 429 del registro (D145). El ROTO «los avisos anotan el uso» espera `_items_con_procedencia`, que en `4db641b0` ya es `_textos_como_van_al_txt` (`main.py:4910`). D149 |
-| estudio1b | lab5 | 19 ROJO + 1 ROTO | Es la misma causa que el ROTO de estudio1. D149 |
-| cobro_mp2 entero | lab5rep | rc=1, 11791 s, 86 ROJO + 1 ROTO | ROTO «sin la variable de entorno hay demo»: ENTORNO-2 `c8afa6ff` llevó el chequeo a `config.py:15`. BASE y cruces de Postgres en verde. D149 |
-| orden1, orden1b, org1b, validacion1 | lab3 | 429 del registro | D145. orden1b da verde en `0d829b8a` y 429 en la BASE de `4db641b0` |
-| sesion1 | lab3 | 2 ROTO + 1 ROJO? + 1 VERDE | D148 |
-| abuso1 | sab_lab | 1 ROTO «vencido el bloqueo…» | ABUSO-2 `59778f92` cambió la línea de `case(...)`. El arnés y el código son iguales en `4db641b0` y en el merge |
-| catalogolargo1 | sab_lab | 4 ROTO + 1 ROJO? | CATALOGO-LARGO-2 `1ecab6f1` partió las líneas. El arnés y el código son iguales en `4db641b0` y en el merge |
+## Riesgos
 
-**Base (dev-tecnica, antes del merge)**
+- **El aviso de las pruebas sigue.** Que no queden conexiones tomadas en esta medición no prueba que no queden en otras rutas o con otros tiempos. La medición cubre las rutas de arriba con un worker.
+- **Topes en vuelo.** Gemini llega a 8 en vuelo porque `asyncio.to_thread` usa el grupo de hilos por omisión, `min(32, cpu + 4)`, que con 4 CPU da 8. Si producción tiene otra cantidad de CPU, el tope cambia. El lector de PDF llega a 4 por `PDF_READ_WORKERS`. bcrypt llega a 40, el tope de hilos de anyio.
+- **Dónde se rompe con el PDF.** Lo calculé, no lo corrí: con 60 subidas, lecturas de más de unos 10 s.
+- **Reinicio del worker** por `--max-requests` con un pedido lento en vuelo (hallazgo 3): sin reproducir.
+- **Versiones sin fijar** de gunicorn y uvicorn en el `Dockerfile`: si una versión nueva de uvicorn cancela al cortar el cliente, el hallazgo 4 pasa a ser alcanzable.
+- **Demoras falsas.** Gemini y el lector de PDF son falsos y demoran lo que dice `--lento`. Un Gemini real puede demorar más; la espera de los normales crece con eso.
 
-| Arnés | Tanda | Qué dio | Causa |
-|---|---|---|---|
-| destino1, foco_cliente1, despacho1a (y cliente1, de la vuelta 1) | destino1 lab5rep y lab6, foco_cliente1 lab5, despacho1a lab14, cliente1 sab_lab | La BASE da rojo con `page.fill` o `locator.click: Timeout 30000ms exceeded.` | Bisección de destino1: `30533fe4` malo, `ebe7b97a` bueno, primer malo `36aba873` (ORDEN-1, mío). El arranque espera al usuario (`ESPERA_USUARIO_MS` 4000) y después hace `goTo('review'/'upload')`, que pisa el `goTo` de la pantalla. Con 6 s de espera, despacho1a da «OK 1280 px» y «OK 390 px», y destino1 da «OK: pantalla DESTINO-1». BORRADOR-1 los tiene que dejar verdes. D143/D144 |
-| cobro_mp1 entero | lab5rep | rc=1, 4718 s: 144 ROJO + 1 VERDE esperado + 1 ROTO | ROTO «g: Listo guarda la operación sin el archivo del MARIA»: el patrón dice `.catch(err => {` y hoy la línea es `.then(r => {`, por COBRO-CORTE-1 `1fea5ba5`. Es un arnés mío. D149 |
-| rendimiento1b | lab5rep | rc=1, 6 ROJO + 1 ROJO? | El ROJO? salió con código 137: dmesg dice «Memory cgroup out of memory». El defecto saboteado (memoria) se ve; el texto esperado no llega a imprimirse. El arnés es frágil frente al OOM. No lo repetí |
+## Para reproducir
 
-**Entorno**
-- La primera corrida de rendimiento1c dio VERDE en «un tope propio de pypdf vuelve a ser un PDF inválido».
-- **Causa:** la venv del laboratorio tenía pypdf 6.21.2, y `requirements.txt` pide `>=6.21.4`. Con 6.21.2 la bomba la frena el tope de memoria, con el mismo 400.
-- **Con 6.21.4:**
-  - 18 ROJO y rc=0, tanto en `c9e9a69c` como con el mismo resultado sobre `4db641b0`;
-  - el subconjunto de pruebas de PDF da «530 passed in 225.79s».
+```bash
+PY=<venv>/bin/python scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_medir.py              # «sin conexiones tomadas», rc=0
+PY=<venv>/bin/python scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_medir.py --pico 60    # máxT 50 en los tres picos, «sin conexiones tomadas»
+PY=<venv>/bin/python scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_medir.py --pico 60 --lento 8 --plazo 240    # «sin conexiones tomadas», rc=0 (unos 4 minutos)
+PY=<venv>/bin/python scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_medir.py --pico 60 --lento 30 --plazo 600   # «QUEDAN CONEXIONES TOMADAS», rc=1; pico_pdf 422 × 16 · 500 × 10 · 504 × 34 (unos 7,5 minutos)
+PY=<venv>/bin/python scripts/testing/sabotajes/conexiones1.sh 37c11eb4                                # cinco líneas BIEN, rc=0 (unos 8 minutos)
+git diff c8733be3 37c11eb4 -- proyecto_maria Dockerfile requirements.txt | wc -l                       # 0
+```
 
-## Suite, ataques y smoke
-
-| Puerta | Salida |
-|---|---|
-| Suite completa, worktree limpio, `cbbd37b2`, pypdf 6.21.4 | `5907 passed, 110 skipped, 3 xfailed in 1371.30s (0:22:51)`; después del resumen, asyncio imprime «Task was destroyed but it is pending!» al cerrar, con rc=0 |
-| `compileall -q proyecto_maria`, `cbbd37b2` | rc=0 |
-| Suite completa, worktree limpio, `f7a45660` (corrida anterior) | `5907 passed, 110 skipped, 3 xfailed in 1446.16s (0:24:06)` |
-| Pruebas de PDF con pypdf 6.21.4, `4899fc51` | `530 passed in 225.79s` |
-| `ataque_aislamiento.sh`, `TMPDIR=/tmp`, Postgres real, `4899fc51` | «✅ Postgres listo», OK=47, FUGA=0, rc=0 |
-| `aislamiento2.sh ataque`, Postgres real, `4899fc51` | «sabotajes con falla: 0», 18 ROJO, rc=0 |
-| `smoke_friccion.sh`, `4899fc51` | `[FAIL] POST /api/ui/event`, rc=1. Es previo de MARIA (ver abajo) |
-
-**Hallazgo en los ataques**
-- Con `TMPDIR=/tmp/cdi-s1` el ataque no encuentra Postgres y pasa a SQLite sin fallar. Lo único que muestra es «⚠️ Sin Postgres: se usa SQLite temporal.».
-- El ataque de la vuelta 1 corrió así, sobre SQLite.
-- **Propuesta:** que el ataque falle cuando no hay Postgres, en lugar de seguir. No lo hice porque está fuera de la tarea.
-
-**El smoke**
-- ABUSO-1, de MARIA, descarta los eventos sin sesión que no están en la lista («Evento sin sesión no admitido» existe en `4db641b0`, no en `0d829b8a`). El smoke manda `smoke_wave1` sin sesión.
-- A mano, con `hero_cta_clicked`:
-  - `/api/ui/event` da `{"ok":true}`;
-  - `/api/session/state` da `{"ok":true}`;
-  - by-cuit da 401.
-- El smoke quedó viejo.
-
-## Revisiones
-
-**`/code-review` del merge `b9db0ad3`**
-
-| Fila | Hallazgo | Clase | Nota |
-|---|---|---|---|
-| 1 | `finalize.js:766`: se fue el respaldo de `detail.message`, y un `detail` objeto da `new Error(obj)` | falso positivo | `efaef2b6` sacó `message` a propósito. El `detail` como dict está sólo en el 403 del login y en el 402 de clientes |
-| 2 | `app_v2.js:83`: el 402 deja 'payment_required' sólo en `err.code` | falso positivo | quien lo usa compara `err.code` |
-| 3 | `main.py:8114`: `save_client_operation` confía en un `operacion_id` propio y le pisa `client_id` e ítems | mío, anterior (`efaef2b6`) | ya estaba antes del merge |
-| 4 | `main.py:7733`: `delete_cliente` deja `generated_file` y el TXT se sigue bajando | mío, anterior (`efaef2b6`) | ya estaba antes del merge |
-| 5 | `finalize.js:1210`: el reintento guarda sin carga ni foto | anterior en los dos padres | — |
-| 6 | `test_cobro_corte1.py:830`: comparar `co_filename` con `main.__file__` es frágil | mío, después del merge (`68e77ed6`) | es fragilidad, no un verde falso |
-| 7 | `main.py:3385`: el `or` corta antes y no suma al contador diario | de MARIA (`a3abd929`) | — |
-| 8 | `main.py:3397`: `if request.email:` siempre es verdadero | de MARIA (`dea64a7c`, ENTRADAS-1) | `_email_valido` ya devuelve el email o da 400, así que la guarda quedó de más |
-| 9 | `main.py:3381`: el comentario «ABUSO-1, C9» rompe §6 | de MARIA (`a3abd929`) | — |
-| 10 | `main.py:7737`: la lista de ids se arma dos veces | del merge, `b9db0ad3` | menor |
-
-**`/code-review` de esta vuelta**
-
-| Fila | Hallazgo | Estado |
-|---|---|---|
-| 1 | el login cuenta después de bcrypt | D146 |
-| 2 | `_commit_que_falla` | no es un defecto |
-| 3 | `_LIMITE_AVISOS_MP` es por worker | D147 |
-| 4 | `finalize.js` | riesgo bajo |
-| 5 | `import re` sin uso | arreglado en `d26d477b` |
-
-**`/security-review`**
-- Ningún hallazgo con confianza ≥ 8.
-- Lo que señaló lo verifiqué en el código: `main.py:11479`, `:2138` y `:2142`.
+No corrí la suite completa ni `/security-review`, porque no hay producto ni `tests/` tocados.
 
 ## chequeo-6
 
-- **Esta vuelta (`19036a2..cbbd37b2`):** producto +0/−2, 0 avisos.
-- **Contra MARIA (`4db641b0..cbbd37b2`):** da 7 AVISOs. Los siete vienen de piezas de dev-tecnica que ya entregué antes de esta vuelta (el `git blame` de la línea de cada aviso y el `git log -L` de las dos funciones que crecieron caen en commits de `0d829b8a`):
-  - el producto suma 286 líneas netas;
-  - `try_extract_with_mapping` pasa de 309 a 312;
-  - hay dos comentarios de 4 líneas;
-  - la función anónima de `finalize.js:9` pasa de 1436 a 1469;
-  - `_instalar` tiene 96 líneas;
-  - `casosTardios` tiene 67 líneas.
-- Ninguno es de esta vuelta. Quedan porque partir o achicar código ya entregado va a `COLA-LIMPIEZA.md`, no dentro de una integración (§6).
-- Después de `cbbd37b2` sólo van los commits de este informe, que tocan sólo `PARA-PM.md`.
+Un AVISO, en el arnés: `_instalar` de `conexiones1_sonda.py:59` tiene 96 líneas, contra ~60. Queda así porque es la función que el gunicorn de la medición carga con `-c`. Envuelve `close()`, el dispatch, `api_logs`, Gemini, el lector y bcrypt, y expone los contadores, todo dentro del proceso del worker. Partirla va a la cola de limpieza si la querés; no toca producto.
 
-<details><summary>Salida entera, esta vuelta</summary>
+<details><summary>Salida de <code>docs/pm/herramientas/chequeo-6.py</code> en los tres commits de arnés</summary>
 
 ```
-chequeo-6 19036a2..cbbd37b2: avisos para mirar, no un veredicto
-producto +0/−2
-arnés +49/−26
+chequeo-6 740ba3afe04a1248db6047d69b95d5fcd3fb45a0..ff2e2aae919a1402f1660fd9648bdcbaf1a6539b: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +785/−0
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/main.py: 12213 → 12211
+  AVISO función nueva de 96 líneas: scripts/testing/conexiones1_sonda.py:59 _instalar (§6: ~60)
+avisos: 1
+```
+
+```
+chequeo-6 c8733be35eb4247d4c78d7b0f1f5e7bb7713c0f3..9c6f721f59465d07b9701add4c557051e0cd207b: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +28/−1
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+avisos: 0
+```
+
+```
+chequeo-6 5db9c1ec19b42d974f7e604a186fda0cc9c78ad7..37c11eb40806e9ee9560397f73101a97ecd972ce: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +27/−20
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
 avisos: 0
 ```
 
 </details>
-
-<details><summary>Salida entera, contra MARIA</summary>
-
-```
-chequeo-6 4db641b0..cbbd37b2: avisos para mirar, no un veredicto
-producto +727/−441
-  AVISO producto suma 286 líneas netas: el informe dice por qué (§6: más de 20)
-arnés +5814/−1044
-historia (grep de §6, sin líneas movidas): vacío
-archivos de producto:
-  proyecto_maria/auth/roles.py: 27 → 26
-  proyecto_maria/database/models.py: 614 → 617
-  proyecto_maria/main.py: 12078 → 12211
-  AVISO creció una función de más de 150: proyecto_maria/main.py:5588 try_extract_with_mapping 309 → 312, 3 en su propio cuerpo (§6: lo nuevo va aparte)
-  AVISO comentario nuevo de 4 líneas: proyecto_maria/main.py:2143 (§6: una o dos)
-  proyecto_maria/security/file_security.py: 693 → 798
-  AVISO comentario nuevo de 4 líneas: proyecto_maria/security/file_security.py:363 (§6: una o dos)
-  proyecto_maria/services/billing_service.py: 407 → 418
-  proyecto_maria/static/v2/app_v2.js: 1199 → 1201
-  proyecto_maria/static/v2/screens/clientes.js: 2211 → 2211
-  proyecto_maria/static/v2/screens/finalize.js: 1444 → 1477
-  AVISO creció una función de más de 150: proyecto_maria/static/v2/screens/finalize.js:9 <anónima> 1436 → 1469, 6 en su propio cuerpo (§6: lo nuevo va aparte)
-  proyecto_maria/static/v2/screens/profile.js: 613 → 613
-  proyecto_maria/static/v2/screens/upload.js: 718 → 718
-  AVISO función nueva de 96 líneas: scripts/testing/conexiones1_sonda.py:59 _instalar (§6: ~60)
-  AVISO función nueva de 67 líneas: scripts/testing/pantalla_cobro_corte1.js:33 casosTardios (§6: ~60)
-avisos: 7
-```
-
-</details>
-
-**Archivo de producto que toqué en esta vuelta:** `proyecto_maria/main.py`, en `d26d477b`.
-
-## Comandos para reproducir
-
-```bash
-git diff cbbd37b2 HEAD -- proyecto_maria tests scripts        # vacío: la suite vale para el SHA final
-git diff 19036a2 HEAD --stat -- proyecto_maria/               # sólo main.py, 2 líneas menos
-git show d26d477b -- proyecto_maria/main.py                   # se va el import re de register
-git log --oneline 30533fe4..4db641b0 -- proyecto_maria/config.py   # c8afa6ff: el chequeo de entorno de cobro_mp2 se mudó en MARIA
-grep -n "_textos_como_van_al_txt(request)" proyecto_maria/main.py  # el patrón nuevo de estudio1 y estudio1b
-TMPDIR=/tmp PUERTO=8791 ./scripts/testing/ataque_aislamiento.sh   # «✅ Postgres listo» y FUGA=0; con otro TMPDIR mirar que no diga «Sin Postgres»
-```
-
-## No corrido o sin cerrar
-
-- **despacho1b:** los 3 ROJO? de CPU no los reproduje. El arnés borra su tmp y no deja un log por sabotaje, y esa corrida fue en paralelo con cobro_mp2.
-- **sesion1:** no lo corrí sobre `4db641b0` solo. La clasificación sale de comparar el código, no de una corrida.
-- **rendimiento1b:** no repetí la corrida que murió por OOM.
-- **El código que el merge juntó solo** (sin conflicto) no lo leí línea por línea. Lo cubren la suite y los arneses.
-- **cobro_mp1:** no verifiqué si otro sabotaje cubre lo mismo que el ROTO (g).
-
-/compact conservar: Dev 1, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM) con send_message priority next. INTEGRAR-1 vuelta 2 entregada con este informe, encima de f9ec94e0; D144-D149 abiertas; pedí un rango de D nuevo. Sigue BORRADOR-1 (D143 a: el goTo tardío del arranque, 36aba873, pisa la navegación; tienen que quedar verdes cliente1, foco_cliente1, destino1 y despacho1a) y después CONEXIONES-1 parte B (lo que tenía a medio hacer está en el parche conexiones1_b_wip.patch del scratchpad). No integrar 0231eee. Rutina trig_011UpBfwEu9TUzoNUrviqoP5 /respondio cada 2 h, minuto 15.

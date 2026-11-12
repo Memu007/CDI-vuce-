@@ -165,7 +165,7 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | ✅ PYPDF-1 | Dev MARIA | Sumada por la PM el 06/11 (D73 de MARIA): ver qué cambió en pypdf 6.21.4, que rompe 5 pruebas, y fijar la versión o adaptar las pruebas según eso |
 | ✅ ABUSO-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ EMAIL-1 | Dev MARIA | Sumada por Emi el 28/10 (D36 de MARIA): recuperar usuario y contraseña encuentran el email con otras mayúsculas; ningún alta ni cambio crea un email repetido con otras mayúsculas; los pares que ya existan no se tocan hasta que Emi los cuente |
-| 🔵 CONEXIONES-1 | Dev técnica (desde el 08/11; antes MARIA) | Sumada por Emi el 28/10 (D37 de MARIA): medir si el cierre de la sesión de base cancelado deja conexiones tomadas, con Postgres 16; arreglar sólo si las deja |
+| 🔵 CONEXIONES-1 | Dev técnica (desde el 08/11; antes MARIA) | Sumada por Emi el 28/10 (D37 de MARIA): medir si el cierre de la sesión de base cancelado deja conexiones tomadas, con Postgres 16; arreglar sólo si las deja. A y B medidas (no hay fuga); C mide si una cuenta sola agota el pool para otra (D180); arreglarlo es propuesta a Emi |
 | ✅ AISLAMIENTO-2 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ LIMPIEZA-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ PERMISOS-1 | Dev técnica | Sumada por la PM el 08/11 («arreglos chicos de seguridad», Emi; D116): ningún usuario llega a admin por un email que él puso |
@@ -185,7 +185,7 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | ✅ CATALOGO-3 | Dev MARIA | Sí de Emi el 09/11: un proveedor sólo en chino (o emoji) tiene su propio catálogo, dos productos que sólo difieren en caracteres chinos no se pisan, la memoria del cliente encuentra lo guardado con la clave nueva, el origen se valida igual en los tres lugares, y la pantalla dice qué producto no se pudo aprender (D76, D77, D78, D80, D84-D86) |
 | ✅ PRESUPUESTO-CLIENTE-1 | Dev MARIA, aceptada sobre `f45243a` e integrada (`8669b43`) | Sí de Emi el 09/11 (D141 a): al pasar una operación a otro cliente, el link de presupuesto compartido con los datos del cliente anterior deja de andar |
 | ✅ INTEGRAR-1 | Dev técnica | Sumada por la PM el 08/11: unir las ramas de las dos Devs sobre la de la PM; aceptada el 10/11 sobre `4555f7c4` |
-| 🔵 BORRADOR-1 | Dev técnica, entregada en `22163cec` | Sí de Emi el 09/11 (D143 a): recuperar el borrador no saca a la usuaria de la pantalla donde está (Clientes) |
+| ✅ BORRADOR-1 | Dev técnica, aceptada sobre `c8733be` (producto de `22163cec`) e integrada | Sí de Emi el 09/11 (D143 a): recuperar el borrador no saca a la usuaria de la pantalla donde está (Clientes) |
 | ⚪ AUDITORIA-FINAL | PM | Ver `AUDITORIA-2026-10-06.md` |
 
 **Cierre:** publicar y probar volver atrás (cierra G3 y G6). Recién ahí

@@ -32,6 +32,7 @@ import asyncio
 import collections
 import io
 import os
+import functools
 import random
 import re
 import secrets
@@ -346,28 +347,34 @@ class Medicion:
         self.revisar_codigos(nombre, codigos)
 
     async def todas(self):
-        a = self.a
-        for tipo in DETALLES_401:
-            await self.fase_de_pedidos(tipo, [tipo] * a.n)
-        await self.fase_de_pedidos("normal", ["normal"] * a.normales)
+        a, f = self.a, functools.partial
         mezcla = [t for t in list(DETALLES_401) + ["normal"] for _ in range(a.mezcla // 7)]
         random.shuffle(mezcla)
-        await self.fase_de_pedidos("mezcla", mezcla)
-        await self.fase_de_pedidos("sugerir", ["sugerir"] * a.cortes)
-        await self.fase_de_pedidos("pdf_sin_lector", ["pdf_sin_lector"] * 10)
-        await self.fase_de_cortes("corte_cuerpo_a_medias", "login_clave_mala",
-                                  "dispatch_entradas", a.cortes, a_medias=True)
-        await self.fase_de_cortes("corte_bcrypt", "corte_bcrypt", "bcrypt_en_vuelo_total", a.cortes)
-        await self.fase_de_cortes("corte_gemini", "corte_gemini", "gemini_en_vuelo_total",
-                                  a.cortes, modo={"gemini": a.lento})
-        await self.fase_de_cortes("corte_pdf", "corte_pdf", "pdf_en_vuelo_total",
-                                  a.cortes, modo={"pdf": a.lento})
-        for nombre, tipo, clave, modo in (
-            ("pico_bcrypt", "pico_bcrypt", "bcrypt_en_vuelo_total", {}),
-            ("pico_gemini", "pico_gemini", "gemini_en_vuelo_total", {"gemini": a.lento}),
-            ("pico_pdf", "pico_pdf", "pdf_en_vuelo_total", {"pdf": a.lento}),
-        ):
-            await self.fase_de_pico(nombre, tipo, clave, a.pico, a.pico_normales, modo)
+        pasos = [f(self.fase_de_pedidos, tipo, [tipo] * a.n) for tipo in DETALLES_401] + [
+            f(self.fase_de_pedidos, "normal", ["normal"] * a.normales),
+            f(self.fase_de_pedidos, "mezcla", mezcla),
+            f(self.fase_de_pedidos, "sugerir", ["sugerir"] * a.cortes),
+            f(self.fase_de_pedidos, "pdf_sin_lector", ["pdf_sin_lector"] * 10),
+            f(self.fase_de_cortes, "corte_cuerpo_a_medias", "login_clave_mala",
+              "dispatch_entradas", a.cortes, a_medias=True),
+            f(self.fase_de_cortes, "corte_bcrypt", "corte_bcrypt", "bcrypt_en_vuelo_total", a.cortes),
+            f(self.fase_de_cortes, "corte_gemini", "corte_gemini", "gemini_en_vuelo_total",
+              a.cortes, modo={"gemini": a.lento}),
+            f(self.fase_de_cortes, "corte_pdf", "corte_pdf", "pdf_en_vuelo_total",
+              a.cortes, modo={"pdf": a.lento}),
+        ] + [f(self.fase_de_pico, nombre, tipo, clave, a.pico, a.pico_normales, modo)
+             for nombre, tipo, clave, modo in (
+                 ("pico_bcrypt", "pico_bcrypt", "bcrypt_en_vuelo_total", {}),
+                 ("pico_gemini", "pico_gemini", "gemini_en_vuelo_total", {"gemini": a.lento}),
+                 ("pico_pdf", "pico_pdf", "pdf_en_vuelo_total", {"pdf": a.lento}),
+             )]
+        for paso in pasos:
+            await paso()
+            # Con una conexión tomada el veredicto ya es 1, y con el pool lleno
+            # cada fase siguiente sólo suma plazos vencidos.
+            if self.fuga:
+                print(f"  {self.filas[-1]['nombre']} dejó conexiones tomadas: no sigo")
+                return
 
     def tabla(self):
         print()

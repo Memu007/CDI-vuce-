@@ -3,90 +3,107 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Puerta nueva: la e2e de MARIA (2026-11-10 14:17 UTC)
+## CONEXIONES-1 B: aceptada como medición sobre `c57b645e` e integrada (2026-11-12 01:08 UTC)
 
-Toda pieza que toque el recorrido MARIA o `static/v2` trae
-`scripts/testing/e2e_maria.sh` sobre su SHA en el informe (`/entregar`,
-§3). Hoy falla en `config/e2e_maria.js:279` por `e035fc98`, que arregla
-MARIA: hasta su arreglo, ese rojo es esperado; cualquier otro es tuyo.
-BORRADOR-1 ya la pasé: sólo ese rojo, y con el parche de evidencia da OK.
+Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`. Integré con
+`merge` exactamente `c57b645e`, no tu cabeza: `dd0eab7e` (los ids) lo reviso
+con su informe. Igual a tu informe: la corrida de 30 s número por número
+(`pico_pdf` 422 × 16 · 500 × 10 · 504 × 34, normales 30,01 / 30,07 / 3,68 s,
+`tomadas` 0, `close` 2968 = 2968), el control (cinco `BIEN`) y `chequeo-6` en
+los tres rangos; el AVISO de `_instalar` queda explicado. Mi negativo, con
+15 s, también rompe (500 × 6, 504 × 22, normales 30 s): confirma tu cuenta
+de «más de unos 10 s». `bcrypt_en_vuelo_max` me dio 36 y 40: es carrera, no
+cambia nada.
 
-## INTEGRAR-1: aceptada sobre `4555f7c4` e integrada (2026-11-10 13:45 UTC)
+Dos cosas que el medidor no separa, y que entran en la pieza de abajo:
 
-Evidencia: `docs/pm/REPRODUCCION-INTEGRAR-1-2026-11-10.md`. Suite igual a la
-tuya (5907 passed), ataques 47/0, migraciones con datos viejos y doble
-arranque limpios, cuatro sabotajes míos en rojo y el g de `cobro_mp1` con el
-patrón al día en rojo. Integré exactamente `4555f7c4`. No es un SHA para
-publicar: los dos adversarios encontraron cosas que se arreglan en piezas de
-MARIA (el link que sobrevive al pase de cliente por `operacion_id`, que es tu
-fila 3, y el arnés de pantalla del 402, que quedó con el contrato viejo).
+- Con el pool lleno imprime «QUEDAN CONEXIONES TOMADAS» y sale con 1 aunque
+  `tomadas` dé 0: junta pool lleno con fuga.
+- Los normales usan el mismo token que el pico: mide a la cuenta que carga,
+  no a otro usuario.
 
-- **D144:** contestada en D143 (a).
-- **D145 (a):** sí. Lo hace MARIA en sus arneses; `abuso1` sigue
-  registrando desde una sola IP, porque eso es lo que prueba.
-- **D146 (b):** a la cola de limpieza hasta que CONEXIONES-1 B mida bcrypt.
-- **D147 (a):** queda por worker, anotado.
-- **D148:** confirmada. El VERDE de `limpiar` lo explicó MARIA en
-  PRUEBA-LIMPIAR-1: cuando corre, el pedido no tiene conexión tomada.
-- **D149 (a):** poné al día tus patrones: `cobro_mp1` g, `despacho1d` y
-  `estudio1`. `despacho1c` lo hace MARIA, junto con el arnés del 402, para
-  no tocar los dos el mismo archivo. MARIA, también los suyos.
-- **El ataque sin Postgres:** que falle en vez de seguir sobre SQLite. Va con
-  D149, en el mismo commit de arnés.
-- **Filas 4 y 7 del code-review del merge:** a la cola de limpieza; ya
-  estaban en sus ramas antes de unir. La fila 3 la cierra
-  PRESUPUESTO-CLIENTE-1 sobre la unión.
-- **El smoke:** lo pone al día MARIA con ABUSO-1.
-- **Tu rango de D: D180 a D189.**
+- **D180: (a), decidido por la PM, con un criterio distinto del tuyo.** No
+  alcanza con «los 500 de PDF». `/api/ncm/sugerir` no tiene límite por minuto
+  ni cuota (no tiene decorador y el `Limiter` de `core/rate_limit.py:67` no
+  tiene límite por defecto), y `pico_gemini` con **un solo token** toma 50 de
+  50 conexiones: esa misma cuenta espera 30 s. A otra cuenta, no está medido. En la subida, la cuota de
+  producción (50 por día) es justo el pool, y la conexión ya está tomada
+  mientras espera el candado de validación, antes del 429 (leído, no
+  medido). Abajo, **CONEXIONES-1 C**: primero medir a otra cuenta.
+- **D181: (b).** A la cola de limpieza, con el caso que importa: muchas claves
+  malas a la vez desde **la misma IP** (el `5/minute` corta antes de entrar;
+  `abuso1` lo prueba en serie, en simultáneo no está corrido).
 
-## Tarea activa: D149 (a), mientras reviso BORRADOR-1 (2026-11-10 13:45 UTC)
+## Tarea activa
 
-BORRADOR-1 (`22163cec`, base `4555f7c4`): **clasificada; el veredicto espera
-tus arneses de navegador sin 429** (`cliente1`, `foco_cliente1`, `destino1`,
-`despacho1a` y `orden1`). Cuando terminen, sumá su salida al informe con
-esto, que tiene que dar vacío (ningún commit de producto tuyo después de
-`22163cec` que no venga de mi rama; mi rama ya trae todo lo de MARIA,
-integrado en `8669b43`):
-`git rev-list --no-merges 22163cec..<SHA> --not origin/claude/practical-shannon-szpwkn -- proyecto_maria`.
-Si al traer mi rama resolviste conflictos en `proyecto_maria`, sumá el
-`git show --remerge-diff` de ese merge. Evidencia en
-`docs/pm/REPRODUCCION-BORRADOR-1-2026-11-10.md`: `borrador1.sh` igual al
-tuyo, `chequeo-6` sin avisos. Mi adversario no encontró pérdida ni mezcla de
-usuarios que la pieza introduzca. Lo que ya pasaba en la base (la subida en
-curso en la carga, «Nueva operación» pisada y tu D171) es una sola causa:
-recuperar no mira lo que ella ya hace en la carga. Va a Emi como pieza nueva.
+1. **El informe del agregado de los ids** (`dd0eab7e`): lo de arriba, en
+   «BORRADOR-1», con tu versión de pytest.
+2. **CONEXIONES-1 C, sólo arnés** (es medir, dentro de CONEXIONES-1). El
+   arreglo de producto no entra sin el sí de Emi: la fila del roadmap dice
+   «arreglar sólo si las deja» y no quedan. Se lo propongo de día.
+   - **Medir a otra cuenta:** el medidor usa otra cuenta para los normales
+     y separa «pool lleno» de «fuga» en el texto y en el rc.
+   - **Corridas** sobre el código de hoy: `--pico 60 --lento 30` para la
+     subida pública de PDF y para `/api/ncm/sugerir`, y una más con la cuota
+     de producción (sin `AI_DAILY_PDF_LIMIT=100000`). El informe dice, para
+     la otra cuenta, cuántos 500 y la espera máxima.
+   - **El login queda afuera:** hoy da cero 500 y 3,1 a 3,7 s; sólo tiene
+     que no empeorar.
+   - **El arreglo, propuesto en el informe y sin commitear** (como en D134),
+     con el criterio que propongas: otra cuenta con cero 500 y espera máxima
+     de unos 5 s, y los pedidos de más con un error limpio (429, 503 o 504).
+     *Sugerencia:* soltar la conexión antes de esperar a Gemini o a la
+     lectura, o un tope de pedidos en vuelo por cuenta.
+   - **Si con otra cuenta no aparece el rojo** (cero 500 y menos de 5 s),
+     frená e informá: entonces no hay arreglo que proponer.
+   - La subida es de la zona de MARIA (D74): le aviso en su canal.
 
-- **D170 (b), decidido por la PM:** a la cola de limpieza, con una excepción
-  que encontró mi adversario: si la pestaña de antes murió sin `pagehide`,
-  ni otra pestaña ni recargar la encuentran durante 3 min.
-- **D171:** pieza nueva para Emi, junto con la subida en curso (hallazgos 1 y
-  3 del acta). No la empieces hasta que Emi diga.
-- **D172:** a la cola de limpieza.
-- **D173 (a):** ya decidida; la hiciste en `4e7da21f`.
+## BORRADOR-1: aceptada sobre `c8733be` e integrada (2026-11-12 00:48 UTC)
 
-Mientras tanto:
+Evidencia: `docs/pm/REPRODUCCION-BORRADOR-1-2026-11-10.md`. Integré con
+`merge` exactamente `c8733be` (tu informe `52029147` incluido), no tu cabeza:
+CONEXIONES-1 B (`c57b645e`) la reviso aparte. El producto que entra es el de
+`22163cec`, línea por línea. Igual a tu informe: los cinco arneses de
+navegación (ninguno con 429), `estudio1b`, `despacho1d`, `borrador1`,
+`cobro_mp1`, el ataque sin Postgres y su control, `chequeo-6`, tu portón y tus
+`--remerge-diff`. Además corrí la e2e de MARIA (`E2E MARIA OK`), la suite
+completa (`6077 passed, 110 skipped, 3 xfailed`) y, sobre el merge, el arnés 402 de MARIA
+(`118 passed`). Una diferencia, abajo.
 
-1. D149 (a) y el ataque sin Postgres: sólo arnés, un commit, cada patrón
-   nuevo con su rojo mostrado una vez. **Suman, decidido por la PM
-   (13:48 UTC), para que no toquen las dos el mismo archivo:** `estudio1b`
-   (la misma causa que el ROTO de `estudio1`) y D145 (a), cada sabotaje con
-   su `X-Forwarded-For`, en `estudio1`, `estudio1b`, `orden1`, `cliente1`,
-   `foco_cliente1`, `destino1` y `despacho1a`. MARIA no los toca.
-   **D173 (a):** sí, en ese mismo commit: `pantalla_cliente1.js:38` mira el
-   status del registro y falla con él. Así las puertas de BORRADOR-1 dan un
-   resultado y no un 429.
-2. Después, CONEXIONES-1 parte B sobre lo integrado (cierra D134).
+- **D149 (a):** aceptada en lo que pedía, salvo `estudio1.sh`, que queda
+  abierto hasta dar rc=0 con pytest 9.2.0 (el agregado de abajo).
+- **D145 (a) y D173 (a):** aceptadas. Los dos commits de arnés en vez de uno,
+  también: no hacía falta `push --force`.
+- **Supuesto de `destino1`** (manda la `X-Forwarded-For` pero no mira el
+  status del registro): a la cola de limpieza.
+- **El AVISO de `chequeo-6`** en `pantalla_cliente1.js:27` (296 → 297):
+  aceptado; partir esa función va a la cola de limpieza.
+- **El ataque no mira la versión de Postgres:** riesgo bajo, aceptado sin
+  pieza.
+- **D170 (b), D171 y D172** quedan como el 10/11 (acta): D171 espera a Emi;
+  no la empieces.
+- **La e2e de MARIA** sigue siendo puerta para lo que toque el recorrido
+  MARIA o `static/v2`. Hoy da `E2E MARIA OK`: cualquier rojo es tuyo.
+- **La diferencia: `estudio1` me da 36 ROJO y 1 ROJO? (rc=1), vos informaste
+  37.** La causa está atada: el sabotaje «el nombre de más de 200 entra» sí
+  rompe la prueba, que falla como
+  `test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve[nombre4]`, y el guion
+  busca `[xxxxx`. Con pytest 9.2.0 (el de `requirements.txt`) un parámetro de
+  texto largo da id `[nombre+índice]`; con 9.1.1 daba el valor. Es la misma
+  causa de `disco1.sh` en MARIA. Con 9.1.1, `--collect-only` da ese caso
+  como `[xxxx…]`. El patrón es anterior a D149: no es devolución.
 
-## NOMBRES-1: aceptada sobre `1960a9a` (2026-11-08 PM)
+**Agregado, decidido por la PM (no es devolución; te lo mandé por mensaje a
+las 00:43):** un commit de arnés aparte en el que ningún patrón
+de tus guiones dependa del id que pytest arma solo para un texto largo
+(sugerencia: `ids=` en el caso, o anclar en el nombre del caso sin el id).
+Mirá todos tus guiones, no sólo `estudio1`: yo corrí únicamente los de esta
+entrega. Mostrá el rojo de `estudio1` una vez con 9.2.0, y decí en el informe
+**qué versión de pytest tenés** (`python -m pytest --version`).
 
-Evidencia: `docs/pm/REPRODUCCION-NOMBRES-1-2026-11-08.md`, vuelta 2. Igual a
-tu informe: `nombres1.sh` 40 passed y 7 ROJO, falla 0; en PG 16 real 15
-passed. Mi sabotaje con `ilike` + `.first()` también da rojo, en PG y en
-SQLite. Tenías razón con lo de SQLite: corregí el acta y el riesgo va a la
-cola de limpieza. No hay D nuevas. La carrera queda como límite conocido; el
-índice sobre `lower(username)` lo veo con Emi.
+**Tu rango de D: D180 a D189.**
 
-## CONEXIONES-1, después de D149 (2026-11-08 PM)
+## CONEXIONES-1, la tarea original (2026-11-08 PM)
 
 Pasa de la cola de MARIA a la tuya, decidido por la PM: es de base y de
 servidor, y MARIA tiene cuatro piezas por delante. Está en el roadmap (sí de
@@ -130,13 +147,6 @@ Tus supuestos quedan como están.
 - **D127: (b), decidido por la PM.** Nombres únicos sin mayúsculas para todas
   las cuentas es una pieza aparte, y antes hay que mirar producción: se la
   propongo a Emi. Sin su sí no entra.
-
-## SEPARADORES-1b-ARNÉS: aceptada sobre `1063b32`, sin integrar (2026-11-08 PM)
-
-Evidencia: `docs/pm/REPRODUCCION-SEPARADORES-1b-ARNES-2026-11-08.md`. Igual
-al informe: base `265 passed`, 12 ROJO, salida 0. Tu hallazgo del caso que ya
-no distingue `sin_grupo` va a la cola de limpieza.
-
 
 ## AISLAMIENTO-2 y LIMPIEZA-1: aceptadas sobre `c86f3ff`, sin integrar (2026-11-08 PM)
 
