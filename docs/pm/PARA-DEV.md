@@ -3,39 +3,44 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## AUTOREMOVE-PG: aceptada sobre `6d370864` e integrada (2026-11-12 21:10 UTC)
+## SEPARADORES-1b-LIMPIEZA: aceptada sobre `bb0d3347` e integrada (2026-11-12 21:55 UTC)
 
-Integro tu rama hasta `ed78ad48`. Acta `REPRODUCCION-AUTOREMOVE-PG-2026-11-12.md`.
-**Traé mi rama con `merge`.** Nada que decidir.
+Integro tu rama hasta `28236cc1`. Acta `REPRODUCCION-SEPARADORES-1b-LIMPIEZA-2026-11-12.md`.
+**Traé mi rama con `merge`.**
 
-- **Reproducido, igual a tu informe:** `chequeo-6` (+0/−0, arnés +27/−1, 0
-  avisos) y `org1.sh` entero con Postgres: 40 ROJO (28 SQLite, 12 Postgres),
-  `sabotajes sin rojo: 0`, salida 0. El del dueño, rojo en las dos bases.
-- **Mis rojos, en una copia de `org1_postgres.py`:** guarda después del
-  `commit`, después de Mercado Pago, búsqueda con `lower()` y con `strip()`:
-  los cuatro FALLA, y la de Mercado Pago sólo la ve tu lista de llamadas.
-- **Tenías razón con el conteo:** en AUTOREMOVE eran 28 SQLite y 11 Postgres,
-  no 29 y 10. Conté la línea BASE como rojo. Corregido en el acta vieja.
-- **Riesgo bajo, queda:** los otros tres sabotajes del dueño siguen sin
-  tercer argumento; en Postgres los vi rojos a mano, no por el guion.
+Reproducido sobre `bb0d3347`, con tu guion de esa versión: 105 passed;
+`chequeo-6` producto +0/−0, arnés +11/−18, 0 avisos; `anclas_perdidas` sin
+nada del archivo; el guion entero da 12 `ROJO` y sale 0. Mi mutación, distinta
+de las tuyas (saqué sólo el espacio fino de la clase de `_monto_factura`), da
+un solo rojo y es la entrada `[4 500.000-,]`: cada separador tiene la suya.
+Tu supuesto de dejar las 4 entradas sin espacio: de acuerdo, quedan.
 
-## Tarea activa (2026-11-12 21:10 UTC): un caso de `test_separadores1b.py` que no distingue su regla, sólo tests
+## Tarea activa (2026-11-12 21:55 UTC): los dos casos de tope por email en `test_abuso1.py`, sólo tests
 
-De `COLA-LIMPIEZA.md`. Lo comprobé: con la regla `sin_grupo` apagada
-(`if False and sin_grupo ...` en `_monto_factura`),
-`test_en_la_factura_con_la_pista_en_contra_queda_sin_leer` sigue verde en
-todas sus entradas: `_numero_factura` ya devuelve None para ellas. Sólo
-`test_en_la_factura_con_grupos_de_espacio_tambien` se pone rojo.
+De `COLA-LIMPIEZA.md`. Lo miré (leído, no corrido): los dos topes salen del
+mismo `_tope_por_cuenta` de `main.py` (claves `recuperar:cuenta:` y
+`reset-cuenta:`). Además,
+`test_s6_recuperar_usuario_corta_en_silencio_por_email` (línea 296) y
+`test_reset_tres_por_hora_por_cuenta_aunque_cambie_la_ip` (línea 477) son casi
+el mismo caso: tres pedidos por hora por cuenta con variantes del email, el
+cuarto contesta igual y no manda, a los 59 minutos sigue cortado, pasada la
+hora pasa. Cambian la ruta, el mensaje, el prefijo del usuario y que el reset
+además cuenta links.
+
+**Primero comprobá la premisa.** Si es la misma causa: un caso con las dos
+rutas como datos. Si no lo es (por ejemplo, un caso junto esconde algo que
+hoy se ve), decilo con la evidencia y la
+línea sale de la cola sin tocar el archivo.
 
 **Puertas:**
-- Con la regla apagada, un caso que la nombra se pone rojo; con la regla, verde.
-  El informe muestra ese rojo una vez. Cómo (otra entrada, unir los dos casos
-  con la familia como datos, o sacar el que sobra) lo elegís vos.
-- `scripts/testing/sabotaje_separadores1b.sh` ancla en ids de este archivo
-  (`grupos_de_espacio_tambien[4 500.000-,]`, `lo_demas_sigue_como_hoy[...]`).
-  Si cambia un id, el ancla cambia en el mismo commit; el guion entero sin
-  sabotajes sin rojo, y `anclas_perdidas.py` sin nada de este archivo.
-- `tests/test_separadores1b.py` entero verde; `chequeo-6` entero, producto +0/−0.
+- Con el tope por cuenta apagado en cada ruta (una por vez), el caso se pone
+  rojo en la entrada de esa ruta. El informe muestra los dos rojos una vez.
+- El chequeo de links del reset no se pierde.
+- `scripts/testing/sabotajes/reset3.sh`, `abuso2.sh` y `abuso1.sh` anclan en
+  este archivo: si cambia un id, el ancla cambia en el mismo commit; cada
+  guion que toques, entero, sin `ROTO`; `anclas_perdidas.py` sin nada de
+  este archivo.
+- `tests/test_abuso1.py` entero verde; `chequeo-6` entero, producto +0/−0.
 
 Sin adversarios. No toques las entradas de `test_email1` ni de
 `IS_PRODUCTION` de la cola: son de la comparación.

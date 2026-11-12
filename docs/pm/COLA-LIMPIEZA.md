@@ -108,7 +108,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   código muerto.
 - `docker-compose.yml:61`: el mensaje `:?` de `JWT_SECRET_KEY` lleva «:» y compose lo corta.
 - Arnés de sabotajes y helpers de `scripts/testing/*_postgres.py` (crear y borrar base, registrar usuario, `chequear`) copiados entre piezas: unificar.
-- `tests/test_separadores1b.py`: `test_en_la_factura_con_la_pista_en_contra_queda_sin_leer` ya no distingue la regla `sin_grupo` (`_numero_factura` ya devuelve None): darle una entrada que sólo la regla rechace, o sacarlo.
 - `proyecto_maria/main.py` 1754, 1771, 2373 y 3406: comentarios con historia («EMAIL-1»), sacarlos.
 - `tests/conftest.py:19`: pisa `DATABASE_URL` con SQLite sin avisar, así que
   un `pytest` con la URL de Postgres corre en SQLite. Hoy se esquiva con
@@ -118,7 +117,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   de importación chequea en el endpoint y en el generador. El chequeo, una
   vez, en los dos generadores.
 - `tests/test_abuso1.py`: el caso del tope de reset casi copia el de
-  recuperar; un caso con las dos rutas como datos.
+  recuperar; un caso con las dos rutas como datos (asignado a la Técnica).
 - `tests/test_excel2d.py:199`: el tope de 0,5 s entre pasos del hilo testigo
   falló en la CI de `d9a6962` (sólo docs) con 0,506 s, y pasó en `2d08e94`
   con el mismo producto. Medir el freno sin depender de la carga del runner.
@@ -188,3 +187,12 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `_estudio1.js`, `_estudio1b.js` y `_orden1.js` (de la Técnica) tienen su
   propia copia de la IP inventada para `X-Forwarded-For`; pasar a
   `require('./_ip_nueva')` (D190 de MARIA; asignado a la Técnica).
+- `scripts/testing/sabotaje_maria3.sh`: contar los casos en `caso` en vez de a
+  mano; el ancla de transacción copia toda la lista de tablas; tres pares
+  ancla/reemplazo repetidos entre SQLite y Postgres (propuestas de MARIA, D216–D220).
+
+## Riesgos que esperan a Emi (no son tareas: no se toman de esta cola)
+
+- `client_memory._norm_desc` pierde las ligaduras («Arandela ﬁna» queda
+  `arandela na`). Arreglarlo cambia `descripcion_normalizada` ya guardada:
+  es producto con migración de datos, y nadie lo midió en facturas reales (D220).
