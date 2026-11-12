@@ -269,7 +269,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-12 21:55 UTC: **SEPARADORES-1b-LIMPIEZA aceptada** sobre `bb0d3347` (e850f417) y **D216/D217 + catalogo_largo2 de MARIA aceptadas** sobre `204c638` (54f3d3a5); actas `REPRODUCCION-SEPARADORES-1b-LIMPIEZA` y `REPRODUCCION-CATALOGO-LARGO2`. D199 no (a): el sabotaje NFKD está vivo (5 failed en test_catalogo3), se muda. Técnica: test_abuso1 de la cola. MARIA: D199 + sabotaje_valor1.
+2026-11-12 21:55 UTC: **SEPARADORES-1b-LIMPIEZA aceptada** sobre `bb0d3347` (e850f417) y **D216/D217 + catalogo_largo2 de MARIA aceptadas** sobre `204c638` (54f3d3a5); actas `REPRODUCCION-SEPARADORES-1b-LIMPIEZA` y `REPRODUCCION-CATALOGO-LARGO2`. D199 no (a): el sabotaje NFKD está vivo (5 failed en test_catalogo3), se muda. Técnica: test_abuso1 de la cola. MARIA: D199 + sabotaje_valor1. Vuelta de rutina: contextos bien (Técnica 131k de 144k, MARIA 132k de 184k), límite «allowed»; MARIA marca `safety_stopped` en su metadata pero sigue trabajando (eventos 21:56) sin rechazo visible: mirarlo en la próxima.
 2026-11-12 21:10 UTC: **AUTOREMOVE-PG aceptada** sobre `6d370864` e integrada (`ed78ad48`); acta `REPRODUCCION-AUTOREMOVE-PG-2026-11-12`: 40 ROJO (28+12), sin rojo 0; corregido mi 29/10 de AUTOREMOVE (eran 28/11). Técnica: `test_separadores1b` de la cola, sólo tests. MARIA entregó `0609e143` (D216/D217 y catalogo_largo2): la reviso ahora.
 
 ## /compact conservar de la PM principal
