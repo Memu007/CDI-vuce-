@@ -167,3 +167,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `tests/test_datos1.py`: un caso con dos operaciones en el cliente que se
   borra; hoy, si `delete_cliente` borra sólo los links de la primera, queda
   verde (A2 del informe de PRESUPUESTO-CLIENTE-1).
+- `scripts/testing/pantalla_destino1.js`: manda la `X-Forwarded-For` pero no
+  mira el status del registro; si falla, sigue sin decir por qué (supuesto de
+  la Técnica en BORRADOR-1).
+- `scripts/testing/pantalla_cliente1.js:27`: la función anónima tiene 297
+  líneas; partirla (AVISO de `chequeo-6` aceptado en BORRADOR-1).
