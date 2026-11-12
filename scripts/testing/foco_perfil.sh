@@ -83,9 +83,9 @@ for caso in "${CASOS[@]}"; do
   if ! reloj "$campo"; then echo "ROTO        | $caso: no se pudo poner el reloj"; ILEGIBLE=1; continue; fi
   salida="$(correr "$js")"; codigo=$?
   focos="$(grep -o 'GET /health?foco=[a-z]*&ms=[0-9]*' "$TMPD/api.log" | sed 's#GET /health?##' | tr '\n' ' ')"
-  robado="$(grep -o 'GET /health?robado=[^ ]*' "$TMPD/api.log" | head -n 1 | sed 's#GET /health?##')"
+  robado="$(grep -o 'GET /health?robado=[^ ]*' "$TMPD/api.log" | sed 's#GET /health?##' | tr '\n' ' ')"
   if [ -n "$robado" ]; then
-    echo "PIERDE      | $caso: lo escrito cayó en «Mi CUIT» ($robado) · focos: $focos"
+    echo "PIERDE      | $caso: lo escrito cayó en «Mi CUIT» (${robado% }) · focos: $focos"
     grep -m 1 FALLA <<<"$salida"; PIERDE=1
   elif [ "$codigo" -ne 0 ]; then
     echo "ILEGIBLE    | $caso: rojo (salida $codigo) sin texto en «Mi CUIT» · focos: $focos"
