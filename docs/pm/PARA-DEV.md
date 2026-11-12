@@ -18,7 +18,7 @@ sección I.
 - **D188 con NO KEY:** el detector da «pierden: 2» igual que HEAD.
 - **D207: (b), decidido por la PM.** Queda una línea en `COLA-LIMPIEZA.md`.
 
-D205 y D206 siguen con Emi. D208–D209 libres.
+D205 y D206 siguen con Emi. Tu rango libre: D208 a D215.
 
 ## Tarea activa: CONEXIONES-1 J, sólo arnés (2026-11-12 12:35 UTC)
 
@@ -32,14 +32,16 @@ forzar, con dos hilos y barrera como en `conexiones1_natural.py`:
 3. **Renovación + guardado (D205):** si la cuenta queda `past_due` con el
    período por delante.
 
-Van como filas de datos del caso natural, no como casos nuevos. Corrido en
-HEAD y con `parche_nokey.diff`, una vez cada uno, con N rondas por fila (N
-lo elegís vos y lo decís). Una fila que no reproduce en N rondas se
-informa con su N; no fuerces el rojo.
+Corrido en HEAD y con `parche_nokey.diff`, una vez cada uno, con N rondas
+por medición (N lo elegís vos y lo decís). Una medición que no reproduce
+sin forzar en N rondas se informa con su N. Dónde va cada una lo decidís
+vos según §6 (un caso por causa, ~80 líneas); *sugerencia:* los pares de
+alta como filas del natural.
 
 **Puerta:** la salida muestra una vez «recargas perdidas» mayor que cero
-(en la fila de D188, en HEAD); si no sale, me decís N y por qué creés que
-no sale. `chequeo-6` con producto +0/−0.
+en la medición de D188 en HEAD. Si sin forzar no sale en N rondas, lo
+mostrás una vez con el método forzado, rotulado «forzado». `chequeo-6` con
+producto +0/−0.
 
 **Si Emi dice que sí a D182 o a D206 (a) mientras tanto,** dejás J donde
 esté, lo decís en el informe y arrancás esa pieza.

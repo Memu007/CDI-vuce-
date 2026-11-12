@@ -996,7 +996,7 @@ para el usuario: el pedido ya respondió.
 |---|---|---|
 | caso 9 | 0 | vuelta 2, `log_request_background`, «la base quedó sin conexiones de la app» |
 | caso 9 con `gc.collect()` → `pass` | 1 | vuelta 4, la misma tarea, «la app no soltó sus conexiones» |
-| caso 8 natural, HEAD | 1 | «deadlocks: 18, recargas perdidas: 0»; vencidos: recarga + guardado 8/10, recarga + MARIA 10/10; al día 0/10 los dos; el aviso perdió 2 veces y el reintento firmado acreditó 10/10 |
+| caso 8 natural, HEAD | 1 | «deadlocks: 18, recargas perdidas: 0»; vencidos: recarga + guardado 8/10, recarga + MARIA 10/10; al día 0/10 los dos; el aviso se perdió 2 veces y los 2 reintentos firmados dejaron los créditos en 10/10 |
 | caso 8 natural, NO KEY | 0 | «deadlocks: 0, recargas perdidas: 0» |
 | caso 6 NO KEY ×3 | 1 cada una | «deadlocks: 3; rondas sin armar: 0», siempre los 3 pares de alta; ningún rc=2 en 168 rondas |
 | detector de D188, HEAD y NO KEY | 1 los dos | «pierden: 2», idéntico: NO KEY no lo empeora ni lo arregla |
