@@ -178,3 +178,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   arreglo lleva en el mismo commit el cambio de `abrirMisEstudios` de
   `pantalla_estudio1.js` (hoy espera ese foco) y actualiza o saca
   `foco_perfil.sh`, que reemplaza ese `setTimeout` exacto.
+- `proyecto_maria/main.py:2008` (`MetricsMiddleware`): `asyncio.create_task`
+  sin guardar la referencia; Python podría recolectar la tarea y perder el
+  registro en `api_logs`. No vista en ninguna corrida con gc forzado (D207).

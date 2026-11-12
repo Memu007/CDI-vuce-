@@ -3,74 +3,65 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## CONEXIONES-1 I: aceptada sobre `e9323b67` e integrada (2026-11-12 12:35 UTC)
+
+Integré `7a68faec`. Evidencia: acta `REPRODUCCION-CONEXIONES-1-2026-11-12.md`,
+sección I.
+
+- **Reproducido, igual al informe:** caso 9 verde (vuelta 2,
+  `log_request_background`) y rojo con `gc.collect()` → `pass`; natural en
+  HEAD 18 deadlocks y 0 recargas perdidas, con NO KEY 0 y 0; caso 6 NO KEY
+  ×3 sin ningún rc=2; `chequeo-6` +0/−0, arnés +166/−3, 0 avisos.
+- **Mis negativos:** una conexión tomada sin referencia hace fallar
+  `soltar()` con «dejó conexiones sin devolver»; con referencia viva, con
+  «no soltó sus conexiones». No tapa una fuga.
+- **D188 con NO KEY:** el detector da «pierden: 2» igual que HEAD.
+- **D207: (b), decidido por la PM.** Queda una línea en `COLA-LIMPIEZA.md`.
+
+D205 y D206 siguen con Emi. Tu rango libre: D208 a D215.
+
+## Tarea activa: CONEXIONES-1 J, sólo arnés (2026-11-12 12:35 UTC)
+
+Lo que hasta ahora sólo medimos tomando la fila desde afuera, medido sin
+forzar, con dos hilos y barrera como en `conexiones1_natural.py`:
+
+1. **Alta + recarga de una org con créditos extra vencidos (D188):** si la
+   recarga queda pisada («quedan 0 de 10»).
+2. **Los tres pares de alta** (alta + guardado, alta + cancelar, alta +
+   reactivar): deadlock sí/no y quién pierde.
+3. **Renovación + guardado (D205):** si la cuenta queda `past_due` con el
+   período por delante.
+
+Corrido en HEAD y con `parche_nokey.diff`, una vez cada uno, con N rondas
+por medición (N lo elegís vos y lo decís). Una medición que no reproduce
+sin forzar en N rondas se informa con su N. Dónde va cada una lo decidís
+vos según §6 (un caso por causa, ~80 líneas); *sugerencia:* los pares de
+alta como filas del natural.
+
+**Puerta:** la salida muestra una vez «recargas perdidas» mayor que cero
+en la medición de D188 en HEAD. Si sin forzar no sale en N rondas, lo
+mostrás una vez con el método forzado, rotulado «forzado». `chequeo-6` con
+producto +0/−0.
+
+**Si Emi dice que sí a D182 o a D206 (a) mientras tanto,** dejás J donde
+esté, lo decís en el informe y arrancás esa pieza.
+La pieza de D206 (a), además de la revisión fuerte: el caso que detecta
+D188 corrido con el arreglo y en HEAD (si da peor que HEAD, frenás y me
+lo decís), y `e2e_maria.sh`, porque toca el guardado y MARIA.
+
+## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
+
+Acta, sección «Plan» (en Git, `6001684c`). D200–D203 (a) por la PM, y siguen
+para la pieza: D201 con el dato de que los créditos extra vencidos no se
+gastan en un alta manual; D202 con tu condición (si el caso 4 da 200 con
+algo perdido, pasás a (b)); D203 con `cancel_billing`/`reactivate_billing` +
+alta como datos del caso 6.
+
 ## CONEXIONES-1 G: aceptada sobre `6ce56cf9` e integrada (2026-11-12 10:13 UTC)
 
-Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección G.
-Integré exactamente `6ce56cf9` (avance directo). Producto +0/−0, `chequeo-6`
-igual.
-
-- **Coincide con tu informe:**
-  - créditos: hoy, (a) y (b) pierden las dos carreras («quedan 0 de 10
-    pagos»), rc=1; verde, (a)+verde y (b)+verde dan 4 OK, rc=0;
-  - cuerpos (1×100 y 4×100): hoy y (b) contestan 402 con 3–4 MB mandados;
-    (a) retiene el cuerpo entero, pico 357.7 y 959.3 MB.
-- **Mi negativo: verde como está arma un deadlock.** Verde toma la org
-  primero; `_cuenta_bloqueada` toma usuario y después org. El mismo usuario
-  de una org, con alta manual y guardar en un cliente a la vez: con verde y
-  con (a)+verde, el guardado da 500 y Postgres cuenta un deadlock, 3 de 3.
-  Con (b)+verde no lo vi (3 de 3). Hoy, 200/200. Tu medidor no lo ve porque
-  no corre las dos rutas a la vez.
-- **D188: a Emi, de día** (plata). Le llevo tu (a): arreglarlo dentro de la
-  pieza de producto, con tu medidor como puerta.
-- **D189: (b), decidido por la PM.** Verde no entra como está: arma el
-  deadlock cuando la dependencia sigue con la org tomada mientras la ruta
-  cuenta (hoy y (a)). Con (b) no lo vi, en el único estado probado. El
-  criterio es el comportamiento:
-  - un caso de las dos rutas a la vez (alta y guardado, el mismo usuario),
-    con usuario y org y con créditos vencidos y no vencidos como datos: da
-    200/200 y deadlocks +0;
-  - `conexiones1_creditos.py` da rc=0;
-  - dos rojos mostrados una vez: créditos con el arreglo revertido; las dos
-    rutas con verde sobre un árbol donde la dependencia no hace `commit`
-    antes de contar (hoy o (a)).
-  - *Sugerencia:* tomar los candados con `_cuenta_bloqueada` (usuario →
-    org), o un `UPDATE` condicional que no lea antes.
-- **D186: se lo llevo a Emi como (b).** Cuerpos: (b) no lee el cuerpo antes
-  del 402, (a) sí.
-- **D184 ya está decidida (a, por la PM, en D):** no la listes como abierta
-  para Emi. Siguen de Emi D182 y D183.
-- Limpieza de `conftest.py`: vista en tu informe, gracias.
-- **Leído, no medido:** `_vencer_y_guardar` escribe
-  `billing_status=past_due` desde una lectura sin candado. Un aviso de pago
-  de suscripción a la vez podría pisarse igual que la recarga. Va como caso
-  de la familia en la pieza; medilo antes de afirmar nada.
-
-## Tarea activa: el plan de la pieza de producto de CONEXIONES-1, sin producto (2026-11-12 10:13 UTC)
-
-Emi todavía no contestó D182 ni D188. Seguís con el plan que ya
-arrancaste. Lleva la lista de casos (uno por causa), las puertas y los
-comandos copiables, con (b) como forma. Tus D van de D200 a D209.
-
-**Condiciones de la pieza** (de F y G):
-- Base caída en cada uno de los tres `commit` nuevos
-  (`require_billing_vigente`, analyze, NCM): un caso, con los tres puntos
-  como datos. Hoy sólo el de NCM tiene `try`.
-- Lo que el caso le cambia al motor o a la sesión se devuelve en un
-  `try/finally`.
-- En `sabotajes_f.py`, `SUELTA` y `COBRO` se anclan en código, no en
-  comentarios (§6), cuando el script entre al repo.
-- La impaga con JSON roto completo sigue en 402, o el cambio va declarado.
-- Créditos: `conexiones1_creditos.py` rc=0, más el caso de las dos rutas a la
-  vez de D189, con sus datos y sus dos rojos.
-- `billing_status` con un aviso de suscripción a la vez: un caso de la familia.
-- Los demás caminos que usan `require_active_billing` o
-  `can_create_operation` (análisis de PDF, otros planes): listados en el plan,
-  con caso o con la razón de por qué no.
-- Revisión fuerte: `/security-review`, adversarios, suite completa y
-  `e2e_maria.sh` sobre el SHA.
-
-**Apenas entregues el plan:** si Emi dijo que sí a D182, la pieza de
-producto. Si no, avisame en el informe y te paso la siguiente de la cola.
+Evidencia y detalle: acta `REPRODUCCION-CONEXIONES-1-2026-11-12.md`,
+sección G (en Git, `a7240cdb`). D188, D186 (b) y D182/D183 están con Emi;
+D189 (b) y D184 (a) los decidió la PM.
 
 ## FOCO-PERFIL: aceptada sobre `dc4cf077` e integrada (2026-11-12 03:37 UTC)
 

@@ -1,0 +1,22 @@
+diff --git a/proyecto_maria/main.py b/proyecto_maria/main.py
+index 52fe473f..f8237615 100644
+--- a/proyecto_maria/main.py
++++ b/proyecto_maria/main.py
+@@ -2260,7 +2260,7 @@ async def _cuenta_bloqueada(db: AsyncSession, username: str):
+     result = await db.execute(
+         select(User)
+         .where(User.username == username)
+-        .with_for_update()
++        .with_for_update(key_share=True, of=User)
+         .execution_options(populate_existing=True)
+     )
+     db_user = result.scalars().first()
+@@ -2270,7 +2270,7 @@ async def _cuenta_bloqueada(db: AsyncSession, username: str):
+         result = await db.execute(
+             select(Organization)
+             .where(Organization.id == db_user.organization_id)
+-            .with_for_update()
++            .with_for_update(key_share=True, of=Organization)
+             .execution_options(populate_existing=True)
+         )
+         org = result.scalars().first()

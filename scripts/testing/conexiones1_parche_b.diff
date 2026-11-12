@@ -1,0 +1,106 @@
+diff --git a/proyecto_maria/main.py b/proyecto_maria/main.py
+index 52fe473f..c22164b8 100644
+--- a/proyecto_maria/main.py
++++ b/proyecto_maria/main.py
+@@ -2260,7 +2260,7 @@ async def _cuenta_bloqueada(db: AsyncSession, username: str):
+     result = await db.execute(
+         select(User)
+         .where(User.username == username)
+-        .with_for_update()
++        .with_for_update(key_share=True, of=User)
+         .execution_options(populate_existing=True)
+     )
+     db_user = result.scalars().first()
+@@ -2270,7 +2270,7 @@ async def _cuenta_bloqueada(db: AsyncSession, username: str):
+         result = await db.execute(
+             select(Organization)
+             .where(Organization.id == db_user.organization_id)
+-            .with_for_update()
++            .with_for_update(key_share=True, of=Organization)
+             .execution_options(populate_existing=True)
+         )
+         org = result.scalars().first()
+@@ -2303,6 +2303,9 @@ async def require_billing_vigente(
+     await _vencer_y_guardar(db, entidad)
+     if not billing_service.tiene_acceso(entidad):
+         raise HTTPException(status_code=402, detail=_detalle_402(entidad))
++    # Termina la transacción de lectura: si no, la conexión queda tomada
++    # mientras el endpoint espera a la IA o a la lectura del PDF.
++    await db.commit()
+     return db_user
+ 
+ 
+@@ -2325,6 +2328,9 @@ async def require_active_billing(
+     ok, reason = billing_service.can_create_operation(entidad)
+     if not ok:
+         raise HTTPException(status_code=402, detail=_detalle_402(entidad, reason))
++    # Termina la transacción de lectura: si no, la conexión queda tomada
++    # mientras la ruta lee el cuerpo.
++    await db.commit()
+     return db_user
+ 
+ 
+@@ -3752,7 +3758,7 @@ async def create_manual_operation(
+     request: Request,
+     user=Depends(get_current_user),
+     db: AsyncSession = Depends(get_db),
+-    db_user: User = Depends(require_active_billing),
++    _cobro=Depends(require_billing_vigente),
+ ):
+     """Crea una operación cargada manualmente (sin PDF/Excel).
+ 
+@@ -7172,6 +7178,8 @@ async def analyze_client_migration(
+         )
+     )
+     existing_clients = existing_result.scalars().all()
++    # Suelta la conexión mientras se lee el archivo; los clientes quedan cargados.
++    await db.commit()
+     mapper = GeminiMigrationHeaderMapper(username=user["username"])
+     try:
+         # Con tiempo máximo, como leer un PDF (EXCEL-1).
+@@ -7211,7 +7219,6 @@ async def analyze_client_migration(
+     db.add(batch)
+     try:
+         await db.commit()
+-        await db.refresh(batch)
+     except Exception as exc:
+         await db.rollback()
+         logging.exception("analyze_client_migration staging failed")
+@@ -10328,6 +10335,15 @@ async def propuesta_de_sufijos(data: dict, user=Depends(get_current_user)):
+     return {"fuente": sufijos_arca.fuente(tabla), "sin_tabla": not tabla, "items": salida}
+ 
+ 
++async def _soltar_conexion(db: AsyncSession) -> None:
++    # Suelta la conexión antes de esperar a un servicio lento. Si la base se
++    # cayó, lo ya leído alcanza: la ruta sigue sin cortar.
++    try:
++        await db.commit()
++    except Exception as err:
++        logging.warning("db release before slow call failed: %s", err)
++
++
+ @app.post("/api/ncm/sugerir")
+ async def sugerir_ncm(
+     data: dict,
+@@ -10448,6 +10464,7 @@ async def sugerir_ncm(
+         # (RENDIMIENTO-1). Si no contesta a tiempo, se sigue sin sus sugerencias.
+         import asyncio
+         limite = _segundos_de_entorno("NCM_GEMINI_TIMEOUT_S", 30.0)
++        await _soltar_conexion(db)
+         try:
+             de_gemini = await asyncio.wait_for(
+                 asyncio.to_thread(_suggest_ncm_with_gemini, descripcion, 5 - len(sugerencias)),
+diff --git a/tests/test_cobro_corte1.py b/tests/test_cobro_corte1.py
+index cfb81a79..8f35b604 100644
+--- a/tests/test_cobro_corte1.py
++++ b/tests/test_cobro_corte1.py
+@@ -828,7 +828,8 @@ _confirmar = main.AsyncSession.commit
+ 
+ async def _commit_que_falla(self):
+     # La autenticación confirma antes de la ruta: falla sólo el de main.py.
+-    if sys._getframe(1).f_code.co_filename != main.__file__:
++    quien = sys._getframe(1).f_code
++    if quien.co_filename != main.__file__ or quien is main.require_billing_vigente.__code__:
+         return await _confirmar(self)
+     raise RuntimeError("la base se cayó al confirmar")
+ 
