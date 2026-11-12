@@ -3,7 +3,7 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## CONEXIONES-1 E: aceptada como arnés sobre `19714ecf` e integrada (2026-11-12 06:55 UTC)
+## CONEXIONES-1 E: aceptada como arnés sobre `19714ecf` e integrada (2026-11-12 06:52 UTC)
 
 Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección E.
 Integré con `merge` exactamente `19714ecf`. Es arnés solo; el producto
@@ -21,9 +21,9 @@ tiene 0 líneas.
   - no hay espera fija nueva;
   - el segmento de log de cada fase se lee después de que terminan sus tareas de registro. La sonda cuenta el fin en el callback y la app corre sin búfer, así que el rc=4 sin arreglo no depende del orden del log. Esa corrida no la repetí.
 - **D185: (a), decidido por la PM.** El tope de cuerpo no entra en esta fila. Va a
-  Emi como riesgo dentro del punto 13 y a la cola como pieza propia.
+  Emi como riesgo dentro del punto 13.
 
-## Tarea activa: CONEXIONES-1 F, casos y puertas con el diff revisado (2026-11-12 06:55 UTC)
+## Tarea activa: CONEXIONES-1 F, casos y puertas con el diff revisado (2026-11-12 06:52 UTC)
 
 Seguimos en la fila abierta de CONEXIONES-1. No commiteás producto: el diff
 revisado sigue fuera de la rama, sólo en el informe. Tus D van de D186 a D189.
@@ -34,7 +34,7 @@ revisado sigue fuera de la rama, sólo en el informe. Tus D van de D186 a D189.
    - el cuerpo completo contesta 402 la impaga y 429 la sin cuota.
 
    Si te sale distinto, mostrá la salida y no lo arregles.
-2. **Hallazgo 3:** analyze con el pool lleno al guardar el respaldo. Medí qué
+2. **Hallazgo 3,** con el diff revisado aplicado: analyze con el pool lleno al guardar el respaldo. Medí qué
    contesta y mostrá que en la base no queda nada a medias. Tiene que ser un
    caso o una fase del medidor, sin espera fija nueva.
 3. **Con el diff revisado aplicado y sin commitear**, corré la suite completa
@@ -48,10 +48,17 @@ revisado sigue fuera de la rama, sólo en el informe. Tus D van de D186 a D189.
 El diff revisado actualizado va en el informe, con `git apply --check`
 limpio sobre tu cabeza.
 
-**Apenas entregues:** si Emi ya dijo que sí a D182, empezá la pieza de
-producto de CONEXIONES-1, con E y F adentro y revisión fuerte. Si todavía no
-dijo nada, avisalo en una línea y quedate quieta: en mi vuelta te doy la
-siguiente.
+**Apenas entregues F: CONEXIONES-1 G**, si Emi todavía no dijo que sí a D182.
+Es sólo arnés y mide el riesgo del cuerpo leído antes del 402. Una cuenta
+impaga manda cuerpos grandes a `/api/operations/manual`: el más grande que
+acepte la app y unos cuantos a la vez. Medilo hoy y con el diff revisado, y
+contestá:
+- cuánto tarda el 402;
+- cuánta memoria sube el proceso;
+- si otra cuenta lo nota.
+
+Ninguna espera fija nueva. Si Emi ya dijo que sí, la pieza de producto de
+CONEXIONES-1 va antes que G, con E y F adentro y revisión fuerte.
 
 ## FOCO-PERFIL: aceptada sobre `dc4cf077` e integrada (2026-11-12 03:37 UTC)
 

@@ -256,7 +256,7 @@ nueva (`confirm` relee con `FOR UPDATE`); la ruta no usa `SET LOCAL`.
 - `/security-review`, la suite completa y `e2e_maria.sh` con el arreglo: van
   en la pieza de producto, si Emi dice que sí.
 
-## E (sólo arnés): aceptada sobre `19714ecf` (2026-11-12 06:55 UTC)
+## E (sólo arnés): aceptada sobre `19714ecf` (2026-11-12 06:52 UTC)
 
 Base `89d3fa3c`. Arnés +31/−21, producto 0. `chequeo-6`: igual al informe,
 historia vacía, 0 avisos.
@@ -304,13 +304,13 @@ La condición del corte se cumple, y no sólo para el ejemplo del caso.
 **D185: (a), decidido por la PM.** Un tope de tamaño para el cuerpo leído
 antes del 402 y del 429 no entra en esta fila. Es exposición que crea el
 propio diff: una cuenta impaga o sin cuota hace leer el cuerpo entero.
-Por eso va a Emi como una línea de riesgo dentro del punto 13, y a la cola
-como pieza propia.
+Por eso va a Emi como una línea de riesgo dentro del punto 13.
 
 **Lo que cambia para la pieza de producto:**
 
 - El diff tiene un trozo más, el import de `ClientDisconnect`.
-- Un corte de una cuenta impaga contesta 400 en vez de 402.
+- Un corte de una cuenta impaga contesta 400 en vez de 402 (leído, no
+  corrido; lo prueba F).
 - El cuerpo se lee antes del 402 y del 429.
 - El texto «Body JSON inválido» queda en dos lugares (§6, declarado por la
   Dev).
