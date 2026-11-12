@@ -3,45 +3,41 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## `sabotaje_maria3.sh`: aceptado sobre `29880ee` e integrado (2026-11-12 18:00 UTC)
+## D198 (b): aceptado sobre `a2af62a`, sin integrar todavía (2026-11-12 19:10 UTC)
 
-Acta: `REPRODUCCION-SABOTAJE-MARIA3-2026-11-12.md`. Unión: `e3d6be57`.
+Acta: `REPRODUCCION-SABOTAJE-MARIA3-2026-11-12.md`, sección «D198».
 
-**Lo reproducido:**
-- El guion entero sobre `29880ee`: 136 passed sin sabotaje, 30 `ROJO`,
-  rc=0. `anclas_perdidas.py` sin filas del guion. `chequeo-6`: producto
-  +0/−0, 0 avisos.
-- La razón del rojo, a mano, en 13 (`assert 200 == 401`) y 27 (el
-  `ValueError` de «inf» se escapa sin 400).
-- Mi negativo para D196 con otro dato: «0100» con la mutación 18 da 2 failed.
+**Lo reproducido.** Tu guion de `a2af62a`, entero: 31 `ROJO`, rc=0.
+`anclas_perdidas.py` sin filas del guion; `chequeo-6`: producto +0/−0,
+0 avisos. Con el flete sin validar miré la razón a mano: `-500` da
+`assert 200 == 400` y `inf` revienta con `TypeError`. Coincide con tu informe.
 
-**D196: (a).** El dato «100» queda.
+**Por qué sin integrar.** `a2af62a` trae debajo `81e81e0` y `ac58fb0`, de
+`catalogo_largo2`, que todavía no revisé. Integro todo junto cuando acepte
+`catalogo_largo2`.
 
-**D197: ninguna de las dos.** Es una mutación equivalente: en
-`origen_iso2`, después del chequeo el código se busca en
-`_iso2_por_codigo_maria()`, que sólo tiene códigos de la tabla (194, 0
-fuera). Sacarlo no cambia nada que un caso pueda ver. No hay pieza ni riesgo
-que anotar.
+**Tenías razón en las dos.** Al pedir el sabotaje del flete no vi que el
+seguro, en la línea de al lado, tenía el mismo hueco, y pedí `flete-inf` sin
+mirar la razón de su rojo. Queda como escape mío.
 
-**D198: (b), y va primero.** Lo comprobé: sacando sólo la validación del
-endpoint fallan los dos casos de avisos y los de generar siguen verdes.
-- Un sabotaje más en `sabotaje_maria3.sh`: saca sólo
-  `importe_valido(request.flete, "Flete")` del endpoint y espera
-  `[/generate_maria/avisos-flete-inf]`.
-- Puerta: el guion entero da 31 `ROJO` y sale 0.
-- Commit aparte, antes de seguir con `catalogo_largo2`. Informe corto en
-  `PARA-PM-2.md`; si ya tenés commits de `catalogo_largo2`, quedan para la
-  entrega siguiente.
+**D216: (b).** El sabotaje 31 espera `[/generate_maria/avisos-flete--500]`.
 
-**Supuestos 1 a 4:** quedan. El riesgo de la segunda copia del lector sin
-sabotaje de la fecha queda anotado en el acta, sin pieza.
+**D217: (a).** Un sabotaje 32 que saca sólo
+`importe_valido(request.seguro, "Seguro")` del endpoint y espera
+`[/generate_maria/avisos-seguro-nan]`. Los dos rojos del seguro son
+`TypeError`, no hay uno con 200: ahí lo aceptamos. Revisé el resto de la
+familia: sin la línea del endpoint, `gastos_fob` y `gastos_anteriores_fob`
+dan 136 passed, porque en esa ruta tienen otra defensa. No hacen falta más
+sabotajes.
 
-**Después:** `catalogo_largo2` y los demás de `sabotajes-conocidos.txt`, uno
-por pieza, con la misma puerta que este. Si en el medio te llega la tarea de
-comparación, va primero.
+**Cómo sigue.**
+1. D216 y D217, en commits aparte. Puerta: el guion entero da 32 `ROJO` y
+   sale 0.
+2. Después, `catalogo_largo2`. Los entregás juntos, con un informe que separe
+   las dos cosas.
+3. Si en el medio llega la tarea de comparación, va primero.
 
-**Tu rango de D pasa a D216–D225** (D199 queda libre también). La Técnica
-usa D209–D215.
+**Próxima D: D218.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
