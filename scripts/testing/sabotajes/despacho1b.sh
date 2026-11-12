@@ -54,14 +54,15 @@ juzgar() {
   echo "ROJO  | $nombre: $(printf '«%s» ' "$@")"
 }
 
-# no_debe <nombre> <salida> <lo que el rojo no tiene que decir>...
+# no_debe <nombre> <salida> <casos que no tienen que fallar>...
+# Mira sólo las líneas de resultado: una advertencia ajena al caso también lo nombra.
 no_debe() {
   local nombre="$1" salida="$2"; shift 2
   if [ -z "$salida" ]; then
     echo "VACÍO | $nombre: no hay salida que mirar"; FALLAS=$((FALLAS+1)); return
   fi
   for prohibido in "$@"; do
-    if grep -qF -- "$prohibido" <<<"$salida"; then
+    if grep -qF -e "FAILED $T::$prohibido" -e "ERROR $T::$prohibido" <<<"$salida"; then
       echo "ANCHO | $nombre: también «$prohibido»"; FALLAS=$((FALLAS+1))
     fi
   done
