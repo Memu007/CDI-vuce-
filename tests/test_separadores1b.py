@@ -26,8 +26,13 @@ from tests.test_separadores1 import _factura, _js
 from tests.test_valor1 import _funciones
 
 # Familia: separador y tres cifras, con lo de adelante que no es un grupo de
-# miles (cuatro o más cifras). Ejemplos distintos de los de la tarea.
-FAMILIA = ["4500.000", "98765,432", "2500.125", "12345,250"]
+# miles (cuatro o más cifras), y la pista decimal en contra. Sin espacios ya los
+# frena _numero_factura; con grupos de espacio, sólo la regla de _monto_factura.
+FAMILIA = [
+    ("4500.000", ","), ("98765,432", "."), ("2500.125", ","), ("12345,250", "."),
+    ("4 500.000", ","), ("4'500.000", ","), ("4\u202f500.000", ","), ("4\u00a0500.000", ","),
+    ("12 345,250", "."),
+]
 
 # Lo que no cambia, en la factura: (texto, pista, lectura de hoy).
 GUARDAS_FACTURA = [
@@ -54,22 +59,10 @@ GUARDAS_PANTALLA = [
 # ---------------------------------------------------------------- la factura
 
 
-@pytest.mark.parametrize("texto", FAMILIA)
-def test_en_la_factura_con_la_pista_en_contra_queda_sin_leer(texto):
-    """Antes «4500.000» con la coma decimal daba 4500000."""
-    en_contra = "," if texto[-4] == "." else "."
+@pytest.mark.parametrize("texto, en_contra", FAMILIA)
+def test_en_la_factura_con_la_pista_en_contra_queda_sin_leer(texto, en_contra):
     assert pdf_extractor._monto_factura(texto, en_contra) is None
     assert pdf_extractor._monto_factura(texto, None) is None
-
-
-@pytest.mark.parametrize("texto, en_contra", [
-    ("4 500.000", ","), ("4'500.000", ","), ("4\u202f500.000", ","), ("4\u00a0500.000", ","),
-    ("12 345,250", "."),
-])
-def test_en_la_factura_con_grupos_de_espacio_tambien(texto, en_contra):
-    """_numero_factura saca esos separadores: «4 500.000» con la coma decimal
-    también daba 4500000."""
-    assert pdf_extractor._monto_factura(texto, en_contra) is None
 
 
 @pytest.mark.parametrize("copia", COPIAS)
