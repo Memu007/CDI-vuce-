@@ -2,104 +2,80 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## Limpieza de CONEXIONES-1 (sólo arnés)
+## D190: las seis pantallas de la Técnica toman la IP de `_ip_nueva.js`
 
 | SHA | qué |
 |---|---|
-| `391f5571` | refactor(test): el SQL de «créditos al día» vive sólo en `conexiones1_creditos.py` (`AL_DIA`); natural y pares lo usan |
-| `376c8adc` | refactor(test): `_instalar` de la sonda se parte en `_contar_registro`, `_sabotear_close`, `_frenar_lentos` y `_contar_cuerpo`; `_instalar` sólo las llama |
-| `e6d938a6` | merge de tu rama (`3ff4e770`), sin choques |
-| este commit | informe |
+| `c8247e95` | tu base (avance rápido, sin merge) |
+| `6f50e17a` | `test:` `tests/test_conexiones1.py` guardado como `scripts/testing/conexiones1_tests.diff` |
+| `0b92e6d8` | `refactor(test):` las seis pantallas usan `require('./_ip_nueva')` |
+| este commit | `docs:` informe |
 
-**Resultado:** las dos entradas quedaron hechas, con las puertas en verde. No hay nada para decidir.
+**Nada para decidir.** Sin supuestos agregados. `producto +0/−0`.
+`tests/test_conexiones1.py` sigue sin seguimiento; su copia está en el parche.
 
-**Entradas de `COLA-LIMPIEZA.md` que cerré** (las sacás vos):
-- línea 146: `conexiones1_sonda.py` `_instalar` (96 líneas).
-- líneas 185-186: el SQL de «créditos al día» en `conexiones1_natural.py` (`CREDITOS`) y en `conexiones1_pares.py`.
+### A. Parche
 
-**`tests/test_conexiones1.py`:** no es descartable y no lo borré.
-- Tiene los 8 casos de la pieza de producto de CONEXIONES-1: «las rutas lentas de RUTAS no retienen una conexión mientras esperan»; por ejemplo, `test_la_espera_no_retiene_conexiones[body-400]` y `test_cuenta_que_no_puede_cargar_y_corta_el_cuerpo`.
-- Es la única copia: no está en ninguno de los dos parches guardados.
-- Por D184 va en el commit de pruebas de esa pieza, si Emi dice que sí a D182 o a D206 (a). Hasta entonces queda sin seguimiento y nunca entra a `git add`.
-- Si preferís no depender de mi contenedor, lo sumo al parche en la próxima pieza: decímelo.
+En un worktree limpio sobre `6f50e17a`: `git apply --check scripts/testing/conexiones1_tests.diff` → `check=0`; después de aplicarlo, `cmp` contra mi `tests/test_conexiones1.py` → `cmp=0` (iguales).
 
-## Puertas
+### B. D190
 
-| puerta | resultado |
-|---|---|
-| `py_compile` de los 4 archivos | compila |
-| `chequeo-6.py 618efd8a 376c8adc` | salida entera abajo: producto +0/−0, 0 avisos; `_instalar` pasó de 96 a 9 líneas |
-| control de la sonda `sabotajes/conexiones1.sh 618efd8a` (antes de partirla) | 6 BIEN, sale 0 |
-| el mismo control sobre `376c8adc` (partida) | 6 BIEN, sale 0; mismas líneas que antes |
-| rojo conocido sin la llamada `_sabotear_close(...)` en `_instalar` | `close_cancelado` da salida 0 y «sin conexiones tomadas»: el rojo depende de la función partida |
-| natural `N=3` sobre `376c8adc` | filas «al día» con 0/3 mal; `recarga + alta, créditos vencidos` con 3/3 mal y 3 RECARGA PERDIDA (D188) |
-| pares sobre `376c8adc` | las 28 filas «créditos al día» dan `ok`; los 5 deadlocks son todos de org con créditos vencidos; sale 1 por esos deadlocks |
+En `pantalla_cliente1.js`, `_despacho1a`, `_destino1`, `_estudio1`, `_estudio1b` y `_orden1` el comentario y `const ipNueva = () => '10.' + ...` pasan a `const ipNueva = require('./_ip_nueva');`. Las seis pasan `node --check`. Arnés +6/−12.
 
-**El rojo conocido es `close_cancelado`.** La sonda cancela algunos `AsyncSession.close()` y retiene la sesión; el medidor tiene que salir 1 con «QUEDAN CONEXIONES TOMADAS». Ya daba ese rojo antes de partirla y lo sigue dando.
+**Grep** (`grep -rnE "'10\.' *\+|X-Forwarded-For': *'|192\.0\.2" scripts/testing/ --include=*.js --include=*.sh --include=*.py`) da sólo dos líneas: `_ip_nueva.js:3` y `pantalla_orden1.js:1343`.
 
-Además, saqué la llamada a `_sabotear_close` en un worktree descartable: el mismo sabotaje pasó a verde. Así se ve que el rojo sale de la función nueva y no de otra parte.
+**Por qué queda el `192.0.2` de `pantalla_orden1.js:1343`:**
+- Es para el login (`@limiter.limit("5/minute")` en `/auth/login`), no para el registro, que es lo que D190 cubre.
+- Es una secuencia (`'192.0.2.' + (++miradas % 250 + 1)`) y no un azar: dentro de una corrida no se repite hasta la mirada 251, y `enElServidor` se llama en dos lugares (1398 y 1489). No puede chocar consigo misma como la IP fija del rojo.
+- El comentario de 1338–1340 ya dice el porqué. Cambiarla a `_ip_nueva` no arregla nada y sumaría azar donde hoy no hay.
 
-Salida del control, igual en los dos SHA:
+**Los 9 guiones sobre `0b92e6d8`**, todos `rc=0`; ningún «BASE» ni «no se puede medir» en los logs:
+
+| guion | ROJO | resultado |
+|---|---|---|
+| cliente1 | 34 | sabotajes sin rojo: 0 |
+| despacho1a | 14 | sabotajes sin rojo: 0 |
+| destino1 | 19 | sabotajes sin rojo: 0 |
+| estudio1 | 37 | sabotajes sin rojo: 0 |
+| estudio1b | 20 | sabotajes sin rojo: 0 |
+| orden1 | 76 | sabotajes sin rojo: 0 |
+| orden1b | 29 | sabotajes sin rojo: 0 |
+| foco_cliente1 | — | «con espera, 80 ms: 100 bien, 0 fallas de 100»; «con espera, en el peor momento: 5 bien, 0 fallas de 5»; control «sin espera, en el peor momento: 0 bien, 5 fallas de 5 (5 con lo de otro campo en la razón social)»; «mediciones con falla: 0»; «tardó 1828 s» |
+| foco_perfil | — | NO PIERDE en las tres filas (`#pfEstudioNombre` 3000/3000/3001 ms; `#pfEstudioCuit` y `#pfEmail` 3000/3000/3000 ms) |
+
+**El rojo con IP fija.** Una API (`ENVIRONMENT=development`, limitador activo, el de siempre), una sola base SQLite y 7 corridas seguidas de `pantalla_estudio1b.js`, que registra una vez por corrida. Dos worktrees descartables: uno con `const ipNueva = () => '10.0.0.1';` y otro limpio en `0b92e6d8`.
+- IP fija: corridas 1–5 `rc=0` «PANTALLA ESTUDIO-1b OK»; corridas 6 y 7 `rc=1`:
+  `FALLA: registro: 429 {"detail":"Demasiados registros desde esta conexión. Intente más tarde."}`. En el log de la API, 2 respuestas 429.
+- `_ip_nueva`: corridas 1–7 `rc=0` y OK; 0 respuestas 429.
+
+Es el límite de 5 registros por hora por IP (`main.py`, registro), no una espera vencida. Los guiones normales no lo ven porque cada corrida empieza con base vacía; por eso el rojo usa una sola base.
+
+**chequeo-6**, entero:
+
 ```
-BIEN  | sin sabotaje: salida 0, dice «sin conexiones tomadas»
-BIEN  | close_cancelado: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
-BIEN  | close_cancelado_suelto: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
-BIEN  | el producto guarda la sesión sin cerrar: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
-BIEN  | el producto suelta la sesión sin cerrar: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
-BIEN  | el producto pierde filas de api_logs sin avisar: salida 2, dice «no explican la diferencia»
-```
-
-Resumen de natural `N=3` sobre `376c8adc`:
-```
-recarga + guardado, créditos vencidos: 3/3 rondas con deadlock, 0/3 mal
-recarga + guardado, créditos al día: 0/3 rondas con deadlock, 0/3 mal
-recarga + maria, créditos vencidos: 3/3 rondas con deadlock, 0/3 mal
-recarga + maria, créditos al día: 0/3 rondas con deadlock, 0/3 mal
-recarga + alta, créditos vencidos: 0/3 rondas con deadlock, 3/3 mal
-recarga + alta, créditos al día: 0/3 rondas con deadlock, 0/3 mal
-alta + guardado, créditos vencidos: 1/3 rondas con deadlock, 0/3 mal
-alta + cancelar, créditos vencidos: 0/3 rondas con deadlock, 0/3 mal
-alta + reactivar, cancelada: 1/3 rondas con deadlock, 0/3 mal
-renovación + guardado, prueba vencida: 0/3 rondas con deadlock, 2/3 mal
-renovación + guardado, active fuera de gracia: 0/3 rondas con deadlock, 3/3 mal
-rondas con deadlock: 8, recargas perdidas: 3, cuentas mal: 5
-```
-Las filas «al día» quedaron en 0 perdidas y 0 mal, y la cláusula del módulo común se aplica. Lo muestra pares: «al día» da 0 deadlocks, mientras que con créditos vencidos la org da deadlocks en las mismas parejas. Las filas de renovación ya estaban en la entrega K.
-
-`chequeo-6.py 618efd8a 376c8adc`, salida entera:
-```
-chequeo-6 618efd8a..376c8adc: avisos para mirar, no un veredicto
+chequeo-6 c8247e95..0b92e6d8: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +22/−5
+arnés +272/−12
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
 ```
 
-**Largos después de partirla:** `_contar_registro` 41, `_sabotear_close` 38, `_frenar_lentos` 32, `_contar_cuerpo` 19 e `_instalar` 9 líneas.
+El +272 incluye el parche. `6f50e17a..0b92e6d8` sólo: arnés +6/−12, avisos 0.
 
-## Comandos para reproducir
+### Comandos
 
 ```bash
-PY=/ruta/venv/bin/python
-# 6 BIEN y sale 0 en los dos SHA; la línea de close_cancelado dice «salida 1, dice «QUEDAN CONEXIONES TOMADAS»»
-PY=$PY scripts/testing/sabotajes/conexiones1.sh 618efd8a
-PY=$PY scripts/testing/sabotajes/conexiones1.sh 376c8adc
-# filas «al día» con 0/3 mal; «recarga + alta, créditos vencidos» con 3/3 mal y RECARGA PERDIDA
-N=3 PY=$PY scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_natural.py
-# todas las filas «créditos al día» en ok
-PY=$PY scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_pares.py
-# producto +0/−0, avisos: 0
-$PY docs/pm/herramientas/chequeo-6.py 618efd8a 376c8adc
-# una sola línea, la de conexiones1_creditos.py
-grep -n "20 days" scripts/testing/*.py
+git diff c8247e95..0b92e6d8 --stat                       # el parche y las seis pantallas; nada en proyecto_maria/
+grep -rnE "'10\.' *\+|X-Forwarded-For': *'|192\.0\.2" scripts/testing/ --include=*.js --include=*.sh --include=*.py
+                                                          # sólo _ip_nueva.js:3 y pantalla_orden1.js:1343
+git apply --check scripts/testing/conexiones1_tests.diff  # sin salida, rc 0 (en un árbol sin tests/test_conexiones1.py)
+python3 docs/pm/herramientas/chequeo-6.py c8247e95 0b92e6d8   # producto +0/−0, avisos: 0
 ```
 
-## Qué no corrí y riesgos
+### No corrido
 
-- **No corrí** la suite de pytest ni `e2e_maria.sh`: no cambió producto y ningún test importa estos arneses.
-- **No corrí** natural con N=10. Con N=3 la puerta pedía otra cosa: que no cambiara qué filas dan mal.
-- **No hubo autorrevisión con subagentes ni `/code-review`.** Es un refactor de arnés sin cambio de comportamiento, y lo cubren el control y su versión sin la llamada.
-- **Riesgo bajo.** Las listas `marcadas` y `retenidas` del sabotaje siguen vivas en el cierre de `close` dentro de `_sabotear_close`, igual que antes. Si se perdiera `retenidas`, `close_cancelado` dejaría de retener y no daría rojo, y el control sigue dando rojo.
+- La suite pytest: no hay cambio de producto ni de `tests/` fuera del parche.
+- Los armados de `X-Forwarded-For` en Python (`conexiones1_medir`/`cuerpo`, `sesion1_motores`, `email1_motores`, `abuso1_motores`, `abuso2_postgres`): no son pantallas, quedan fuera de D190.
 
-/compact conservar: Dev 1 técnica, rama claude/dev-tecnica; entregué la limpieza de CONEXIONES-1 (391f5571 + 376c8adc + informe); nada para decidir; tests/test_conexiones1.py sigue sin seguimiento hasta la pieza de producto (D182 / D206 a); espero veredicto, nada «apenas entregues».
+/compact conservar: Dev 1 técnica, rama claude/dev-tecnica; entregué D190 (6f50e17a + 0b92e6d8 + informe); nada para decidir; tests/test_conexiones1.py sin seguimiento (su copia está en el parche); espero veredicto.
