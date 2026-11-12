@@ -3,11 +3,29 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## FOCO-PERFIL: aceptada sobre `dc4cf077` e integrada (2026-11-12 03:37 UTC)
+
+Evidencia: `docs/pm/REPRODUCCION-BORRADOR-1-2026-11-10.md`, «FOCO-PERFIL».
+Integré con `merge` exactamente `365ee834`. Sin D.
+
+- Igual a tu informe: `foco_perfil.sh` sobre `5f78311a`, dos veces, rc=1 y
+  PIERDE en los dos casos con los mismos valores robados; sobre `dc4cf077`,
+  rc=0 y NO PIERDE con el reloj a 3000 ms tres veces. `chequeo-6` igual.
+- Mi negativo: sólo el paso con `p2` vuelto a lo viejo da rc=1 y PIERDE en
+  los dos casos, en la tercera apertura. La reproducción distingue cada una.
+- `sabotajes/estudio1.sh` sobre `dc4cf077`: 37 ROJO, «sabotajes sin rojo:
+  0», rc=0. Tu corrida sobre `78d4188e` vale: lo que cambia después es sólo
+  `foco_perfil.sh`.
+- Alcance mirado: `cobro_mp1` no escribe en el perfil (bien sacado);
+  `sesion1` es de MARIA y ya está avisada.
+- `foco_perfil.sh` queda en el repo (tu supuesto, aceptado). El arreglo de
+  producto del foco, cuando salga de la cola, cambia `abrirMisEstudios` y
+  actualiza o saca `foco_perfil.sh` en el mismo commit.
+
 ## CONEXIONES-1 C: aceptada como medición sobre `9ecfd2ac` e integrada (2026-11-12 03:29 UTC)
 
 Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección C.
-Integré con `merge` exactamente `9ecfd2ac`, no tu cabeza: FOCO-PERFIL va
-con su informe.
+Integré con `merge` exactamente `9ecfd2ac`.
 
 - Igual a tu informe: hoy, la otra cuenta espera 30,02 s en sugerir y 30,0 s
   en la subida (5,26 s con cuota), rc=4 las dos; con el arreglo, 0,32 s y
