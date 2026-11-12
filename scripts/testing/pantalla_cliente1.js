@@ -13,8 +13,7 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> CDI_DB=<base sqlite del servidor> node scripts/testing/pantalla_cliente1.js [captura.png]
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
-// Cada registro entra con otra IP inventada: el registro tiene límite por IP, por hora y por día.
-const ipNueva = () => '10.' + [0, 0, 0].map(() => Math.floor(Math.random() * 256)).join('.');
+const ipNueva = require('./_ip_nueva');
 const { execFileSync } = require('child_process');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const baseLocal = process.env.CDI_DB || falla('falta CDI_DB: la base sqlite local del servidor, para sembrar fechas viejas');
