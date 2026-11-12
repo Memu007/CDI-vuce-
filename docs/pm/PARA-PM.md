@@ -2,188 +2,201 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CONEXIONES-1 H: casos 6 y 7 sobre HEAD, como scripts (sólo arnés)
+## CONEXIONES-1 I: causa del rc=2 y caso natural (sólo arnés)
 
-**Hallazgo de producción: sí, hoy dan deadlock.** En HEAD, una org con
-créditos extra vencidos que guarda una operación a la vez que recarga, o que
-genera MARIA a la vez que recarga, recibe un 500 y Postgres cuenta un
-deadlock. El usuario ve «No se pudo guardar la operación al cliente: …
-DeadlockDetectedError» o «Error generando archivo MARIA: … deadlock
-detected». Lo mismo pasa con alta + guardado, alta + cancelar y alta +
-reactivar de esa org. Con un usuario suelto, o con créditos al día, no pasa.
+**El rc=2 era del arnés, no del producto.** Después de cada pedido, la app
+registra el pedido en una tarea de fondo (`log_request_background`, lanzada
+con `asyncio.create_task` en `MetricsMiddleware`, `main.py:1977-2015`). Esa
+tarea sigue después de que llega la respuesta. Si abre su sesión antes del
+`engine.dispose()` del arnés y la devuelve después, la conexión vuelve al
+pool viejo, el descartado. Ese pool ya no se cierra con otro dispose: en
+Postgres queda una conexión `idle` cuya última consulta es `COMMIT;`, y el
+arnés anterior esperaba 15 s, la veía y salía 2. La cierra `gc.collect()`.
 
-**D204 reproduce.** Si la renovación llega antes que el pedido que vence la
-cuenta, la cuenta queda `past_due` con el período por delante: pagó y queda
-bloqueada. Pasa con usuario y org, con prueba vencida y con `active` fuera de
-gracia: 4 de 8. El parche (b) no lo arregla. El arreglo lo decide Emi (D205).
+**Arreglo:** `soltar()` en `conexiones1_rondas.py`, que usan los casos 6, 7 y
+8. Hace dispose + `gc.collect()` dentro del loop de la app y repite hasta
+que Postgres no ve conexiones de la app, sin espera fija. Si gc tuvo que
+cerrar una conexión que la app nunca devolvió al pool (una fuga real),
+`soltar()` falla en vez de taparla.
+
+**Caso natural** (`conexiones1_natural.py`, 78 líneas), sin tomar la fila
+desde afuera. En HEAD, con créditos vencidos: deadlock en 8/10 rondas de
+recarga + guardado y en 9/10 de recarga + MARIA. Con créditos al día, 0/10
+en los dos pares. Una vez perdió el aviso de MP: la recarga no quedó
+acreditada, y el reintento firmado la acreditó. Ninguna recarga quedó
+perdida. Con `parche_nokey.diff`: 0 deadlocks en las 40 rondas y todas las
+recargas quedaron enteras.
 
 | SHA | Qué |
 |---|---|
-| `06695c86` | `test:` casos 6 y 7, `parche_b.diff`, `con_parche.sh` |
-| `cfc5f2af` | `test:` `PARCHE=` elige el parche; `parche_nokey.diff` |
-| `218069dc` | `test:` el contador no depende del 500; arnés roto sale 2 |
-| `7e55e35d` | `test:` docstring del caso 7 a 80 columnas |
+| `4268eb2c` | `test:` primera versión de `soltar`, casos 9 y 8 |
+| `315c77f9` | merge de tu rama |
+| `e9323b67` | `test:` `soltar()` detecta fugas, el caso 9 exige el pool descartado, el natural verifica la recarga |
 | este commit | `docs:` este informe |
 
-Producto +0/−0. Emi no dijo que sí a D182: sigo en H.
+Producto +0/−0. Emi no dijo que sí a D182 ni a D206 (a): sigo en I.
 
 ## Decisiones
 
-- **D205 (para Emi): el arreglo de D204.** Hoy quien vence lee la cuenta
-  sin candado y escribe `billing_status = 'past_due'` encima de la
-  renovación. Son dos lugares: `_vencer_y_guardar` (`main.py:2282`, desde
-  `require_billing_vigente`) y `get_current_user`
-  (`auth/dependencies.py:146`), que es el que escribe en las filas de
-  prueba vencida de un usuario.
-  - (a) **Recomendada.** Vencer con un `UPDATE … WHERE billing_status = <el
-    leído> AND trial_ends_at = <el leído>`. Si la renovación ya escribió, no
-    toca nada. Sin candado nuevo, así no suma otro orden de toma al de
-    D206. Son los dos lugares, una sola función.
-  - (b) Vencer bajo `FOR UPDATE` releyendo la fila. También arregla, pero
-    toma otro candado en cada pedido de una cuenta vencida.
-  - (c) No tocar: pasa sólo si los dos llegan en la misma ventana, y la
-    próxima renovación lo corrige, pero mientras tanto pagó y no puede
-    trabajar.
-- **D206 (para Emi): los deadlocks de hoy.**
-  - (a) **Recomendada.** Una pieza chica ya: las 2 líneas de
-    `parche_nokey.diff` (`FOR NO KEY UPDATE` con `of=`). Medido: arregla
-    recarga + guardado y recarga + MARIA, que son los que pidió saber. No
-    arregla alta + guardado, alta + cancelar ni alta + reactivar: esos
-    necesitan (b) entero, que espera D182.
-  - (b) Esperar D182 y entrar todo con la pieza de (b).
+**Nada nuevo para decidir.** D205 y D206 siguen con Emi.
 
-## Resultados
+- **D207 (opcional, sólo para anotar).** `asyncio.create_task(...)` en
+  `main.py:2008` no guarda la referencia de la tarea. Python puede
+  recolectar una tarea sin referencia antes de que termine, y entonces se
+  pierde el registro del pedido en `api_logs`. Al usuario no le pasa nada.
+  - (a) Anotarla en la cola de limpieza: un `set` de tareas vivas.
+  - (b) **Recomendada.** No hacer nada ahora. No la vi pasar en ninguna
+    corrida, y lo que acá molestaba (la conexión tardía) no lo arregla.
 
-Caso 6: 7 pares × 2 órdenes × usuario/org × créditos vencidos/al día = 56
-rondas. Caso 7: 2 órdenes × usuario/org × prueba vencida/`active` fuera de
-gracia = 8 rondas. Una vez cada uno, sobre `7e55e35d`, salvo el caso 6 en
-HEAD: corrió con el árbol que después fue `218069dc`; `7e55e35d` sólo
-cambia el docstring del caso 7.
+## Causa, con evidencia
 
-| Caso | Árbol | rc | Resultado |
-|---|---|---|---|
-| 6 | HEAD | 1 | `deadlocks: 5; rondas sin armar: 0` |
-| 6 | (b) completo | 0 | `deadlocks: 0; rondas sin armar: 0` |
-| 6 | sólo `FOR NO KEY UPDATE` | 1 | `deadlocks: 3; rondas sin armar: 0` |
-| 7 | HEAD | 1 | `cuentas mal: 4; rondas sin armar: 0` |
-| 7 | (b) completo | 1 | `cuentas mal: 4; rondas sin armar: 0` |
+Medí con un script de diagnóstico que no se commitea: pedidos, dispose y,
+si quedaba una conexión, qué mostraba Postgres y qué hacía gc.
 
-Caso 6 en HEAD, las 5 rondas con deadlock, todas de org con créditos
-vencidos, `[200, 500]`:
+| corrida | vueltas | quedó una conexión | en Postgres | después de `gc.collect()` |
+|---|---|---|---|---|
+| 1 | 30 | 1 vez (vuelta 10) | `idle`, `COMMIT;` | libre |
+| 2 | 30 | 6 veces (vueltas 2, 10, 11, 13, 17, 20) | `idle`, `COMMIT;` las 6 | libre las 6 |
 
-```
-DEADLOCK | alta + guardado | org | créditos vencidos | [200, 500] | deadlocks +1
-DEADLOCK | recarga + guardado | org | créditos vencidos | [200, 500] | deadlocks +1
-DEADLOCK | recarga + maria | org | créditos vencidos | [200, 500] | deadlocks +1
-DEADLOCK | alta + cancelar | org | créditos vencidos | [200, 500] | deadlocks +1
-DEADLOCK | alta + reactivar | org | créditos vencidos | [200, 500] | deadlocks +1
-```
+En las dos corridas, sin generadores suspendidos. Lo que quedaba eran dos
+pools: el actual vacío y el descartado con 1 conexión. Quién la devuelve lo
+muestra el caso 9: parchea `Pool._return_conn` y anota qué tarea devuelve
+una conexión a un pool que no es el actual. En las tres corridas fue
+`MetricsMiddleware.dispatch.<locals>.log_request_background`.
 
-Con sólo `FOR NO KEY UPDATE` quedan alta + guardado, alta + cancelar y alta +
-reactivar. Por D203, el rojo de alta + cancelar/reactivar con (a) es el que
-mete (b): con (b) completo dan 0.
+**Descartado:**
+- La sesión de la dependencia del pedido: su cierre corre antes de que salga
+  la respuesta.
+- Un freno en el commit para forzarlo: 8/8 corridas dieron rc=4, porque el
+  freno corría antes del dispose y el caso no se armaba.
+- Antes (H): el caso 6 con NO KEY dio rc=2 en 1 de 6 corridas; 40 rondas
+  aisladas dieron 0; vos corriste 50 y dieron 0. Por eso el caso 9 no espera
+  al azar: repite pedido + dispose hasta que el dispose solo deja la
+  conexión abierta (en las corridas, entre la vuelta 2 y la 20).
 
-Línea que el caso 6 imprime del código de `_cuenta_bloqueada`:
-- HEAD: `_cuenta_bloqueada: with_for_update() | with_for_update()`
-- (b) y sólo NO KEY, igual: `_cuenta_bloqueada: with_for_update(key_share=True, of=User) | with_for_update(key_share=True, of=Organization)`. Lo demás de (b) está fuera de esa función.
+**Es del producto?** No como defecto para el usuario: el pedido ya respondió
+y el registro se guarda. Es el arnés el que cerraba el pool en medio de una
+tarea viva.
 
-Caso 7 en HEAD. Con (b), las 4 MAL son iguales; en las ok cambia el código del
-guardado en dos filas (usuario con prueba vencida y org `active` fuera de
-gracia): `[200, 200]` en vez de `[402, 200]`. La cuenta termina igual,
-`active` con el período por delante; leo que con (b) ese guardado ya vio la
-renovación, pero no lo medí aparte.
+## El caso que antes daba rc=2: caso 9 (`conexiones1_soltar.py`)
 
-```
-ok       | guardado + renovación | usuario | prueba vencida | [402, 200] | termina active, período por delante
-ok       | guardado + renovación | usuario | active fuera de gracia | [402, 200] | termina active, período por delante
-ok       | guardado + renovación | org | prueba vencida | [402, 200] | termina active, período por delante
-ok       | guardado + renovación | org | active fuera de gracia | [402, 200] | termina active, período por delante
-MAL      | renovación + guardado | usuario | prueba vencida | [200, 402] | termina past_due, período por delante
-MAL      | renovación + guardado | usuario | active fuera de gracia | [200, 402] | termina past_due, período por delante
-MAL      | renovación + guardado | org | prueba vencida | [200, 402] | termina past_due, período por delante
-MAL      | renovación + guardado | org | active fuera de gracia | [200, 402] | termina past_due, período por delante
-```
+Repite pedido + dispose hasta que el arnés anterior (dispose y esperar 15
+s) deja una conexión abierta, y ahí prueba `soltar()`. Sale 4 si en 30
+vueltas no se armó, y 2 si la conexión abierta no vino del pool descartado.
+
+| corrida | rc | salida |
+|---|---|---|
+| HEAD | 0 | «vuelta 6: arnés anterior (dispose y esperar 15 s): 1 conexión(es) de la app abiertas» · «devueltas al pool descartado por: ['MetricsMiddleware.dispatch.<locals>.log_request_background']» · «soltar(): la base quedó sin conexiones de la app» |
+| `gc.collect()` reemplazado por `pass` (el arreglo revertido) | 1 | «vuelta 5: arnés anterior (dispose y esperar 15 s): 1 conexión(es) de la app abiertas» · el mismo `log_request_background` · «soltar(): la app no soltó sus conexiones» |
+
+**Que gc no tape una fuga.** Probé con un script que no se commitea: saca
+una conexión del pool y no la devuelve. El `soltar()` de `4268eb2c` dio
+verde: «soltar(): verde, OTRAS = 0», más un `SAWarning` que nadie miraba.
+Con `e9323b67`: «OTRAS antes: 1» y «soltar(): la app dejó conexiones sin
+devolver al pool: The garbage collector is trying to clean up
+non-checked-in connection <AdaptedConnection <».
+
+**El resto de la familia con el `soltar()` nuevo**, una vez cada uno:
+
+| caso | corrida | rc | salida | rc=2 |
+|---|---|---|---|---|
+| 6 (`conexiones1_pares.py`) | con `parche_nokey.diff` | 1 | «deadlocks: 3; rondas sin armar: 0». Los 3 son pares con alta, de org con créditos vencidos: alta + guardado, alta + cancelar y alta + reactivar, con `[200, 500]`. Los otros 53 dieron `ok` | no |
+| 7 (`conexiones1_renovacion.py`) | HEAD | 1 | «cuentas mal: 4; rondas sin armar: 0»: las 4 de renovación + guardado terminan `past_due`, como en H (D204) | no |
+
+En ninguno de los dos hubo `Invalida` de `soltar()`. Los deadlocks con alta
+ya estaban en H: NO KEY no cubre el alta.
+
+## Caso natural (`conexiones1_natural.py`)
+
+Los dos pedidos salen juntos con una barrera de hilos; nadie toma la fila
+desde afuera. 10 rondas por combinación. Después de cada ronda:
+`soltar()`, deadlocks de `pg_stat_database` y el estado de la recarga
+(`mp_pagos_aplicados` y créditos de la org). Si perdió el aviso de MP,
+manda el aviso firmado otra vez y mira de nuevo.
+
+**HEAD** (`e9323b67`), rc=1, «deadlocks: 17, recargas perdidas: 0»:
+
+| par | créditos | deadlock | quién pierde | recarga |
+|---|---|---|---|---|
+| recarga + guardado | vencidos | 8/10 | guardado 500 en 7, aviso 500 en 1 | aplicada, 10/10 vigentes en 9; la del aviso 500, abajo |
+| recarga + guardado | al día | 0/10 | nadie | aplicada, 15/15 vigentes en las 10 |
+| recarga + MARIA | vencidos | 9/10 | MARIA 500 en las 9 | aplicada, 10/10 vigentes en las 10 |
+| recarga + MARIA | al día | 0/10 | nadie | aplicada, 15/15 vigentes en las 10 |
+
+La ronda en que perdió el aviso, copiada del log:
+`DEADLOCK | recarga + guardado | créditos vencidos | aviso 500, guardado 200 | pago sin fila, créditos 0/10 vencidos | reintento 200: pago aplicado, créditos 10/10 vigentes`
+
+**Con `parche_nokey.diff`**, rc=0, «deadlocks: 0, recargas perdidas: 0»:
+las 40 rondas `ok` con aviso 200 y el otro pedido 200. La recarga quedó
+aplicada, 10/10 vigentes con créditos vencidos y 15/15 con créditos al día.
+
+«10/10» quiere decir 10 créditos de la recarga y nada de los 5 vencidos;
+«15/15», los 10 más los 5 que seguían vigentes.
+
+Sale 2 si una ronda sin deadlock no dio 200/200: así no cuenta como «sin
+deadlock» una ronda en la que un pedido falló por otra cosa. No pasó en
+ninguna de las 80.
 
 ## Comandos
 
-Desde la raíz, con el venv del proyecto en `PY`. Cada uno tarda unos minutos.
+Desde la raíz, con `PY` apuntando al python del venv.
 
 ```bash
-PY=$PWD/venv/bin/python   # o el tuyo
-# caso 6 en HEAD → 5 líneas DEADLOCK, «deadlocks: 5; rondas sin armar: 0», rc=1
-scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_pares.py; echo rc=$?
-# caso 6 con (b) → ninguna DEADLOCK, «deadlocks: 0; rondas sin armar: 0», rc=0
-PY=$PY scripts/testing/conexiones1_con_parche.sh scripts/testing/conexiones1_pares.py; echo rc=$?
-# caso 6 con sólo NO KEY → 3 DEADLOCK (alta + guardado/cancelar/reactivar), rc=1
-PARCHE=conexiones1_parche_nokey.diff PY=$PY scripts/testing/conexiones1_con_parche.sh scripts/testing/conexiones1_pares.py; echo rc=$?
-# caso 7 en HEAD y con (b) → 4 MAL, «cuentas mal: 4; rondas sin armar: 0», rc=1
-scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_renovacion.py; echo rc=$?
-PY=$PY scripts/testing/conexiones1_con_parche.sh scripts/testing/conexiones1_renovacion.py; echo rc=$?
-# parche que no aplica → rc=2
-PARCHE=no_existe.diff PY=$PY scripts/testing/conexiones1_con_parche.sh scripts/testing/conexiones1_pares.py; echo rc=$?
-git worktree list | grep -c cdi-parche   # → 0
-```
+# caso 9: rc 0, con la vuelta, log_request_background y «la base quedó sin conexiones de la app»
+scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_soltar.py
+# rojo: en conexiones1_rondas.py, cambiar «gc.collect()» por «pass»: rc 1, «la app no soltó sus conexiones»
 
-Códigos de salida: 1 = deadlock o cuenta mal; 4 = alguna ronda no se armó;
-2 = el arnés falló o el parche no aplica; 0 = limpio. Un error de import o
-de `git worktree add` sale 1 igual, pero sin la última línea «deadlocks: N»
-o «cuentas mal: N»: así se distingue.
+# natural en HEAD: rc 1, «deadlocks: N, recargas perdidas: 0» con N > 0
+scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_natural.py
+# natural con NO KEY: rc 0, «deadlocks: 0, recargas perdidas: 0»
+PARCHE=conexiones1_parche_nokey.diff PY=$PY scripts/testing/conexiones1_con_parche.sh scripts/testing/conexiones1_natural.py
+
+docs/pm/herramientas/chequeo-6.py 734b484c e9323b67
+```
 
 ## Puertas
 
-| Puerta | Salida |
-|---|---|
-| `chequeo-6 6001684..7e55e35d` | `producto +0/−0`, `arnés +323/−0`, historia vacía, `avisos: 0` |
-| caso 6 y 7, con y sin parche | la tabla de Resultados |
-| parche inexistente | rc=2 |
-| worktrees `cdi-parche` sueltos | 0 |
-| suite completa | **no corrida**: no hay producto |
-
-Salida entera de `chequeo-6`:
+`chequeo-6`, salida entera:
 
 ```
-chequeo-6 6001684ccc1249bc5bfbf33e10e6d327d80c51b2..7e55e35dc2dffa98c36502431bcc3929c1723b72: avisos para mirar, no un veredicto
+chequeo-6 734b484c..e9323b67c9d3dcfe1ac06d05a7670757b7f7c2f9: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +323/−0
+arnés +166/−3
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
 ```
 
-## Cómo cuenta el arnés
-
-- El deadlock lo cuenta `pg_stat_database.deadlocks` antes y después de la
-  ronda. Postgres lo actualiza sin plazo fijo, pero sí al cerrar la conexión:
-  la ronda cierra el pool de la app y espera a que no le quede ninguna
-  conexión. Así cuenta también un deadlock que la app atrape y no dé 500
-  (`_vencer_y_guardar` hace `rollback` de cualquier excepción).
-- La ronda se arma cuando el segundo pedido está esperando el candado del
-  primero; si no se arma, la ronda sale «NO SE ARMÓ» y el caso da 4.
+Archivos de producto tocados: ninguno.
 
 ## Revisión
 
-| Quién | Modelo y esfuerzo | Hallazgo | Qué hice |
+| quién | modelo y esfuerzo | hallazgo | qué hice |
 |---|---|---|---|
-| adversario | Sonnet, alto | Excepción del arnés salía 1, igual que un deadlock | Arreglado: sale 2 |
-| adversario | Sonnet, alto | Parche que no aplica salía 1 | Arreglado: sale 2 |
-| `/code-review` | high | El contador sólo esperaba si había un 500 | Arreglado: cierra el pool y espera siempre |
-| `/code-review` | high | El docstring del caso 7 no nombraba `get_current_user` | Arreglado |
-| `/code-review` | high | `.sh`: raíz relativa, trap, stderr tapado | Arreglado |
-| adversario | Sonnet, alto | El 0 es de (b) completo, no de NO KEY solo | Declarado: la tabla trae las 3 variantes |
-| adversario | Sonnet, alto | El caso 6 imprime el código fuente, no el SQL emitido, y corta «esperaba» a 110 caracteres: no se ve el modo del candado | Queda. La línea de `_cuenta_bloqueada` sí muestra el modo |
-| `/code-review` | high | `ronda` duplica `fase_carrera` de `conexiones1_creditos.py`; el loop de reporte se repite en los dos casos | Queda: `creditos.py` no lo toco en H. Va a la cola si la pieza de producto no lo absorbe |
-| adversario | Sonnet, alto | `parche_b.diff` contiene a `parche_nokey.diff` | Queda: son variantes completas, no se aplican juntas |
-| adversario | Sonnet, alto | Con NO KEY, la ronda puede armarse por una espera de FK y no por el candado | Queda: el arnés no distingue qué pedido espera |
-| adversario | Sonnet, alto | El argumento del `.sh` tiene que ser relativo a la raíz; el caso 7 no imprime el árbol | Queda: el uso lo dice |
-
-El adversario reprodujo por su cuenta los mismos números de HEAD, (b) y NO
-KEY antes del arreglo del contador.
+| `/code-review` | Opus, alto | gc corría en el hilo principal, no en el loop de la app | Movido al loop (`c.portal.call`) |
+| `/code-review` | Opus, alto | el natural no verificaba que los dos pedidos hubieran corrido | Sale 2 si no hubo deadlock y no dio 200/200 |
+| `/code-review` | Opus, alto | el caso 9 salía 0 aunque nadie hubiera devuelto al pool descartado | Sale 2 |
+| `/code-review` | Opus, alto | la barrera no tenía plazo | Tiene el plazo del arnés; el cuelgue al cerrar los hilos queda como riesgo |
+| `/code-review` | Opus, alto | esperar la tarea de registro en vez de repetir dispose + gc | Queda así: dependería de un nombre interno del producto |
+| `/code-review` | Opus, alto | `_return_conn` es privado de SQLAlchemy | Se usa sólo para diagnosticar en el caso 9 |
+| `/code-review` | Opus, alto | el costo de gc en cada sondeo, el docstring de N y un nombre repetido | Bajo / corregido / renombrado a `ESTADO` |
+| adversario | Sonnet, alto | MEDIA: gc tapaba una fuga real | Corregido con los avisos de gc; probado arriba |
+| adversario | Sonnet, alto | MEDIA: el caso 9 con nadie anotado salía 0 | Corregido (igual que arriba) |
+| adversario | Sonnet, alto | MEDIA: el natural no verificaba la recarga | Corregido: créditos esperados y «RECARGA PERDIDA» |
+| adversario | Sonnet, alto | BAJA-MEDIA: no prueba que los pedidos se solapen | Límite del pedido: sin tomar la fila desde afuera, sólo lo muestra el deadlock |
+| adversario | Sonnet, alto | BAJA: quién pierde se deduce del código HTTP | Límite: es lo que ve el usuario |
+| adversario | Sonnet, alto | BAJA: una conexión ajena a la app en la base da falso rojo | Riesgo, abajo |
 
 ## Riesgos y lo no corrido
 
-- Cada caso corrió una vez por árbol. Es una carrera armada (el segundo
-  pedido espera el candado del primero), no un sorteo, pero no midió
-  frecuencia en producción.
-- Suite completa, e2e y arneses de otras piezas: no corridos; no hay
-  producto.
-- `tests/test_conexiones1.py` sigue sin seguimiento a propósito.
+- `soltar()` cuenta todas las conexiones a la base del arnés, salvo la
+  suya. Si otra cosa se conecta a esa base (no pasa con `con_pg16.sh`, que
+  levanta una propia), espera de más y sale 2: falso rojo, nunca falso
+  verde.
+- Si un pedido se cuelga, `ThreadPoolExecutor` espera al cerrar. Lo corta el
+  `timeout` de afuera (rc 124), no el caso.
+- El natural en HEAD varía de corrida a corrida (antes dio 10/10 y 9/10;
+  ahora 8/10 y 9/10). Los ceros con créditos al día y con NO KEY no
+  cambiaron.
+- **No corrido:** suite, e2e y arneses de otras piezas. No hay producto en
+  la pieza.
