@@ -3,62 +3,74 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## CONEXIONES-1 E: aceptada como arnés sobre `19714ecf` e integrada (2026-11-12 06:52 UTC)
+## CONEXIONES-1 G: aceptada sobre `6ce56cf9` e integrada (2026-11-12 10:13 UTC)
 
-Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección E.
-Integré con `merge` exactamente `19714ecf`. Es arnés solo; el producto
-tiene 0 líneas.
+Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección G.
+Integré exactamente `6ce56cf9` (avance directo). Producto +0/−0, `chequeo-6`
+igual.
 
 - **Coincide con tu informe:**
-  - el caso del corte da `assert 500 == 400` con el diff de D y `103 passed` con el revisado;
-  - el medidor con el revisado da rc=0, con `corte_manual_a_medias` {400: 15} y `pico_cuerpo_manual` 60 de 60 con 0 tomadas;
-  - el control da seis `BIEN`;
-  - `chequeo-6` da lo mismo, con 0 avisos.
-- **Mis negativos:** corté sin mandar nada y en tres trozos. Con el
-  `except` las dos formas dan 400 sin ERROR; sin él, 500.
-- **Leído:**
-  - el ancla es código;
-  - no hay espera fija nueva;
-  - el segmento de log de cada fase se lee después de que terminan sus tareas de registro. La sonda cuenta el fin en el callback y la app corre sin búfer, así que el rc=4 sin arreglo no depende del orden del log. Esa corrida no la repetí.
-- **D185: (a), decidido por la PM.** El tope de cuerpo no entra en esta fila. Va a
-  Emi como riesgo dentro del punto 13.
+  - créditos: hoy, (a) y (b) pierden las dos carreras («quedan 0 de 10
+    pagos»), rc=1; verde, (a)+verde y (b)+verde dan 4 OK, rc=0;
+  - cuerpos (1×100 y 4×100): hoy y (b) contestan 402 con 3–4 MB mandados;
+    (a) retiene el cuerpo entero, pico 357.7 y 959.3 MB.
+- **Mi negativo: verde como está arma un deadlock.** Verde toma la org
+  primero; `_cuenta_bloqueada` toma usuario y después org. El mismo usuario
+  de una org, con alta manual y guardar en un cliente a la vez: con verde y
+  con (a)+verde, el guardado da 500 y Postgres cuenta un deadlock, 3 de 3.
+  Con (b)+verde no lo vi (3 de 3). Hoy, 200/200. Tu medidor no lo ve porque
+  no corre las dos rutas a la vez.
+- **D188: a Emi, de día** (plata). Le llevo tu (a): arreglarlo dentro de la
+  pieza de producto, con tu medidor como puerta.
+- **D189: (b), decidido por la PM.** Verde no entra como está: arma el
+  deadlock cuando la dependencia sigue con la org tomada mientras la ruta
+  cuenta (hoy y (a)). Con (b) no lo vi, en el único estado probado. El
+  criterio es el comportamiento:
+  - un caso de las dos rutas a la vez (alta y guardado, el mismo usuario),
+    con usuario y org y con créditos vencidos y no vencidos como datos: da
+    200/200 y deadlocks +0;
+  - `conexiones1_creditos.py` da rc=0;
+  - dos rojos mostrados una vez: créditos con el arreglo revertido; las dos
+    rutas con verde sobre un árbol donde la dependencia no hace `commit`
+    antes de contar (hoy o (a)).
+  - *Sugerencia:* tomar los candados con `_cuenta_bloqueada` (usuario →
+    org), o un `UPDATE` condicional que no lea antes.
+- **D186: se lo llevo a Emi como (b).** Cuerpos: (b) no lee el cuerpo antes
+  del 402, (a) sí.
+- **D184 ya está decidida (a, por la PM, en D):** no la listes como abierta
+  para Emi. Siguen de Emi D182 y D183.
+- Limpieza de `conftest.py`: vista en tu informe, gracias.
+- **Leído, no medido:** `_vencer_y_guardar` escribe
+  `billing_status=past_due` desde una lectura sin candado. Un aviso de pago
+  de suscripción a la vez podría pisarse igual que la recarga. Va como caso
+  de la familia en la pieza; medilo antes de afirmar nada.
 
-## Tarea activa: CONEXIONES-1 F, casos y puertas con el diff revisado (2026-11-12 06:52 UTC)
+## Tarea activa: el plan de la pieza de producto de CONEXIONES-1, sin producto (2026-11-12 10:13 UTC)
 
-Seguimos en la fila abierta de CONEXIONES-1. No commiteás producto: el diff
-revisado sigue fuera de la rama, sólo en el informe. Tus D van de D186 a D189.
+Emi todavía no contestó D182 ni D188. Seguís con el plan que ya
+arrancaste. Lleva la lista de casos (uno por causa), las puertas y los
+comandos copiables, con (b) como forma. Tus D van de D200 a D209.
 
-1. **Cuenta impaga y cuenta sin cuota.** Agregalas en `test_conexiones1.py`
-   como datos dentro de un caso. Para cada una:
-   - un corte a mitad del cuerpo contesta 400;
-   - el cuerpo completo contesta 402 la impaga y 429 la sin cuota.
+**Condiciones de la pieza** (de F y G):
+- Base caída en cada uno de los tres `commit` nuevos
+  (`require_billing_vigente`, analyze, NCM): un caso, con los tres puntos
+  como datos. Hoy sólo el de NCM tiene `try`.
+- Lo que el caso le cambia al motor o a la sesión se devuelve en un
+  `try/finally`.
+- En `sabotajes_f.py`, `SUELTA` y `COBRO` se anclan en código, no en
+  comentarios (§6), cuando el script entre al repo.
+- La impaga con JSON roto completo sigue en 402, o el cambio va declarado.
+- Créditos: `conexiones1_creditos.py` rc=0, más el caso de las dos rutas a la
+  vez de D189, con sus datos y sus dos rojos.
+- `billing_status` con un aviso de suscripción a la vez: un caso de la familia.
+- Los demás caminos que usan `require_active_billing` o
+  `can_create_operation` (análisis de PDF, otros planes): listados en el plan,
+  con caso o con la razón de por qué no.
+- Revisión fuerte: `/security-review`, adversarios, suite completa y
+  `e2e_maria.sh` sobre el SHA.
 
-   Si te sale distinto, mostrá la salida y no lo arregles.
-2. **Hallazgo 3,** con el diff revisado aplicado: analyze con el pool lleno al guardar el respaldo. Medí qué
-   contesta y mostrá que en la base no queda nada a medias. Tiene que ser un
-   caso o una fase del medidor, sin espera fija nueva.
-3. **Con el diff revisado aplicado y sin commitear**, corré la suite completa
-   (`DOLARAPI_BASE` local, `ENVIRONMENT=testing`, `GEMINI_API_KEY` vacía) y
-   `e2e_maria.sh`. Poné las dos salidas en el informe. Esto no reemplaza la
-   puerta sobre el SHA que entregues en la pieza de producto: decilo así.
-4. **Para la pieza de producto, sin hacerlo ahora:** el texto «Body JSON
-   inválido» está repetido en dos lugares (§6). Proponé cómo queda en uno
-   solo, o explicá por qué no se puede sin cambiar la firma de la ruta.
-
-El diff revisado actualizado va en el informe, con `git apply --check`
-limpio sobre tu cabeza.
-
-**Apenas entregues F: CONEXIONES-1 G**, si Emi todavía no dijo que sí a D182.
-Es sólo arnés y mide el riesgo del cuerpo leído antes del 402. Una cuenta
-impaga manda cuerpos grandes a `/api/operations/manual`: el más grande que
-acepte la app y unos cuantos a la vez. Medilo hoy y con el diff revisado, y
-contestá:
-- cuánto tarda el 402;
-- cuánta memoria sube el proceso;
-- si otra cuenta lo nota.
-
-Ninguna espera fija nueva. Si Emi ya dijo que sí, la pieza de producto de
-CONEXIONES-1 va antes que G, con E y F adentro y revisión fuerte.
+**Apenas entregues el plan:** si Emi dijo que sí a D182, la pieza de
+producto. Si no, avisame en el informe y te paso la siguiente de la cola.
 
 ## FOCO-PERFIL: aceptada sobre `dc4cf077` e integrada (2026-11-12 03:37 UTC)
 

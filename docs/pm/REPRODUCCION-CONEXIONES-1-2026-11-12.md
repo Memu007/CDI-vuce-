@@ -321,3 +321,308 @@ Por eso va a Emi como una línea de riesgo dentro del punto 13.
   el corte del segmento de log espera a las tareas de registro (ver arriba).
 - Los adversarios, `/security-review`, la suite completa y `e2e_maria.sh`
   con el diff revisado. Van en la pieza de producto.
+
+## F (sólo arnés y diff revisado): aceptada sobre `21df2a39` (2026-11-12 09:19 UTC)
+
+Informe de la Técnica en `PARA-PM.md` de `21df2a39`; sólo trae ese
+archivo (`git diff 759241ff 21df2a39 --stat`). El diff revisado, la
+alternativa D186 y `sabotajes_f.py` los saqué del informe con sus `awk`.
+Árboles descartables `/tmp/cdi-pm/wt-con1f` (`35c19be7`) y
+`wt-con1f-head` (`759241ff`). `ls /tmp/conftest.py /tmp/cdi-pm/conftest.py`:
+«No such file or directory» los dos.
+
+### Lo corrido por la PM
+
+| Qué | Dónde | Salida |
+|---|---|---|
+| `git apply --check` del diff revisado, en árboles nuevos | `35c19be7` y `759241ff` | «check limpio» en los dos |
+| Pruebas de F sin el diff (rojo) | `35c19be7` | 7 failed, 1 passed; `('impaga', 402, 402, 'sin leer') != ('impaga', 400, 402, 0)`; `('al leer', 200, '', 1, 200, 2) != ('al leer', 500, …, 0, 200, 1)` |
+| Con el diff revisado | `35c19be7` | `test_conexiones1.py` + `test_cobro_corte1.py`: 106 passed |
+| `sabotajes_f.py` | `35c19be7` + diff | los 9 ROJO, con el mismo texto de rojo que la tabla del informe; «sabotajes sin rojo: ninguno», rc=0 |
+| Alternativa D186 + `test_conexiones1.py` | `35c19be7` | 1 failed, 7 passed: `('impaga', 402, 402, 'sin leer') != ('impaga', 400, 402, 0)` |
+| Alternativa D186 + pruebas de cobro (`test_cobro_corte1`, `test_cobro_mp1*`, `mp2`, `mp3`, `test_billing_*`, `test_api_clientes_billing`, `test_g7_cobro`) | `35c19be7` | 482 passed |
+| Exención de `test_cobro_corte1.py`: `_commit_que_falla` sin `raise` | `759241ff` + diff | 4 failed, 94 passed (`importacion_al_confirmar`, `al_confirmar`, `al_confirmar_y_deshacer`, `al_confirmar_sin_enlaces`): los casos eximidos siguen llegando a la falla |
+| `chequeo-6 35c19be7` con el diff commiteado en un árbol descartable (`4d64fb8c`, no es un SHA entregado) | | igual al informe: producto +26/−1, 1 AVISO explicado (+25 netas), historia vacía |
+
+**Mis negativos** (en `759241ff` + el diff revisado; código abajo):
+
+1. **Pool lleno al leer, pero la otra cuenta suelta mientras analyze espera
+   para guardar** (espera del pool 10 s, como producción con 30 s): 200 y 1
+   respaldo; al pedir conexión el pool tenía 5 de 5 tomadas. Sabotaje: la
+   otra cuenta no suelta (espera 0,5 s) → `(500, 0, 5, [5]) != (200, 1, 5,
+   [5])`. O sea: el 500 de F aparece sólo si el pool queda lleno durante toda
+   la espera, y nunca deja medio respaldo.
+2. **Cuerpos raros en `/api/operations/manual`**, como datos de un caso:
+   corte sin un byte (al día y impaga) → 400 «Body JSON inválido»; JSON roto
+   completo, al día → 400 «Body JSON inválido»; JSON roto completo, impaga →
+   **402**. Ese último dato contradice el punto 4 del informe: con
+   `_leer_json` el JSON se parsearía antes del plan y esa cuenta pasaría a
+   400. El contrato HTTP sí cambia en ese caso.
+
+### Leído
+
+- `_FRIENDLY_5XX` (`main.py:466`) explica por qué el 500 de analyze dice
+  «No pudimos procesar tu solicitud» y no el texto de la ruta.
+- `expire_on_commit=False` (`database/connection.py:79`): los clientes y
+  el usuario siguen cargados después de los `commit` nuevos.
+- `sabotajes_f.py` ancla `SUELTA` y `COBRO` en líneas de comentario
+  (§6: el ancla es código). Hoy el script vive en el informe, no en el repo:
+  queda como condición cuando entre al repo.
+- Los `commit` nuevos de `require_billing_vigente` y de analyze no tienen
+  `try`, el de NCM sí. Lo que pasa con la base caída en cada uno no tiene
+  caso: condición de la pieza de producto.
+- La alternativa D186 pone un `commit` en `require_active_billing`, que
+  llama a `can_create_operation` → `_expire_extra_ops`
+  (`billing_service.py:109`, `:164`). En C quedó «no tocar
+  `require_active_billing` sin resolver `_expire_extra_ops`»: es la razón
+  para no elegir (b) todavía, no la del punto 1 de F (que se escribió para
+  el diseño de leer el cuerpo primero).
+
+### Decisiones
+
+- **D186: (a) por ahora, decidido por la PM.** (b) suelta igual la conexión
+  y no trae los dos cambios del punto 13 ni el riesgo del tope, pero guarda
+  en la dependencia el vencimiento de créditos extra. G lo mide en una
+  tercera columna, con un caso de créditos extra vencidos y una recarga a la
+  vez. Si sale bien, la PM le lleva (b) a Emi como la recomendada.
+- **D187: (a), decidido por la PM.** `pool_timeout=0.05` no es una espera
+  fija: el caso no duerme; el motor deja de esperar.
+
+### No corrido por la PM
+
+- La suite completa y `e2e_maria.sh` con el diff revisado: sólo la corrida
+  de la Dev (6085 passed, E2E MARIA OK). La puerta va sobre el SHA de la pieza
+  de producto.
+- Adversarios y `/security-review`: en la pieza de producto.
+
+<details><summary>Negativos de la PM (no van al repo)</summary>
+
+```python
+"""Negativos de la PM sobre CONEXIONES-1 F (no van al repo)."""
+import asyncio
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.pool import AsyncAdaptedQueuePool
+from starlette.requests import Request
+
+from proyecto_maria import main
+from proyecto_maria.database import connection as _conn
+from proyecto_maria.services import migration_service
+from tests.test_conexiones1 import _sesion, _respaldos, _impaga, MANUAL
+
+
+def test_pm_pool_lleno_al_leer_pero_se_libera_mientras_espera(monkeypatch):
+    """Con espera de pool larga (como producción), si la otra cuenta suelta
+    mientras analyze espera conexión para guardar, contesta 200 y guarda 1."""
+    c, nombre = _sesion(monkeypatch)
+    leer, guardar = migration_service.analyze_migration_file_async, AsyncSession.commit
+    archivo = {"file": ("clientes.csv", b"cuit,nombre\n20123456786,Cliente Uno\n", "text/csv")}
+    motor = create_async_engine(_conn.DATABASE_URL, poolclass=AsyncAdaptedQueuePool,
+                                pool_size=5, max_overflow=0, pool_timeout=10)
+    otras, liberar, pidio = [], [], []
+    pedir = motor.pool._do_get
+
+    def pedir_marcando():
+        if len(otras) == 5:
+            pidio.append(motor.pool.checkedout())
+        return pedir()
+    motor.pool._do_get = pedir_marcando
+
+    async def leer_y_llenar(*a, **k):
+        while motor.pool.checkedout() < motor.pool.size():
+            otras.append(await motor.connect())
+        return await leer(*a, **k)
+
+    async def guardar_soltando(self, *a, **k):
+        if otras and not liberar:
+            async def soltar():
+                # Suelta recién cuando el commit ya está esperando en la cola del pool.
+                while not pidio:
+                    await asyncio.sleep(0)
+                for o in otras:
+                    await o.close()
+            liberar.append(asyncio.ensure_future(soltar()))
+        return await guardar(self, *a, **k)
+
+    monkeypatch.setattr(migration_service, "analyze_migration_file_async", leer_y_llenar)
+    monkeypatch.setattr(AsyncSession, "commit", guardar_soltando)
+    antes = _respaldos(nombre)
+    _conn.AsyncSessionLocal.configure(bind=motor)
+    try:
+        with c:
+            r = c.post("/api/migrations/analyze", files=archivo)
+            c.portal.call(motor.dispose)
+    finally:
+        _conn.AsyncSessionLocal.configure(bind=_conn.engine)
+    assert (r.status_code, _respaldos(nombre) - antes, len(otras), pidio[:1]) == (200, 1, 5, [5]), r.text
+
+
+def _cortar_sin_nada(pedido):
+    mensajes = iter([{"type": "http.disconnect"}])
+
+    async def recibir():
+        return next(mensajes)
+    pedido._receive = recibir
+
+
+def test_pm_cuerpos_raros_en_manual(monkeypatch):
+    """Familia de cuerpos: corte sin un byte (impaga y al día), JSON roto
+    completo (impaga y al día). (cuenta, cuerpo, código)."""
+    CASOS = [
+        ("al dia", "corte vacio", 400),
+        ("impaga", "corte vacio", 400),
+        ("al dia", "json roto", 400),
+        ("impaga", "json roto", 402),
+    ]
+    leer, vieron = Request.body, []
+    for cuenta, cuerpo, _cod in CASOS:
+        with monkeypatch.context() as mp:
+            c, nombre = _sesion(mp)
+            if cuenta == "impaga":
+                _impaga(nombre)
+            if cuerpo == "corte vacio":
+                async def frenar(self):
+                    if not hasattr(self, "_body"):
+                        _cortar_sin_nada(self)
+                    return await leer(self)
+                mp.setattr(Request, "body", frenar)
+            with c:
+                if cuerpo == "json roto":
+                    r = c.post("/api/operations/manual", content=b'{"client_id": ',
+                               headers={"content-type": "application/json"})
+                else:
+                    r = c.post("/api/operations/manual", json=MANUAL)
+        detalle = r.json().get("detail")
+        vieron.append((cuenta, cuerpo, r.status_code,
+                       detalle if isinstance(detalle, str) else type(detalle).__name__))
+    print(vieron)
+    assert [v[:3] for v in vieron] == [(a, b, c) for a, b, c in CASOS], vieron
+```
+
+</details>
+
+## G (sólo arnés): aceptada sobre `6ce56cf9` (2026-11-12 10:13 UTC)
+
+Informe de la Técnica en `PARA-PM.md` de `6ce56cf9`. Producto +0/−0:
+`git diff 2c69edf4 6ce56cf9 --stat -- proyecto_maria/` vacío; `chequeo-6`
+igual al informe (arnés +592, historia vacía, 0 avisos). Los diffs (a) y (b)
+y el arreglo de prueba de una línea («verde») los saqué del informe. Árbol
+descartable `/tmp/cdi-pm/wt-g` en `6ce56cf9`, Postgres 16 descartable de
+`scripts/testing/con_pg16.sh`.
+
+### Lo corrido por la PM
+
+| Qué | hoy | (a) revisado | (b) alternativa | verde | (a)+verde | (b)+verde |
+|---|---|---|---|---|---|---|
+| `conexiones1_creditos.py` (usuario y org, control y carrera) | PIERDE las dos carreras, «quedan 0 de 10 pagos», rc=1 | rc=1, igual | rc=1, igual | 4 OK, rc=0 | 4 OK, rc=0 | 4 OK, rc=0 |
+| `conexiones1_cuerpo.py --rondas 1x100,4x100`: pico RSS (MB) | 157.7 · 158.5 | **357.7 · 959.3** | 157.9 · 158.9 | — | — | — |
+| ídem: 402 con lo mandado | 3–4 MB, 0 retenidas | 100 MB, todas retenidas | 3–4 MB, 0 retenidas | — | — | — |
+| ídem: otra cuenta al soltar, 4×100 | sin muestra | 249.4 ms | sin muestra | — | — | — |
+
+Coincide con el informe (su 1×100 del revisado: pico 358.5). Los 4×500 MB
+(pico 4159.7 MB) son de la Dev; no los corrí.
+
+### Mi negativo: el orden de los candados
+
+El arreglo verde toma la fila de la **org** en `require_active_billing`
+(`db.refresh(entidad, with_for_update=True)`) y después la ruta cuenta con
+`_cuenta_bloqueada` (`main.py:2257`), que toma **usuario y después org**. Una
+cuenta de org, el **mismo usuario** con dos pedidos a la vez: alta manual (M)
+y guardar una operación en un cliente (P). El arnés toma la org, espera a ver
+M y P esperando, y suelta. Mide códigos y deadlocks de `pg_stat_database`.
+
+| Árbol | control | carrera (3 rondas) |
+|---|---|---|
+| hoy | 200/200 | 200/200, deadlocks +0, las tres |
+| verde | 200/200 | alta 200, **guardado 500**, deadlocks +1, las tres |
+| (a)+verde | 200/200 | alta 200, **guardado 500**, deadlocks +1, las tres |
+| (b)+verde | 200/200 | 200/200, deadlocks +0, las tres (no observado en este estado; no es una prueba de que no pueda pasar) |
+
+El 500 tiene el texto amable («No pudimos procesar tu solicitud…»); el log
+dice `DeadlockDetectedError` en `save_client_operation`. No verifiqué qué
+quedó guardado ni contado después del 500. El ciclo pide dos pedidos del
+mismo usuario a la vez (`_cuenta_bloqueada` bloquea el usuario que pide).
+Cuentas sin org: no corrido (por lectura, una sola fila no arma ciclo).
+Conclusión: verde como está no entra; arma el ciclo cuando la dependencia
+sigue con la org tomada mientras la ruta cuenta. El negativo no tenía
+créditos vencidos (`extra_ops_remaining = 0`, sin vencimiento): el caso de la
+pieza los lleva como datos. Lo que separa (a) de (b) es la memoria de arriba.
+
+### Leído
+
+- `record_operation_created` (`billing_service`) corre sólo bajo el candado
+  de `_contar_en_la_cuenta`: no es otro camino de pérdida. Mi sospecha,
+  descartada.
+- `_vencer_y_guardar` escribe `billing_status=past_due` desde una lectura
+  sin candado; un aviso de pago de suscripción a la vez podría pisarse igual
+  que la recarga. No medido: va como caso de la familia en la pieza.
+
+### No corrido por la PM
+
+- Adversarios, `/security-review`, suite y `e2e_maria.sh`: la entrega no
+  tiene producto. Van en la pieza de producto.
+- 4×500 MB, 8×100 MB y keep-alive: sólo la corrida de la Dev.
+- El negativo en cuentas sin org y con usuarios distintos de la misma org.
+
+<details><summary>Negativo de la PM (no va al repo; correr desde la raíz del repo con con_pg16.sh)</summary>
+
+```python
+"""Negativo PM sobre G: el arreglo de prueba bloquea la org antes que el usuario;
+_cuenta_bloqueada bloquea usuario y después org. Con el mismo usuario de una org:
+alta manual (M) y guardado en un cliente (P) a la vez. El arnés toma la org,
+espera a ver M y P esperando, y suelta. Mide códigos y deadlocks de Postgres."""
+import os, sys
+from contextlib import closing
+from concurrent.futures import ThreadPoolExecutor
+sys.path.insert(0, "scripts/testing")
+import conexiones1_creditos as h  # noqa: E402
+import psycopg2  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+
+def deadlocks():
+    return h.sql("select deadlocks from pg_stat_database where datname = current_database()")[0][0]
+
+
+def guardar(c, sesion, cliente):
+    return c.post(f"/api/clientes/{cliente}/operaciones", headers=sesion, json={"items": []})
+
+
+def ronda(c, carrera):
+    sesion, cliente, ref, (tabla, clave, valor) = h.preparar(c, True)
+    h.sql("update organizations set extra_ops_expires_at = null, extra_ops_remaining = 0 where id = %s", valor)
+    antes = deadlocks()
+    if not carrera:
+        a, b = h.alta(c, sesion, cliente), guardar(c, sesion, cliente)
+        return a.status_code, b.status_code, deadlocks() - antes, []
+    with ThreadPoolExecutor(2) as hilos, closing(psycopg2.connect(h.URL)) as candado:
+        try:
+            with candado.cursor() as cur:
+                cur.execute("select 1 from organizations where id = %s for update", (valor,))
+                cur.execute("select pg_backend_pid()")
+                mio = cur.fetchone()[0]
+            m = hilos.submit(h.alta, c, sesion, cliente)
+            ok1 = h.hasta(lambda: len(h.esperando(mio)) >= 1)
+            p = hilos.submit(guardar, c, sesion, cliente)
+            ok2 = h.hasta(lambda: len(h.esperando(mio)) >= 2)
+            q = [" ".join(x.split())[:80] for x in h.esperando(mio)]
+        finally:
+            candado.rollback()
+        rm, rp = m.result(h.PLAZO), p.result(h.PLAZO)
+        return rm.status_code, rp.status_code, deadlocks() - antes, q + [f"armada: {ok1 and ok2}", rm.text[:100], rp.text[:100]]
+
+
+def main():
+    print(h.arbol())
+    with TestClient(h.main_mod.app, raise_server_exceptions=False) as c:
+        for carrera in (False, True):
+            for _ in range(1 if not carrera else 3):
+                am, gp, dl, extra = ronda(c, carrera)
+                print(f"{'carrera' if carrera else 'control'}: alta {am}, guardado {gp}, deadlocks +{dl}")
+                for x in extra:
+                    print("    ", x)
+
+
+main()
+```
+
+</details>
