@@ -168,8 +168,9 @@ antes de cerrar la Fase 3.
      la org después del vencimiento (después ya no); en esa condición pasó
      casi todas las veces de mi prueba. No sé cada cuánto coincide en
      producción. Si pierde la recarga, se acredita cuando MP reintenta (lo
-     simulé, no lo vi con MP). Con el arreglo chico, las 60 recargas de
-     la prueba quedaron acreditadas en el momento, sin errores.
+     simulé, no lo vi con MP). Con el arreglo chico, en esos 2 casos, las
+     60 recargas de la prueba local (pago simulado) quedaron acreditadas en
+     el momento. No arregla D188, que va con la pieza grande.
    - **El arreglo chico de 2 líneas arregla 2 de los 5 casos** (recarga +
      guardado y recarga + MARIA: 0 errores medidos). Los otros 3 (alta +
      guardado, alta + cancelar, alta + reactivar de esa org; medidos sólo
