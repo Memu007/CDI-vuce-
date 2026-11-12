@@ -204,27 +204,39 @@ pasar.
 prueba.** Sabotaje «un alta o un borrado no refresca los avisos», falla «sin
 perfil, el estudio no aparece en la lista».
 
-- Causa: `profile.js`, `open()`, termina con
-  `setTimeout(() => cuitInput && cuitInput.focus(), 150)` después de cargar
-  perfil, facturación y estudio. `pantalla_estudio1.js` (paso 9, y el mismo
-  patrón en el paso 2) abre el modal y llena enseguida `#pfEstudioNombre` y
-  `#pfEstudioCuit`. Si el foco salta durante el `fill`, el CUIT cae en
-  «Mi CUIT (despachante)», el del estudio queda vacío y el POST da 400.
-- **Observado** en una copia instrumentada (registra los campos antes del
-  clic de alta), 3 pantallas a la vez, 10 rondas: 29 bien, 1 mal. En la mala:
-  `["Estudio Inventado Tres", "", "30222222229", "pfCuit"]` (nombre, CUIT del
-  estudio, «Mi CUIT», elemento con foco) y POST `{"cuit":""}` → 400.
-- Tandas anteriores, por familia (sin instrumentar el foco):
-  - mismo estado observado: 2;
-  - compatibles sólo por el mensaje «CUIT no válido»: 3;
+- Causa: `profile.js` (`static/v2/screens/profile.js:135`), `open()`,
+  termina con `setTimeout(() => cuitInput && cuitInput.focus(), 150)`
+  después de cargar perfil, facturación y estudios. `pantalla_estudio1.js`,
+  paso 9, abre el modal y llena enseguida `#pfEstudioNombre` y
+  `#pfEstudioCuit`. Si el foco salta durante el `fill`, el CUIT cae en «Mi
+  CUIT (despachante)», el del estudio queda vacío y el POST da 400.
+- **Observado** en una copia instrumentada (registra nombre, CUIT del
+  estudio, «Mi CUIT» y elemento con foco antes del clic de alta), 3
+  pantallas a la vez, 10 rondas: 29 bien, 1 mal. En la mala:
+  `["Estudio Inventado Tres", "", "30222222229", "pfCuit"]` y POST
+  `{"cuit":""}` → 400. El usuario del paso 9 se registra en la prueba sin
+  CUIT, y el valor de «Mi CUIT» es exactamente `CUIT_UNO`: es lo escrito.
+  Fue en la ronda 1, con varios 429 antes; el GET 500 de `/api/estudios` lo
+  fuerza la propia prueba.
+- Todas las tandas (11 fallas; logs en el scratchpad de la PM):
+  - 8 a la vez, 3 rondas: 19 bien, 5 mal;
+  - 3 a la vez, 8 rondas: 22 bien, 2 mal;
+  - 8 a la vez, 3 rondas: 13 bien, 11 mal, de las que 8 son ECONNREFUSED de
+    la ronda 1 (servidor no listo) y no cuentan;
+  - 3 a la vez, 10 rondas: 29 bien, 1 mal.
+- Por familia:
+  - foco en «Mi CUIT» y CUIT del estudio vacío, observado: 3 (en la primera
+    de ellas el registro no traía el valor de «Mi CUIT»);
+  - compatibles sólo por el mensaje «CUIT del estudio no es válido»: 2;
+  - paso 2, «el nombre del estudio no puede quedar vacío» donde se esperaba
+    el error del CUIT corto: 1, compatible con el mismo foco, no observado;
   - sin clasificar: 2;
-  - 500 del servidor con 8 pantallas a la vez: 2 (otra causa, carga).
-  - Válidas con 8 a la vez: 16 (8 de la ronda 1 fueron ECONNREFUSED por
-    servidor no listo y no cuentan).
+  - 500 del servidor (perfil, TXT, registro), con 8 a la vez: 3; otra
+    causa, carga.
 - La corrida original queda «compatible, estado no capturado».
 - No lo introduce `dd0eab7e`: la prueba y el frente no cambiaron desde
-  `c8733be`. Se le pide a la Técnica arreglar la prueba (comportamiento y
-  prueba, sin espera fija) en `PARA-DEV.md`.
+  `c8733be`. Arreglo de la prueba a la Técnica (`estudio1`, `cobro_mp1`) con
+  reproducción que dé el rojo siempre; dato a MARIA para su `sesion1`.
 - Observación de producto, leída y no corrida: con carga lenta, a quien ya
   escribe en otro campo el foco le salta a «Mi CUIT». Va a la cola de
   limpieza.

@@ -15,25 +15,29 @@ el informe), no tu cabeza: CONEXIONES-1 C la reviso con su informe.
 - `disco1.sh` `[BBBB`: no hace falta pasárselo a MARIA, ya lo cambió a
   `[descripcion-de-2001]` en `ab5b08c7`.
 
-**Agregado, antes de seguir con CONEXIONES-1 C (es corto).** El ROJO? tiene
-causa y no es de tu arreglo:
+**Agregado, después del informe de CONEXIONES-1 C** (si ya lo estás
+cerrando, terminalo primero). El ROJO? tiene causa y no es de tu arreglo:
 
 - `profile.js`, `open()`, mueve el foco a «Mi CUIT» 150 ms después de cargar.
-  `pantalla_estudio1.js` (paso 9; el paso 2 tiene el mismo patrón) abre el
-  modal y llena enseguida los campos del estudio. Si el foco salta en medio
-  del `fill`, el CUIT cae en «Mi CUIT», el del estudio queda vacío y el alta
-  da 400. Lo observé: `["Estudio Inventado Tres", "", "30222222229", "pfCuit"]`
-  antes del clic, 1 de 30 con 3 pantallas a la vez.
-- **Pido:** cada lugar del arnés donde una `pantalla_*.js` abre el modal del
-  perfil y llena campos (buscá `openProfileModal`) no puede perder lo
-  escrito por ese foco. `estudio1` seguro; `cobro_mp1` espera a que cargue,
-  pero el foco cae 150 ms después: revisala. `sesion1` no: es de MARIA, que
-  está arreglando ahí otra carrera del modal y le paso esta. Prueba: la carrera repetida con varias pantallas a la vez sin ninguna
-  falla por el foco, y el rojo mostrado una vez con el arreglo revertido.
+  `pantalla_estudio1.js`, paso 9, abre el modal y llena enseguida los campos
+  del estudio. Si el foco salta en medio del `fill`, el CUIT cae en «Mi
+  CUIT», el del estudio queda vacío y el alta da 400. Lo observé (usuario
+  recién registrado, sin CUIT en el perfil):
+  `["Estudio Inventado Tres", "", "30222222229", "pfCuit"]` antes del clic.
+  En el paso 2 es probable (una falla «el nombre no puede quedar vacío»),
+  no observado: verificalo.
+- **Pido:** las `pantalla_*.js` tuyas que abren el modal del perfil y
+  llenan campos (buscá `openProfileModal`: `estudio1` seguro; `cobro_mp1`
+  espera la carga, pero el foco cae 150 ms después: revisala) no pierden lo
+  escrito por ese foco. `sesion1` no: es de MARIA, le paso esto.
+- **Prueba:** una reproducción que dé el rojo **siempre** con el arnés de hoy
+  y verde con el arreglado, no una tanda de repeticiones (falla ~1 de 30).
   Sin espera fija.
-- *Sugerencia* (no es criterio): esperar a que el foco inicial haya caído
-  en `#pfCuit` antes de llenar.
-- No toques `profile.js`: lo del foco en producto va a la cola de limpieza.
+- *Sugerencia* (no es criterio): para reproducir, demorar dentro de la página
+  la carga del perfil para que el foco caiga durante el `fill`; para
+  arreglar, esperar a que el foco inicial haya caído en `#pfCuit` antes de
+  llenar.
+- No toques `profile.js`: el foco en producto va a la cola.
 
 ## CONEXIONES-1 B: aceptada como medición sobre `c57b645e` e integrada (2026-11-12 01:08 UTC)
 
@@ -68,9 +72,7 @@ Dos cosas que el medidor no separa, y que entran en la pieza de abajo:
 
 ## Tarea activa
 
-1. **El informe del agregado de los ids** (`dd0eab7e`): lo de arriba, en
-   «BORRADOR-1», con tu versión de pytest.
-2. **CONEXIONES-1 C, sólo arnés** (es medir, dentro de CONEXIONES-1). El
+1. **CONEXIONES-1 C, sólo arnés** (es medir, dentro de CONEXIONES-1). El
    arreglo de producto no entra sin el sí de Emi: la fila del roadmap dice
    «arreglar sólo si las deja» y no quedan. Se lo propongo de día.
    - **Medir a otra cuenta:** el medidor usa otra cuenta para los normales
@@ -89,6 +91,7 @@ Dos cosas que el medidor no separa, y que entran en la pieza de abajo:
    - **Si con otra cuenta no aparece el rojo** (cero 500 y menos de 5 s),
      frená e informá: entonces no hay arreglo que proponer.
    - La subida es de la zona de MARIA (D74): le aviso en su canal.
+2. **La carrera del foco del perfil** (arriba, en «IDS-PYTEST»).
 
 ## BORRADOR-1: aceptada sobre `c8733be` e integrada (2026-11-12 00:48 UTC)
 
@@ -102,8 +105,7 @@ navegación (ninguno con 429), `estudio1b`, `despacho1d`, `borrador1`,
 completa (`6077 passed, 110 skipped, 3 xfailed`) y, sobre el merge, el arnés 402 de MARIA
 (`118 passed`). Una diferencia, abajo.
 
-- **D149 (a):** aceptada en lo que pedía, salvo `estudio1.sh`, que queda
-  abierto hasta dar rc=0 con pytest 9.2.0 (el agregado de abajo).
+- **D149 (a):** aceptada; `estudio1.sh` quedó cerrado en IDS-PYTEST.
 - **D145 (a) y D173 (a):** aceptadas. Los dos commits de arnés en vez de uno,
   también: no hacía falta `push --force`.
 - **Supuesto de `destino1`** (manda la `X-Forwarded-For` pero no mira el
@@ -116,22 +118,7 @@ completa (`6077 passed, 110 skipped, 3 xfailed`) y, sobre el merge, el arnés 40
   no la empieces.
 - **La e2e de MARIA** sigue siendo puerta para lo que toque el recorrido
   MARIA o `static/v2`. Hoy da `E2E MARIA OK`: cualquier rojo es tuyo.
-- **La diferencia: `estudio1` me da 36 ROJO y 1 ROJO? (rc=1), vos informaste
-  37.** La causa está atada: el sabotaje «el nombre de más de 200 entra» sí
-  rompe la prueba, que falla como
-  `test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve[nombre4]`, y el guion
-  busca `[xxxxx`. Con pytest 9.2.0 (el de `requirements.txt`) un parámetro de
-  texto largo da id `[nombre+índice]`; con 9.1.1 daba el valor. Es la misma
-  causa de `disco1.sh` en MARIA. Con 9.1.1, `--collect-only` da ese caso
-  como `[xxxx…]`. El patrón es anterior a D149: no es devolución.
-
-**Agregado, decidido por la PM (no es devolución; te lo mandé por mensaje a
-las 00:43):** un commit de arnés aparte en el que ningún patrón
-de tus guiones dependa del id que pytest arma solo para un texto largo
-(sugerencia: `ids=` en el caso, o anclar en el nombre del caso sin el id).
-Mirá todos tus guiones, no sólo `estudio1`: yo corrí únicamente los de esta
-entrega. Mostrá el rojo de `estudio1` una vez con 9.2.0, y decí en el informe
-**qué versión de pytest tenés** (`python -m pytest --version`).
+- **La diferencia de `estudio1` (ids de pytest):** cerrada en IDS-PYTEST.
 
 **Tu rango de D: D180 a D189.**
 
