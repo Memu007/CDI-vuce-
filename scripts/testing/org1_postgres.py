@@ -14,6 +14,7 @@ Comprueba:
 5. un email, una cuenta (D40): no se invita un email que ya tiene cuenta, y
    al registrarse se usan las otras invitaciones de ese email en el estudio;
 6. las guardas: un miembro no invita, no se saca a alguien de otro estudio,
+   el dueño no se saca a sí mismo (ni con otras mayúsculas o espacios),
    una vencida sigue vencida, con el estudio lleno un email con cuenta dice
    que ya tiene cuenta, y una pendiente cuyo email ya tiene cuenta no ocupa
    lugar.
@@ -393,6 +394,31 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
         r = c.delete(f"/api/organizations/members/{ajeno}")
         chequear(r.status_code == 404 and usuarios(b) == [(ajeno, otro.org_id)],
                  f"no se saca a alguien de otro estudio ({r.status_code} {detalle(r)}, {usuarios(b)})")
+
+        # Mercado Pago no se llama: las dos funciones sólo anotan quién las pidió.
+        sql("update users set mp_preapproval_id=%s where username=%s", f"pend-{est.dueno}", est.dueno)
+        a_mp, mp_real = [], (main_mod._leer_suscripcion_mp, main_mod._cancelar_suscripcion_mp)
+        main_mod._leer_suscripcion_mp = lambda sid: a_mp.append(("leer", sid)) or "pending"
+        main_mod._cancelar_suscripcion_mp = lambda sid: a_mp.append(("cancelar", sid))
+
+        def de_la_base():
+            return (sql("select o.owner_username, u.mp_preapproval_id from organizations o "
+                        "join users u on u.username=o.owner_username where o.id=%s", est.org_id),
+                    sql("select username from users where organization_id=%s order by username", est.org_id))
+
+        try:
+            antes, respuestas = de_la_base(), []
+            for nombre in (est.dueno, est.dueno.upper(), f" {est.dueno}", f"{est.dueno} "):
+                con_sesion(est.sesion)
+                r = c.delete(f"/api/organizations/members/{nombre}")
+                respuestas.append((r.status_code, detalle(r)))
+            exacto, variantes = respuestas[0], respuestas[1:]
+            chequear(exacto == (400, "No podés removerte a vos mismo del estudio")
+                     and all(v in (exacto, (404, "Ese usuario no es miembro del estudio")) for v in variantes)
+                     and de_la_base() == antes and a_mp == [],
+                     f"el dueño no se saca a sí mismo ({respuestas}, {de_la_base() == antes}, {a_mp})")
+        finally:
+            main_mod._leer_suscripcion_mp, main_mod._cancelar_suscripcion_mp = mp_real
 
         a = email()
         vencida, vigente = est.token(a), est.token(a)

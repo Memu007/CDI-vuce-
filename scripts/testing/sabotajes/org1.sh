@@ -257,7 +257,7 @@ YO="test_el_duenio_no_se_saca_a_si_mismo_y_el_estudio_queda_igual"
 GUARDA='    if username == org.owner_username:
         raise HTTPException(status_code=400, detail="No podés removerte a vos mismo del estudio")
 '
-sabotaje "el dueño se saca a sí mismo" "$YO" "" "$GUARDA" ""
+sabotaje "el dueño se saca a sí mismo" "$YO" "el dueño no se saca a sí mismo" "$GUARDA" ""
 sabotaje "la guarda va después de Mercado Pago" "$YO" "" "$GUARDA" "" \
   "    member.organization_id = None
 " "$GUARDA    member.organization_id = None
