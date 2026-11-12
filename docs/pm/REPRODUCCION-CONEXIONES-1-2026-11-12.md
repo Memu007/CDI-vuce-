@@ -499,3 +499,129 @@ def test_pm_cuerpos_raros_en_manual(monkeypatch):
 ```
 
 </details>
+
+## G (sólo arnés): aceptada sobre `6ce56cf9` (2026-11-12 10:13 UTC)
+
+Informe de la Técnica en `PARA-PM.md` de `6ce56cf9`. Producto +0/−0:
+`git diff 2c69edf4 6ce56cf9 --stat -- proyecto_maria/` vacío; `chequeo-6`
+igual al informe (arnés +592, historia vacía, 0 avisos). Los diffs (a) y (b)
+y el arreglo de prueba de una línea («verde») los saqué del informe. Árbol
+descartable `/tmp/cdi-pm/wt-g` en `6ce56cf9`, Postgres 16 descartable de
+`scripts/testing/con_pg16.sh`.
+
+### Lo corrido por la PM
+
+| Qué | hoy | (a) revisado | (b) alternativa | verde | (a)+verde | (b)+verde |
+|---|---|---|---|---|---|---|
+| `conexiones1_creditos.py` (usuario y org, control y carrera) | PIERDE las dos carreras, «quedan 0 de 10 pagos», rc=1 | rc=1, igual | rc=1, igual | 4 OK, rc=0 | 4 OK, rc=0 | 4 OK, rc=0 |
+| `conexiones1_cuerpo.py --rondas 1x100,4x100`: pico RSS (MB) | 157.7 · 158.5 | **357.7 · 959.3** | 157.9 · 158.9 | — | — | — |
+| ídem: 402 con lo mandado | 3–4 MB, 0 retenidas | 100 MB, todas retenidas | 3–4 MB, 0 retenidas | — | — | — |
+| ídem: otra cuenta al soltar, 4×100 | sin muestra | 249.4 ms | sin muestra | — | — | — |
+
+Coincide con el informe (su 1×100 del revisado: pico 358.5). Los 4×500 MB
+(pico 4159.7 MB) son de la Dev; no los corrí.
+
+### Mi negativo: el orden de los candados
+
+El arreglo verde toma la fila de la **org** en `require_active_billing`
+(`db.refresh(entidad, with_for_update=True)`) y después la ruta cuenta con
+`_cuenta_bloqueada` (`main.py:2257`), que toma **usuario y después org**. Una
+cuenta de org, el **mismo usuario** con dos pedidos a la vez: alta manual (M)
+y guardar una operación en un cliente (P). El arnés toma la org, espera a ver
+M y P esperando, y suelta. Mide códigos y deadlocks de `pg_stat_database`.
+
+| Árbol | control | carrera (3 rondas) |
+|---|---|---|
+| hoy | 200/200 | 200/200, deadlocks +0, las tres |
+| verde | 200/200 | alta 200, **guardado 500**, deadlocks +1, las tres |
+| (a)+verde | 200/200 | alta 200, **guardado 500**, deadlocks +1, las tres |
+| (b)+verde | 200/200 | 200/200, deadlocks +0, las tres (no observado en este estado; no es una prueba de que no pueda pasar) |
+
+El 500 tiene el texto amable («No pudimos procesar tu solicitud…»); el log
+dice `DeadlockDetectedError` en `save_client_operation`. No verifiqué qué
+quedó guardado ni contado después del 500. El ciclo pide dos pedidos del
+mismo usuario a la vez (`_cuenta_bloqueada` bloquea el usuario que pide).
+Cuentas sin org: no corrido (por lectura, una sola fila no arma ciclo).
+Conclusión: verde como está no puede entrar. Cualquier arreglo toma los
+candados en el orden usuario → org. Lo que separa (a) de (b) es la memoria
+de arriba, no esto.
+
+### Leído
+
+- `record_operation_created` (`billing_service`) corre sólo bajo el candado
+  de `_contar_en_la_cuenta`: no es otro camino de pérdida. Mi sospecha,
+  descartada.
+- `_vencer_y_guardar` escribe `billing_status=past_due` desde una lectura
+  sin candado; un aviso de pago de suscripción a la vez podría pisarse igual
+  que la recarga. No medido: va como caso de la familia en la pieza.
+
+### No corrido por la PM
+
+- Adversarios, `/security-review`, suite y `e2e_maria.sh`: la entrega no
+  tiene producto. Van en la pieza de producto.
+- 4×500 MB, 8×100 MB y keep-alive: sólo la corrida de la Dev.
+- El negativo en cuentas sin org y con usuarios distintos de la misma org.
+
+<details><summary>Negativo de la PM (no va al repo; correr desde la raíz del repo con con_pg16.sh)</summary>
+
+```python
+"""Negativo PM sobre G: el arreglo de prueba bloquea la org antes que el usuario;
+_cuenta_bloqueada bloquea usuario y después org. Con el mismo usuario de una org:
+alta manual (M) y guardado en un cliente (P) a la vez. El arnés toma la org,
+espera a ver M y P esperando, y suelta. Mide códigos y deadlocks de Postgres."""
+import os, sys
+from contextlib import closing
+from concurrent.futures import ThreadPoolExecutor
+sys.path.insert(0, "scripts/testing")
+import conexiones1_creditos as h  # noqa: E402
+import psycopg2  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+
+def deadlocks():
+    return h.sql("select deadlocks from pg_stat_database where datname = current_database()")[0][0]
+
+
+def guardar(c, sesion, cliente):
+    return c.post(f"/api/clientes/{cliente}/operaciones", headers=sesion, json={"items": []})
+
+
+def ronda(c, carrera):
+    sesion, cliente, ref, (tabla, clave, valor) = h.preparar(c, True)
+    h.sql("update organizations set extra_ops_expires_at = null, extra_ops_remaining = 0 where id = %s", valor)
+    antes = deadlocks()
+    if not carrera:
+        a, b = h.alta(c, sesion, cliente), guardar(c, sesion, cliente)
+        return a.status_code, b.status_code, deadlocks() - antes, []
+    with ThreadPoolExecutor(2) as hilos, closing(psycopg2.connect(h.URL)) as candado:
+        try:
+            with candado.cursor() as cur:
+                cur.execute("select 1 from organizations where id = %s for update", (valor,))
+                cur.execute("select pg_backend_pid()")
+                mio = cur.fetchone()[0]
+            m = hilos.submit(h.alta, c, sesion, cliente)
+            ok1 = h.hasta(lambda: len(h.esperando(mio)) >= 1)
+            p = hilos.submit(guardar, c, sesion, cliente)
+            ok2 = h.hasta(lambda: len(h.esperando(mio)) >= 2)
+            q = [" ".join(x.split())[:80] for x in h.esperando(mio)]
+        finally:
+            candado.rollback()
+        rm, rp = m.result(h.PLAZO), p.result(h.PLAZO)
+        return rm.status_code, rp.status_code, deadlocks() - antes, q + [f"armada: {ok1 and ok2}", rm.text[:100], rp.text[:100]]
+
+
+def main():
+    print(h.arbol())
+    with TestClient(h.main_mod.app, raise_server_exceptions=False) as c:
+        for carrera in (False, True):
+            for _ in range(1 if not carrera else 3):
+                am, gp, dl, extra = ronda(c, carrera)
+                print(f"{'carrera' if carrera else 'control'}: alta {am}, guardado {gp}, deadlocks +{dl}")
+                for x in extra:
+                    print("    ", x)
+
+
+main()
+```
+
+</details>

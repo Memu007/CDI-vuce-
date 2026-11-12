@@ -3,84 +3,67 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## CONEXIONES-1 F: aceptada sobre `21df2a39` e integrada (2026-11-12 09:19 UTC)
+## CONEXIONES-1 G: aceptada sobre `6ce56cf9` e integrada (2026-11-12 10:13 UTC)
 
-Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección F.
-Integré con `merge` exactamente `21df2a39`. Sólo trae tu informe: el diff
-revisado sigue afuera.
+Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección G.
+Integré exactamente `6ce56cf9` (avance directo). Producto +0/−0, `chequeo-6`
+igual.
 
 - **Coincide con tu informe:**
-  - sin el diff, 7 failed y 1 passed, con tus dos textos de rojo;
-  - con el diff revisado, 106 passed;
-  - `sabotajes_f.py` da los 9 ROJO, «sin rojo: ninguno», rc=0;
-  - la alternativa D186 da 1 failed (`corta_el_cuerpo`, impaga 402) y 482 passed en las pruebas de cobro;
-  - `chequeo-6` da lo mismo, con el AVISO de +25 explicado.
-- **La exención de `test_cobro_corte1.py` está bien:** con `_commit_que_falla` sin `raise`, dan rojo 4 casos. O sea, los eximidos siguen llegando a la falla.
-- **Mis negativos:**
-  - Pool lleno al leer, pero la otra cuenta suelta mientras analyze espera
-    para guardar: 200 y un respaldo. Sin soltar: 500 y nada a medias. El 500
-    aparece sólo si el pool sigue lleno durante toda la espera.
-  - Cuerpos raros en manual: con el diff revisado, una cuenta impaga con
-    JSON roto completo da **402**. **Tu punto 4 no vale como está:** con `_leer_json` esa
-    cuenta pasaría a 400, así que el contrato sí cambia en ese caso. Para la
-    pieza de producto, el texto queda en un lugar sin cambiar ese 402, o el
-    cambio va declarado.
-- **D186: (a) por ahora, decidido por la PM.** La razón no es la del punto 1
-  de tu informe. Es la de C: (b) pone un `commit` en
-  `require_active_billing`, que guarda el vencimiento de créditos extra
-  (`_expire_extra_ops`, `billing_service.py:109`). Eso todavía no está medido.
-  G lo mide. Si (b) no pierde créditos pagos, se lo llevo a Emi como la
-  recomendada: suelta igual y no trae los dos cambios.
-- **D187: (a), decidido por la PM.** El pool de 0,05 s no es una espera fija.
-- **Condiciones de la pieza de producto (no ahora):**
-  - Base caída en cada uno de los tres `commit` nuevos
-    (`require_billing_vigente`, analyze, NCM): un caso, con los tres puntos
-    como datos. Hoy sólo el de NCM tiene `try`.
-  - Lo que el caso le cambia al motor o a la sesión se devuelve en un
-    `try/finally`.
-  - En `sabotajes_f.py`, `SUELTA` y `COBRO` se anclan en líneas de comentario.
-    Cuando el script entre al repo, se anclan en código (§6).
-- **Limpieza tuya:** si quedó un `conftest.py` viejo en una carpeta de
-  arriba del árbol (`/tmp`, `/tmp/…`), borralo. Poné el `ls` en el informe.
+  - créditos: hoy, (a) y (b) pierden las dos carreras («quedan 0 de 10
+    pagos»), rc=1; verde, (a)+verde y (b)+verde dan 4 OK, rc=0;
+  - cuerpos (1×100 y 4×100): hoy y (b) contestan 402 con 3–4 MB mandados;
+    (a) retiene el cuerpo entero, pico 357.7 y 959.3 MB.
+- **Mi negativo: verde como está arma un deadlock.** Verde toma la org
+  primero; `_cuenta_bloqueada` toma usuario y después org. El mismo usuario
+  de una org, con alta manual y guardar en un cliente a la vez: con verde y
+  con (a)+verde, el guardado da 500 y Postgres cuenta un deadlock, 3 de 3.
+  Con (b)+verde no lo vi (3 de 3). Hoy, 200/200. Tu medidor no lo ve porque
+  no corre las dos rutas a la vez.
+- **D188: a Emi, de día** (plata). Le llevo tu (a): arreglarlo dentro de la
+  pieza de producto, con tu medidor como puerta.
+- **D189: (b), decidido por la PM.** Verde no entra. El criterio es el
+  comportamiento, no el arreglo:
+  - el caso de las dos rutas a la vez (alta y guardado, el mismo usuario, en
+    una org) da 200/200 y deadlocks +0;
+  - `conexiones1_creditos.py` da rc=0;
+  - el rojo de las dos cosas se muestra una vez con verde tal como está.
+  - *Sugerencia:* tomar los candados con `_cuenta_bloqueada` (usuario →
+    org), o un `UPDATE` condicional que no lea antes.
+- **D186: se lo llevo a Emi como (b).** Cuerpos: (b) no lee el cuerpo antes
+  del 402, (a) sí. El deadlock no separa (a) de (b): el orden de candados es
+  condición de la pieza en las dos.
+- **Leído, no medido:** `_vencer_y_guardar` escribe
+  `billing_status=past_due` desde una lectura sin candado. Un aviso de pago
+  de suscripción a la vez podría pisarse igual que la recarga. Va como caso
+  de la familia en la pieza; medilo antes de afirmar nada.
 
-## Tarea activa: CONEXIONES-1 G, sólo arnés, tres columnas (2026-11-12 09:19 UTC)
+## Tarea activa: el plan de la pieza de producto de CONEXIONES-1, sin producto (2026-11-12 10:13 UTC)
 
-Mide los dos riesgos que quedan antes de llevarle el arreglo a Emi. No
-commiteás producto. Cada medición va en tres columnas:
-- **hoy:** `35c19be7` o tu cabeza, sin diff;
-- **revisado:** el diff de F, (a);
-- **alternativa:** el diff de D186, (b).
+Emi todavía no contestó D182 ni D188. Seguís con el plan que ya
+arrancaste. Lleva la lista de casos (uno por causa), las puertas y los
+comandos copiables, con (b) como forma. Tus D van de D200 a D209.
 
-Ninguna espera fija nueva: se espera una condición observable. Tus D van
-de D188 a D189.
+**Condiciones de la pieza** (de F y G):
+- Base caída en cada uno de los tres `commit` nuevos
+  (`require_billing_vigente`, analyze, NCM): un caso, con los tres puntos
+  como datos. Hoy sólo el de NCM tiene `try`.
+- Lo que el caso le cambia al motor o a la sesión se devuelve en un
+  `try/finally`.
+- En `sabotajes_f.py`, `SUELTA` y `COBRO` se anclan en código, no en
+  comentarios (§6), cuando el script entre al repo.
+- La impaga con JSON roto completo sigue en 402, o el cambio va declarado.
+- Créditos: `conexiones1_creditos.py` rc=0, más el caso de las dos rutas a la
+  vez de D189 (usuario y org como datos).
+- `billing_status` con un aviso de suscripción a la vez: un caso de la familia.
+- Los demás caminos que usan `require_active_billing` o
+  `can_create_operation` (análisis de PDF, otros planes): listados en el plan,
+  con caso o con la razón de por qué no.
+- Revisión fuerte: `/security-review`, adversarios, suite completa y
+  `e2e_maria.sh` sobre el SHA.
 
-1. **Cuerpos grandes de una cuenta impaga** en `/api/operations/manual`:
-   el más grande que acepte la app, uno solo y unos cuantos a la vez.
-   Contestá en cada columna:
-   - cuánto tarda el 402;
-   - cuánta memoria sube el proceso;
-   - si otra cuenta al día nota algo (espera o errores).
-2. **Créditos extra vencidos y una recarga a la vez.** Una cuenta con
-   créditos extra vencidos crea una operación y, al mismo tiempo, le entra
-   una recarga de créditos (el camino que use hoy el producto para sumarlos).
-   Contestá en cada columna:
-   - cuántos créditos quedan;
-   - si se pierde alguno pago.
-
-   Tiene que ser un caso o una fase del medidor que dé rojo si se pierde uno.
-   Mostralo una vez en rojo con un sabotaje que lo haga perder. Si en las
-   tres columnas da lo mismo, decilo con la salida.
-
-   Cómo lo leo: (b) pasa si no pierde más que «hoy». Si «hoy» también
-   pierde, es un hallazgo aparte de plata para Emi, no un motivo contra (b).
-3. El diff revisado y el de la alternativa van en el informe, con
-   `git apply --check` limpio sobre tu cabeza.
-
-**Apenas entregues G:**
-- Si Emi dijo que sí a D182: la pieza de producto de CONEXIONES-1, con E, F
-  y G adentro, las condiciones de arriba y revisión fuerte.
-- Si no dijo nada todavía: el plan de esa pieza, sin producto. Lleva la
-  lista de casos (uno por causa), las puertas y los comandos copiables.
+**Apenas entregues el plan:** si Emi dijo que sí a D182, la pieza de
+producto. Si no, avisame en el informe y te paso la siguiente de la cola.
 
 ## FOCO-PERFIL: aceptada sobre `dc4cf077` e integrada (2026-11-12 03:37 UTC)
 
