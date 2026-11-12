@@ -782,6 +782,25 @@ Reenviado como lo reintentaría MP, da 200 y acredita (`aplicado`, `(10,
 True)`). O sea: la plata no se pierde **si MP reintenta**; eso lo simulé, no
 lo verifiqué con MP.
 
+**¿Con el arreglo chico queda acreditada la recarga?** (11:52 UTC) Antes de
+recomendarlo, chequeé que no cambie un error que MP reintenta por un pago
+perdido: misma carrera, 30 rondas por par, y en **cada** ronda leí
+`mp_pagos_aplicados` y los créditos de la org (`pm_natural3.py`, abajo).
+
+| Árbol | Par | Resultado por ronda | Rondas |
+|---|---|---|---|
+| sólo NO KEY | recarga + guardado | 200 / 200, `aplicado`, `(10, True)`, sin deadlock | 30 |
+| sólo NO KEY | recarga + MARIA | 200 / 200, `aplicado`, `(10, True)`, sin deadlock | 30 |
+| HEAD | recarga + guardado | 200 / 200, `aplicado` | 3 |
+| HEAD | recarga + guardado | recarga 200, guardado 500, `aplicado` | 22 |
+| HEAD | recarga + guardado | recarga 500, sin fila, `(0, None)` (espera el reintento) | 5 |
+| HEAD | recarga + MARIA | recarga 200, MARIA 500, `aplicado` | 29 |
+| HEAD | recarga + MARIA | recarga 500, sin fila, `(0, None)` | 1 |
+
+«Recargas con 200 y no acreditadas»: 0 en los dos árboles. Con el arreglo
+chico, las 60 recargas quedaron acreditadas en el momento, sin depender del
+reintento de MP. La recomendación de D206 (a) se mantiene.
+
 **D204 sigue:** renovación + guardado con prueba vencida, usuario y org,
 `[200, 402]`; las dos cuentas quedan `past_due` con el período por delante y
 `tiene_acceso` da `False`: pagó y queda bloqueada hasta la próxima
@@ -909,6 +928,53 @@ def main():
     with TestClient(m.app, raise_server_exceptions=False) as c:
         natural(c, True); natural(c, False); d204(c); bucle(c)
     return 0
+if __name__ == "__main__":
+    sys.exit(correr(main))
+```
+
+</details>
+
+<details><summary><code>pm_natural3.py</code> (igual; un worktree de HEAD y otro con <code>parche_nokey.diff</code>)</summary>
+
+```python
+"""Negativo de la PM: carrera natural recarga + guardado / recarga + maria de org con
+créditos vencidos; en CADA ronda, el estado de la recarga y los créditos al final."""
+import os, sys, threading, collections
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from conexiones1_rondas import correr, m, PEDIDOS, DEADLOCKS, OTRAS
+import conexiones1_creditos as h
+from proyecto_maria.database.connection import engine
+from fastapi.testclient import TestClient
+from concurrent.futures import ThreadPoolExecutor
+N = int(os.environ.get("N", "30"))
+def main():
+    perdidas = 0
+    with TestClient(m.app, raise_server_exceptions=False) as c:
+        for otro in ("guardado", "maria"):
+            tabla = collections.Counter()
+            for i in range(N):
+                s, cl, ref, cuenta = h.preparar(c, True)
+                antes = h.sql(DEADLOCKS)[0][0]
+                bar, box = threading.Barrier(2), {}
+                def rec():
+                    bar.wait(); pid, r = h.recargar(c, ref); box["pid"] = pid; return r
+                def otra():
+                    bar.wait(); return PEDIDOS[otro](c, ref, s, cl)
+                with ThreadPoolExecutor(2) as ex:
+                    fr, fo = ex.submit(rec), ex.submit(otra)
+                    rr, ro = fr.result(h.PLAZO), fo.result(h.PLAZO)
+                c.portal.call(engine.dispose); h.hasta(lambda: h.sql(OTRAS)[0][0] == 0)
+                dl = h.sql(DEADLOCKS)[0][0] - antes
+                est = h.sql("select estado from mp_pagos_aplicados where payment_id = %s", box["pid"])
+                ops = h.sql("select extra_ops_remaining, extra_ops_expires_at > now() from organizations where id = %s", cuenta[2])[0]
+                acreditada = est == [("aplicado",)] and ops[1] is True and (ops[0] or 0) >= 9
+                if rr.status_code == 200 and not acreditada:
+                    perdidas += 1
+                tabla[(f"recarga {rr.status_code}", f"{otro} {ro.status_code}", f"dl {dl}", f"estado {est[0][0] if est else '-'}", f"ops {ops}")] += 1
+            for k, v in sorted(tabla.items(), key=str):
+                print(f"recarga + {otro} | {' | '.join(k)} | x{v}", flush=True)
+    print(f"recargas con 200 y no acreditadas: {perdidas}", flush=True)
+    return 1 if perdidas else 0
 if __name__ == "__main__":
     sys.exit(correr(main))
 ```

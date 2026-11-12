@@ -168,7 +168,8 @@ antes de cerrar la Fase 3.
      la org después del vencimiento (después ya no); en esa condición pasó
      casi todas las veces de mi prueba. No sé cada cuánto coincide en
      producción. Si pierde la recarga, se acredita cuando MP reintenta (lo
-     simulé, no lo vi con MP).
+     simulé, no lo vi con MP). Con el arreglo chico, las 60 recargas de
+     la prueba quedaron acreditadas en el momento, sin errores.
    - **El arreglo chico de 2 líneas arregla 2 de los 5 casos** (recarga +
      guardado y recarga + MARIA: 0 errores medidos). Los otros 3 (alta +
      guardado, alta + cancelar, alta + reactivar de esa org; medidos sólo
@@ -268,7 +269,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-12 11:45 UTC: **CONEXIONES-1 H aceptada como medición** sobre `bd8665bf` e integrada (acta, sección H), con devolución por la causa: una corrida mía con sólo NO KEY dio rc=2 («la app no soltó sus conexiones»), causa sin confirmar (algo abre una conexión después de `dispose`). Hallazgo de producción confirmado por la PM sin forzar: org con créditos vencidos, recarga + guardado o MARIA a la vez dan deadlock (28/30, 30/30; con NO KEY 0/90; créditos al día 0/30); sólo primera actividad después del vencimiento; si pierde el aviso, MP reintenta y acredita (simulado). D204 sigue. D205 y D206 a Emi (punto 13). La Técnica sigue con **CONEXIONES-1 I** (la causa del rc=2 y el caso natural). MARIA: D149 + CR8 en curso (`48195cfe`), sin entrega. CI de `6001684c`: tests cortado a los 20 min (punto 14).
+2026-11-12 11:45 UTC: **CONEXIONES-1 H aceptada como medición** sobre `bd8665bf` e integrada (acta, sección H), con devolución por la causa: una corrida mía con sólo NO KEY dio rc=2 («la app no soltó sus conexiones»), causa sin confirmar (algo abre una conexión después de `dispose`). Hallazgo de producción confirmado por la PM sin forzar: org con créditos vencidos, recarga + guardado o MARIA a la vez dan deadlock (28/30, 30/30; con NO KEY 0/90; créditos al día 0/30); sólo primera actividad después del vencimiento; si pierde el aviso, MP reintenta y acredita (simulado). D204 sigue. D205 y D206 a Emi (punto 13). La Técnica sigue con **CONEXIONES-1 I** (la causa del rc=2 y el caso natural). MARIA: D149 + CR8 en curso (`48195cfe`), sin entrega. CI de `6001684c`: tests cortado a los 20 min (punto 14). 11:52: con sólo NO KEY, 60/60 recargas acreditadas en el momento (acta H); D206 (a) se mantiene.
 2026-11-12 10:47 UTC: plan de la pieza de CONEXIONES-1 leído sobre `b60c30d4` e integrado; D200–D203 (a) por la PM; H activa.
 
 ## /compact conservar de la PM principal

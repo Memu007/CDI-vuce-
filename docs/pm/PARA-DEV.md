@@ -46,7 +46,9 @@ esperan D182. D207–D209 siguen libres.
    sin tomar la fila desde afuera, recarga + guardado y recarga + MARIA de
    una org con créditos vencidos, más el control con créditos al día. Por
    ronda: deadlock sí/no, quién pierde, y cuando pierde el aviso de MP, si
-   la recarga quedó acreditada antes y después de un reintento firmado.
+   la recarga quedó acreditada antes y después de un reintento firmado;
+   además, el estado de la recarga en todas las rondas, también cuando
+   nadie pierde (`pm_natural3.py`, acta H).
    Corrido en HEAD y con `parche_nokey.diff`, una vez cada uno. Podés partir
    de `pm_natural2.py` (acta, sección H).
 
