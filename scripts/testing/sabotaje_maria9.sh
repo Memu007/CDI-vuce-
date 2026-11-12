@@ -70,11 +70,11 @@ reemplazar $F '    def sufijo_de_la_operacion():' '    limpiar_sufijo((sbt_sufij
 caso "analiza_siempre" "FAILED $T::test_el_de_la_operacion_frena_sólo_si_alguien_lo_usa[renglones_con_propio]"
 
 # 2. los avisos no anticipan el error
-reemplazar $F '        if usa_el_sufijo_de_la_operacion(items, iva_adicional):' '        if False:'
+reemplazar $F '        usa_el_general = usa_el_sufijo_de_la_operacion(items)' '        usa_el_general = False'
 caso "sin_aviso" "FAILED $T::test_los_avisos_anticipan_el_error_sólo_si_alguien_lo_usa[item_entero]"
 
 # 3. los avisos lo anticipan aunque nadie lo use
-reemplazar $F '        if usa_el_sufijo_de_la_operacion(items, iva_adicional):' '        if True:'
+reemplazar $F '        usa_el_general = usa_el_sufijo_de_la_operacion(items)' '        usa_el_general = True'
 caso "aviso_siempre" "FAILED $T::test_los_avisos_anticipan_el_error_sólo_si_alguien_lo_usa[renglones_con_propio]"
 
 # 4. el aviso no tiene el texto del error
@@ -91,20 +91,20 @@ caso "propio_malo_usa_el_general" "FAILED $T::test_un_propio_que_no_se_separa_da
 reemplazar $F 'not isinstance(sub, dict) or sin_propio(sub.get("sufijo")) for sub in subs' 'not isinstance(sub, dict) for sub in subs'
 caso "subitem_sin_propio_no_cuenta" "FAILED $T::test_los_avisos_anticipan_el_error_sólo_si_alguien_lo_usa[un_subitem_sin_propio]"
 
-# 7. un ítem que sale entero no cuenta (se ignora si va junto con otros)
-reemplazar $F '        elif n not in juntos or sin_propio(item.get("sufijo")):' '        elif sin_propio(item.get("sufijo")):'
-caso "item_entero_no_cuenta" "FAILED $T::test_los_avisos_anticipan_el_error_sólo_si_alguien_lo_usa[item_entero_con_propio]"
+# 7. un ítem o renglón con su propio usa igual el de la operación
+reemplazar $F '        elif sin_propio(item.get("sufijo")):' '        elif True:'
+caso "con_propio_usa_el_general" "FAILED $T::test_los_avisos_anticipan_el_error_sólo_si_alguien_lo_usa[item_entero_con_propio]"
 
 # 8. un renglón sin propio no cuenta
-reemplazar $F '        elif n not in juntos or sin_propio(item.get("sufijo")):' '        elif n not in juntos:'
+reemplazar $F '        elif sin_propio(item.get("sufijo")):' '        elif False:'
 caso "renglon_sin_propio_no_cuenta" "FAILED $T::test_los_avisos_anticipan_el_error_sólo_si_alguien_lo_usa[un_renglon_sin_propio]"
 
 # 9. la API sigue exigiendo el general aunque cada renglón traiga el suyo
-reemplazar $M '        if not sbt_raw and usa_el_sufijo_de_la_operacion(items, request.iva_adicional):' '        if not sbt_raw:'
+reemplazar $M '        if not sbt_raw and usa_el_general:' '        if not sbt_raw:'
 caso "api_exige_el_general" "FAILED $T::test_por_api_los_renglones_con_propio_generan[]"
 
 # 10. la API deja pasar la falta del general cuando alguien lo usa
-reemplazar $M '        if not sbt_raw and usa_el_sufijo_de_la_operacion(items, request.iva_adicional):' '        if False:'
+reemplazar $M '        if not sbt_raw and usa_el_general:' '        if False:'
 caso "api_sin_falta" "FAILED $T::test_por_api_sin_ninguno_falta_el_sufijo"
 
 # --- La pantalla (punto 2): scripts/testing/pantalla_maria9.js contra una API
@@ -205,7 +205,7 @@ caso "unidad_desconocida_sin_aviso" "FAILED $B::test_una_unidad_que_no_se_recono
 K=tests/test_maria9_kilos.py
 
 # 24. el error nombra a todos los renglones del ítem (el defecto)
-reemplazar $F 'if min(valores).quantize(Decimal("0.01"), ROUND_HALF_UP) <= 0]' 'if False]'
+reemplazar $F 'if min(valores).quantize(Decimal("0.01"), ROUND_HALF_UP) <= 0}' 'if False}'
 caso "nombra_a_todos" "FAILED $K::test_el_error_nombra_sólo_los_renglones_chicos[uno_al_final]"
 
 # 25. sólo mira la cantidad: unos kilos en cero ya no frenan
@@ -217,11 +217,11 @@ reemplazar $F 'no cierra" if len(chicos) == 1 else' 'no cierra" if False else'
 caso "siempre_plural" "FAILED $K::test_el_error_nombra_sólo_los_renglones_chicos[uno_al_principio]"
 
 # 27. si nadie da cero solo, nombra sólo al primero
-reemplazar $F 'chicos = chicos or [lugar_en_el_pedido[id(r)] for r in renglones]' 'chicos = chicos or [lugar_en_el_pedido[id(renglones[0])]]'
+reemplazar $F 'if i in solos or not en_cero <= solos]' 'if i in solos or (i == 0 and not en_cero <= solos)]'
 caso "sin_chico_nombra_al_primero" "FAILED $K::test_el_error_nombra_sólo_los_renglones_chicos[todos_iguales]"
 
 # 28. mira lo que queda después del ajuste, no lo que da cada uno solo
-reemplazar $F 'for r, *valores in zip(renglones, *propios)' 'for r, *valores in zip(renglones, cantidades_sub, estadisticas_sub)'
+reemplazar $F 'enumerate(zip(*propios))' 'enumerate(zip(cantidades_sub, estadisticas_sub))'
 caso "mira_despues_del_ajuste" "FAILED $K::test_el_error_nombra_sólo_los_renglones_chicos[el_cero_cae_en_el_mas_grande]"
 
 # 29. no mira los kilos de cada uno
@@ -229,7 +229,7 @@ reemplazar $F '[kilos_renglones] if unidad_est == UNIDAD_KILOGRAMO else []' '[]'
 caso "no_mira_los_kilos" "FAILED $K::test_el_error_nombra_sólo_los_renglones_chicos[uno_al_final]"
 
 # 30. el endpoint arma los ítems sin la procedencia de la operación
-reemplazar $M '        if not sbt_raw and usa_el_sufijo_de_la_operacion(items, request.iva_adicional):' '        if not sbt_raw and usa_el_sufijo_de_la_operacion(request.items, request.iva_adicional):'
+reemplazar $M '        usa_el_general = usa_el_sufijo_de_la_operacion(items)' '        usa_el_general = usa_el_sufijo_de_la_operacion(request.items)'
 caso "endpoint_sin_procedencia" "FAILED $T::test_el_endpoint_agrupa_con_la_procedencia_de_la_operacion"
 
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
