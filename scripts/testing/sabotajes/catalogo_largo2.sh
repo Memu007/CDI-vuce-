@@ -114,8 +114,8 @@ sabotaje $CS "el catálogo no mide el proveedor" \
   '    vendor_name = (vendor_name or "").strip()' \
   "FAILED $T::${TOPE}[catalogo-proveedor]" "FAILED $T::${MALA}[lote-proveedor]"
 sabotaje $CS "guardar en el catálogo no mide el origen" \
-  '    origen = texto_para_guardar(prod.get("origen"), "El origen")' \
-  '    origen = (prod.get("origen") or "").strip()' \
+  '    origen, aviso = origen_para_guardar(prod.get("origen"))' \
+  '    origen, aviso = (prod.get("origen") or "").strip(), ""' \
   "FAILED $T::${TOPE}[catalogo-origen]" "FAILED $T::${MALA}[lote-origen]"
 sabotaje $CS "una fila sin descripción se mide antes de saltarla" \
   '    desc = texto_para_guardar(prod.get("descripcion"))
@@ -132,34 +132,16 @@ sabotaje $CM "la memoria del cliente no mide el origen" \
   "FAILED $T::test_la_memoria_del_cliente_no_guarda_un_origen_de_mas_de_2000[aprender]" \
   "FAILED $T::test_la_memoria_del_cliente_no_guarda_un_origen_de_mas_de_2000[operacion]"
 sabotaje $CS "cambiar el origen no lo mide" \
-  '        ("origen", "El origen"), ("unidad_medida", "La unidad"),
-    ) if updates.get(campo) is not None}
-    if updates.get("ncm") is not None:
-        textos["ncm"] = ncm_para_guardar(updates["ncm"])
-
-    new_desc = textos.get("descripcion_original") or row.descripcion or ""
-    if "ncm" in textos:
-        row.ncm = textos["ncm"] or None
-    if "origen" in textos:
-        row.origen = textos["origen"] or None' \
-  '        ("unidad_medida", "La unidad"),
-    ) if updates.get(campo) is not None}
-    if updates.get("ncm") is not None:
-        textos["ncm"] = ncm_para_guardar(updates["ncm"])
-
-    new_desc = textos.get("descripcion_original") or row.descripcion or ""
-    if "ncm" in textos:
-        row.ncm = textos["ncm"] or None
-    if updates.get("origen") is not None:
-        row.origen = updates["origen"].strip() or None' \
+  '        origen, aviso = origen_para_guardar(updates["origen"])' \
+  '        origen, aviso = updates["origen"].strip(), ""' \
   "FAILED $T::${TOPE}[cambiar-origen]" "FAILED $T::${MALA}[cambio-origen]"
 sabotaje $M "guardar-uso no mide el proveedor" \
   '        vendor_name = catalog_svc.texto_para_guardar(data.get("vendor_name"), "El proveedor")' \
   '        vendor_name = (data.get("vendor_name") or "").strip()' \
   "FAILED $T::${TOPE}[guardar-uso-proveedor]" "FAILED $T::${MALA}[uso-proveedor]"
 sabotaje $M "guardar-uso no mide el origen" \
-  '        origin = catalog_svc.texto_para_guardar(data.get("origen"), "El origen")' \
-  '        origin = (data.get("origen") or "").strip()' \
+  '        origin, aviso_origen = catalog_svc.origen_para_guardar(data.get("origen"))' \
+  '        origin, aviso_origen = (data.get("origen") or "").strip(), ""' \
   "FAILED $T::${TOPE}[guardar-uso-origen]" "FAILED $T::${MALA}[uso-origen]"
 sabotaje $CS "el NUL no se limpia" \
   '    valor = valor.replace("\x00", "").strip()' \
@@ -176,9 +158,9 @@ sabotaje $CS "lo que no es texto se toma como texto" \
   '        valor = str(valor)' \
   "FAILED $T::${MALA}[lote-ncm]" "FAILED $T::${MALA}[cambio-descripci" "FAILED $T::${MALA}[uso-origen]" "false:"
 sabotaje $M "la migración de claves no mueve nada" \
-  '    sin_latinas = "NOT GLOB' \
+  '    no_ascii = "GLOB' \
   '    return
-    sin_latinas = "NOT GLOB' \
+    no_ascii = "GLOB' \
   "FAILED $T::${VIEJA}" "quedó en 2 filas"
 sabotaje $M "el arranque no llama a la migración de claves" \
   '    await _migrate_catalogo_claves()' \
@@ -228,17 +210,18 @@ if [ -n "$PG_URL" ]; then
       '("product_key", "descripcion", "origen")' \
       "arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
     sabotaje $M "el arranque no pasa el origen de la memoria del cliente a text" \
-      ',
-                            ("client_product_history", ("origen_frecuente",))):' \
-      ',):' \
+      '                            ("client_product_history", ("origen_frecuente",)),' \
+      '' \
       "arranque: las columnas son text" "FALLA | guardar-uso con cliente guarda enteros"
     sabotaje $M "el arranque traba las dos tablas en una transacción" \
       '    for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "origen", "vendor_nombre")),
-                            ("client_product_history", ("origen_frecuente",))):
+                            ("client_product_history", ("origen_frecuente",)),
+                            ("operation_items", ("origen",))):
         async with engine.begin() as conn:' \
       '    async with engine.begin() as conn:
      for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "origen", "vendor_nombre")),
-                            ("client_product_history", ("origen_frecuente",))):
+                            ("client_product_history", ("origen_frecuente",)),
+                            ("operation_items", ("origen",))):
         if True:' \
       "FALLA | el arranque y una escritura como guardar-uso andan los dos"
     sabotaje $M "el arranque espera la tabla tomada sin tope" \
@@ -252,9 +235,9 @@ if [ -n "$PG_URL" ]; then
                 await conn.exec_driver_sql(f"ALTER TABLE {tabla} ALTER COLUMN {columna} TYPE TEXT")' \
       "FALLA | con la tabla tomada el arranque falla"
     sabotaje $M "la migración de claves no mueve nada" \
-      '    sin_latinas = "NOT GLOB' \
+      '    no_ascii = "GLOB' \
       '    return
-    sin_latinas = "NOT GLOB' \
+    no_ascii = "GLOB' \
       "de una fila vieja es una sola fila y sigue editable"
     sabotaje $CS "lo que no es texto se toma como texto" \
       '        raise ValueError(f"{que} tiene que ser texto.")' \
