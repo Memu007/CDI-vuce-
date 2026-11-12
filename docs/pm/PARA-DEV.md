@@ -11,9 +11,11 @@ Integré `bd8665bf` (avance directo). Evidencia: acta
 - **Reproducido, igual al informe:** caso 6 en HEAD 5 deadlocks; con (b) 0;
   caso 7 en HEAD 4 MAL; `chequeo-6` +0/−0, arnés +323/−0, 0 avisos.
 - **No igual:** caso 6 con sólo NO KEY, la primera corrida salió **rc=2**
-  (`la app no soltó sus conexiones`, después de «recarga + maria | usuario |
-  créditos vencidos»). La segunda dio 3, como tu informe. El mismo par 50
-  veces seguidas: 0 fallas. No tengo la causa.
+  (`la app no soltó sus conexiones`) en la ronda «recarga + maria | usuario
+  | créditos al día». La segunda dio 3, como tu informe. Lo que corrí para
+  buscarlo no es la misma ronda: 50 veces «maria + recarga», usuario,
+  créditos al día, en HEAD sin parche, 0 fallas. El final de la salida está
+  en el acta. No tengo la causa.
 - **Mis negativos (sin tomar la fila desde afuera, dos hilos con barrera):**
   en HEAD, org con créditos vencidos, recarga + guardado 28/30, recarga +
   MARIA 30/30, guardado + recarga 25/30; con NO KEY 0/90; con créditos al
@@ -28,7 +30,8 @@ registro de pedidos en segundo plano (`log_request_background`), pero no lo
 probé: diagnosticalo vos.
 
 **Tus D:** D205 y D206 van a Emi (punto 13 de NOW), con tu recomendación (a)
-en las dos. D207–D209 siguen libres.
+en las dos; en D206 le digo que (a) arregla 2 de los 5 pares y los otros 3
+esperan D182. D207–D209 siguen libres.
 
 ## Tarea activa: CONEXIONES-1 I, sólo arnés (2026-11-12 11:45 UTC)
 
@@ -36,7 +39,9 @@ en las dos. D207–D209 siguen libres.
    abierta y quién la abre). Arreglá el arnés para toda esa familia, no
    sólo para el registro de pedidos, y mostrá un caso que antes daba rc=2 y
    ahora no, con el rojo del arreglo revertido una vez. Sin esperas fijas.
-   Si la causa está en producto, no lo tocás: me lo decís como D.
+   Si no reproduce en N corridas de esa ronda, me decís N y qué descartaste;
+   no fuerces un rojo que no sale. Si la causa está en producto, no lo
+   tocás: me lo decís como D.
 2. **El caso natural como script** (≤80 líneas): los dos pedidos a la vez
    sin tomar la fila desde afuera, recarga + guardado y recarga + MARIA de
    una org con créditos vencidos, más el control con créditos al día. Por
@@ -52,8 +57,11 @@ esté, lo decís en el informe y arrancás esa pieza.
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 
-Acta, sección «Plan» (en Git, `6001684c`). D200–D203 (a) por la PM; sus
-condiciones siguen para la pieza.
+Acta, sección «Plan» (en Git, `6001684c`). D200–D203 (a) por la PM, y siguen
+para la pieza: D201 con el dato de que los créditos extra vencidos no se
+gastan en un alta manual; D202 con tu condición (si el caso 4 da 200 con
+algo perdido, pasás a (b)); D203 con `cancel_billing`/`reactivate_billing` +
+alta como datos del caso 6.
 
 ## CONEXIONES-1 G: aceptada sobre `6ce56cf9` e integrada (2026-11-12 10:13 UTC)
 

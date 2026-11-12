@@ -728,16 +728,33 @@ Integrada por avance directo. `chequeo-6.py 6001684c bd8665bf`: producto
 |---|---|---|---|
 | 6 | HEAD | 1 | `deadlocks: 5; rondas sin armar: 0` (las 5 del informe) |
 | 6 | (b) completo | 0 | `deadlocks: 0; rondas sin armar: 0` |
-| 6 | sólo NO KEY, 1.ª corrida | **2** | `Invalida: la app no soltó sus conexiones`, después de la ronda «recarga + maria \| usuario \| créditos vencidos» |
+| 6 | sólo NO KEY, 1.ª corrida | **2** | `Invalida: la app no soltó sus conexiones` en la ronda «recarga + maria \| usuario \| créditos al día» (la anterior, «… créditos vencidos», salió ok) |
 | 6 | sólo NO KEY, 2.ª corrida | 1 | `deadlocks: 3; rondas sin armar: 0` (igual al informe) |
 | 7 | HEAD | 1 | `cuentas mal: 4; rondas sin armar: 0` |
 
-**El rc=2 no tiene causa confirmada.** Lo mismo, 50 veces seguidas
-(maria + recarga, usuario, créditos al día): 0 fallas. Hipótesis, sin
-probar: algo abre una conexión después de `engine.dispose` (por ejemplo, la
-tarea en segundo plano del registro de pedidos, `log_request_background`,
-que no espera a nadie) y la espera de «cero conexiones» lo ve. Es arnés, no
-producto: va como devolución.
+Final de la 1.ª corrida con sólo NO KEY:
+
+```
+ok       | recarga + maria | usuario | créditos vencidos | [200, 200] | deadlocks +0
+Usuario registrado: cr_398dfcf2be (plan: premium, verificado: True)
+Traceback (most recent call last):
+  File "/tmp/cdi-parche.QwcF8P/scripts/testing/conexiones1_rondas.py", line 85, in correr
+  File "/tmp/cdi-parche.QwcF8P/scripts/testing/conexiones1_pares.py", line 31, in main
+    codigos, dl, consultas, _ = ronda(c, a, b, de_org, ajuste + (
+  File "/tmp/cdi-parche.QwcF8P/scripts/testing/conexiones1_rondas.py", line 77, in ronda
+    raise h.Invalida("la app no soltó sus conexiones")
+conexiones1_creditos.Invalida: la app no soltó sus conexiones
+rc=2
+```
+
+**El rc=2 no tiene causa confirmada.** Lo que corrí para buscarlo **no es
+la misma ronda**: 50 veces `ronda(c, "maria", "recarga", …)`, usuario,
+créditos al día, sobre HEAD sin parche (el orden inverso y otro árbol): 0
+fallas. La ronda que falló (recarga primero, con NO KEY) no la repetí
+aislada. Hipótesis, sin probar: algo abre una conexión después de
+`engine.dispose` (por ejemplo, la tarea en segundo plano del registro de
+pedidos, `log_request_background`, que no espera a nadie) y la espera de
+«cero conexiones» lo ve. Es arnés, no producto: va como devolución.
 
 ### Mis negativos: la carrera sin forzar, sobre HEAD
 
@@ -775,8 +792,8 @@ renovación.
 - **H aceptada como medición, con devolución por la causa:** lo que abre una
   conexión después de `dispose` rompe la espera a cero conexiones. Diagnosticar
   el rc=2 o hacer la espera robusta a esa familia, con un caso que lo muestre.
-- **D205 y D206 van a Emi** (punto 13 de NOW). Recomiendo D206 (a) y D205
-  (a). Los dos llevan revisión fuerte: candados de cobro y
+- **D205 y D206 van a Emi** (punto 13 de NOW). Recomiendo D206 (a), que
+  arregla 2 de los 5 pares (los otros 3 esperan D182), y D205 (a). Los dos llevan revisión fuerte: candados de cobro y
   `get_current_user`.
 
 ### No corrido por la PM
