@@ -695,6 +695,27 @@ def test_sacar_no_borra_al_usuario():
     assert r.status_code == 200, r.text
 
 
+def test_el_duenio_no_se_saca_a_si_mismo_y_el_estudio_queda_igual():
+    """Con otras mayúsculas el nombre no es el de nadie del estudio: 404, y tampoco sale."""
+    est = Estudio()
+    _miembro(est)
+    _miembro(est)
+
+    def estado():
+        async def q(s):
+            return (await s.execute(select(Organization.owner_username)
+                                    .where(Organization.id == est.org_id))).scalar_one()
+        return _db(q), _miembros(est.org_id)
+
+    antes = estado()
+    assert antes[0] == est.dueno and est.dueno in antes[1] and len(antes[1]) == 3
+    for nombre, codigo, detalle in ((est.dueno, 400, "No podés removerte a vos mismo del estudio"),
+                                    (est.dueno.upper(), 404, "Ese usuario no es miembro del estudio")):
+        r = est.quitar(nombre)
+        assert (r.status_code, r.json().get("detail")) == (codigo, detalle), (nombre, r.text)
+        assert estado() == antes, nombre
+
+
 def test_mine_lista_sólo_los_miembros_del_estudio_y_quién_es_dueño():
     est, otro = Estudio(), Estudio()
     usuario = _azar("o1u_")
