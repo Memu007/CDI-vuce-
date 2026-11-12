@@ -75,8 +75,7 @@
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_orden1.js
 // El servidor corre con CSRF_ENFORCE=true, como en producción.
 const { chromium, request } = require('/opt/node-tools/node_modules/playwright');
-// Cada registro entra con otra IP inventada: el registro tiene límite por IP, por hora y por día.
-const ipNueva = () => '10.' + [0, 0, 0].map(() => Math.floor(Math.random() * 256)).join('.');
+const ipNueva = require('./_ip_nueva');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const base = process.env.BASE_URL || 'http://127.0.0.1:8771';
 const INTERVALO_MS = 2500;  // el guardado periódico de app_v2.js
