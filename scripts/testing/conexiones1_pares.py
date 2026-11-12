@@ -13,6 +13,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from conexiones1_creditos import AL_DIA  # noqa: E402
 from conexiones1_rondas import correr, m, ronda  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -29,7 +30,7 @@ def main():
             a, b = (x, y)[::orden]
             ajuste = f"billing_status = '{'canceled' if 'reactivar' in (a, b) else 'active'}'"
             codigos, dl, consultas, _ = ronda(c, a, b, de_org, ajuste + (
-                "" if vencidos else ", extra_ops_expires_at = now() + interval '20 days'"))
+                "" if vencidos else ", " + AL_DIA))
             total, sin_armar = total + dl, sin_armar + (consultas is None)
             print(f"{'DEADLOCK' if dl else 'ok      '} | {a} + {b} | {'org' if de_org else 'usuario'} | "
                   f"créditos {'vencidos' if vencidos else 'al día'} | {codigos} | deadlocks +{dl}"
