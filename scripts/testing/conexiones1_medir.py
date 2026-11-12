@@ -170,7 +170,7 @@ class Medicion:
         self.sonda_cli = httpx.AsyncClient(base_url=f"http://127.0.0.1:{puerto_sonda}", timeout=10)
         self.c = httpx.AsyncClient(base_url=f"http://127.0.0.1:{puerto}", timeout=90)
         self.filas, self.invalida, self.fuga, self.lleno = [], False, False, False
-        self.quinientos = 0
+        self.quinientos = self.filas_perdidas = 0
         self.pdf = pdf_en_blanco()
 
     async def sonda(self, ruta="/", **params) -> dict:
@@ -323,7 +323,9 @@ class Medicion:
             self.invalida = True
         if enviados_registrables is not None and filas != enviados_registrables:
             print(f"  {nombre}: {enviados_registrables} pedidos y {filas} filas nuevas en api_logs")
-            self.invalida = True
+            if filas > enviados_registrables:
+                self.invalida = True
+            self.filas_perdidas += max(0, enviados_registrables - filas)
         return resultados
 
     async def fase_de_pedidos(self, nombre, tipos):
@@ -582,6 +584,12 @@ def leer_log(log, med) -> None:
         elif s in SEÑALES_DE_POOL_LLENO and med.quinientos:
             print(f"  {med.quinientos} × 500 en los picos sin {s!r} en el log: no sé de qué son")
             med.invalida = True
+    # Una fila perdida vale sólo si el log dice que el registro de métricas no
+    # consiguió conexión con el pool lleno; si no, no se sabe adónde fue.
+    errores = texto.count("Error logging metrics")
+    if med.filas_perdidas and (not med.lleno or errores < med.filas_perdidas):
+        print(f"  {med.filas_perdidas} filas de api_logs perdidas y {errores} 'Error logging metrics'")
+        med.invalida = True
     print(f"log completo: {log}")
 
 
