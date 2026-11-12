@@ -3,57 +3,52 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Veredicto: D191 (a), devuelta sobre `f1809e95`; D192 y D193 decididas (2026-11-12 14:55 UTC)
+## D194: aceptada sobre `f507763` e integrada (2026-11-12 16:45 UTC)
 
-**Todavía no la acepto ni la integro: la puerta es salida 0 y da 1.** Hiciste
-bien en devolver el 30 como D en vez de arreglarlo en el guion. Acta:
-`REPRODUCCION-D191-2026-11-12.md`.
+Acta: `REPRODUCCION-D194-2026-11-12.md`.
 
-**Lo reproducido sobre `f1809e95`:** `sabotaje_maria9.sh` entero da 29 `ROJO`,
-`FALLA endpoint_sin_procedencia: quedó verde` y rc=1, en 290 s. Es lo mismo
-que tu informe.
+**Lo reproducido:**
+- `anclas_perdidas.py` sobre `f507763` da 18 anclas de una línea perdidas en
+  8 guiones; sobre `3ff4e77` da 28 en 9. Las dos cuentas coinciden con tu
+  informe.
+- Tus pruebas: 27 passed. `chequeo-6`: producto +0/−0, 0 avisos.
+- Mis dos negativos movieron la cuenta en los dos sentidos:
+  - saqué un ancla y subió a 19;
+  - repuse una y dupliqué otra, y bajó a 17 con «otra cantidad (está 2)».
+- `sabotaje_maria7.sh` corrido: frena en `PATRON NO ENCONTRADO` justo en la
+  fila 97, rc=1.
+- Las dos anclas de `doc1` dan 0 y 0, como contaste a mano.
 
-**D192: (a), decidido por la PM, con un cambio de nombre.** Lo medí:
-- Con `items = _items_con_procedencia(request)` → `items = request.items`,
-  `test_maria3_antes_de_generar.py` y `test_punta_a_punta1.py` dan 22 failed,
-  igual que tu tabla. Con esa mutación, la prueba del 30 pasa.
-- Pero esa misma prueba, corrida sola, se pone roja con la mutación del 7 y
-  con la del 9. Con las del 2, 3, 8 y 10 pasa. Todavía distingue un defecto,
-  así que no se borra.
+**D195: (a), decidido por la PM.**
+- Los 10 guiones ya están en `herramientas/sabotajes-conocidos.txt`, con
+  dueña vos y salida «reescribirlo».
+- Cada guion es una pieza de arnés aparte.
+- La publicación pendiente toca justo esos archivos, así que (b) sería lo
+  mismo que (a), sólo que más tarde.
 
-Entonces:
-- Sacá el sabotaje 30 del guion, con su comentario `# 30.`. El final pasa a
-  decir «los 29».
-- La prueba queda, con un nombre que diga lo que mira: si cada renglón trae
-  su sufijo, el endpoint no pide el de la operación. El nombre lo elegís
-  vos; su comentario también se corrige.
+**Supuestos:**
+1. La herramienta y sus pruebas quedan.
+2. Las clases extra quedan.
+3. Un archivo que ya no existe cuenta como perdida.
 
-**D193: (a), decidido por la PM.** `con_propio_usa_el_general` queda como
-está.
+**Sigue: re-anclar `sabotaje_maria3.sh`** (7 anclas perdidas). Es sólo
+arnés y el producto queda en +0/−0.
+- Ancla por ancla, mirá si la protección que ataca el sabotaje sigue
+  existiendo en el código de hoy:
+  - si sigue, re-anclalo al texto de hoy;
+  - si no, ese sabotaje no se toca y va como D que propone retirarlo.
+- Puerta: el guion entero sobre la cabeza da todos `ROJO` y sale 0, y
+  `anclas_perdidas.py` no da ninguna fila perdida para ese guion. Al
+  entregar, sacá su línea de `sabotajes-conocidos.txt`.
+- Si algún sabotaje va como D de retirarlo, el guion commiteado lo sigue
+  teniendo y su línea queda en `sabotajes-conocidos.txt` hasta que decida.
+  La puerta pasa a ser: una corrida con ese sabotaje salteado sólo en una
+  copia local (no en el commit) da `ROJO` en todos los demás y sale 0; las
+  únicas filas perdidas son las de ese D.
+- Después siguen `catalogo_largo2` y los demás, uno por pieza.
+- Si en el medio te llega la tarea de comparación, va primero.
 
-**El escape es más ancho de lo que dije en D145.** La última vez que
-`sabotaje_maria9.sh` dio 30 de 30 fue sobre `efa2e08` (VALOR-1b, acta del
-2026-10-25). Después, VALOR-1c (`3df999c8`) cambió las anclas 24, 27 y 28, y
-su acta (aceptada sobre `a099655`) no corrió este guion. Recién después,
-SUFIJOS-1 (`fe95a49b`) rompió las otras. Lo corrijo en `DECISIONS.md` y en
-el acta de D145. No cambia nada de lo que tenés que hacer.
-
-### Sigue: la vuelta de D191, sólo arnés
-
-**Puertas:**
-- `sabotaje_maria9.sh <SHA>` entero, desde un worktree limpio: «OK: los 29
-  sabotajes dan rojo por la razón esperada» y sale 0.
-- `tests/test_maria9_sufijo_operacion.py` entero da la misma cantidad de
-  `passed` que en `f1809e95`.
-- La prueba renombrada se pone roja con la mutación del 9: la salida va en
-  el informe.
-- La prueba y el guion van en commits separados.
-- `chequeo-6` entero, con producto +0/−0.
-
-**Apenas entregues:** sigue D194, el conteo estático de anclas. Si ya lo
-empezaste, dejalo y terminá antes esta vuelta: la devolución va primero.
-
-**Tu rango de D: D190 a D199** (la próxima libre es D195).
+**Tu rango de D: D190 a D199** (la próxima libre es D196).
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
