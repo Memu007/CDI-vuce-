@@ -47,9 +47,10 @@ Cada pantalla tocada, sin sabotajes, sobre una base nueva:
 | `destino1` | 1 | rc=0 | 0 |
 | `estudio1b` | 1 | rc=0, `PANTALLA ESTUDIO-1b OK` | 0 |
 
-`orden1` cuatro veces es para el `192.0.2.` que queda: su secuencia vuelve a
-empezar en cada corrida y repite IPs de login sobre la misma base. No llega
-al límite de `/auth/login`. La primera corrida de `cliente1` dio rc=1 porque
+El `192.0.2.` que queda no llega al límite de `/auth/login` por la cuenta,
+no por la corrida: el límite es 5 por minuto y por IP, cada IP se usa una vez
+por corrida y una corrida de `orden1` tarda ~9 min. Las cuatro corridas son
+una observación; no podían fallar por eso. La primera corrida de `cliente1` dio rc=1 porque
 mi guion no le pasaba `CDI_DB`; error mío, no de la entrega.
 
 ## No corrido

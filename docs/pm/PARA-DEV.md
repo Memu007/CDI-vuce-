@@ -16,9 +16,9 @@ Integro tu rama hasta `5a1a5a8b`. Acta `REPRODUCCION-D190-2026-11-12.md`.
   con 429 de `/auth/register`; con `_ip_nueva` pasan las cuatro y no hay
   ningún 429 de registro.
 - **El `192.0.2.` de `orden1`:** acepto tus razones. La corrí cuatro veces
-  seguidas sobre una base para ver si la secuencia, que vuelve a empezar en
-  cada corrida, choca con el límite del login: las cuatro rc=0 y ningún 429 de
-  `/auth/login` (sólo telemetría). Las otras cuatro pantallas, una vez cada
+  seguidas sobre una base: las cuatro rc=0, ningún 429 de `/auth/login`.
+  Es sólo una observación: cada corrida tarda ~9 min y el límite es por
+  minuto, así que esa repetición no podía chocar. Las otras cuatro pantallas, una vez cada
   una sobre base nueva, también pasan.
 - **No corrí** tus 9 guiones (corrí las pantallas solas) ni el `cmp` del
   parche (el original está en tu contenedor).
@@ -32,7 +32,10 @@ ya usan `tmp_path`.
 En `remove_member` (`DELETE /api/organizations/members/{username}`, cerca
 de `main.py:10987`) está la guarda que impide que el dueño del estudio se
 saque a sí mismo. Ningún caso falla si se borra. Es la entrada de
-`COLA-LIMPIEZA.md`; es permisos, así que va con revisión fuerte.
+`COLA-LIMPIEZA.md`. Lo comprobé: con la guarda borrada, `test_org1.py` y
+`test_cobro_mp2.py` dan 208 passed, y el dueño sale con 200 y el estudio
+queda sin él. Producto +0/−0: la revisión son estas puertas, sin
+adversarios ni guion de sabotaje.
 
 **Puertas:**
 - Un caso nuevo en `tests/` (donde ya se prueba sacar miembros, por

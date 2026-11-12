@@ -126,7 +126,7 @@ def test_la_procedencia_del_producto_gana_sobre_la_de_la_operacion(client, auth_
     assert "CARTPAYPRC=222" in data["content"]
 
 
-@pytest.mark.parametrize("procedencia", ["Narnia", "99999", "12", "²", "٢٢٢", "2²2"])
+@pytest.mark.parametrize("procedencia", ["Narnia", "99999", "12", "100", "²", "٢٢٢", "2²2"])
 @pytest.mark.parametrize("ruta", ["/generate_maria", "/generate_maria/avisos"])
 def test_procedencia_no_reconocida_se_rechaza(client, auth_override, procedencia, ruta):
     r = client.post(ruta, json=_cuerpo(procedencia=procedencia))
