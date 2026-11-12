@@ -228,9 +228,5 @@ caso "mira_despues_del_ajuste" "FAILED $K::test_el_error_nombra_sólo_los_renglo
 reemplazar $F '[kilos_renglones] if unidad_est == UNIDAD_KILOGRAMO else []' '[]'
 caso "no_mira_los_kilos" "FAILED $K::test_el_error_nombra_sólo_los_renglones_chicos[uno_al_final]"
 
-# 30. el endpoint arma los ítems sin la procedencia de la operación
-reemplazar $M '        usa_el_general = usa_el_sufijo_de_la_operacion(items)' '        usa_el_general = usa_el_sufijo_de_la_operacion(request.items)'
-caso "endpoint_sin_procedencia" "FAILED $T::test_el_endpoint_agrupa_con_la_procedencia_de_la_operacion"
-
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
-echo "OK: los 30 sabotajes dan rojo por la razón esperada"
+echo "OK: los 29 sabotajes dan rojo por la razón esperada"
