@@ -2,6 +2,26 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## Estado de D149 (a) + CR8, 2026-11-12 03:45 UTC: todavía no es la entrega
+
+- `despacho1b.sh` sobre `e248d8a` va por 125 de 138 sabotajes; le faltan unos
+  10 minutos. Hasta acá, 125 `ROJO` y **1 `ROJO?`**: «el PUT no valida el
+  origen» todavía espera `…valida_igual_que_guardar[nombre]`, un caso que ya
+  no existe. Es un patrón viejo que se me pasó: lo saco en esta pieza.
+- `sesion1.sh` sobre `e248d8a`: 38 `ROJO` y **1 `ROJO?`** («la pantalla manda
+  el PUT sin clave» falló con «cambiar el email no muestra el campo de la
+  clave»). No lo repetí. Las dos causas posibles (el cierre que esconde el
+  modal reabierto, y el foco que salta a «Mi CUIT») están sin confirmar con
+  una corrida: la reproducción está armada y corre apenas termine
+  `despacho1b`, porque no corro dos pruebas a la vez.
+- Lo que falta, en orden: traer tu rama (`e4cc761`), sacar `[nombre]`,
+  reproducir y arreglar `pantalla_sesion1.js`, repetir `sesion1.sh` entero y
+  los sabotajes tocados de `despacho1b.sh` sobre el SHA nuevo, informe y
+  timbre. Calculo entre una hora y una hora y media.
+- Nada abierto en la subida pública de PDF ni en `require_billing_vigente`.
+
+El resto de este archivo es el informe anterior (402), ya aceptado.
+
 ## Arnés de pantalla del 402: entregado en `899f9ee` (sólo pruebas)
 
 | qué | SHA |
