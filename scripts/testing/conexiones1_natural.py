@@ -26,7 +26,7 @@ ESTADO = ("select (select estado from mp_pagos_aplicados where payment_id = %s),
 OPERACIONES = ("select o.id, count(i.id) from operations o left join operation_items i on i.operation_id = o.id"
                " where o.owner_username = (select owner_username from organizations where id = %s) group by o.id")
 CUENTA = "select ops_used_this_period, billing_status from organizations where id = %s"
-CREDITOS = {"créditos vencidos": None, "créditos al día": "extra_ops_expires_at = now() + interval '20 days'"}
+CREDITOS = {"créditos vencidos": None, "créditos al día": h.AL_DIA}
 # (a, b, rótulo, cómo queda la org además de los créditos extra vencidos, códigos que b puede dar sin deadlock)
 FILAS = [("recarga", b, *c, {200}) for b in ("guardado", "maria", "alta") for c in CREDITOS.items()] + [
     ("alta", b, "créditos vencidos", None, {200}) for b in ("guardado", "cancelar")] + [
