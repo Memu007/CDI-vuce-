@@ -626,3 +626,93 @@ main()
 ```
 
 </details>
+
+## Plan de la pieza de producto (sólo docs): leído sobre `b60c30d4` (2026-11-12 10:47 UTC)
+
+Integrado con avance directo. Sin producto.
+
+**Qué árbol es cada «(b)»:**
+- en G, (b) era el `commit` en la dependencia; perdía la recarga (rc=1);
+- en el plan, (b) es la manual con `require_billing_vigente` +
+  `_contar_operacion_bloqueada`. Según la Dev, da deadlock en alta + recarga
+  de la org (rc=2, 3/3). Lo arregla `_cuenta_bloqueada` con
+  `FOR NO KEY UPDATE OF`.
+
+Mi negativo de G (alta + guardado) no veía ese par.
+
+**Lo reproducido por la PM:**
+- El comando 1 da `2.0.25 True False`: sin `of=`, `key_share` comparte la
+  clave de cache con `FOR UPDATE`.
+- El comando 2 da 3755 `require_active_billing` y 3840, 4611, 5032, 5296,
+  7147, 7245, 8132, 10335 `require_billing_vigente`.
+- El mecanismo, mínimo y sin la app (PG16 local, `fk.py` abajo):
+  - `FOR UPDATE`: el segundo `UPDATE` de la org espera (FK →
+    `FOR KEY SHARE` de la dueña) → `['ok', 'DeadlockDetectedError']`;
+  - `FOR NO KEY UPDATE`: el segundo `UPDATE` no espera, el aviso confirma y
+    el alta sigue → `['ok', 'ok']`.
+
+**Leído:** `_vencer_y_guardar` hace su propio `commit`/`rollback`; el
+`commit` nuevo de vigente no carga esa escritura (D202).
+
+**No reproducido:** los resultados 1 a 3 dentro de la app; los midió la Dev
+sobre árboles sin commitear. Van copiables en H.
+
+**Abierto:**
+- ¿Pasa hoy? En HEAD, el guardado y generar MARIA ya toman a la dueña con
+  `FOR UPDATE` y después la org. Se mide en H.
+- D204 (`past_due` sobre una renovación), en H.
+
+**Decisiones:**
+- D200 (a), D201 (a) con un dato de créditos vencidos, D202 (a) con la
+  condición del caso 4 y D203 (a) con el espejo como dato: las decidió la
+  PM.
+- D204: la medición la ordena la PM; el arreglo lo decide Emi.
+
+<details><summary>fk.py (mínimo, PG local)</summary>
+
+```python
+import asyncio, asyncpg, sys
+DSN = "postgresql://cdi@127.0.0.1:55462/pm_fk_repro"
+async def prep():
+    c = await asyncpg.connect("postgresql://cdi@127.0.0.1:55462/postgres")
+    await c.execute("DROP DATABASE IF EXISTS pm_fk_repro"); await c.execute("CREATE DATABASE pm_fk_repro"); await c.close()
+    c = await asyncpg.connect(DSN)
+    await c.execute("CREATE TABLE users(username text primary key, n int default 0);"
+                    "CREATE TABLE orgs(id int primary key, owner_username text references users(username), cred int default 0);"
+                    "INSERT INTO users VALUES ('ana'); INSERT INTO orgs VALUES (1,'ana');")
+    await c.close()
+async def esperar_bloqueado(mon, pid):
+    for _ in range(500):
+        r = await mon.fetchval("select wait_event_type from pg_stat_activity where pid=$1", pid)
+        if r == 'Lock': return
+        await asyncio.sleep(0.01)
+    raise RuntimeError("no se bloqueó")
+async def corrida(modo):
+    await prep()
+    alta, hook, mon = [await asyncpg.connect(DSN) for _ in range(3)]
+    hpid = await hook.fetchval("select pg_backend_pid()"); apid = await alta.fetchval("select pg_backend_pid()")
+    ta = alta.transaction(); await ta.start(); th = hook.transaction(); await th.start()
+    await alta.execute(f"SELECT * FROM users WHERE username='ana' {modo}")      # alta: usuario primero
+    await hook.execute("UPDATE orgs SET cred=cred+10 WHERE id=1")             # webhook: primer UPDATE
+    t2 = asyncio.create_task(hook.execute("UPDATE orgs SET cred=cred+0 WHERE id=1"))  # segundo UPDATE: dispara la FK
+    try:
+        await asyncio.wait_for(asyncio.shield(t2), 0.5); print(modo, "-> 2do UPDATE no espera")
+    except asyncio.TimeoutError:
+        print(modo, "-> 2do UPDATE espera (FOR KEY SHARE sobre la dueña)")
+    t1 = asyncio.create_task(alta.execute(f"SELECT * FROM orgs WHERE id=1 {modo}"))
+    r2 = await asyncio.gather(t2, return_exceptions=True)
+    if not isinstance(r2[0], Exception):
+        try: await asyncio.wait_for(asyncio.shield(t1), 0.5)
+        except asyncio.TimeoutError: await th.commit(); print(modo, "-> el webhook confirma; el alta sigue")
+    res = [await asyncio.gather(t1, return_exceptions=True)][0] + r2
+    print(modo, "->", [type(r).__name__ if isinstance(r, Exception) else "ok" for r in res])
+    for t, c in ((ta, alta), (th, hook)):
+        try: await t.rollback()
+        except Exception: pass
+    for c in (alta, hook, mon): await c.close()
+async def main():
+    await corrida("FOR UPDATE"); await corrida("FOR NO KEY UPDATE")
+asyncio.run(main())
+```
+
+</details>
