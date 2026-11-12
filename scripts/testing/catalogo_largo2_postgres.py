@@ -69,7 +69,6 @@ USUARIO = f"cl2{uuid.uuid4().hex[:6]}"
 VENDOR = "Proveedor sintetico"
 VENDOR_ID = "proveedor_sintetico"
 LARGO = "Proveedor largo " + "x" * 204
-LARGO_ID = ("proveedor_largo_" + "x" * 204)[:60]
 NCM = "73181500"
 # Variados: repetidos, Postgres los comprime y entran en el índice igual.
 CJK_LARGO = "".join(chr(0x4E00 + i * 7) for i in range(2000))
@@ -195,8 +194,10 @@ try:
     from fastapi.testclient import TestClient  # noqa: E402
     import proyecto_maria.main as main_mod  # noqa: E402
     from proyecto_maria.core.rate_limit import limiter  # noqa: E402
+    from proyecto_maria.core.catalog_service import _vendor_key  # noqa: E402
     from proyecto_maria.database.connection import engine  # noqa: E402
     limiter.enabled = False
+    LARGO_ID = _vendor_key(LARGO)
 
     class Arranque(TestClient):
         """Un arranque de la app; al salir cierra las conexiones, como un

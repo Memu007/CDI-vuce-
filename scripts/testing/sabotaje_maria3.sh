@@ -56,6 +56,11 @@ open(p, "w", encoding="utf-8").write(s.replace(viejo, nuevo, 1))
 PY
 }
 
+# La validación del flete en el endpoint: la sacan dos sabotajes.
+sin_flete_en_el_endpoint() {
+  reemplazar $M '    request.flete = importe_valido(request.flete, "Flete") or 0' '    request.flete = request.flete or 0'
+}
+
 FALLAS=0
 caso() {  # caso <nombre> <texto que el rojo tiene que mostrar>
   local nombre="$1" espera="$2" salida
@@ -217,7 +222,7 @@ reemplazar $G '    flete = centavos(importe_valido(flete or 0, "Flete"))' '    f
 # Al generar lo validan también el control del pedido y la conversión de
 # importes del endpoint, y cada una alcanza sola para el 400: se sacan las tres.
 reemplazar proyecto_maria/core/controles_maria.py '    ("flete", "Flete"), ("seguro", "Seguro"),' '    ("seguro", "Seguro"),'
-reemplazar $M '    request.flete = importe_valido(request.flete, "Flete") or 0' '    request.flete = request.flete or 0'
+sin_flete_en_el_endpoint
 caso flete_sin_validar "${T}test_flete_o_seguro_que_no_son_un_importe_dan_400[/generate_maria-flete-inf]"
 
 # 29. una procedencia de producto no reconocida pasa
@@ -228,5 +233,13 @@ caso procedencia_de_producto "${T}test_codigo_raro_en_el_producto_da_400_con_men
 reemplazar $G "    if not fecha_ok:" "    if items and not fecha_ok:"
 caso fecha_sin_productos "${T}test_sin_productos_los_avisos_tambien_piden_la_fecha"
 
+# 31. los avisos previos no validan el flete: ahí no lo rechaza nadie más
+sin_flete_en_el_endpoint
+caso avisos_flete_sin_validar "${T}test_flete_o_seguro_que_no_son_un_importe_dan_400[/generate_maria/avisos-flete--500]"
+
+# 32. los avisos previos no validan el seguro: el pedido no llega a responder
+reemplazar $M '    request.seguro = importe_valido(request.seguro, "Seguro") or 0' '    request.seguro = request.seguro or 0'
+caso avisos_seguro_sin_validar "${T}test_flete_o_seguro_que_no_son_un_importe_dan_400[/generate_maria/avisos-seguro-nan]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 30 sabotajes dan rojo por la razón esperada"
+echo "OK: los 32 sabotajes dan rojo por la razón esperada"

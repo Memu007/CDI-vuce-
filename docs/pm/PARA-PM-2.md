@@ -2,176 +2,305 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## `sabotaje_maria3.sh` re-anclado: entregado en `29880ee` (sólo arnés). 30 de 30 en rojo, sale 0
+## Dos cosas, entregadas en `204c638` (sólo arnés): la vuelta de D216/D217 y `catalogo_largo2.sh` re-anclado
 
 | qué | SHA |
 |---|---|
-| base (tu cabeza anterior, ya integrada) | `3af35be` |
-| un dato más en la prueba de procedencia («100») | `ff69c3d` |
-| las siete anclas perdidas, sobre el código de hoy | `2cf7ddd` |
-| el sabotaje del flete saca las tres validaciones | `d13f153` |
-| tu cabeza `47ca0cd` integrada | `c26e21c` |
-| arreglos de la autorrevisión (ids completos, comentario) | `e0ddb9e`, `29880ee` |
-| su línea sale de `sabotajes-conocidos.txt` | `e4308e1` |
-| **el que se entrega** | `29880ee` |
+| base (tu cabeza `eeec625`, integrada) | `e115e50` |
+| **Parte 1.** D216 (b): el sabotaje 31 espera el caso de `-500` | `170cdc0` |
+| **Parte 1.** D217 (a): el sabotaje 32, el seguro en avisos | `0baa07b` |
+| **Parte 2.** la prueba de Postgres usa el id que arma el producto | `81e81e0` |
+| **Parte 2.** las siete anclas | `ac58fb0` |
+| **Parte 2.** arreglos de la autorrevisión | `6af3b80`, `a538124`, `204c638` |
+| **Parte 2.** el texto de su línea en `sabotajes-conocidos.txt` | `2cc6d18` |
+| **el que se entrega** | `204c638` |
+| tu cabeza `8f79bcc`, integrada después: no toca producto, estos guiones ni sus pruebas | `829f2d1` |
 | informe | el commit siguiente |
 
-**Resultado.** Las siete protecciones siguen existiendo en el código de hoy:
-ninguna va como D de retirar. El guion entero sobre `29880ee` da 30 `ROJO`
-y sale 0. `anclas_perdidas.py 29880ee` no da ninguna fila para el guion.
-Producto: **+0/−0**.
+**Resultado.**
 
-Dos cosas que no eran re-anclar puro y por eso van como D:
+- **Parte 1.** `sabotaje_maria3.sh` entero da 32 `ROJO` y sale 0. Nada para
+  decidir.
+- **Parte 2.** `catalogo_largo2.sh` tiene 38 sabotajes. Entero y con
+  Postgres, 37 dan `ROJO`. El otro, «la clave junta ﬁ con fi», queda verde
+  con su ancla presente: es D199. Lo salteé sólo en una copia local (no
+  commiteada): 37 `ROJO`, `fallas: 0`, sale 0. Su línea sigue en
+  `sabotajes-conocidos.txt` hasta que decidas.
+- Producto: **+0/−0** en las dos.
 
-- El sabotaje 18, anclado donde hoy vive la protección, quedaba verde:
-  ningún caso distinguía «código de tres cifras que no está en la tabla».
-  Agregué el dato «100» a la prueba (D196).
-- El sabotaje 28 (flete) no estaba entre los siete, pero quedó verde apenas
-  el guion pudo llegar hasta él: hoy el flete se valida en tres lugares al
-  generar. Ahora saca los tres (D198).
+## Decisiones (todas de la parte 2)
 
-## Decisiones
+**D199. Retirar el sabotaje «la clave junta ﬁ con fi».** Cambia `NFD` por
+`NFKD` en `_normalize` y espera que fallen
+`test_lo_que_no_tiene_letras_latinas_se_guarda_sin_cruzarse[catalogo]` y
+`[guardar-uso]`. Hoy la clave pasa antes por `_compatible`, que junta «ﬁ»
+con «fi» a propósito: `tests/test_catalogo3.py:145` lo exige y
+`catalogo3.sh:98` ya tiene el sabotaje de esa línea. Para la clave, el
+cambio del sabotaje no cambia nada, y por eso queda verde.
+- (a) Lo retiro y sale la línea del guion de `sabotajes-conocidos.txt`.
+  **Recomiendo (a)**: lo que protegía ya no es lo que el producto hace, y lo
+  que hace hoy tiene su sabotaje en otro guion.
+- (b) Queda como está, vencido.
 
-**D196. El dato «100» en `test_procedencia_no_reconocida_se_rechaza`.**
-Sin él, el sabotaje 18 no tiene rojo: «99999» y «12» se rechazan por la
-forma del código, antes de mirar la tabla. Con la mutación 18 y sin el dato:
-`134 passed`. Con el dato: `2 failed` (`assert 200 == 400` en las dos rutas).
-«100» no está en la tabla oficial (309 códigos; `grep -c '"code":"100"'` da
-0); 999 sí está.
-- (a) Queda el dato. **Recomiendo (a)**: es una línea, verde hoy, y es el
-  único caso que prueba que un código con forma válida se busca en la tabla.
-- (b) Lo saco, y el sabotaje 18 va como D de retirar.
+Mientras no decidas, el selector saltea el guion entero por este solo
+sabotaje.
 
-**D197. `_codigo_de_la_tabla` quedó sin prueba que la distinga.** Es la
-función que atacaban los sabotajes 18 y 24 viejos. Hoy la ruta de generar
-pasa por `codigo_de_pais`, y `_codigo_de_la_tabla` la usa sólo
-`despacho_lector.py:259`. Le saqué el chequeo de tabla en una copia y corrí
-los 7 archivos de prueba que tocan el lector: `441 passed`. No corrí la
-suite entera con esa mutación.
-- (a) Pieza aparte: un caso del lector con un código que no está en la tabla
-  y su sabotaje. **Recomiendo (a)**. El lector es de la Técnica: decidí vos
-  quién.
-- (b) Queda anotado como riesgo y no se hace nada.
+**D218. La tabla `operation_items` no tiene sabotaje en el arranque.** El
+arranque pasa a texto tres tablas. `catalogo_largo2_postgres.py` no mira la
+tercera. `catalogo3_postgres.py` sí: sacándole la tupla a mano da `FALLA |
+operation_items.origen pasa a text y la fila vieja queda igual`. Pero ningún
+guion de sabotaje corre esa prueba.
+- (a) Pieza chica aparte: un sabotaje que saca la tupla y corre
+  `catalogo3_postgres.py`. **Recomiendo (a)**: es una migración.
+- (b) Queda como riesgo anotado.
 
-**D198. El sabotaje 28 saca tres validaciones del flete a la vez.** Al
-generar, alcanza con cualquiera de las tres para el 400 (generador, control
-del pedido, conversión de importes del endpoint): con una o dos sacadas,
-los casos de `/generate_maria` siguen verdes. El rojo prueba que alguna
-funciona, no cuál. En `/generate_maria/avisos` hay una sola (la del endpoint); sacándola
-sola fallan los dos casos de avisos, pero ningún sabotaje del guion los
-nombra.
-- (a) Queda así: es defensa repetida, y una sola rota no cambia lo que ve el
-  usuario.
-- (b) Un sabotaje más en este guion, de un ancla, que espere
-  `[/generate_maria/avisos-flete-inf]`. Son tres líneas y la prueba ya
-  existe. **Recomiendo (b)**, porque en avisos no hay segunda defensa.
-- (c) Además de (b), una prueba directa del generador con flete inválido.
-  No la recomiendo: detrás tiene otras dos capas.
+**D219. Ninguna prueba fija el id de un proveedor de nombre largo.** Con más
+de 60 caracteres, `_vendor_key` arma el id con un corte y un resumen. Cambié
+el corte a mano (`[:38]` y `[:21]`) y corrí los 8 archivos de prueba del
+catálogo: `256 passed`. Si ese esquema cambia sin querer, los proveedores
+largos ya guardados dejan de encontrarse y nada avisa. No corrí la suite
+entera con ese cambio.
+- (a) Un dato más en `test_un_proveedor_latino_conserva_su_id`: un nombre
+  largo con su id escrito. **Recomiendo (a)**: una línea.
+- (b) Queda como riesgo anotado.
 
-## Supuestos (reversibles)
+**D220. Fuera de la clave, «ﬁ» se pierde.** Salió al revisar D199.
+`_normalize` sola no junta «ﬁ» con «fi»: la borra. La clave no lo sufre
+(pasa por `_compatible`), pero dos lugares llaman a `_normalize` sin ese
+paso. Medido llamando a las funciones, no por la pantalla:
 
-1. **Sabotaje 13.** En vez de sacar el parámetro `user`, cambia la
-   dependencia por una que no mira la sesión. El cuerpo del endpoint usa
-   `user["username"]`: sacando el parámetro daba un 500 por otra causa. Con
-   el cambio, el rojo es `assert 200 == 401`.
-2. **Sabotaje 16.** Hoy la fecha sale de `_fecha_leida`. La mutación hace
-   que una copia del lector no pase por ahí. Una variante más fina
-   (`str(raw)` dentro de `_fecha_leida`) queda verde, `136 passed`: «None»
-   no es una fecha y sale vacía igual.
-3. **Ids completos en los sabotajes 16 y 24.** Esperaban un prefijo del id,
-   que también cumple otro parámetro. Ahora esperan `[None-pymupdf]` y
-   `[/generate_maria/avisos-\u0662\u0662\u0662]`, escrito con la
-   barra y la u, como lo imprime pytest.
-4. **Saqué `reemplazar_si_esta`.** Su único uso era el control del pedido en
-   el sabotaje 28, que ya está integrado: ahora es `reemplazar`, y si el
-   ancla se pierde el guion frena.
+| «Arandela ﬁna» | da |
+|---|---|
+| `clave_de_producto` | `arandela fina` |
+| `_word_set` (el parecido entre descripciones) | `['arandela']` |
+| `_norm_desc` (`descripcion_normalizada` del cliente) | `arandela na` |
 
-## Qué cambió en cada sabotaje
+La búsqueda exacta anda. El parecido pierde la palabra que trae la
+ligadura. No medí si alguna factura real llega con ligaduras.
+- (a) A la cola de limpieza: que esos dos lugares pasen por `_compatible`,
+  con su caso. **Recomiendo (a)**, sin apuro.
+- (b) No se hace nada.
 
-| # | nombre | dónde está hoy la protección | rojo |
-|---|---|---|---|
-| 13 | `avisos_sin_sesion` | `user=Depends(get_current_user)` en `avisos_maria_endpoint`; la firma ganó `db` | 1 failed |
-| 14 | `avisos_previos_distintos` | `_supuestos_maria(request, items, gastos)`; el ancla vieja incluía un comentario que ya no está | 1 failed |
-| 16 | `fecha_none` | `'fecha_emision': fecha,` (dos copias, se cambia la primera) | 1 failed |
-| 18 | `procedencia_fuera_de_la_tabla` | `codigo in _tabla_oficial()` en `codigo_de_pais` | 2 failed |
-| 21 | `tabla_corta` | `_tabla_oficial()` arma un diccionario, no un `frozenset` | 9 failed |
-| 24 | `cifras_raras` | `[0-9]{3}` en el patrón de `codigo_de_pais` | 4 failed |
-| 27 | `avisos_gastos_500` | `except ValueError` después de `_importes_como_numeros(request)` | 14 failed |
-| 28 | `flete_sin_validar` | generador, `controles_maria.py` y `_importes_como_numeros` | 4 failed |
+---
 
-## Para reproducir
+## Parte 1. Vuelta de D216 y D217 (`sabotaje_maria3.sh`)
+
+Hice lo que decidiste, sin supuestos:
+
+- **31** (`170cdc0`): espera `[/generate_maria/avisos-flete--500]`.
+- **32** (`0baa07b`): saca sólo `importe_valido(request.seguro, "Seguro")`
+  del endpoint y espera `[/generate_maria/avisos-seguro-nan]`.
+
+### Para reproducir
 
 ```bash
-bash scripts/testing/sabotaje_maria3.sh 29880ee <venv>
-# VERDE sin sabotaje: 136 passed; 30 líneas ROJO;
-# «OK: los 30 sabotajes dan rojo por la razón esperada»; sale 0
-python scripts/testing/anclas_perdidas.py 29880ee | grep -c sabotaje_maria3
+bash scripts/testing/sabotaje_maria3.sh 204c638 <venv>
+# VERDE sin sabotaje: 136 passed; 32 líneas ROJO;
+# «OK: los 32 sabotajes dan rojo por la razón esperada»; sale 0
+python scripts/testing/anclas_perdidas.py 204c638 | grep -c sabotaje_maria3
 # 0
-python docs/pm/herramientas/chequeo-6.py 3af35be 29880ee
-# producto +0/−0, avisos: 0
 ```
 
-## Puertas
+### Puertas
 
 | puerta | sobre | salida |
 |---|---|---|
-| guion entero | `29880ee` | `VERDE  sin sabotaje: 136 passed`; 30 `ROJO`; `OK: los 30 sabotajes dan rojo por la razón esperada`; `rc=0 segundos=230` |
-| `anclas_perdidas.py` | `29880ee` | ninguna fila de `sabotaje_maria3.sh`. En el repo quedan: `perdida, una línea 14 (guiones: 7)`, `perdida, varias líneas 7 (guiones: 4)`, `otra cantidad 2 (guiones: 1)` |
-| `chequeo-6.py 3af35be 29880ee` | | abajo, entera |
-| rojo antes: guion viejo | `3af35be` | 12 `ROJO`, después `PATRON NO ENCONTRADO (0 veces) en proyecto_maria/main.py` en el sabotaje 13; `rc=1` |
+| guion entero | `0baa07b` | `VERDE  sin sabotaje: 136 passed`; 32 `ROJO`; `ROJO   avisos_flete_sin_validar: 2 failed, 134 passed`; `ROJO   avisos_seguro_sin_validar: 2 failed, 134 passed`; `OK: los 32 sabotajes dan rojo por la razón esperada`; `rc=0 segundos=216` |
+| la mutación 32 a mano | antes de escribir el sabotaje | `2 failed, 134 passed`: `avisos-seguro-nan` y `avisos-seguro-1e+308` |
+| la mutación 31 a mano | antes de cambiar el id | el caso de `-500` falla con `assert 200 == 400`; `2 failed, 134 passed` |
+| `anclas_perdidas.py` | `0baa07b` | ninguna fila de `sabotaje_maria3.sh` |
+| `chequeo-6.py e115e50 0baa07b` | | abajo, entera |
+
+El guion entero corrió sobre `0baa07b`, no sobre `204c638`. Entre los dos no
+cambió el guion, su prueba ni el producto:
+`git diff --stat 0baa07b 204c638 -- scripts/testing/sabotaje_maria3.sh tests proyecto_maria`
+da vacío.
 
 ```
-chequeo-6 3af35be..29880ee: avisos para mirar, no un veredicto
+chequeo-6 e115e50..0baa07b: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +21/−28
+arnés +6/−2
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
 ```
 
-**Rojos intermedios, diagnosticados (no repetí hasta verde):**
+No hubo rojos intermedios.
 
-- Sobre `2cf7ddd`: 29 `ROJO` y `FALLA flete_sin_validar: quedó verde`,
-  `rc=1`. Causa: la tercera validación del flete. Arreglo: `d13f153`.
-- Sobre `e4308e1`: 29 `ROJO` y `FALLA cifras_raras: rojo, pero sin «…»`,
-  `rc=1`. Causa: mía. Al pasar al id completo, las tres cifras quedaron
-  guardadas como caracteres y pytest las imprime escapadas. El rojo salía
-  (4 failed), el texto esperado no. Arreglo: `29880ee`.
-
-## Hallazgos de la autorrevisión
+### Hallazgos de la autorrevisión (parte 1)
 
 | quién | hallazgo | severidad | qué hice |
 |---|---|---|---|
-| adversario Sonnet, medio | Las 8 mutaciones sacan la protección que dice su comentario y el rojo sale por esa razón (corrió cada una a mano) | — | nada |
-| adversario Sonnet, medio | 16: la mutación saltea `_fecha_leida` entera, no sólo el «None» | baja | supuesto 2 |
-| adversario Sonnet, medio | 24: el id esperado era un prefijo | baja | arreglado |
-| adversario Sonnet, medio | 28: hay una cuarta validación (`cuentas_del_valor`), que no da 400: su error queda en `valor.error` | — | nada; lo reproduje, sacar la cuarta no cambia los 4 rojos |
-| `/code-review high` (revisores Fable, alto) | 28 saca tres a la vez | media | D198 |
-| `/code-review high` | 24: prefijo | baja | arreglado |
-| `/code-review high` | `_codigo_de_la_tabla` sin negativo | media | D197, medido |
-| `/code-review high` | 16: la segunda copia del lector no tiene sabotaje (viene de antes) | baja | queda como riesgo; el id ahora nombra la copia |
-| `/code-review high` | comentario nuevo de tres líneas | baja | arreglado: dos |
+| adversario Sonnet, medio | El rojo del 32 sale por lo que dice su comentario; el id esperado no es prefijo de otro; el ancla está una vez (corrió las mutaciones 31 y 32 a mano) | — | nada |
+| adversario Sonnet, medio | `gastos_fob` y `gastos_anteriores_fob` sin sabotaje: sacando sus dos líneas, `136 passed`; antes las valida `gastos_fob_para_el_txt` | baja | nada: es lo que mediste vos |
+| adversario Sonnet, medio | `caso` acepta cualquier rojo que traiga el id esperado, aunque venga de otra causa. No encontró un caso concreto | baja | nada: viene de antes. Riesgo anotado |
+| `/code-review high` (revisores Fable, alto) | El «32» del mensaje final se cambia a mano | baja | no lo toqué: viene de antes. Repito la propuesta para la cola: «`sabotaje_maria3.sh`: contar los casos en `caso` en vez de escribir el número» |
 
-`/security-review`: no corrido. La pieza no toca producto.
+---
+
+## Parte 2. `catalogo_largo2.sh` re-anclado
+
+### Supuestos (reversibles)
+
+1. **La prueba de Postgres estaba en rojo sin sabotaje** (`81e81e0`). Tenía
+   escrito a mano el id de un proveedor de nombre largo, y el producto hoy
+   lo arma distinto. Ahora lo pide a `_vendor_key`, como ya hacía
+   `tests/test_catalogo_largo2.py`. De ahí sale D219.
+2. **Los tres sabotajes «no mide el origen»** (catálogo, cambiar,
+   guardar-uso) anclan en la línea que llama a `origen_para_guardar` en cada
+   lugar.
+3. **Un sabotaje nuevo, «el origen no se mide»** (`a538124`). Con el
+   supuesto 2, nada tocaba la línea de adentro de `origen_para_guardar` que
+   mide. Usa el mismo molde que «el catálogo no mide el proveedor». El
+   `/code-review` objeta que espera los mismos tres casos que los del
+   supuesto 2 y que saca más que la medida; lo dejé porque los casos
+   esperados son los del tope. Suma unos 40 s al guion. Si no lo querés, lo
+   saco.
+4. **«La migración de claves no mueve nada»** ancla en `no_ascii = "GLOB`
+   (antes `sin_latinas = "NOT GLOB`). En Postgres espera
+   `FALLA | «螺丝钉» de una fila vieja es una sola fila y sigue editable`.
+5. **Los tres sabotajes «el arranque no pasa … a text»** esperan
+   `FALLA | primer arranque: las columnas son text` (`204c638`). Esperaban
+   «arranque: las columnas son text», que la prueba también imprime en sus
+   líneas `OK`: se cumplía con o sin sabotaje. Es el texto que ya usa
+   `catalogolargo1.sh`.
+6. **El sabotaje de la transacción** incluye la tercera tabla en su ancla y
+   se llama «el arranque traba las tablas en una transacción» (`6af3b80`).
+7. **El texto de la línea del guion en `sabotajes-conocidos.txt`**
+   (`2cc6d18`) dice lo que le falta hoy: D199.
+
+### Qué cambió en cada sabotaje
+
+| sabotaje | ancla de hoy |
+|---|---|
+| guardar en el catálogo no mide el origen | `origen, aviso = origen_para_guardar(prod.get("origen"))` |
+| cambiar el origen no lo mide | `origen, aviso = origen_para_guardar(updates["origen"])` |
+| guardar-uso no mide el origen | `origin, aviso_origen = catalog_svc.origen_para_guardar(data.get("origen"))` |
+| el origen no se mide (nuevo) | `origen = texto_para_guardar(valor, "El origen")` |
+| la migración de claves no mueve nada (SQLite y Postgres) | `no_ascii = "GLOB` |
+| el arranque no pasa el origen de la memoria del cliente a text | la línea de `client_product_history`, que ya no es la última de la lista |
+| el arranque traba las tablas en una transacción | la lista de las tres tablas |
+
+### Para reproducir
+
+```bash
+# Postgres local y descartable; unos 23 minutos
+PY=<venv>/bin/python scripts/testing/con_pg16.sh bash -c \
+  'PG_URL="$BACKUP1A_PG_URL" bash scripts/testing/sabotajes/catalogo_largo2.sh 204c638'
+# 37 ROJO y «VERDE | la clave junta ﬁ con fi: la prueba no lo vio»;
+# fallas: 1; sale 1. Ese verde es D199.
+python scripts/testing/anclas_perdidas.py 204c638 | grep -c catalogo_largo2
+# 0
+```
+
+Así, con el guion commiteado, no lo corrí yo: corrí una copia local que
+saltea ese sabotaje, como pide tu regla. El verde de «ﬁ» lo vi en la corrida
+del guion viejo sobre `8c4a434`; desde ahí no cambiaron ni el producto ni
+esas líneas del guion. La copia difiere en esto:
+
+```
+31c31
+< sabotaje() {
+---
+> _sabotaje_real() {
+56a57
+> sabotaje() { case "$2" in "la clave junta ﬁ con fi") echo "SALTEADO | $2";; *) _sabotaje_real "$@";; esac; }
+```
+
+### Puertas
+
+| puerta | sobre | salida |
+|---|---|---|
+| guion entero con Postgres, «ﬁ» salteado en la copia | `204c638` | 37 `ROJO`, 1 `SALTEADO | la clave junta ﬁ con fi`, `fallas: 0`, `rc=0 segundos=1377`. Los tres «el arranque no pasa … a text» dicen `FALLA | primer arranque: las columnas son text` |
+| lo mismo, antes del último arreglo | `a538124` | 37 `ROJO`, 1 `SALTEADO | la clave junta ﬁ con fi`, `fallas: 0`, `rc=0 segundos=1345` |
+| `anclas_perdidas.py` | `204c638` | ninguna fila de `catalogo_largo2.sh` ni de `sabotaje_maria3.sh`. En el repo quedan: `perdida, una línea 10 (guiones: 6)`, `perdida, varias líneas 4 (guiones: 3)`, `otra cantidad 2 (guiones: 1)` |
+| rojo antes: guion viejo | `8c4a434` | 23 `ROJO`; 4 `ROTO` (los tres del origen y la migración de claves); `VERDE | la clave junta ﬁ con fi: la prueba no lo vio`; `BASE  | la prueba en Postgres ya está en rojo sin sabotaje`; `fallas: 6`; `rc=1 segundos=1022` |
+| la prueba de Postgres sin sabotaje | antes y después de `81e81e0` | 3 `FALLA` → 21 `OK`, `fallas: 0` |
+| `chequeo-6.py`, por tramo | | abajo, enteras |
+
+La pieza quedó partida por dos integraciones de tu rama, así que `chequeo-6`
+va por tramo. Sobre el rango entero cuenta tus documentos como arnés y no
+sirve.
+
+```
+chequeo-6 8c4a434..ac58fb0: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +18/−34
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+avisos: 0
+```
+
+```
+chequeo-6 dd89d03..a538124: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +6/−2
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+avisos: 0
+```
+
+```
+chequeo-6 0baa07b..204c638: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +3/−3
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+avisos: 0
+```
+
+### Rojos y errores intermedios
+
+- Guion viejo sobre `8c4a434`: `fallas: 6`. Es el rojo de antes, arriba.
+- Mi corrida a mano de `catalogo3_postgres.py` para D218 imprimió la `FALLA`
+  de `operation_items` y después se cayó: la lancé sin las variables de
+  prueba. Error de mi invocación; no la repetí.
+- Una copia local temprana del guion tenía un error de sintaxis mío. Nunca
+  estuvo en el repositorio.
+
+### Hallazgos de la autorrevisión (parte 2)
+
+| quién | hallazgo | severidad | qué hice |
+|---|---|---|---|
+| adversario Sonnet, medio | Los tres sabotajes del origen dan rojo con `assert (200, None) == (400, …)`; el de la migración, con `«螺丝钉» quedó en 2 filas`; las anclas están una vez; con 0 o 2 da `ROTO` | — | nada |
+| corrida propia del guion viejo, y `/code-review high` (revisores Fable, alto), primera pasada | «ﬁ» queda verde con el ancla presente | media | D199 |
+| adversario Sonnet, medio | El nombre del sabotaje de la transacción contaba las tablas | baja | arreglado en `6af3b80` |
+| adversario Sonnet, medio (por lectura) y `/code-review high`, primera pasada | `operation_items` sin sabotaje. El revisor midió `fallas: 0` con la tupla sacada; eso no lo reproduje yo, sí la `FALLA` de `catalogo3_postgres.py` | media | D218 |
+| adversario Sonnet, medio, y `/code-review high`, primera pasada | Ninguna prueba fija el id de un proveedor largo | media | D219, reproducido |
+| `/code-review high`, primera pasada | Nada tocaba la línea que mide el origen. El adversario había medido que sacarla sola da `6 failed` | media | arreglado en `a538124` (supuesto 3) |
+| `/code-review high`, primera pasada | El sabotaje de la migración en Postgres esperaba un texto que también sale en `OK` | media | arreglado en `a538124` |
+| `/code-review high`, las dos pasadas | Los otros tres sabotajes del arranque tenían, en su primer texto, el mismo problema. La primera pasada lo nombró de costado y no lo arreglé; la segunda lo trajo como hallazgo | baja | arreglado en `204c638` (supuesto 5) |
+| `/code-review high`, segunda pasada | El cambio del sabotaje «ﬁ» no es inocuo fuera de la clave | media | reproducido; D220, y corregí el porqué de D199 |
+| `/code-review high`, segunda pasada | La línea de `sabotajes-conocidos.txt` deja afuera del selector al guion entero por un solo sabotaje, y su campo de salida dice «reescribirlo» | baja | no la toqué: tu regla dice que la línea queda hasta D199. Lo anoté en D199 |
+| `/code-review high`, segunda pasada | El sabotaje nuevo del origen repite casos esperados y saca más que la medida | baja | supuesto 3 |
+
+Propuestas para la cola de limpieza (la escribís vos), las dos de la primera
+pasada de `/code-review`:
+
+- El ancla del sabotaje de la transacción copia la lista entera de tablas.
+- Tres pares ancla/reemplazo están repetidos entre la mitad de SQLite y la
+  de Postgres.
+
+`/security-review`: no corrido. Ninguna de las dos partes toca producto.
 
 ## Qué no corrí y riesgos
 
-- La suite entera: no. Es arnés, producto +0/−0. Corrí
-  `tests/test_maria3_antes_de_generar.py` (136 passed) y el guion entero.
-- Ningún otro guion vencido: van uno por pieza.
-- La mutación 18 la probé contra los archivos de prueba que tocan países
-  (1184 passed, 2 xfailed sin el dato «100»), no contra la suite entera.
-- Riesgo: las anclas de 13, 14 y 27 son de dos o tres líneas y dependen de
-  la línea vecina. Si cambia, el guion frena con `PATRON NO ENCONTRADO`; no
-  pasa en verde.
-- Riesgo: la segunda copia del lector (`pdf_directo`) no tiene sabotaje de
-  la fecha.
+- La suite entera: no. Es arnés, producto +0/−0.
+- El guion commiteado de `catalogo_largo2`, entero y sin el salto: no.
+- D219: la mutación sólo contra 8 archivos de prueba.
+- D220: medido en las funciones, no por la pantalla ni por un pedido.
+- Riesgo: mientras D199 esté abierta, el selector no elige
+  `catalogo_largo2.sh`.
+- Riesgo: `caso`, en `sabotaje_maria3.sh`, no comprueba que el rojo venga
+  sólo de la causa esperada.
 
 Archivos de producto tocados: ninguno. Arnés:
-`scripts/testing/sabotaje_maria3.sh`, `tests/test_maria3_antes_de_generar.py`
-(un dato) y `docs/pm/herramientas/sabotajes-conocidos.txt` (una línea menos).
+`scripts/testing/sabotaje_maria3.sh`,
+`scripts/testing/sabotajes/catalogo_largo2.sh`,
+`scripts/testing/catalogo_largo2_postgres.py` y
+`docs/pm/herramientas/sabotajes-conocidos.txt` (el texto de una línea).
 
-No hay pieza marcada «apenas entregues»: sigo con `catalogo_largo2`, como
+No hay pieza marcada «apenas entregues»: sigo con `sabotaje_valor1.sh`, como
 dice tu canal, salvo que llegue una devolución o la tarea de comparación.
 
-/compact conservar: Dev 2 (MARIA), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (rama claude/practical-shannon-szpwkn, cabeza 47ca0cd, ya integrada), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. El re-anclaje de sabotaje_maria3.sh está entregado en 29880ee (informe en el commit siguiente), esperando veredicto: 30 de 30 en rojo, sale 0, sin filas en anclas_perdidas.py, producto +0/−0. Abiertas, las decide la PM: D196 (dato «100» en la prueba), D197 (_codigo_de_la_tabla sin prueba), D198 (el sabotaje del flete saca tres validaciones). Sigue, una pieza por guion: catalogo_largo2 y después valor1, maria8, maria1d, maria5, valor1b, doc1.py, maria7, guardar2; al entregar cada uno sale su línea de herramientas/sabotajes-conocidos.txt. Próxima D libre: D199. Una devolución de la PM o la tarea de comparación van primero. Los detalles están en PARA-PM-2.md: el resumen los cita, no los copia. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; las Devs no usan el consejero.
+/compact conservar: Dev 2 (MARIA), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (rama claude/practical-shannon-szpwkn, cabeza 8f79bcc, ya integrada en 829f2d1), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. Entregado en 204c638 (informe en el commit siguiente), esperando veredicto, dos cosas: la vuelta de D216 (b) y D217 (a) en sabotaje_maria3.sh (32 de 32 en rojo, sale 0) y el re-anclaje de sabotajes/catalogo_largo2.sh (todos en rojo menos «la clave junta ﬁ con fi», salteado sólo en una copia local: fallas 0, sale 0). Producto +0/−0. Abiertas, las decide la PM: D199 (retirar ese sabotaje; su línea queda en herramientas/sabotajes-conocidos.txt hasta entonces), D218 (operation_items sin sabotaje en el arranque), D219 (id de proveedor largo sin prueba), D220 (fuera de la clave, _normalize borra «ﬁ»). Sigue, una pieza por guion: valor1 (la que arranco ahora), maria8, maria1d, maria5, valor1b, doc1.py, maria7, guardar2; puerta de cada una: guion entero todo ROJO y sale 0, sin filas en anclas_perdidas.py, y sale su línea de sabotajes-conocidos.txt. Rango de D: D216 a D225; próxima libre D221. Una devolución de la PM o la tarea de comparación van primero. Los detalles están en PARA-PM-2.md: el resumen los cita, no los copia. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; las Devs no usan el consejero.
