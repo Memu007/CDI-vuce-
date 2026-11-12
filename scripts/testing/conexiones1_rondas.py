@@ -1,0 +1,72 @@
+"""Lo común de los casos de dos pedidos a la vez sobre la misma cuenta.
+
+ronda() toma la fila de la cuenta, larga los dos pedidos, espera verlos
+esperando y suelta. Mercado Pago es simulado.
+"""
+import os
+import sys
+import uuid
+from contextlib import closing
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import conexiones1_creditos as h  # noqa: E402
+import psycopg2  # noqa: E402
+from tests.mp_firma import aviso_firmado  # noqa: E402
+from tests.test_maria7_rechazos_24_10 import _pedido  # noqa: E402
+
+m, SUSCRIPCIONES, COBROS = h.main_mod, {}, {}
+m._leer_cobro_autorizado_mp = COBROS.__getitem__
+h._SDK.preapproval = lambda self: type("P", (), {
+    "get": lambda _, sid: {"status": 200, "response": SUSCRIPCIONES[sid]}})()
+
+
+def renovar(c, ref, *_):
+    pid, sid, plan = f"rn-{uuid.uuid4().hex[:10]}", f"sus-{uuid.uuid4().hex[:8]}", f"{ref}:premium"
+    precio = float(m.billing_service.PLANS["premium"]["price"])
+    SUSCRIPCIONES[sid] = {"external_reference": plan, "auto_recurring": {"transaction_amount": precio}}
+    COBROS[pid] = {"payment": {"id": pid}, "preapproval_id": sid}
+    h.PAGOS[pid] = {"id": pid, "status": "approved", "external_reference": plan, "preapproval_id": sid,
+                    "transaction_amount": precio, "currency_id": "ARS", "payer": {"id": "p"},
+                    "date_approved": datetime.now(timezone.utc).isoformat()}
+    return c.post("/api/payments/webhook", **aviso_firmado("subscription_authorized_payment", pid, "secreto-de-prueba"))
+
+
+PEDIDOS = {
+    "alta": lambda c, ref, s, cl: h.alta(c, s, cl),
+    "guardado": lambda c, ref, s, cl: c.post(f"/api/clientes/{cl}/operaciones", headers=s, json={"items": []}),
+    "recarga": lambda c, ref, *_: h.recargar(c, ref)[1],
+    "maria": lambda c, ref, s, cl: c.post("/generate_maria", headers=s, json={
+        **_pedido(), "operation_id": f"F{uuid.uuid4().hex[:8]}", "operacion_id": ""}),
+    "renovación": renovar,
+    "cancelar": lambda c, ref, s, cl: c.post("/api/billing/cancel", headers=s),
+    "reactivar": lambda c, ref, s, cl: c.post("/api/billing/reactivate", headers=s),
+}
+DEADLOCKS = "select deadlocks from pg_stat_database where datname = current_database()"
+
+
+def ronda(c, a, b, de_org, ajuste):
+    """Pone la cuenta según ajuste (un SET de SQL) y corre a y b con la fila tomada.
+    Da (códigos, deadlocks, consultas que esperaban o None si no se armó, (tabla, clave, valor))."""
+    sesion, cliente, ref, cuenta = h.preparar(c, de_org)
+    h.sql(f"update {cuenta[0]} set {ajuste} where {cuenta[1]} = %s", cuenta[2])
+    antes, consultas = h.sql(DEADLOCKS)[0][0], None
+    with ThreadPoolExecutor(2) as hilos, closing(psycopg2.connect(h.URL)) as candado:
+        try:
+            with candado.cursor() as cur:
+                cur.execute(f"select pg_backend_pid() from {cuenta[0]} where {cuenta[1]} = %s for update",
+                            (cuenta[2],))
+                mio = cur.fetchone()[0]
+            futuros = [hilos.submit(PEDIDOS[a], c, ref, sesion, cliente)]
+            if h.hasta(lambda: len(h.esperando(mio)) >= 1):
+                futuros.append(hilos.submit(PEDIDOS[b], c, ref, sesion, cliente))
+                if h.hasta(lambda: len(h.esperando(mio)) >= 2):
+                    consultas = [" ".join(q.split())[:110] for q in h.esperando(mio)]
+        finally:
+            candado.rollback()
+        codigos = [f.result(h.PLAZO).status_code for f in futuros]
+    if max(codigos) >= 500:  # pg_stat_database se entera cuando el pedido suelta la conexión
+        h.hasta(lambda: h.sql(DEADLOCKS)[0][0] > antes)
+    return codigos, h.sql(DEADLOCKS)[0][0] - antes, consultas, cuenta
+
