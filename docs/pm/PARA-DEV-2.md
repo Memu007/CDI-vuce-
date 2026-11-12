@@ -3,75 +3,44 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Dato para tu `ROJO?` de `sesion1`: el foco del perfil (2026-11-12 02:32 UTC)
+## Veredicto: D149 aceptada sobre `48195cfe` e integrada (2026-11-12 13:42 UTC)
 
-No cambia tu orden. Vi tu hipótesis (el cierre del guardado esconde el modal
-ya reabierto). Hay otra causa posible en el mismo modal, observada en
-`estudio1`: `profile.js`, `open()`, mueve el foco a «Mi CUIT» 150 ms
-**después** de cargar, y lo que se está escribiendo en ese momento cae ahí
-(`["Estudio Inventado Tres", "", "30222222229", "pfCuit"]` antes del clic;
-acta de BORRADOR-1, «IDS-PYTEST»). `abrirPerfil` de `pantalla_sesion1.js`
-espera a `#pfEmail`, que llega antes de ese foco. Si el email cae en «Mi
-CUIT», el email no cambia y el campo de la clave no aparece: es tu mismo
-mensaje de falla.
+**Aceptada.** Informe `46959d76`. Acta: `REPRODUCCION-D149-2026-11-12.md`.
+Lo integré con `merge` de `46959d76`, no de tu cabeza. **Traé mi rama con
+`merge`.**
 
-- En `sesion1` no lo observé. Tu reproducción registra, en el momento de la
-  falla, `document.activeElement.id`, el valor de `#pfCuit` y si el modal
-  está visible, y el informe dice cuál de las dos causas fue (o las dos).
-- La prueba del arreglo: el rojo **siempre** con el arnés de hoy y verde con
-  el arreglado, no una tanda de repeticiones. Sin espera fija.
-- `estudio1` y `cobro_mp1` los arregla la Técnica; `profile.js` no se toca
-  (va a la cola).
+**Lo reproducido sobre `48195cfe`:** `chequeo-6` igual a tu informe (+0/−0);
+`catalogolargo1` 11 `ROJO`, `datos1` 20, `disco1` 46 y `maria1b` 34, sin
+sabotaje sin rojo; `foco_perfil.sh` con tu caso `#pfEmail` da `PIERDE` en
+`832bf74` y `NO PIERDE` acá; `test_despacho1b.py` natural `285 passed` tres
+veces; el sabotaje de `4292e0f` rojo 15 de 15. Mis negativos: los 29
+argumentos de `no_debe` nombran un caso real, y el `no_debe` nuevo calla con
+la advertencia de aiosqlite y da `ANCHO` con un `FAILED` real.
 
-## Aviso: la Técnica sigue midiendo la subida pública de PDF (2026-11-12 03:30 UTC)
+**Vale como una corrida entera limpia de `despacho1b`, la tuya.** No la
+repetí; `cobro_mp2` entero no lo corrió nadie (queda en el acta).
 
-No cambia tu orden.
-- **CONEXIONES-1 C midió esto:** mientras una cuenta satura la subida, otra
-  cuenta espera hasta 30 s. El arreglo propuesto baja esa espera a 0,05 s.
-  Ese arreglo es un `commit` en `require_billing_vigente`, que comparten las
-  ocho rutas de cobro; la subida es una de ellas.
-- **Está sin commitear:** va a Emi (D182) y, si dice que sí, lo hace la
-  Técnica entero.
-- **Ahora sigue CONEXIONES-1 D, sólo arnés:** muestrea la subida en el
-  tiempo.
-- Si tenés algo abierto en esa ruta o en esa dependencia, decímelo en tu
-  informe.
-- Para tu `ROJO?` de `sesion1`: la Técnica dejó
-  `scripts/testing/foco_perfil.sh`, que da el rojo del foco siempre
-  (casos de `estudio1`). Su mecanismo te puede servir para la prueba de tu
-  arreglo; el script es de ella.
+**D168: (b), decidido por la PM.** CR8 eran los tres de `datos1`. La familia
+va a `COLA-LIMPIEZA.md` como una entrada con tu grep; la paga cada Dev cuando
+vuelve a tocar el guion.
 
-## Veredicto: arnés de pantalla del 402 aceptado sobre `899f9ee` e integrado (2026-11-11 23:04 UTC)
+**D169: (a).** La suma la Técnica: su caso tiene que dar `PIERDE` en
+`832bf74` y `NO PIERDE` en `48195cfe`. Vos no tocás `foco_perfil.sh`.
 
-**Aceptado.** Informe `94a765fc`. Acta: `REPRODUCCION-ARNES-402-2026-11-11.md`.
-Lo integré con `merge` de `94a765fc`, no de tu cabeza: `2e7c8807` es D149 y
-lo reviso con tu informe de D149. **Traé mi rama con `merge`.**
+**`f2709a2`** (los cuatro guiones cortos que integré sin aceptar): aceptado
+con esta pieza.
 
-**Lo reproducido:** `chequeo-6` igual a tu informe (+0/−0); `despacho1c.sh`
-19 ROJO y `front422.sh` 17 ROJO, ninguno sin rojo; los dos sabotajes que
-pedí, por nombre, en rojo; pytest de los dos archivos `118 passed`. Mi
-negativo: `app_v2.js` ignorando `detail.message` da `4 failed`.
+**Tus supuestos 1 a 8:** aceptados. El 3 y el 4 (`sesion1.sh`) se apoyan
+en tu corrida sobre `54ba001`; no la repetí. Tus riesgos y la idea de guardar-uso
+(largo medido dos veces) quedan en el acta y en la cola.
 
-**Tus supuestos:** 1 y 2, aceptados. 3: `f2709a2` entra con este merge
-porque es ancestro de `899f9ee`; no cuenta como aceptado, va con D149.
+### Sigue
 
-### Sigue, en este orden
+**D145 (a):** en tus arneses, cada sabotaje registra con su propio
+`X-Forwarded-For`; `abuso1` sigue con una sola IP. La parte de la Técnica
+(`cliente1`, `foco_cliente1`, `destino1`, `despacho1a`) ya está aceptada.
 
-1. **D149 (a):** tus patrones viejos: `maria1b`, `despacho1b`, `entradas1` y
-   los «Previos de MARIA» del informe de la Técnica sobre `4555f7c4`
-   (`PARA-PM.md`), **salvo `estudio1`, `estudio1b` y `orden1`**, que los hace
-   la Técnica. Con CR8. **Suma una causa, en el mismo commit:** ningún
-   patrón puede depender del id que pytest arma solo para un parámetro de
-   texto largo. Con pytest 9.2.0 (el de `requirements.txt`) `"x" * 201` da
-   `[nombre1]`, no `[xxxx…]` (con 9.1.1 sí; probado aislado, en el acta). En
-   tu rama, `disco1.sh` líneas 200 y 227 buscan `[BBBB`. Buscá la familia
-   en todos tus guiones, con la versión de pytest que dice tu informe.
-   Sugerencia: `ids=` explícitos en esos `parametrize`.
-2. **D145 (a):** en tus arneses, cada sabotaje registra con su propio
-   `X-Forwarded-For`; `abuso1` sigue con una sola IP. `cliente1`,
-   `foco_cliente1`, `destino1` y `despacho1a` los hace la Técnica.
-
-**Tu rango de D: D165 a D169, y después D190 a D199.**
+**Tu rango de D: D190 a D199.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 

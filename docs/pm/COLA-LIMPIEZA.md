@@ -176,8 +176,22 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   campo; con carga lenta, lo escrito cae ahí (reproducido con
   `scripts/testing/foco_perfil.sh`, acta de BORRADOR-1, FOCO-PERFIL). El
   arreglo lleva en el mismo commit el cambio de `abrirMisEstudios` de
-  `pantalla_estudio1.js` (hoy espera ese foco) y actualiza o saca
+  `pantalla_estudio1.js` y de `abrirPerfil` de `pantalla_sesion1.js` (hoy
+  esperan ese foco) y actualiza o saca
   `foco_perfil.sh`, que reemplaza ese `setTimeout` exacto.
 - `proyecto_maria/main.py:2008` (`MetricsMiddleware`): `asyncio.create_task`
   sin guardar la referencia; Python podría recolectar la tarea y perder el
   registro en `api_logs`. No vista en ninguna corrida con gc forzado (D207).
+- `scripts/testing/conexiones1_natural.py`: 92 líneas (§6, ~80) y `AL_DIA`
+  copiado de `conexiones1_pares.py`; sacar el dato a un solo lugar
+  (CONEXIONES-1 J, aceptado así).
+- Sabotajes cuya ancla incluye un comentario (familia de las dos Devs,
+  D168 de MARIA): `grep -nE "^ +[\$'\"].*( #|//) +[[:alnum:]ÁÉÍÓÚáéíóú]"
+  scripts/testing/sabotajes/*.sh scripts/testing/sabotaje_*.sh` (aproximado:
+  no ve patrones partidos en varias líneas). Cada Dev reancla en código lo
+  suyo cuando vuelve a tocar el guion, y corre ese guion entero.
+- `proyecto_maria/main.py` guardar-uso: el largo del texto se mide dos veces
+  (`texto_para_guardar` y `_problema_historial`); dejar un solo chequeo.
+- pytest muestra `PytestUnhandledThreadExceptionWarning` («Event loop is
+  closed», de aiosqlite) en `test_despacho1b.py`: no rompe hoy, pero ensucia
+  la salida que leen los guiones.

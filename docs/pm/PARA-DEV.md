@@ -3,47 +3,49 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## CONEXIONES-1 I: aceptada sobre `e9323b67` e integrada (2026-11-12 12:35 UTC)
+## Mientras reviso K: una línea en `foco_perfil.sh` (2026-11-12 13:50 UTC)
 
-Integré `7a68faec`. Evidencia: acta `REPRODUCCION-CONEXIONES-1-2026-11-12.md`,
-sección I.
+Vi tu entrega de K (`32b1161c`); la reviso ahora. Mientras tanto, D169 de
+MARIA, sólo arnés: sumá a `CASOS` de `scripts/testing/foco_perfil.sh`
+`"scripts/testing/pantalla_sesion1.js·#pfEmail"`. Puerta: con ese caso,
+`PIERDE` sobre `832bf74` y `NO PIERDE` sobre HEAD (ya lo vi con una copia;
+lo quiero en tu guion). Informe corto en `PARA-PM.md`, arriba del de K.
 
-- **Reproducido, igual al informe:** caso 9 verde (vuelta 2,
-  `log_request_background`) y rojo con `gc.collect()` → `pass`; natural en
-  HEAD 18 deadlocks y 0 recargas perdidas, con NO KEY 0 y 0; caso 6 NO KEY
-  ×3 sin ningún rc=2; `chequeo-6` +0/−0, arnés +166/−3, 0 avisos.
-- **Mis negativos:** una conexión tomada sin referencia hace fallar
-  `soltar()` con «dejó conexiones sin devolver»; con referencia viva, con
-  «no soltó sus conexiones». No tapa una fuga.
-- **D188 con NO KEY:** el detector da «pierden: 2» igual que HEAD.
-- **D207: (b), decidido por la PM.** Queda una línea en `COLA-LIMPIEZA.md`.
+## CONEXIONES-1 J: aceptada sobre `4f0cfbbd` e integrada (2026-11-12 13:10 UTC)
 
-D205 y D206 siguen con Emi. Tu rango libre: D208 a D215.
+Integré `c0e119fd`. Evidencia: acta `REPRODUCCION-CONEXIONES-1-2026-11-12.md`,
+sección J.
 
-## Tarea activa: CONEXIONES-1 J, sólo arnés (2026-11-12 12:35 UTC)
+- **Reproducido con N=20:** HEAD 65 / 20 / 33 (rondas con deadlock /
+  recargas perdidas / cuentas mal), NO KEY 27 / 19 / 29; los tuyos, 60 / 20 /
+  37 y 28 / 18 / 31. `chequeo-6` igual, 0 avisos. Puerta cumplida sin forzar.
+- **Mis negativos:** recarga y alta en serie, 0 de 10 perdidas; renovación
+  y guardado en serie, 0 de 20 mal. D188 y D205 son carreras.
+- **Las 92 líneas:** aceptadas por lo que explicaste; el dato copiado
+  (`AL_DIA`) va a `COLA-LIMPIEZA.md`.
+- **D208:** va a Emi con recomendación (b). No la tocás.
+- **Un rojo mío sin causa:** una corrida de mi negativo dio rc=2, «la app
+  no soltó sus conexiones», en el primer `soltar()`, con tus dos naturales
+  corriendo al lado. No se repitió en 6 corridas. Es la razón del punto 1 de K.
 
-Lo que hasta ahora sólo medimos tomando la fila desde afuera, medido sin
-forzar, con dos hilos y barrera como en `conexiones1_natural.py`:
+D205, D206 y D208 siguen con Emi. Tu rango libre: D209 a D215.
 
-1. **Alta + recarga de una org con créditos extra vencidos (D188):** si la
-   recarga queda pisada («quedan 0 de 10»).
-2. **Los tres pares de alta** (alta + guardado, alta + cancelar, alta +
-   reactivar): deadlock sí/no y quién pierde.
-3. **Renovación + guardado (D205):** si la cuenta queda `past_due` con el
-   período por delante.
+## Tarea activa: CONEXIONES-1 K, sólo arnés (2026-11-12 13:10 UTC)
 
-Corrido en HEAD y con `parche_nokey.diff`, una vez cada uno, con N rondas
-por medición (N lo elegís vos y lo decís). Una medición que no reproduce
-sin forzar en N rondas se informa con su N. Dónde va cada una lo decidís
-vos según §6 (un caso por causa, ~80 líneas); *sugerencia:* los pares de
-alta como filas del natural.
+1. **Cuando `soltar()` falla, dice qué hacen las conexiones que quedan**
+   (estado, en qué espera, desde cuándo y el comienzo de la consulta), para
+   que el próximo rc=2 traiga su causa. Puerta: la salida con una conexión
+   de la app tomada a propósito, una vez, rotulada «forzado».
+2. **Los pares de alta miden el estado final**, no sólo deadlock y códigos:
+   lo que dio 200 quedó guardado y lo que no dio 200 no dejó nada a medias
+   (la operación del alta, el guardado, `billing_status` tras cancelar o
+   reactivar). Un estado que no coincide con los códigos cuenta como «mal».
+   Puerta: la salida en HEAD con N rondas (N lo decís), y una vez el rojo
+   con la comprobación saboteada.
 
-**Puerta:** la salida muestra una vez «recargas perdidas» mayor que cero
-en la medición de D188 en HEAD. Si sin forzar no sale en N rondas, lo
-mostrás una vez con el método forzado, rotulado «forzado». `chequeo-6` con
-producto +0/−0.
+`chequeo-6` con producto +0/−0. Dónde va cada cosa lo decidís vos según §6.
 
-**Si Emi dice que sí a D182 o a D206 (a) mientras tanto,** dejás J donde
+**Si Emi dice que sí a D182 o a D206 (a) mientras tanto,** dejás K donde
 esté, lo decís en el informe y arrancás esa pieza.
 La pieza de D206 (a), además de la revisión fuerte: el caso que detecta
 D188 corrido con el arreglo y en HEAD (si da peor que HEAD, frenás y me
