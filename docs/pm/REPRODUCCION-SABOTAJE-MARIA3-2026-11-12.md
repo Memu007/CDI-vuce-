@@ -52,3 +52,48 @@ guion: la corrida de arriba vale para la cabeza.
 ## Escape
 
 Ninguno.
+
+## D198 (b): sabotaje 31, sobre `a2af62a` (2026-11-12 19:10 UTC)
+
+Entrega `a2af62a` (informe `dd89d03`), base `ffb1ec5`. Sólo arnés. Lo revisó la PM
+principal en un worktree aparte.
+
+| qué | salida |
+|---|---|
+| el guion de `a2af62a` (`bash <worktree en a2af62a>/scripts/testing/sabotaje_maria3.sh a2af62a`), entero | `VERDE sin sabotaje: 136 passed`; 31 `ROJO`; `ROJO avisos_flete_sin_validar: 2 failed, 134 passed`; `OK: los 31 sabotajes…`; rc=0, 180 s |
+| mi primera corrida, con el guion de mi rama | 30 `ROJO`: las mutaciones salen del archivo del guion que se corre, no del SHA que se le pasa. No cuenta |
+| `anclas_perdidas.py a2af62a \| grep -c sabotaje_maria3` (lee con `git show` del SHA) | `0` |
+| `chequeo-6.py ffb1ec5 a2af62a` | producto +0/−0, arnés +11/−2, historia vacía, avisos: 0 |
+
+**Mis negativos, la familia entera.** `_importes_como_numeros` del endpoint
+valida cuatro importes. Saqué uno por vez y corrí
+`tests/test_maria3_antes_de_generar.py`:
+
+| sin validar en el endpoint | resultado |
+|---|---|
+| flete (el sabotaje 31) | lo cubre el guion |
+| seguro | `2 failed, 134 passed`: `avisos-seguro-nan` y `avisos-seguro-1e+308`, los dos con `TypeError` (Decimal + float), sin respuesta |
+| `gastos_fob` | `136 passed` |
+| `gastos_anteriores_fob` | `136 passed` |
+
+En los gastos, los casos de avisos con `inf`, `nan`, negativo, `1e308` y `-inf`
+siguen dando 400 sin la línea del endpoint: en esa ruta hay otra defensa, así
+que un sabotaje de esa línea sola daría verde. El hueco es sólo el seguro (D217).
+
+**D216, a mano.** Con el flete sin validar, `avisos-flete--500` da `assert 200 == 400`
+y `avisos-flete-inf` revienta con `TypeError` (float + Decimal). Para el seguro no hay un caso
+que dé 200: los dos revientan, así que su sabotaje espera `avisos-seguro-nan`.
+
+**Integración:** no. `a2af62a` trae debajo dos commits de `catalogo_largo2`
+(`81e81e0`, `ac58fb0`) sin revisar; se integra todo junto al aceptar esa pieza.
+
+## No corrí (D198)
+
+- La suite entera: sólo arnés, producto +0/−0.
+- Los dos commits de `catalogo_largo2` (`81e81e0`, `ac58fb0`): van en la entrega siguiente.
+
+## Escape (D198)
+
+Uno mío, en la aceptación de las 18:01: el seguro tenía el mismo hueco que el
+flete en la línea de al lado, y no lo marqué. Además pedí esperar `flete-inf`
+sin mirar la razón de su rojo. Las dos cosas las encontró la Dev.
