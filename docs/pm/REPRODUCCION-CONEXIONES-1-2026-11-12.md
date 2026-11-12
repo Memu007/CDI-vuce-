@@ -980,3 +980,85 @@ if __name__ == "__main__":
 ```
 
 </details>
+
+## I (sólo arnés): aceptada sobre `e9323b67` (2026-11-12 12:35 UTC)
+
+Informe `7a68faec` (sólo `docs/pm/PARA-PM.md` sobre `e9323b67`).
+`chequeo-6.py 734b484c e9323b67`: producto +0/−0, arnés +166/−3, historia
+vacío, 0 avisos; igual al informe.
+
+**La causa del rc=2 queda probada.** `log_request_background` (tarea de
+fondo de `MetricsMiddleware`, `main.py:2008`) devuelve su conexión a un
+pool que `engine.dispose` ya descartó; sólo gc la cierra. No es un defecto
+para el usuario: el pedido ya respondió.
+
+| corrida (todas sobre `e9323b67`) | rc | salida |
+|---|---|---|
+| caso 9 | 0 | vuelta 2, `log_request_background`, «la base quedó sin conexiones de la app» |
+| caso 9 con `gc.collect()` → `pass` | 1 | vuelta 4, la misma tarea, «la app no soltó sus conexiones» |
+| caso 8 natural, HEAD | 1 | «deadlocks: 18, recargas perdidas: 0»; vencidos: recarga + guardado 8/10, recarga + MARIA 10/10; al día 0/10 los dos; el aviso perdió 2 veces y el reintento firmado acreditó 10/10 |
+| caso 8 natural, NO KEY | 0 | «deadlocks: 0, recargas perdidas: 0» |
+| caso 6 NO KEY ×3 | 1 cada una | «deadlocks: 3; rondas sin armar: 0», siempre los 3 pares de alta; ningún rc=2 en 168 rondas |
+| detector de D188, HEAD y NO KEY | 1 los dos | «pierden: 2», idéntico: NO KEY no lo empeora ni lo arregla |
+| caso 7, HEAD | 1 | «cuentas mal: 4», renovación + guardado → `past_due` (D205) |
+| negativo de la PM `pm_fuga_i.py` | 0 | A (conexión tomada, sin referencia) → «dejó conexiones sin devolver»; B (con referencia viva) → «no soltó sus conexiones»; malos 0 |
+
+- **Prueba:** el caso 9 verde contra rojo con el arreglo revertido, y mis
+  dos negativos: `soltar()` no tapa una fuga en ninguna de las dos formas.
+- **El caso 6 ×3:** consistente y sin regresión; no es prueba de la causa.
+- **«recargas perdidas: 0»** coincide con `pm_natural3.py` (sección H),
+  corrido aparte.
+- Mis números del natural (18 deadlocks, 10/10) difieren poco de los suyos
+  (17, 9/10): variación normal de una carrera.
+- **D207:** (b), decidido por la PM; una línea en `COLA-LIMPIEZA.md`.
+- **No corrido:** suite y `e2e_maria.sh`: I no toca producto.
+
+<details><summary>Negativo de la PM: <code>pm_fuga_i.py</code></summary>
+
+```python
+"""Negativo de la PM (entrega I): soltar() no da verde con una conexión de la app tomada.
+A: tomada y sin referencia (gc la cierra) -> debe decir «dejó conexiones sin devolver».
+B: tomada y con referencia viva (gc no la toca) -> debe decir «no soltó sus conexiones».
+"""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from conexiones1_rondas import OTRAS, correr, engine, h, m, soltar  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+VIVAS = []
+
+def main():
+    malos = 0
+    with TestClient(m.app, raise_server_exceptions=False) as c:
+        h.preparar(c, False)
+        soltar(c)
+        print("base limpia:", h.sql(OTRAS)[0][0])
+        for nombre, guardar in (("A sin referencia", False), ("B con referencia", True)):
+            async def tomar():
+                conn = await engine.connect()
+                await conn.exec_driver_sql("select 1")
+                if guardar:
+                    VIVAS.append(conn)
+            c.portal.call(tomar)
+            print(nombre, "OTRAS antes:", h.sql(OTRAS)[0][0])
+            try:
+                soltar(c)
+                print(nombre, "-> VERDE (mal)")
+                malos += 1
+            except h.Invalida as e:
+                print(nombre, "-> Invalida:", str(e)[:120])
+            if VIVAS:
+                async def cerrar():
+                    for v in VIVAS:
+                        await v.close()
+                    VIVAS.clear()
+                c.portal.call(cerrar)
+                soltar(c)
+    print("malos:", malos)
+    return 1 if malos else 0
+
+if __name__ == "__main__":
+    sys.exit(correr(main))
+```
+
+</details>

@@ -3,58 +3,45 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## CONEXIONES-1 H: aceptada como medición sobre `bd8665bf`, con devolución por la causa (2026-11-12 11:45 UTC)
+## CONEXIONES-1 I: aceptada sobre `e9323b67` e integrada (2026-11-12 12:35 UTC)
 
-Integré `bd8665bf` (avance directo). Evidencia: acta
-`REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección H.
+Integré `7a68faec`. Evidencia: acta `REPRODUCCION-CONEXIONES-1-2026-11-12.md`,
+sección I.
 
-- **Reproducido, igual al informe:** caso 6 en HEAD 5 deadlocks; con (b) 0;
-  caso 7 en HEAD 4 MAL; `chequeo-6` +0/−0, arnés +323/−0, 0 avisos.
-- **No igual:** caso 6 con sólo NO KEY, la primera corrida salió **rc=2**
-  (`la app no soltó sus conexiones`) en la ronda «recarga + maria | usuario
-  | créditos al día». La segunda dio 3, como tu informe. Lo que corrí para
-  buscarlo no es la misma ronda: 50 veces «maria + recarga», usuario,
-  créditos al día, en HEAD sin parche, 0 fallas. El final de la salida está
-  en el acta. No tengo la causa.
-- **Mis negativos (sin tomar la fila desde afuera, dos hilos con barrera):**
-  en HEAD, org con créditos vencidos, recarga + guardado 28/30, recarga +
-  MARIA 30/30, guardado + recarga 25/30; con NO KEY 0/90; con créditos al
-  día 0/30. Cuando pierde el aviso de MP (6 de 24), la recarga no queda
-  acreditada; el reintento estilo MP la acredita. D204 sigue: `past_due`
-  con el período por delante y `tiene_acceso` en `False`.
+- **Reproducido, igual al informe:** caso 9 verde (vuelta 2,
+  `log_request_background`) y rojo con `gc.collect()` → `pass`; natural en
+  HEAD 18 deadlocks y 0 recargas perdidas, con NO KEY 0 y 0; caso 6 NO KEY
+  ×3 sin ningún rc=2; `chequeo-6` +0/−0, arnés +166/−3, 0 avisos.
+- **Mis negativos:** una conexión tomada sin referencia hace fallar
+  `soltar()` con «dejó conexiones sin devolver»; con referencia viva, con
+  «no soltó sus conexiones». No tapa una fuga.
+- **D188 con NO KEY:** el detector da «pierden: 2» igual que HEAD.
+- **D207: (b), decidido por la PM.** Queda una línea en `COLA-LIMPIEZA.md`.
 
-**Devolución por la causa:** lo que abre una conexión después de
-`engine.dispose` rompe la espera a cero conexiones del arnés, y la ronda
-sale «inválida» sin que el producto haya fallado. Sospecho de la tarea del
-registro de pedidos en segundo plano (`log_request_background`), pero no lo
-probé: diagnosticalo vos.
+D205 y D206 siguen con Emi. D208–D209 libres.
 
-**Tus D:** D205 y D206 van a Emi (punto 13 de NOW), con tu recomendación (a)
-en las dos; en D206 le digo que (a) arregla 2 de los 5 pares y los otros 3
-esperan D182. D207–D209 siguen libres.
+## Tarea activa: CONEXIONES-1 J, sólo arnés (2026-11-12 12:35 UTC)
 
-## Tarea activa: CONEXIONES-1 I, sólo arnés (2026-11-12 11:45 UTC)
+Lo que hasta ahora sólo medimos tomando la fila desde afuera, medido sin
+forzar, con dos hilos y barrera como en `conexiones1_natural.py`:
 
-1. **La causa del rc=2.** Diagnosticala con evidencia (qué conexión queda
-   abierta y quién la abre). Arreglá el arnés para toda esa familia, no
-   sólo para el registro de pedidos, y mostrá un caso que antes daba rc=2 y
-   ahora no, con el rojo del arreglo revertido una vez. Sin esperas fijas.
-   Si no reproduce en N corridas de esa ronda, me decís N y qué descartaste;
-   no fuerces un rojo que no sale. Si la causa está en producto, no lo
-   tocás: me lo decís como D.
-2. **El caso natural como script** (≤80 líneas): los dos pedidos a la vez
-   sin tomar la fila desde afuera, recarga + guardado y recarga + MARIA de
-   una org con créditos vencidos, más el control con créditos al día. Por
-   ronda: deadlock sí/no, quién pierde, y cuando pierde el aviso de MP, si
-   la recarga quedó acreditada antes y después de un reintento firmado;
-   además, el estado de la recarga en todas las rondas, también cuando
-   nadie pierde (`pm_natural3.py`, acta H).
-   Corrido en HEAD y con `parche_nokey.diff`, una vez cada uno. Podés partir
-   de `pm_natural2.py` (acta, sección H).
+1. **Alta + recarga de una org con créditos extra vencidos (D188):** si la
+   recarga queda pisada («quedan 0 de 10»).
+2. **Los tres pares de alta** (alta + guardado, alta + cancelar, alta +
+   reactivar): deadlock sí/no y quién pierde.
+3. **Renovación + guardado (D205):** si la cuenta queda `past_due` con el
+   período por delante.
 
-`chequeo-6` con producto +0/−0.
+Van como filas de datos del caso natural, no como casos nuevos. Corrido en
+HEAD y con `parche_nokey.diff`, una vez cada uno, con N rondas por fila (N
+lo elegís vos y lo decís). Una fila que no reproduce en N rondas se
+informa con su N; no fuerces el rojo.
 
-**Si Emi dice que sí a D182 o a D206 (a) mientras tanto,** dejás I donde
+**Puerta:** la salida muestra una vez «recargas perdidas» mayor que cero
+(en la fila de D188, en HEAD); si no sale, me decís N y por qué creés que
+no sale. `chequeo-6` con producto +0/−0.
+
+**Si Emi dice que sí a D182 o a D206 (a) mientras tanto,** dejás J donde
 esté, lo decís en el informe y arrancás esa pieza.
 La pieza de D206 (a), además de la revisión fuerte: el caso que detecta
 D188 corrido con el arreglo y en HEAD (si da peor que HEAD, frenás y me
