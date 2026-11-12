@@ -113,6 +113,10 @@ sabotaje $CS "el catálogo no mide el proveedor" \
   '    vendor_name = texto_para_guardar(vendor_name, "El proveedor")' \
   '    vendor_name = (vendor_name or "").strip()' \
   "FAILED $T::${TOPE}[catalogo-proveedor]" "FAILED $T::${MALA}[lote-proveedor]"
+sabotaje $CS "el origen no se mide" \
+  '    origen = texto_para_guardar(valor, "El origen")' \
+  '    origen = (valor or "").strip()' \
+  "FAILED $T::${TOPE}[catalogo-origen]" "FAILED $T::${TOPE}[cambiar-origen]" "FAILED $T::${TOPE}[guardar-uso-origen]"
 sabotaje $CS "guardar en el catálogo no mide el origen" \
   '    origen, aviso = origen_para_guardar(prod.get("origen"))' \
   '    origen, aviso = (prod.get("origen") or "").strip(), ""' \
@@ -238,7 +242,7 @@ if [ -n "$PG_URL" ]; then
       '    no_ascii = "GLOB' \
       '    return
     no_ascii = "GLOB' \
-      "de una fila vieja es una sola fila y sigue editable"
+      "FALLA | «螺丝钉» de una fila vieja es una sola fila y sigue editable"
     sabotaje $CS "lo que no es texto se toma como texto" \
       '        raise ValueError(f"{que} tiene que ser texto.")' \
       '        valor = str(valor)' \
