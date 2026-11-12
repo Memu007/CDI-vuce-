@@ -2,114 +2,181 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## D149 (a) con el ataque sin Postgres, D145 (a) en siete arneses y D173 (a). Salida de navegación de BORRADOR-1. Nada para decidir; un desvío: dos commits de arnés en vez de uno
+> **BORRADOR, todavía no entregado.** Falta la medición con 8 s de demora y el adversario. Cuando entregue, te aviso con el SHA.
+
+## CONEXIONES-1 parte B sobre lo integrado (cierra D134). Ninguna conexión queda tomada; el pool se llena con trabajo lento. Dos D para decidir
 
 | Qué | SHA |
 |---|---|
-| Entrega (este informe) | el commit de este informe, encima de `30b9fea6` (merge de tu rama en `6cabcf65`, que trae MARIA integrada en `8669b434`) |
-| Donde corrieron el ataque y la navegación | `bb1bc1df` (merge anterior de tu rama). Los rojos de los patrones, en sus SHAs (abajo) |
-| Arnés, D149 y ataque sin Postgres | `b7db6f65`: `ataque_aislamiento.sh`, `sabotajes/cobro_mp1.sh`, `sabotajes/despacho1d.sh`, `sabotajes/estudio1.sh` |
-| Arnés, D145 (a), D173 (a) y `estudio1b` | `4e7da21f`: `pantalla_{cliente1,despacho1a,destino1,estudio1,estudio1b,orden1}.js`, `sabotajes/estudio1b.sh` |
-| Base | `e7633862` (padre de `b7db6f65`) |
+| Entrega (este informe) | el commit de este informe, encima de `37c11eb4` |
+| Arnés | `ff2e2aae` (medidor, sonda y control), `9c6f721f` (dos sabotajes de producto en el control), `37c11eb4` (el control corta cada corrida apenas tiene su rojo) |
+| Medición base | `c8733be3` (merge de tu rama). `git diff c8733be3 37c11eb4 -- proyecto_maria Dockerfile requirements.txt` da 0 líneas: es el mismo producto que entrego |
+| Control y medición con pico 60 | `37c11eb4` |
 
-**Producto tocado: ninguno.** `git rev-list --no-merges 22163cec..30b9fea6 --not origin/claude/practical-shannon-szpwkn -- proyecto_maria` da vacío. Los merges de tu rama (`6809a846` y `30b9fea6`) no tuvieron conflictos, así que no hay `--remerge-diff` mío. Recorriendo todos los merges de `22163cec..30b9fea6`, `git show --remerge-diff` limitado a `proyecto_maria` da 0 líneas en cada uno, salvo `2b59f396` (97 líneas). Ese es el merge de MARIA que integra tu rama en `claude/dev-maria`, y ya es ancestro de tu rama.
+**Producto tocado: ninguno.** `git rev-list --no-merges ff2e2aae^..37c11eb4 --not origin/claude/practical-shannon-szpwkn -- proyecto_maria` da sólo `524a8f00`, `6c2b3383` y `cc8b834b`, que son de BORRADOR-1 (pieza anterior).
 
 **Resultado**
-- Los cuatro patrones viejos (`cobro_mp1` g, `despacho1d`, `estudio1`, `estudio1b`) vuelven a encontrar su texto y cada sabotaje da ROJO. Ningún ROTO.
-- `ataque_aislamiento.sh` ya no cae a SQLite: si Postgres 16 no levanta, sale con `rc=1` y el log de Postgres. Con Postgres, el control sigue en 47 bloqueados y 0 fugas.
-- Cada llamada a `/auth/register` de los siete arneses manda su propia `X-Forwarded-For`. Va por registro y no por sabotaje: `foco_cliente1` registra unas cien veces dentro de un mismo sabotaje, así que una IP por sabotaje igual llegaría al límite.
-- `pantalla_cliente1.js:41` falla con el status y el texto del registro si no es 2xx (D173 a). `foco_cliente1` usa ese mismo archivo, así que también lo hereda.
-- Navegación de BORRADOR-1 sobre `bb1bc1df`: los cinco arneses con rc=0, ningún ROTO y ningún 429 (tabla abajo).
-
-**Desvío que tenés que saber:** pediste un commit de arnés y son dos (`b7db6f65` y `4e7da21f`). Los dos ya estaban subidos cuando lo noté; sin `push --force` no se pueden unir. Ninguno toca producto.
-
-**Puerta e2e de MARIA:** no aplica. La pieza no toca el recorrido MARIA ni `static/v2`; sólo `scripts/testing`.
+- Un `close()` cancelado no deja conexiones tomadas. Probé 401 de seis tipos, normales, mezcla, `/api/ncm/sugerir`, la subida pública de PDF, cuatro tipos de corte en vuelo y picos de bcrypt, Gemini y PDF. En todos, al final quedan 0 tomadas, `close_empezados` = `close_terminados` y Postgres queda en `{'idle': 20}`.
+- El control da rojo cuando la sesión no se cierra: con dos sabotajes de la sonda (cancelar el `close` a propósito, guardando la sesión o soltándola) y con dos del producto (el `finally` de `get_async_session` no cierra, guardando la sesión o soltándola).
+- Lo que sí aparece es **saturación**. Cada pedido lento (bcrypt, Gemini, lector de PDF) tiene su conexión tomada mientras espera. Con 60 en paralelo, el pool llega a 50 de 50 (20 + 30 de desborde) y los pedidos normales esperan hasta 6,79 s. Una conexión tomada así no es una pérdida: vuelve al terminar el pedido. Es la D180.
+- Como no quedan conexiones tomadas, no hay arreglo: el producto queda sin cambio y el aviso de las pruebas sigue en riesgos.
 
 ## Decisiones
 
-Nada para decidir. No uso ninguna D de mi rango (D180 a D189).
+**D180. El pool se llena con trabajo lento.**
+- Opciones:
+  - (a) Una pieza aparte que suelte la conexión antes del trabajo lento (bcrypt, Gemini, lector de PDF) o que limite cuántos de esos esperan con conexión tomada. Esa pieza lleva su rojo.
+  - (b) Aceptarlo como riesgo y anotarlo.
+- Recomiendo LENTO8_RECOMENDACION
+- Datos:
+  - Con un solo worker (el `Dockerfile`), el tope es 50 conexiones.
+  - Hace falta tener a la vez más de 50 pedidos lentos para llenarlo.
+  - Con pico 60 y 2 s de demora falsa, ningún pedido normal dio error; esperaron 3,14 s (bcrypt), 3,99 s (Gemini) y 6,79 s (PDF).
+  - LENTO8_DATOS
 
-Supuesto reversible: `pantalla_destino1.js` manda la `X-Forwarded-For` pero no mira el status del registro. D173 (a) pedía el chequeo sólo en `cliente1`, y no lo sumé donde no se pidió. Si lo querés en los demás, es una línea por arnés.
+**D181. D146 con los números de bcrypt.** Pediste mantener D146 en la cola de limpieza hasta tener esta medida.
+- Opciones:
+  - (a) Contar antes de verificar, en una pieza propia.
+  - (b) Dejarlo en la cola de limpieza.
+- Recomiendo (b).
+- Por qué:
+  - 60 claves malas en paralelo para la misma cuenta, cada una desde otra IP, dieron 60 × 401 y ningún 429. El límite va por IP (`login:{ip}`) y por IP y cuenta (`cuenta:{username}:login:{ip}`), así que con IPs distintas ninguno de los dos corta, se cuente antes o después de bcrypt.
+  - La IP que usa el límite la arma el último proxy de confianza (`get_client_ip`, `core/rate_limit.py`). En el medidor la pone el cliente, porque no hay proxy delante. En producción, esto equivale a un atacante con 60 IPs propias, no a alguien que la invente.
+  - Lo que esos 60 sí hacen es tomar el pool: llega a 50 de 50, y los pedidos normales esperan hasta 3,14 s.
+  - bcrypt corre en el grupo de hilos de anyio (`run_in_threadpool`). Ese grupo tiene un tope de 40, y lo medí: `bcrypt_en_vuelo_max` dio 40. Los que esperan hilo igual tienen su conexión tomada.
+  - Eso es la D180, no D146. Contar antes no lo cambia.
 
-## Rojos de los patrones nuevos (cada uno, una vez)
+## Cómo se midió
 
-Corrieron sobre `54ddb500` (`despacho1d`, `estudio1`), `542c1860` (`cobro_mp1`) y `4e7da21f` (`estudio1b`). Los tres son ancestros de `bb1bc1df`, y `git diff <cada uno> bb1bc1df -- scripts/testing tests proyecto_maria` da sólo `client_memory.py`, `tests/memoria_pantalla.js`, `tests/test_guardar1.py` y `tests/test_memoria_pantalla.py` (MARIA). Ningún script de sabotaje ni pantalla cambió.
+Usé gunicorn con las mismas opciones del `Dockerfile` y Postgres 16 descartable (`con_pg16.sh`). La sonda (`conexiones1_sonda.py`) se carga con `-c` y expone por HTTP los contadores del pool y de `close()`.
 
-| Arnés | Resultado | El rojo del patrón nuevo |
-|---|---|---|
-| `cobro_mp1` | 145 ROJO, «sabotajes con falla: 0», rc=0 | «ROJO  · g: Listo guarda la operación sin el archivo del MARIA: dice «FALLA: import: la pantalla hizo»» |
-| `despacho1d` | 9 ROJO, «fallas: 0», rc=0 | «ROJO  · la operación vuelve a esperar al catálogo: dice «FAILED tests/test_despacho1c.py::test_la_operacion_no_espera_al_catalogo[colgado-guardado]»» |
-| `estudio1` | 37 ROJO, «sabotajes sin rojo: 0», rc=0 | «ROJO  · generar no espera la lista de estudios: dice «FALLA: generar antes de la lista manda estudio_id»» y «ROJO  · los avisos anotan el uso: dice «FAILED tests/test_estudio1.py::test_los_avisos_y_un_txt_que_no_se_genera_no_cuentan_como_uso»» |
-| `estudio1b` | 20 ROJO, «sabotajes sin rojo: 0», rc=0 | ancla nueva `_textos_como_van_al_txt(request)`: «ROJO  · el uso del perfil no se anota: dice «FAILED tests/test_estudio1b.py::test_generar_con_el_perfil_despues_de_un_estudio_preselecciona_el_perfil»» |
+Las condiciones de la D46:
+- **Sin tiempos fijos.** Cada fase espera hasta que `api_logs` tiene una fila por pedido. La columna `filas` es igual a `env` en todas.
+- **Cortes en vuelo de verdad.** El cliente corta el socket a mitad del pedido, mientras el servidor está en bcrypt, en Gemini o en el lector de PDF, o con el cuerpo a medias. Cada corte da «15 de 15 cortados con el pedido en vuelo».
+- **Gemini sin clave real y sin red.** Hay un Gemini falso que demora `--lento` segundos. El lector de PDF falso demora lo mismo.
+- **bcrypt es el real.**
 
-En las celdas cambié la barra vertical del log por `·`.
+Columnas: `máxT` es el máximo de `pool.checkedout()` y `máxPG` el máximo de conexiones en `pg_stat_activity`.
 
-## El ataque sin Postgres: rojo y control
+### Medición base (`c8733be3`, pico 30): «sin conexiones tomadas», rc=0
 
-Corrió sobre `bb1bc1df` sin `TMPDIR`. El ataque arma `$TMP` con `mktemp -d` y levanta Postgres con `su` como otro usuario. Con mi `TMPDIR` (un directorio de root sin permiso para otros) Postgres no podía entrar y daba un rojo falso; por eso el rojo de abajo ocupa el puerto a propósito.
+Las seis fases de 401, `normal`, `mezcla`, `sugerir` y `pdf_sin_lector` dan 0 en `quedan`. Sus códigos en `api_logs` son los esperados: 401 × 40 en cada tipo de 401, 200 × 40, «{401: 72, 200: 12}», 200 × 15 y 503 × 10.
 
-- **Rojo (puerto 5434 ocupado a propósito, 21:03:51 UTC):** rc=1.
-  - «❌ No levantó Postgres 16: sin él no se mide.»
-  - Del log de Postgres: «could not bind IPv4 address "127.0.0.1": Address already in use» y «FATAL:  could not create any TCP/IP sockets».
-  - Antes de `b7db6f65`, en ese caso seguía sobre SQLite.
-- **Control (puerto libre, 21:03:59 UTC):** rc=0.
-  - «✅ Postgres listo», «Bloqueado: 47   ·   Fugas: 0   ·   Sin probar: 0», «✅ PUERTA G3 PASADA. Ningún despachante ve datos de otro.».
+| Fase | Códigos en `api_logs` | máxT | máxPG | quedan | seg | Espera máxima de un normal |
+|---|---|---|---|---|---|---|
+| `login_clave_mala` | 401 × 40 | 40 | 40 | 0 | 0.0 | — |
+| `corte_cuerpo_a_medias` | 400 × 15 | 1 | 20 | 0 | 0.06 | — |
+| `corte_bcrypt` | 401 × 15 | 11 | 20 | 0 | 0.5 | — |
+| `corte_gemini` | 200 × 15 | 9 | 20 | 0 | 2.02 | — |
+| `corte_pdf` | 422 × 15 | 5 | 20 | 0 | 1.99 | — |
+| `pico_bcrypt` | 401 × 30 · 200 × 12 | 42 | 42 | 0 | 0.0 | 2.31 |
+| `pico_gemini` | 200 × 42 | 42 | 42 | 0 | 0.06 | 0.62 |
+| `pico_pdf` | 422 × 30 · 200 × 12 | 42 | 42 | 0 | 0.06 | 0.34 |
 
-## Navegación de BORRADOR-1 sobre `bb1bc1df`
+Sonda al final:
+- `apilog_creados` 576 y «filas en api_logs: 576».
+- `close_empezados` 2508 y `close_terminados` 2508.
+- `close_con_transaccion` 220.
+- `tomadas` 0, `libres` 20, `desborde` 0.
+- `bcrypt_en_vuelo_max` 20, `gemini_en_vuelo_max` 8, `pdf_en_vuelo_max` 4.
 
-| Arnés | Resultado | 429 | Inicio → fin (UTC) |
-|---|---|---|---|
-| `cliente1` | 34 ROJO, «sabotajes sin rojo: 0», rc=0 | 0 | 21:04:31 → 21:09:15 |
-| `foco_cliente1` | «con espera, 80 ms: 100 bien, 0 fallas de 100», «con espera, en el peor momento: 5 bien, 0 fallas de 5», «sin espera, en el peor momento: 0 bien, 5 fallas de 5 (5 con lo de otro campo en la razón social)», «mediciones con falla: 0», rc=0 | 0 | 21:09:15 → 21:39:23 |
-| `destino1` | 19 ROJO, «sabotajes sin rojo: 0», rc=0 | 0 | 21:39:23 → 21:46:15 |
-| `despacho1a` | 14 ROJO, «sabotajes sin rojo: 0», rc=0 | 0 | 21:46:15 → 21:47:16 |
-| `orden1` | 76 ROJO, «sabotajes sin rojo: 0», rc=0 | 0 | 21:47:16 → 22:17:58 |
+Estas cadenas aparecen 0 veces en el log de gunicorn: 'non-checked-in connection', 'Task was destroyed but it is pending', 'QueuePool limit', 'CancelledError', 'UnboundLocalError', 'Exception in ASGI application', 'Error logging metrics' y 'Traceback'.
 
-`foco_cliente1` no imprime líneas ROJO: mide corridas. El rojo es la fila «sin espera». «429» es la cantidad de líneas del log que contienen «429».
+### Pico 60 (`37c11eb4`, `--pico 60`): «sin conexiones tomadas», rc=0
 
-No los volví a correr sobre `30b9fea6`. Lo que ese merge suma sobre `bb1bc1df` es lo tuyo y lo de MARIA que aceptaste (`main.py`, `catalog_service.py`, `finalize.js`, entre otros), no código mío. De mis arneses, sólo cambió `despacho1d.sh`: MARIA reescribió el patrón de «aprender el catálogo con la red caída no avisa», que no es el de D149. Lo volví a correr sobre `30b9fea6`: 9 ROJO, «fallas: 0», rc=0, ningún ROTO.
+Las fases anteriores a los picos dan lo mismo que la base, salvo diferencias de uno en `máxT` (por ejemplo, `corte_bcrypt` 10 y `corte_cuerpo_a_medias` 0).
 
-El merge también cambia `main.py`. `git diff bb1bc1df 30b9fea6 -- proyecto_maria/main.py` toca límites sólo en la recuperación de contraseña (`_tope_por_cuenta`, `recuperar:cuenta:`), no en `register` ni en `get_client_ip`. Para comprobar el registro desde el navegador sobre lo que entrego, volví a correr `despacho1a` sobre `30b9fea6`: 14 ROJO, «sabotajes sin rojo: 0», rc=0, 0 líneas con «429».
+| Fase | Códigos en `api_logs` | máxT | máxPG | quedan | Espera máxima de un normal |
+|---|---|---|---|---|---|
+| `pico_bcrypt` | 401 × 60 · 200 × 12 | 50 | 50 | 0 | 3.14 |
+| `pico_gemini` | 200 × 72 | 50 | 50 | 0 | 3.99 |
+| `pico_pdf` | 422 × 60 · 200 × 12 | 50 | 50 | 0 | 6.79 |
 
-Los patrones de D149 aparecen una vez cada uno en `30b9fea6`, con la sangría exacta del `.sh` (`grep -cF` da 1 en cada caso):
-- `cobro_mp1` g: `saveOperationToHistory(...)`, con 12 espacios, en `finalize.js`.
-- `estudio1`: `if (CDI.estudios) await CDI.estudios.listo();`, con 8 espacios, en `finalize.js`.
-- `estudio1b`: el par `_estudio_elegido` / `_textos_como_van_al_txt(request)` en `main.py`.
+Sonda al final:
+- `apilog_creados` 666 y «filas en api_logs: 666».
+- `close_empezados` 2988 y `close_terminados` 2988.
+- `tomadas` 0, `libres` 20, `desborde` 0.
+- `bcrypt_en_vuelo_max` 40, `gemini_en_vuelo_max` 8, `pdf_en_vuelo_max` 4.
 
-De los cuatro arneses, sólo `despacho1d` volvió a correr.
+Las ocho cadenas del log dan 0, también 'QueuePool limit'. Ningún 500.
+
+LENTO8_SECCION
+
+### Control: el medidor da rojo cuando una sesión no se cierra
+
+Corrida sobre `37c11eb4` (00:06:55 → 00:14:16 UTC), rc=0:
+
+```
+BIEN  | sin sabotaje: salida 0, dice «sin conexiones tomadas»
+BIEN  | close_cancelado: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+BIEN  | close_cancelado_suelto: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+BIEN  | el producto guarda la sesión sin cerrar: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+BIEN  | el producto suelta la sesión sin cerrar: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+```
+
+La corrida anterior sobre `c8733be3`, con el control de `9c6f721f`, dio las cuatro primeras líneas BIEN y terminó con `rc=124`: se le acabó el `timeout` en la quinta. No se colgó. El medidor seguía todas las fases aunque el rojo ya estuviera, y con la sesión soltada sin cerrar cada fase esperaba su plazo. `37c11eb4` corta la corrida apenas aparece el rojo. Por eso hay tres commits de arnés y no uno.
+
+## Lo que no cubre
+
+- Hay sesiones que no se abren con `get_async_session`, y la medición no pasa por ellas:
+  - `main.py:10129`
+  - 11 en `client_service.py`
+  - `core/ncm_service.py:46` y `:85`
+- **Un solo worker.** Es la configuración del `Dockerfile`. Con más workers, el tope de Postgres se multiplica por cada uno; no lo medí.
+
+## Hallazgos del adversario
+
+ADVERSARIO_TABLA
 
 ## Riesgos
 
-- **Versión de Postgres:** el mensaje dice «Postgres 16», pero el script no mira el número de versión; usa el `initdb` del PATH. En este contenedor el log dice 16.15. En una máquina con otra versión mediría sobre esa sin avisar. Severidad baja; si querés el chequeo, es una pieza aparte.
-- **IP inventada:** `ipNueva()` arma `10.x.x.x` al azar (unos 16 millones). El 429 llega con más de 5 registros por hora desde una IP (`main.py`, `register`). Que seis de unos cientos caigan en la misma es despreciable.
-- **No corrí:** la suite completa (no se tocó producto ni `tests/`) ni `e2e_maria.sh` (la puerta no aplica).
+- **El aviso de las pruebas sigue.** Que no queden conexiones tomadas en esta medición no prueba que no queden en otras rutas o con otros tiempos. La medición cubre las rutas de arriba con un worker.
+- **Las causas de los topes en vuelo, sin verificar.** Gemini llega a 8 en vuelo y el lector de PDF a 4, y no comprobé de dónde sale cada número. Hay candidatos (`_HILOS_MP` en `main.py:11211` y semáforos en `despacho_lector.py:699` y `:725`), pero no los afirmo.
+- **Demoras falsas.** Gemini y el lector de PDF son falsos y demoran lo que dice `--lento`. Un Gemini real puede demorar más; la espera de los normales crece con eso.
 
 ## Para reproducir
 
 ```bash
-git fetch origin claude/practical-shannon-szpwkn
-git rev-list --no-merges 22163cec..30b9fea6 --not origin/claude/practical-shannon-szpwkn -- proyecto_maria   # vacío
-git show --remerge-diff --format= 30b9fea6 -- proyecto_maria | wc -l    # 0 (igual con 6809a846)
-bash scripts/testing/sabotajes/estudio1b.sh bb1bc1df          # 20 ROJO, «sabotajes sin rojo: 0»
-bash scripts/testing/ataque_aislamiento.sh                    # sin Postgres 16: rc=1 y «❌ No levantó Postgres 16»; con él: 47 / 0 / 0
-grep -ln "X-Forwarded-For" scripts/testing/pantalla_*.js      # seis archivos; foco_cliente1 usa pantalla_cliente1.js
+PY=<venv>/bin/python scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_medir.py              # «sin conexiones tomadas», rc=0
+PY=<venv>/bin/python scripts/testing/con_pg16.sh $PY scripts/testing/conexiones1_medir.py --pico 60    # máxT 50 en los tres picos, «sin conexiones tomadas»
+PY=<venv>/bin/python scripts/testing/sabotajes/conexiones1.sh 37c11eb4                                # cinco líneas BIEN, rc=0 (unos 8 minutos)
+git diff c8733be3 37c11eb4 -- proyecto_maria Dockerfile requirements.txt | wc -l                       # 0
 ```
+
+No corrí la suite completa ni `/security-review`, porque no hay producto ni `tests/` tocados.
 
 ## chequeo-6
 
-Corrió sobre `bb1bc1df`, no sobre `30b9fea6`: medido ahí, sumaría como míos los cambios de MARIA que trae tu rama. El único AVISO es `pantalla_cliente1.js:27`: la función anónima del arnés pasa de 296 a 297 líneas por el chequeo de D173 (a), que es una línea. Queda porque D173 pedía el chequeo ahí, donde está el registro. Partir esa función va a la cola de limpieza; no lo hago dentro de esta pieza.
+Un AVISO, en el arnés: `_instalar` de `conexiones1_sonda.py:59` tiene 96 líneas, contra ~60. Queda así porque es la función que el gunicorn de la medición carga con `-c`. Envuelve `close()`, el dispatch, `api_logs`, Gemini, el lector y bcrypt, y expone los contadores, todo dentro del proceso del worker. Partirla va a la cola de limpieza si la querés; no toca producto.
 
-<details><summary>Salida de <code>docs/pm/herramientas/chequeo-6.py e7633862 bb1bc1df</code></summary>
+<details><summary>Salida de <code>docs/pm/herramientas/chequeo-6.py</code> en los tres commits de arnés</summary>
 
 ```
-chequeo-6 e7633862..bb1bc1dff1b92d8954857f60264be10f7b285c29: avisos para mirar, no un veredicto
-producto +2/−2
-arnés +121/−26
+chequeo-6 740ba3afe04a1248db6047d69b95d5fcd3fb45a0..ff2e2aae919a1402f1660fd9648bdcbaf1a6539b: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +785/−0
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/services/client_memory.py: 305 → 305
-  AVISO creció una función de más de 150: scripts/testing/pantalla_cliente1.js:27 <anónima> 296 → 297, 1 en su propio cuerpo (§6: lo nuevo va aparte)
+  AVISO función nueva de 96 líneas: scripts/testing/conexiones1_sonda.py:59 _instalar (§6: ~60)
 avisos: 1
+```
+
+```
+chequeo-6 c8733be35eb4247d4c78d7b0f1f5e7bb7713c0f3..9c6f721f59465d07b9701add4c557051e0cd207b: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +28/−1
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+avisos: 0
+```
+
+```
+chequeo-6 5db9c1ec19b42d974f7e604a186fda0cc9c78ad7..37c11eb40806e9ee9560397f73101a97ecd972ce: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +27/−20
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+avisos: 0
 ```
 
 </details>
