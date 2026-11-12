@@ -7,7 +7,8 @@ descartado. Se repiten pedidos y dispose hasta que lo que hacía el arnés antes
 y se prueba soltar().
 uso: scripts/testing/con_pg16.sh python scripts/testing/conexiones1_soltar.py [vueltas]
 Sale 0 si soltar() deja la base sin conexiones de la app, 1 si no, 4 si en las
-vueltas no quedó ninguna abierta (el caso no se armó) y 2 si el arnés falló.
+vueltas no quedó ninguna abierta (el caso no se armó) y 2 si el arnés falló o
+la conexión abierta no vino del pool descartado.
 """
 import asyncio
 import os
@@ -47,6 +48,8 @@ def main():
             print(f"vuelta {vuelta}: arnés anterior (dispose y esperar {h.PLAZO} s): "
                   f"{h.sql(OTRAS)[0][0]} conexión(es) de la app abiertas")
             print(f"devueltas al pool descartado por: {TARDIAS}")
+            if not TARDIAS:
+                raise h.Invalida("quedó abierta una conexión que no volvió al pool descartado")
             try:
                 soltar(c)
             except h.Invalida as e:

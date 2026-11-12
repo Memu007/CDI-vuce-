@@ -8,6 +8,7 @@ import os
 import sys
 import traceback
 import uuid
+import warnings
 from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -78,12 +79,21 @@ def ronda(c, a, b, de_org, ajuste):
 
 
 def soltar(c):
-    """Cierra las conexiones de la app y espera a que Postgres no vea ninguna."""
+    """Cierra las conexiones de la app y espera a que Postgres no vea ninguna.
+    Falla si gc tuvo que cerrar una conexión que la app nunca devolvió al pool."""
     # La app registra cada pedido en una tarea que sigue después de responder: si
-    # devuelve su conexión tras el dispose, cae en el pool descartado y sólo la cierra gc.
+    # devuelve su conexión tras el dispose, cae en el pool descartado y sólo la cierra gc,
+    # que corre en el loop para que asyncpg cierre el socket desde su propio hilo.
+    async def cerrar():
+        await engine.dispose()
+        with warnings.catch_warnings(record=True) as avisos:
+            warnings.simplefilter("always")
+            gc.collect()
+        return [str(a.message) for a in avisos if "non-checked-in" in str(a.message)]
+
     def libres():
-        c.portal.call(engine.dispose)
-        gc.collect()
+        if fugas := c.portal.call(cerrar):
+            raise h.Invalida(f"la app dejó conexiones sin devolver al pool: {fugas[0][:90]}")
         return h.sql(OTRAS)[0][0] == 0
     if not h.hasta(libres):
         raise h.Invalida("la app no soltó sus conexiones")
