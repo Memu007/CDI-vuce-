@@ -182,9 +182,9 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `proyecto_maria/main.py:2008` (`MetricsMiddleware`): `asyncio.create_task`
   sin guardar la referencia; Python podría recolectar la tarea y perder el
   registro en `api_logs`. No vista en ninguna corrida con gc forzado (D207).
-- `scripts/testing/conexiones1_natural.py`: 92 líneas (§6, ~80) y `AL_DIA`
-  copiado de `conexiones1_pares.py`; sacar el dato a un solo lugar
-  (CONEXIONES-1 J, aceptado así).
+- `scripts/testing/conexiones1_natural.py` (`CREDITOS`) y `conexiones1_pares.py`:
+  el SQL de «créditos al día» está en los dos; sacarlo a un solo lugar
+  (CONEXIONES-1 J; asignado a la Técnica).
 - Sabotajes cuya ancla incluye un comentario (familia de las dos Devs,
   D168 de MARIA): `grep -nE "^ +[\$'\"].*( #|//) +[[:alnum:]ÁÉÍÓÚáéíóú]"
   scripts/testing/sabotajes/*.sh scripts/testing/sabotaje_*.sh` (aproximado:

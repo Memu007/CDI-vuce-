@@ -1192,3 +1192,39 @@ if __name__ == "__main__":
 ```
 
 </details>
+
+## K (sólo arnés): aceptada sobre `7dcfc5cc` (2026-11-12 13:43 UTC)
+
+Informe `32b1161c`. `chequeo-6.py f93c58c0 7dcfc5cc`: producto +0/−0, arnés
++36/−11, historia vacía, 0 avisos; igual al informe. Reproducido en un
+worktree de `7dcfc5cc`.
+
+| corrida | rc | resultado | ella |
+|---|---|---|---|
+| natural N=20 (171 s) | 1 | 55 rondas con deadlock / 19 recargas perdidas / 32 cuentas mal | 54 / 20 / 31 |
+| negativo PM `soltar_activa.py`: una conexión de la app ocupada con `select pg_sleep(120)` | — | «la app no soltó sus conexiones: active, espera Timeout:PgSleep, hace 15.9 s: select pg_sleep(120)» | ella forzó una ociosa en transacción |
+| negativo PM `sabotaje_alta.py`: el alta da 200 sin guardar el ítem, sólo filas con alta, N=3 | 1 | 14 de 15 «CUENTA MAL» | — |
+| `conexiones1_soltar.py` (no lo corrió ella) | 0 | «soltar(): la base quedó sin conexiones de la app» | — |
+
+Por fila (deadlock / mal): recarga + guardado vencidos 15/0, al día 0/0;
+recarga + MARIA vencidos 17/0, al día 0/0; recarga + alta vencidos 0/19
+(D188), al día 0/0; alta + guardado 8/0; alta + cancelar 9/0; alta +
+reactivar 6/0; renovación prueba vencida 0/17 y active fuera de gracia 0/15
+(D205).
+
+- **19 contra sus 20 recargas perdidas:** es la carrera de D188 (en serie,
+  0 de 10, sección J).
+- **La ronda sin «CUENTA MAL» del sabotaje:** «DEADLOCK | alta + guardado |
+  alta 500, guardado 200 | 1 operaciones, 1 contadas»: el alta no dio 200 y
+  no dejó nada. Está bien que no cuente.
+- **El texto nuevo de `soltar()`:** ningún script ni test compara el texto
+  viejo (`git grep` en `scripts` y `tests` sólo da la línea que lo lanza).
+- **Su supuesto** (las filas recarga + alta también miden el alta):
+  aceptado.
+- **El rc=2 mío de J:** no volvió a salir en estas corridas. Sigue abierto;
+  si vuelve, `soltar()` dice ahora qué hace cada conexión.
+- **No corrido:** un sabotaje donde el alta guarda y después da 500 (la
+  mitad «lo que no dio 200 no dejó nada» de la puerta 2 sólo se ve en las
+  rondas naturales con deadlock: alta 500 → 0 operaciones); la puerta
+  forzada de ella tal cual (corrí la mía, ocupada en vez de ociosa); suite y
+  `e2e_maria.sh` (sin producto).

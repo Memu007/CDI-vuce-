@@ -3,53 +3,54 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Mientras reviso K: una línea en `foco_perfil.sh` (2026-11-12 13:50 UTC)
+## CONEXIONES-1 K: aceptada sobre `7dcfc5cc` e integrada (2026-11-12 13:43 UTC)
 
-Vi tu entrega de K (`32b1161c`); la reviso ahora. Mientras tanto, D169 de
-MARIA, sólo arnés: sumá a `CASOS` de `scripts/testing/foco_perfil.sh`
-`"scripts/testing/pantalla_sesion1.js·#pfEmail"`. Puerta: con ese caso,
-`PIERDE` sobre `832bf74` y `NO PIERDE` sobre HEAD (ya lo vi con una copia;
-lo quiero en tu guion). Informe corto en `PARA-PM.md`, arriba del de K.
+Integré `32b1161c`. Acta `REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección K.
 
-## CONEXIONES-1 J: aceptada sobre `4f0cfbbd` e integrada (2026-11-12 13:10 UTC)
+- **Reproducido:** `chequeo-6` igual (+0/−0, 0 avisos). Natural N=20, rc=1:
+  55 rondas con deadlock / 19 recargas perdidas / 32 cuentas mal (los tuyos,
+  54 / 20 / 31). Mi 19 contra tu 20 es la carrera de D188. Las cuentas mal
+  son todas de renovación (D205). Las rondas con deadlock de los pares de
+  alta no dejan nada a medias.
+- **Mis negativos:** `soltar()` con una conexión de la app ocupada (no
+  ociosa: `select pg_sleep(120)`) dice «active, espera Timeout:PgSleep, hace
+  15.9 s: select pg_sleep(120)». Un alta que da 200 sin guardar el ítem da
+  «CUENTA MAL» en las filas de alta (14 de 15; la otra fue un deadlock donde
+  el alta dio 500 y no dejó nada, que está bien). `conexiones1_soltar.py`
+  sobre `7dcfc5cc`: rc=0.
+- **Tu supuesto** (las filas recarga + alta también miden el alta):
+  aceptado.
+- **El rc=2 mío de J** no volvió a salir; queda abierto, y ahora traería su
+  causa.
+- **Una línea:** tu sesión mencionó un `tests/test_conexiones1.py` sin
+  subir. ¿Qué es? Si es descartable, borralo; si no, decímelo.
 
-Integré `c0e119fd`. Evidencia: acta `REPRODUCCION-CONEXIONES-1-2026-11-12.md`,
-sección J.
+## Tarea activa (2026-11-12 13:43 UTC): D169 de MARIA y limpieza de CONEXIONES-1, sólo arnés
 
-- **Reproducido con N=20:** HEAD 65 / 20 / 33 (rondas con deadlock /
-  recargas perdidas / cuentas mal), NO KEY 27 / 19 / 29; los tuyos, 60 / 20 /
-  37 y 28 / 18 / 31. `chequeo-6` igual, 0 avisos. Puerta cumplida sin forzar.
-- **Mis negativos:** recarga y alta en serie, 0 de 10 perdidas; renovación
-  y guardado en serie, 0 de 20 mal. D188 y D205 son carreras.
-- **Las 92 líneas:** aceptadas por lo que explicaste; el dato copiado
-  (`AL_DIA`) va a `COLA-LIMPIEZA.md`.
-- **D208:** va a Emi con recomendación (b). No la tocás.
-- **Un rojo mío sin causa:** una corrida de mi negativo dio rc=2, «la app
-  no soltó sus conexiones», en el primer `soltar()`, con tus dos naturales
-  corriendo al lado. No se repitió en 6 corridas. Es la razón del punto 1 de K.
+**Primero traé mi rama con `merge`:** trae el arreglo de
+`pantalla_sesion1.js` de MARIA, que tu rama no tiene. No toques ese archivo.
+
+1. **D169:** sumá a `CASOS` de `scripts/testing/foco_perfil.sh`
+   `"scripts/testing/pantalla_sesion1.js·#pfEmail"`. Puerta: con ese caso,
+   `PIERDE` sobre `832bf74` y `NO PIERDE` sobre `48195cfe` y sobre tu HEAD
+   después del `merge`.
+2. **Limpieza de `COLA-LIMPIEZA.md`, entradas de CONEXIONES-1:** el SQL de
+   «créditos al día» está en `conexiones1_natural.py` (`CREDITOS`) y en
+   `conexiones1_pares.py`: que quede en un solo lugar. Y `_instalar` de
+   `conexiones1_sonda.py` (96 líneas) partida. Puerta: los casos que usan
+   esos archivos dan lo mismo que antes (decís cuáles corriste y con qué N),
+   `chequeo-6` con producto +0/−0. Me decís qué entradas de la cola
+   cerraste y las saco yo.
+
+Un informe para las dos en `PARA-PM.md`.
+
+**Si Emi dice que sí a D182 o a D206 (a) mientras tanto,** dejás esto donde
+esté, lo decís en el informe y arrancás esa pieza. La pieza de D206 (a),
+además de la revisión fuerte: el caso que detecta D188 corrido con el
+arreglo y en HEAD (si da peor que HEAD, frenás y me lo decís), y
+`e2e_maria.sh`, porque toca el guardado y MARIA.
 
 D205, D206 y D208 siguen con Emi. Tu rango libre: D209 a D215.
-
-## Tarea activa: CONEXIONES-1 K, sólo arnés (2026-11-12 13:10 UTC)
-
-1. **Cuando `soltar()` falla, dice qué hacen las conexiones que quedan**
-   (estado, en qué espera, desde cuándo y el comienzo de la consulta), para
-   que el próximo rc=2 traiga su causa. Puerta: la salida con una conexión
-   de la app tomada a propósito, una vez, rotulada «forzado».
-2. **Los pares de alta miden el estado final**, no sólo deadlock y códigos:
-   lo que dio 200 quedó guardado y lo que no dio 200 no dejó nada a medias
-   (la operación del alta, el guardado, `billing_status` tras cancelar o
-   reactivar). Un estado que no coincide con los códigos cuenta como «mal».
-   Puerta: la salida en HEAD con N rondas (N lo decís), y una vez el rojo
-   con la comprobación saboteada.
-
-`chequeo-6` con producto +0/−0. Dónde va cada cosa lo decidís vos según §6.
-
-**Si Emi dice que sí a D182 o a D206 (a) mientras tanto,** dejás K donde
-esté, lo decís en el informe y arrancás esa pieza.
-La pieza de D206 (a), además de la revisión fuerte: el caso que detecta
-D188 corrido con el arreglo y en HEAD (si da peor que HEAD, frenás y me
-lo decís), y `e2e_maria.sh`, porque toca el guardado y MARIA.
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 
