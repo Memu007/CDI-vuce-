@@ -8,10 +8,9 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_org1b.js
 const { chromium } = require('playwright');
+const ipNueva = require('./_ip_nueva');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const CLAVE = 'Clave-Inventada-123';
-// Cada contexto sin sesión entra con otra IP inventada: el registro tiene límite por IP, por hora y por día.
-const ipNueva = () => '10.' + [0, 0, 0].map(() => Math.floor(Math.random() * 256)).join('.');
 
 (async () => {
   const b = await chromium.launch();
@@ -33,6 +32,7 @@ const ipNueva = () => '10.' + [0, 0, 0].map(() => Math.floor(Math.random() * 256
   // Abre la landing en un contexto nuevo (sin sesión) y espera a que la
   // pantalla termine de mirar la invitación, si la hay.
   async function abrir(query, rutaFalsa) {
+    // El registro sale del formulario de la página: la IP inventada va en todo el contexto.
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, extraHTTPHeaders: { 'X-Forwarded-For': ipNueva() } });
     const page = await ctx.newPage();
     if (rutaFalsa) await page.route('**/api/invitations/**', rutaFalsa);

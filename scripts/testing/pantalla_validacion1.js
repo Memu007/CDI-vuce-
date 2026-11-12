@@ -7,6 +7,7 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_validacion1.js
 const { chromium } = require('playwright');
+const ipNueva = require('./_ip_nueva');
 const OP = { moneda: 'DOL', incoterm: 'CFR', comprador_cuit: '30712345671', fecha_emision: '10/10/2026' };
 const A = { pieza: '39211390900F', descripcion: 'Lona de PVC gris', origen: 'CN', cantidad: 750,
             valor_unitario: 1.85, peso_unitario: 0.62 };
@@ -114,9 +115,6 @@ async function simular(page, modo) {
   });
   return sim;
 }
-
-// Cada registro entra con otra IP inventada: el registro tiene límite por IP, por hora y por día.
-const ipNueva = () => '10.' + [0, 0, 0].map(() => Math.floor(Math.random() * 256)).join('.');
 
 (async () => {
   const b = await chromium.launch();

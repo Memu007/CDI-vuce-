@@ -7,6 +7,7 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_maria9.js
 const { chromium } = require('playwright');
+const ipNueva = require('./_ip_nueva');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const OP = { numero_factura: 'INV-2026/0457', moneda: 'DOL', incoterm: 'CFR', comprador_cuit: '30712345671',
              fecha_emision: '10/10/2026' };
@@ -19,7 +20,7 @@ const conSubitems = (...sufijos) => ({ ...LONA, subitems: sufijos.map(s => ({ ca
   const page = await (await b.newContext({ viewport: { width: 1400, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  await page.request.post(base + '/auth/register', { data: { username: 'm9_' + id, password: 'Clave-Inventada-123', email: 'm9' + id + '@ejemplo.test' } });
+  await page.request.post(base + '/auth/register', { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: 'm9_' + id, password: 'Clave-Inventada-123', email: 'm9' + id + '@ejemplo.test' } });
 
   const campoGeneral = page.locator('#sbtFieldError');
   const errorGeneracion = page.locator('#readyErrorText');
