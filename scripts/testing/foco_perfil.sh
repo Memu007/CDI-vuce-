@@ -29,6 +29,7 @@ P=proyecto_maria/static/v2/screens/profile.js
 CASOS=(
   "scripts/testing/pantalla_estudio1.js·#pfEstudioNombre"
   "scripts/testing/pantalla_estudio1.js·#pfEstudioCuit"
+  "scripts/testing/pantalla_sesion1.js·#pfEmail"
 )
 
 reloj() {
