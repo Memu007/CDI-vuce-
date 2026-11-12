@@ -269,7 +269,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-12 19:55 UTC: **AUTOREMOVE aceptada** sobre `1368dff8` e integrada (`77101b83`); acta `REPRODUCCION-AUTOREMOVE-2026-11-12`: org1.sh entero con PG 39 ROJO, sin rojo 0, salida 0; riesgo: guarda achicada a un plan no la ve el caso. Técnica: el caso del dueño en Postgres, sólo arnés.
+2026-11-12 19:55 UTC: **AUTOREMOVE aceptada** sobre `1368dff8` e integrada (`77101b83`); acta `REPRODUCCION-AUTOREMOVE-2026-11-12`: org1.sh entero con PG 39 ROJO, sin rojo 0, salida 0; riesgo: guarda achicada a un plan no la ve el caso. Técnica: el caso del dueño en Postgres, sólo arnés. Vuelta de rutina: MARIA en `catalogo_largo2` (`a538124e`, sin entrega nueva); contextos y límites bien.
 2026-11-12 19:10 UTC: **D198 (b) aceptada** sobre `a2af62a`, **sin integrar** (trae dos commits de `catalogo_largo2` sin revisar). D216 (b), D217 (a): un sabotaje 32 para el seguro; gastos ya tienen otra defensa. Escape mío: no vi el seguro al pedir el flete.
 
 ## /compact conservar de la PM principal
