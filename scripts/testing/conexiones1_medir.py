@@ -27,9 +27,10 @@ usuario que no carga nada mientras otro satura.
 
 Sale con 0 si no queda nada tomado y la otra cuenta no sufrió; con 1 si queda
 algo tomado o el log muestra una conexión perdida; con 2 si la medición no vale
-(respuestas inesperadas, el worker se recicló o la app no arrancó), y con 3 si
+(respuestas inesperadas, el worker se recicló o la app no arrancó), y con 4 si
 nada quedó tomado pero el pool se llenó: algún 500, el aviso de QueuePool en el
-log o la otra cuenta esperando más de `--espera-otra`.
+log o la otra cuenta esperando más de `--espera-otra`. El 3 no se usa: es el
+de `con_pg16.sh` cuando Postgres no levanta.
 """
 
 import argparse
@@ -547,10 +548,10 @@ async def main() -> int:
     finally:
         await cerrar(admin, pg, proc, med, base)
     leer_log(log, med)
-    codigo = 1 if med.fuga else 2 if med.invalida else 3 if med.lleno else 0
+    codigo = 1 if med.fuga else 2 if med.invalida else 4 if med.lleno else 0
     print({0: "sin conexiones tomadas", 1: "QUEDAN CONEXIONES TOMADAS",
            2: "LA MEDICIÓN NO VALE",
-           3: "POOL LLENO: ninguna conexión quedó tomada, pero la otra cuenta o el log sufrieron"}[codigo])
+           4: "POOL LLENO: ninguna conexión quedó tomada, pero la otra cuenta o el log sufrieron"}[codigo])
     return codigo
 
 
