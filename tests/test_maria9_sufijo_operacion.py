@@ -130,11 +130,9 @@ def test_por_api_los_avisos_anticipan_el_error(client):
     assert not any(a.startswith(ERROR_GENERAL) for a in r.json()["avisos"])
 
 
-def test_el_endpoint_agrupa_con_la_procedencia_de_la_operacion(client):
-    # Uno trae la procedencia de la operación escrita y el otro la toma de
-    # ella: el generador los junta en un ítem con un sufijo por renglón, así
-    # que el de la operación no hace falta. El endpoint tiene que verlos
-    # juntos igual, y no pedirlo.
+def test_por_api_con_sufijo_en_cada_renglon_no_pide_el_de_la_operacion(client):
+    # Cada renglón trae su sufijo (uno escribe la procedencia, el otro la toma
+    # de la operación): el endpoint no pide el de la operación.
     _registrar_con_cuit(client, "maria9_procedencia")
     pedido = _pedido()
     lona = dict(pedido["items"][0], estado=2)
