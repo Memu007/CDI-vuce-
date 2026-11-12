@@ -905,7 +905,7 @@
         // Persistence: Load from localStorage. El borrador es de un usuario:
         // se recupera después de saber quién entró (con tope, para no dejar la
         // pantalla en blanco si la red no contesta). Si el usuario llega
-        // después del tope, se recupera entonces (adoptarTarde).
+        // después del tope o ya fue a otra pantalla, se recupera con adoptarTarde.
         const espera = new Promise(r => setTimeout(r, ESPERA_USUARIO_MS));
         Promise.race([usuarioListo, espera])
             .then(() => {
@@ -916,13 +916,16 @@
                         .catch(e => console.warn('[app_v2] failed to restore state', e));
                     return null;
                 }
-                return recuperarBorrador();
+                // Se decide al tenerlo, sin esperar más: si ya fue a otra pantalla, no se la saca de ahí.
+                // A la carga la puede haber llevado el tour, no ella: ahí se recupera igual.
+                return buscarBorrador().then(b => (!b ? null
+                    : currentScreen && currentScreen !== 'upload' ? adoptarTarde(b) : adoptarBorrador(b)));
             })
             .catch(e => { console.warn('[app_v2] failed to restore state', e); return null; })
             .then(parsed => {
                 if (parsed) recuperada(parsed);
-                // Si ya había items (por ej. carga asíncrona de PDF, o restaurado recién)
-                // nos vamos a review. Sino, arrancamos en upload.
+                if (currentScreen && !parsed) return;
+                // Con la operación recuperada se va a review; si no, a upload.
                 if (CDI.state && CDI.state.items && CDI.state.items.length > 0) {
                     goTo('review');
                 } else {
@@ -1160,11 +1163,6 @@
             if (!elegido || b.savedAt > elegido.savedAt) elegido = b;
         });
         return elegido;
-    }
-
-    async function recuperarBorrador() {
-        const b = await buscarBorrador();
-        return b ? adoptarBorrador(b) : null;
     }
 
     CDI.borrador = { borrar: borrarBorrador, buscar: buscarBorrador, adoptar: adoptarBorrador, avisar: avisarBorrador, usuario: usuarioActual };

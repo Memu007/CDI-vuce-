@@ -75,6 +75,8 @@
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_orden1.js
 // El servidor corre con CSRF_ENFORCE=true, como en producción.
 const { chromium, request } = require('/opt/node-tools/node_modules/playwright');
+// Cada registro entra con otra IP inventada: el registro tiene límite por IP, por hora y por día.
+const ipNueva = () => '10.' + [0, 0, 0].map(() => Math.floor(Math.random() * 256)).join('.');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const base = process.env.BASE_URL || 'http://127.0.0.1:8771';
 const INTERVALO_MS = 2500;  // el guardado periódico de app_v2.js
@@ -104,7 +106,7 @@ async function nuevoUsuario(ctx, nombre) {
   const id = Date.now() + '_' + Math.floor(Math.random() * 1e6);
   const usuario = nombre + '_' + id;
   const r = await p.request.post(base + '/auth/register',
-    { data: { username: usuario, password: CLAVE, email: nombre + id + '@ejemplo.test' } });
+    { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: usuario, password: CLAVE, email: nombre + id + '@ejemplo.test' } });
   if (!r.ok()) falla('no se pudo registrar el usuario de prueba: ' + r.status());
   // Sin el CUIT del despachante no se genera el TXT (ESTUDIO-1); inventado.
   const perfil = await p.request.put(base + '/api/user/profile',

@@ -13,6 +13,8 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> CDI_DB=<base sqlite del servidor> node scripts/testing/pantalla_cliente1.js [captura.png]
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
+// Cada registro entra con otra IP inventada: el registro tiene límite por IP, por hora y por día.
+const ipNueva = () => '10.' + [0, 0, 0].map(() => Math.floor(Math.random() * 256)).join('.');
 const { execFileSync } = require('child_process');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const baseLocal = process.env.CDI_DB || falla('falta CDI_DB: la base sqlite local del servidor, para sembrar fechas viejas');
@@ -35,7 +37,8 @@ function sembrarFecha(clienteId, fecha) {
     await page.waitForFunction(() => document.activeElement && document.activeElement.id === 'cfNombre', null, { timeout: 10000 })
       .catch(() => falla('el formulario abierto no puso el foco en la razón social'));
   }
-  await page.request.post(base + '/auth/register', { data: { username: 'c1_' + id, password: 'Clave-Inventada-123', email: 'c1' + id + '@ejemplo.test' } });
+  const reg = await page.request.post(base + '/auth/register', { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: 'c1_' + id, password: 'Clave-Inventada-123', email: 'c1' + id + '@ejemplo.test' } });
+  if (!reg.ok()) falla('registro: ' + reg.status() + ' ' + await reg.text());
   await page.goto(base + '/dashboard');
   await page.waitForFunction(() => window.CDI && CDI.goTo);
   await page.evaluate(() => CDI.goTo('clientes'));
