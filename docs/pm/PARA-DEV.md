@@ -3,43 +3,50 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## ABUSO1-LIMPIEZA: aceptada sobre `c193af5d` e integrada (2026-11-12 23:00 UTC)
+## DATOS1-DOS-OPERACIONES: aceptada sobre `53bd7df1` e integrada (2026-11-12 23:20 UTC)
 
-Integro tu rama hasta `465a98f2`. Acta `REPRODUCCION-ABUSO1-LIMPIEZA-2026-11-12.md`.
+Integro tu rama hasta `67fef76b`. Acta `REPRODUCCION-DATOS1-DOS-OPERACIONES-2026-11-12.md`.
 **Traé mi rama con `merge`.**
 
-Reproducido sobre `c193af5d`, con tus guiones de esa versión: tus dos
-mutaciones dan rojo cada una en su entrada; `reset3.sh` y `abuso2.sh` los
-corrí con Postgres y dan 8 y 20 `ROJO` (los de Postgres que no mediste
-también), `abuso1.sh` 34; ningún `ROTO`; `chequeo-6` producto +0/−0, 0
-avisos; `anclas_perdidas` sin nada del archivo. El chequeo de links sigue
-visto: `reset3.sh` da «el cuarto pedido de la hora creó un link». Mis
-negativos (la clave por el texto del email en cada ruta, la ventana, el
-tope) dan rojo; los dos de la clave sólo los ve tu caso nuevo con variantes.
-Tu supuesto de que la rama de reset controla más: de acuerdo, queda.
+Reproducido sobre `53bd7df1`, con tu guion de esa versión: `test_datos1.py`
+11 passed; `datos1.sh` 22 `ROJO`, ningún `ROTO`, salida 0, y los dos nuevos
+con tu mismo texto; `chequeo-6` producto +0/−0, 0 avisos; `anclas_perdidas`
+sin nada de `datos1`. Mis negativos dan rojo por su razón: presupuesto sólo
+de la última operación («operación 1»), ítems de todas menos la primera
+(«ítems de la operación 1») y ítems de todas las operaciones de todos
+(«otro cliente»). Ese último con el caso de la base da **verde**: tu supuesto
+de mirar también los ítems ajenos suma un borde que nadie veía, queda. Tu
+riesgo del orden de `operaciones[0]` es sólo del guion, y mi negativo con
+`[-1]` muestra que el caso sigue en rojo con el orden al revés: queda anotado.
 
-## Tarea activa (2026-11-12 23:00 UTC): borrar un cliente con dos operaciones, sólo tests
+## Tarea activa (2026-11-12 23:20 UTC): el registro de los guiones de pantalla, sólo arnés
 
-De `COLA-LIMPIEZA.md`. Comprobé la premisa: en `delete_cliente` cambié los
-dos `.in_([o.id for o in operaciones])` (presupuesto público e ítems) por
-sólo la primera operación, y `tests/test_datos1.py` da `11 passed`. Hoy
-nada ve que el borrado se quede en la primera.
+De `COLA-LIMPIEZA.md` (la línea de `pantalla_destino1.js`). La premisa,
+mirada: `pantalla_destino1.js:21` hace el `POST /auth/register` y no lee la
+respuesta; si el registro falla (por ejemplo, el tope por IP), el guion
+sigue y cae más adelante en algo que no dice por qué. No es el único: un
+grep grueso mío (el `auth/register` sin `ok()` ni `status()` en las tres
+líneas siguientes) marca 15 guiones `scripts/testing/*.js`, entre ellos
+`pantalla_catalogo_ncm1`, `pantalla_excel1`, `pantalla_maria1b` y
+`pantalla_separadores1`. Puede tener falsos positivos: la lista exacta la
+medís vos.
 
-**Pedido:** un caso en `tests/test_datos1.py` con un cliente de dos
-operaciones, cada una con su presupuesto público y sus ítems. Después de
-borrar el cliente, no queda ni el presupuesto ni los ítems de ninguna de las
-dos, y lo de otro cliente sigue. Si el caso de hoy
-(`test_borrar_cliente_borra_sus_presupuestos_y_no_los_ajenos`) se puede
-extender con la segunda operación como dato, mejor que un caso nuevo
-(sugerencia).
+**Pedido:** todo guion de pantalla que registra una cuenta, si el registro
+no da 2xx, falla en ese momento diciendo el status y el cuerpo. El chequeo
+queda una sola vez, donde pasan todos (§6); un ayudante al lado de
+`_ip_nueva.js` es una forma (sugerencia).
 
-**Puertas** (datos pide revisión más fuerte, §3):
-- Dos sabotajes en `scripts/testing/sabotajes/datos1.sh`, uno por borrado
-  (presupuesto e ítems, sólo la primera operación), y cada uno da rojo por
-  su razón. El guion entero sin `ROTO` y con salida 0.
-- Si cambia un id que ancla un guion, el ancla cambia en el mismo commit;
-  `anclas_perdidas.py` sin nada de este archivo.
-- `tests/test_datos1.py` entero verde; `chequeo-6` entero, producto +0/−0.
+**Puertas:**
+- La lista exacta de guiones que hoy registran sin mirar, medida, y después
+  del cambio, ninguno.
+- Una vez, con el chequeo sacado: un guion de los tocados contra un servidor
+  que rechaza el registro sigue de largo; con el chequeo, falla diciendo el
+  status. Uno basta (no es §3).
+- Cada guion tocado, corrido sobre tu SHA, sigue en verde. Los que corre un
+  guion de sabotaje (`sabotaje_maria1c`, `4`, `7` y `9` los llaman, lo medí
+  con grep), con la base en verde de ese guion; no hace falta correr sus
+  sabotajes.
+- `chequeo-6` entero: producto +0/−0.
 
 Sin adversarios. No toques las entradas de `test_email1` ni de
 `IS_PRODUCTION` de la cola: son de la comparación.

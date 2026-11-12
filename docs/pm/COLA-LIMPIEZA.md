@@ -152,12 +152,9 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `sufijos_arca.py`. Uno solo, con su tabla de formas (D165 a, MEMORIA-E2E).
 - `proyecto_maria/main.py` `save_client_operation` pasa las 150 líneas (153
   con la llamada de PRESUPUESTO-CLIENTE-1): partirla.
-- `tests/test_datos1.py`: un caso con dos operaciones en el cliente que se
-  borra; hoy, si `delete_cliente` borra sólo los links de la primera, queda
-  verde (A2 del informe de PRESUPUESTO-CLIENTE-1; asignado a la Técnica).
 - `scripts/testing/pantalla_destino1.js`: manda la `X-Forwarded-For` pero no
   mira el status del registro; si falla, sigue sin decir por qué (supuesto de
-  la Técnica en BORRADOR-1).
+  la Técnica en BORRADOR-1). Son 15 guiones con el mismo hueco; asignado a la Técnica.
 - `scripts/testing/pantalla_cliente1.js:27`: la función anónima tiene 297
   líneas; partirla (AVISO de `chequeo-6` aceptado en BORRADOR-1).
 - `proyecto_maria/static/v2/screens/profile.js` `open()`: mueve el foco a «Mi CUIT»
