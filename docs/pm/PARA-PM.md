@@ -2,106 +2,193 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## IDS-PYTEST (agregado de BORRADOR-1): `estudio1.sh` da rc=0 con pytest 9.2.0 y con 9.1.1, y ningún otro guion mío depende de un id que pytest arma solo. Nada para decidir
+## CONEXIONES-1 C (sólo arnés): el rojo con otra cuenta está. Mientras otra cuenta satura, quien sólo consulta espera 30 s en `/api/ncm/sugerir`, y en la subida pública 30 s (6,5 s con la cuota de producción). El arreglo propuesto, sin commitear, lo baja a 0,45 s o menos. Decide Emi: D182
 
 | Qué | SHA |
 |---|---|
-| Arnés | `dd0eab7e` (id del caso y patrón de `estudio1`, padre `c57b645e`) |
-| Merges de tu rama | `45309f10` y `2bf38f93` |
-| Informe | el commit `docs:` encima de `2bf38f93` |
-| Rojo de antes | `c57b645e`, con su propio `estudio1.sh` |
-| Verde de después | `dd0eab7e`, con su propio `estudio1.sh` |
+| Base | `8d61bb09` |
+| Arnés: el medidor mide a otra cuenta y separa pool lleno de fuga | `33c61162` |
+| Arnés: pool lleno sale con 4, no con 3 (el 3 es de `con_pg16.sh`) | `76b50666` |
+| Informe | el commit `docs:` encima de `76b50666` |
+| Corridas de hoy | `76b50666`, código de producto igual a la base |
+| Corridas del arreglo | `76b50666` más el diff de abajo, sin commitear |
 
-**Producto tocado: ninguno.** `chequeo-6` da `producto +0/−0` y `arnés +4/−2`.
-
-**Versión de pytest**
-
-| Entorno | Python | pytest | Qué corrió |
-|---|---|---|---|
-| El de siempre | 3.12.3 | **9.1.1** | BORRADOR-1 y todo lo anterior, incluidos los 37 ROJO de `estudio1` que te informé |
-| Uno nuevo, armado con `requirements.txt` (`pytest>=9.1.0`) | 3.12.3 | **9.2.0** | el rojo de antes y el verde de después de esta pieza |
-
-Tu resultado (36 ROJO, 1 ROJO? y rc=1) y el mío (37 ROJO y rc=0) difieren por la versión de pytest. El producto no tiene nada que ver.
-
-**Resultado**
-- **La causa.** pytest 9.2.0 le pone al texto largo del parámetro el id `nombre4`, que es el nombre del argumento más la posición. 9.1.1 usaba el texto mismo, `xxxx…`. El sabotaje buscaba `[xxxxx`.
-- **El arreglo.** El caso le da un id propio, `pytest.param("x" * 201, id="largo")`, y el sabotaje busca `[largo]`. Con las dos versiones, el caso junta los mismos cinco ids: `[]`, `[   ]`, `[None]`, `[Estudio\nInventado]` y `[largo]`.
-- **Antes y después no son el mismo SHA.** El caso y el patrón cambian juntos:
-  - «antes» es `c57b645e` con su guion;
-  - «después» es `dd0eab7e` con el suyo.
-
-  Cada corrida usa una copia del guion de su SHA (`git show <SHA>:scripts/testing/sabotajes/estudio1.sh`), y no toqué nada mientras corrían.
-- **Rojo de antes, `c57b645e` con 9.2.0: 36 ROJO, `sabotajes sin rojo: 1`, rc=1.**
-  ```
-  ROJO? | el nombre de más de 200 entra: rojo (salida 1), pero sin «FAILED tests/test_estudio1.py::test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve[xxxxx»
-  FAILED tests/test_estudio1.py::test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve[nombre4]
-  ```
-  El sabotaje sí rompió el caso. Lo que no coincidía era el id.
-- **Verde de después, `dd0eab7e` con 9.2.0: 37 ROJO, `sabotajes sin rojo: 0`, rc=0.**
-  ```
-  ROJO  | el nombre de más de 200 entra: dice «FAILED tests/test_estudio1.py::test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve[largo]»
-  ```
-- **Verde de después, `dd0eab7e` con 9.1.1: 37 ROJO, `sabotajes sin rojo: 0`, rc=0**, con la misma línea `[largo]`.
-- **Mis otros guiones.**
-  - Son 42 guiones, con 237 patrones con `[`. Comparé cada patrón con los ids que junta pytest 9.2.0 sobre `dd0eab7e`.
-  - Todos coinciden salvo dos que no son texto fijo: `cobro_mp2.sh:250` y `:280` usan `[$fila]`.
-  - Cada valor que toma `$fila` (por ejemplo `cancelar_cancela`, `checkout_crea` y `sacar_cancela`) existe como id explícito.
-- **Los ids que cambian de 9.1.1 a 9.2.0 en todo `tests/`.** Junté los ids de todo `tests/` con las dos versiones sobre el mismo árbol (`c57b645e`), 6155 de cada lado. Cambian ocho:
-
-| Caso | id con 9.2.0 | Guion que lo nombra | ¿Se rompe? |
-|---|---|---|---|
-| `test_disco1.py::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada` | `desc0-8413.70.10-Fila…` | `disco1.sh:200` y `:227` buscan `[BBBB` | **Sí. Es de MARIA y no lo toqué: ¿se lo pasás?** |
-| `test_disco1.py::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda` | `desc0-8413.70.10-La…` | `disco1.sh:203` y `:220` buscan `[Bomba sintetica-888`, que es otro parámetro | No |
-| `test_estudio1.py::test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve` | `nombre4`, ahora `largo` | `estudio1.sh:134` | Arreglado en `dd0eab7e` |
-| `test_maria1a_lectura_factura.py::test_otros_numeros_sucios_quedan_vacios` | `texto3` | ninguno | No |
-| `test_maria8_subitems_por_posicion.py::test_el_sufijo_de_un_renglon_se_valida_como_los_otros` | `largo-sufijo1-120…` | `sabotaje_maria8.sh:203` y `:207` buscan `[igual` y `[no_texto` | No |
-| `test_org1.py::test_invitar_un_email_que_el_registro_rechaza_400_sin_ocupar_lugar` | `malo5` | `org1.sh:203`, sin `[` | No |
-| `test_subitems1.py::test_el_error_del_sufijo_dice_que_subitem` | `sufijo2` | `sabotaje_subitems1.sh:81`, que corta en `[` | No |
-| `test_valor1c.py::test_un_general_que_se_usa_sigue_controlado` | `general2-120…` | `sabotaje_valor1c.sh:155`, sin `[` | No |
-
-No corrí `disco1.sh`. Lo de esa fila sale de leer sus patrones contra los ids.
+**Producto tocado: ninguno.** `chequeo-6` da `producto +0/−0` y `arnés +58/−27`.
 
 ## Decisiones
 
-Nada para decidir. No usé ninguna D de mi rango.
+**D182. ¿Entra el arreglo que suelta la conexión antes de esperar?** Decide Emi: la fila del roadmap dice «arreglar sólo si las deja», y no las deja.
+- (a) Entra tal como está abajo: un `commit` al final de `require_billing_vigente` y otro en `sugerir_ncm` antes de esperar a Gemini. Lo acompaña el ajuste de una línea al inyector de fallas de `test_cobro_corte1.py`.
+- (b) Igual que (a), y además lo mismo en `require_active_billing`, que tiene el mismo patrón y no medí.
+- (c) No entra, y queda la espera de 30 s para la otra cuenta mientras alguien satura.
 
-**Supuesto reversible:** el id se llama `largo`. Cambiarlo es una palabra en el caso y otra en el guion.
+**Recomiendo (a).** Cumple el criterio en las dos configuraciones, y (b) sumaría una ruta que no medí. Si entra, va como pieza con `/entregar`: subagentes, `/code-review`, `/security-review` (toca sesión de base y cobro) y la suite completa.
+
+**Supuesto reversible: el criterio.** Lo propongo así:
+- la otra cuenta recibe 0 × 500 y espera como máximo 5 s (`--espera-otra 5`, el valor por defecto del medidor);
+- la cuenta que satura recibe sólo 422, 429 o 504.
+
+## Resultado, para la otra cuenta
+
+Todas las corridas son `--pico 60 --lento 30`, en gunicorn más Postgres 16 descartable (`con_pg16.sh`).
+- Pool: 20 + 30 = 50 conexiones, con `pool_timeout` de 30 s.
+- La otra cuenta hace 12 pedidos rápidos por pico.
+- «máxT / máxPG» es el máximo de conexiones tomadas según el pool y según `pg_stat_activity`.
+
+### Código de hoy (`76b50666`)
+
+| Corrida | Pico | Otra cuenta: 500 | Otra cuenta: espera máx. | Códigos de la cuenta que satura | máxT / máxPG |
+|---|---|---|---|---|---|
+| sin cuota | login (bcrypt) | 0 | 3.38 s | 401 × 60 | 50 / 50 |
+| sin cuota | sugerir (Gemini) | 0 | **30.08 s** | 200 × 60 | 50 / 50 |
+| sin cuota | subida pública de PDF | 0 | **30.01 s** | 422 × 16 · 500 × 10 · 504 × 34 | 50 / 50 |
+| cuota de producción | login (bcrypt) | 0 | 3.85 s | 401 × 60 | 50 / 50 |
+| cuota de producción | sugerir (Gemini) | 0 | **30.06 s** | 200 × 60 | 50 / 50 |
+| cuota de producción | subida pública de PDF | 0 | **6.51 s** | 422 × 16 · 429 × 25 · 504 × 19 | 50 / 50 |
+
+- **Las dos corridas salen con rc 4:** «POOL LLENO: ninguna conexión quedó tomada, pero la otra cuenta o el log sufrieron».
+- **No es una fuga.** Al final quedan `tomadas` 0, `close_empezados` = `close_terminados` y `apilog_creados` = `log_tareas_fin` = 667.
+- **Sin cuota, los 10 × 500 son de la cuenta que satura**, no de la otra. Son `TimeoutError` del pool. El log tiene `QueuePool limit` 50, `Exception in ASGI application` 10 y `Traceback` 60.
+- **Con la cuota de producción el log queda limpio:** `QueuePool limit` 0, `Exception in ASGI application` 0 y `Traceback` 0. Igual, la otra cuenta espera 30.06 s en sugerir y 6.51 s en la subida.
+- **El login no empeora:** 3.38 s y 3.85 s, dentro de los 3,1 a 3,7 s de antes salvo el 3.85. El margen contra los 5 s es fino (riesgos).
+
+**La causa, leída en el código.**
+- `require_billing_vigente` lee la entidad de cobro y deja abierta la transacción de lectura. La conexión queda tomada hasta que la sesión cierra al final del pedido.
+- `sugerir_ncm` además lee el catálogo y el historial y después espera hasta 30 s a Gemini con esa conexión tomada.
+- Con 50 pedidos lentos en vuelo, el pool se llena, y el pedido rápido de la otra cuenta espera a que se libere una.
+
+### Con el arreglo propuesto (mismo medidor congelado, worktree descartable)
+
+| Corrida | Pico | Otra cuenta: 500 | Otra cuenta: espera máx. | Códigos de la cuenta que satura | máxT / máxPG |
+|---|---|---|---|---|---|
+| sin cuota | login (bcrypt) | 0 | 3.48 s | 401 × 60 | 50 / 50 |
+| sin cuota | sugerir (Gemini) | 0 | **0.45 s** | 200 × 60 | **24 / 27** |
+| sin cuota | subida pública de PDF | 0 | **0.05 s** | 422 × 16 · 504 × 44 | 50 / 50 |
+| cuota de producción | login (bcrypt) | 0 | 3.13 s | 401 × 60 | 50 / 50 |
+| cuota de producción | sugerir (Gemini) | 0 | **0.38 s** | 200 × 60 | **26 / 27** |
+| cuota de producción | subida pública de PDF | 0 | **0.05 s** | 422 × 16 · 429 × 25 · 504 × 19 | 50 / 50 |
+
+- **Las dos corridas salen con rc 0:** «sin conexiones tomadas».
+- **En total hay 0 × 500**, y el log da 0 en cada contador: QueuePool, ASGI y Traceback.
+- **`close_con_transaccion` baja de 280 a 105.** Son los cierres de sesión que encontraron una transacción abierta.
+- **Al final, en las dos:** `tomadas` 0, `close_empezados` = `close_terminados` = 2992 y `apilog_creados` 667.
+- **Los cortes de 30 s siguen.** `corte_gemini` (30.02 s y 30.01 s) y `corte_pdf` (30.04 s y 30.01 s) son la duración de los pedidos cortados, no la espera de la otra cuenta.
+
+### El diff propuesto, sin commitear
+
+```diff
+--- a/proyecto_maria/main.py
++++ b/proyecto_maria/main.py
+@@ -2303,6 +2303,9 @@ async def require_billing_vigente(
+     await _vencer_y_guardar(db, entidad)
+     if not billing_service.tiene_acceso(entidad):
+         raise HTTPException(status_code=402, detail=_detalle_402(entidad))
++    # Termina la transacción de lectura: si no, la conexión queda tomada
++    # mientras el endpoint espera a la IA o a la lectura del PDF.
++    await db.commit()
+     return db_user
+ 
+ 
+@@ -10448,6 +10451,7 @@ async def sugerir_ncm(
+         # (RENDIMIENTO-1). Si no contesta a tiempo, se sigue sin sus sugerencias.
+         import asyncio
+         limite = _segundos_de_entorno("NCM_GEMINI_TIMEOUT_S", 30.0)
++        await db.commit()
+         try:
+             de_gemini = await asyncio.wait_for(
+```
+
+Y el ajuste que necesita el inyector de fallas de `test_cobro_corte1.py`, también sin commitear:
+
+```diff
+--- a/tests/test_cobro_corte1.py
++++ b/tests/test_cobro_corte1.py
+@@ -828,7 +828,8 @@ _confirmar = main.AsyncSession.commit
+ 
+ async def _commit_que_falla(self):
+     # La autenticación confirma antes de la ruta: falla sólo el de main.py.
+-    if sys._getframe(1).f_code.co_filename != main.__file__:
++    quien = sys._getframe(1).f_code
++    if quien.co_filename != main.__file__ or quien.co_name == "require_billing_vigente":
+         return await _confirmar(self)
+     raise RuntimeError("la base se cayó al confirmar")
+```
+
+**Por qué el ajuste.**
+- El inyector hace fallar cualquier `commit` llamado desde `main.py`, para simular que se cae el `commit` de la ruta.
+- Con el arreglo, el primer `commit` desde `main.py` es el de la dependencia, que corre antes de la ruta. La falla salta ahí y el caso ya no prueba lo que dice.
+- Sin el ajuste fallan 4 casos, con `RuntimeError: la base se cayó al confirmar`:
+  - `test_lo_no_entregado_no_queda_cobrado[importacion_al_confirmar]`;
+  - `test_regenerar_con_una_falla_deja_entero_lo_ya_entregado`, con `[al_confirmar]`, `[al_confirmar_y_deshacer]` y `[al_confirmar_sin_enlaces]`.
+- Con el ajuste pasan.
+- Si la base se cae en ese `commit` nuevo, pasa lo mismo que si se cae el `commit` con que ya termina `get_current_user`: un 500 sin escribir nada.
+
+**Qué se confirma en cada punto nuevo.** Lo leí en el código. Ninguna de estas funciones deja algo pendiente de escribir al llegar al `commit` nuevo:
+- `get_current_user` ya termina con su propio `commit`.
+- `_vencer_y_guardar` confirma sólo si cambió algo y, si falla, deshace.
+- `_get_billing_entity`, `lookup_client_memory`, `match_items` y `load_ncm_historial` sólo leen: no tienen `db.add`, `flush` ni `commit`.
+- Con `expire_on_commit=False`, el usuario y la entidad leídos siguen usables después del `commit`.
+
+**Los 8 endpoints que pasan por `require_billing_vigente`:**
+- `/process_operation/`;
+- `/upload_pdf/public`;
+- `/generate_maria` y `/generate_maria_export`;
+- `/api/migrations/analyze` y `/api/migrations/{batch_id}/confirm`;
+- `/api/clientes/{client_id}/operaciones`;
+- `/api/ncm/sugerir`.
+
+En todos, el cuerpo arranca con una transacción nueva.
+
+**Subida de PDF: es zona de MARIA (D74).** El arreglo no toca su código, pero cambia la transacción con la que entra a `/upload_pdf/public`. ¿Se lo pasás?
 
 ## Comandos
 
 ```bash
-# 1. Tu versión de pytest. Para ver el rojo de antes tiene que ser 9.2.0.
-python -m pytest --version
+# 1. Rojo de hoy: rc=4 y «POOL LLENO…»; «pico_gemini: la otra cuenta recibió 0 × 500 y esperó hasta 30.xx s».
+scripts/testing/con_pg16.sh python scripts/testing/conexiones1_medir.py --pico 60 --lento 30; echo rc=$?
 
-# 2. Rojo de antes: termina con «sabotajes sin rojo: 1» y rc=1.
-#    La línea ROJO? del nombre de más de 200 busca «[xxxxx» y muestra «[nombre4]».
-git show c57b645e:scripts/testing/sabotajes/estudio1.sh > /tmp/e1_antes.sh && bash /tmp/e1_antes.sh c57b645e; echo rc=$?
+# 2. Lo mismo con la cuota de producción: rc=4; pico_pdf de la otra cuenta en ~6.5 s y pico_gemini en ~30 s.
+scripts/testing/con_pg16.sh python scripts/testing/conexiones1_medir.py --pico 60 --lento 30 --cuota-de-produccion; echo rc=$?
 
-# 3. Verde de después: termina con «sabotajes sin rojo: 0» y rc=0, con «[largo]» en esa línea.
-git show dd0eab7e:scripts/testing/sabotajes/estudio1.sh > /tmp/e1_despues.sh && bash /tmp/e1_despues.sh dd0eab7e; echo rc=$?
+# 3. El arreglo: guardá los dos diffs de arriba en /tmp/arreglo.diff y corré el 1 en un worktree.
+#    Tiene que dar rc=0, «sin conexiones tomadas» y la otra cuenta por debajo de 0.5 s en pico_gemini y pico_pdf.
+git worktree add --detach /tmp/wt-c 76b50666 && cd /tmp/wt-c && git apply /tmp/arreglo.diff
+scripts/testing/con_pg16.sh python scripts/testing/conexiones1_medir.py --pico 60 --lento 30; echo rc=$?
 
-# 4. Los cinco ids del caso, iguales con 9.1.1 y con 9.2.0. El último es [largo].
-python -m pytest --collect-only -q --no-cov tests/test_estudio1.py 2>/dev/null | grep nombre_vacio
+# 4. Control del medidor: cinco BIEN y rc=0.
+PY=python scripts/testing/sabotajes/conexiones1.sh 76b50666; echo rc=$?
 ```
 
 ## Puertas
 
 | Puerta | Salida |
 |---|---|
-| `estudio1.sh` sobre `c57b645e`, pytest 9.2.0 | 36 ROJO · `sabotajes sin rojo: 1` · rc=1 |
-| `estudio1.sh` sobre `dd0eab7e`, pytest 9.2.0 | 37 ROJO · `sabotajes sin rojo: 0` · rc=0 |
-| `estudio1.sh` sobre `dd0eab7e`, pytest 9.1.1 | 37 ROJO · `sabotajes sin rojo: 0` · rc=0 |
-| ids del caso, `--collect-only` en `dd0eab7e`, 9.1.1 y 9.2.0 | `[]` · `[   ]` · `[None]` · `[Estudio\nInventado]` · `[largo]`, iguales |
-| Patrones de mis 42 guiones contra los ids de 9.2.0 | 237 · 235 coinciden como texto · los 2 `[$fila]` coinciden con cada valor |
-| `python -m compileall -q proyecto_maria` | rc=0 |
-| `chequeo-6 c57b645e dd0eab7e` | avisos: 0 |
+| Medidor, hoy, `--pico 60 --lento 30` | rc=4 · POOL LLENO · otra cuenta 30.08 s en sugerir y 30.01 s en subida |
+| Medidor, hoy, con `--cuota-de-produccion` | rc=4 · POOL LLENO · otra cuenta 30.06 s en sugerir y 6.51 s en subida |
+| Medidor, arreglo, `--pico 60 --lento 30` | rc=0 · sin conexiones tomadas · otra cuenta 0.45 s y 0.05 s |
+| Medidor, arreglo, con `--cuota-de-produccion` | rc=0 · sin conexiones tomadas · otra cuenta 0.38 s y 0.05 s |
+| `sabotajes/conexiones1.sh` sobre `76b50666` | 5 BIEN · rc=0 |
+| pytest en el arreglo, sin el ajuste del inyector: billing, cobro, sugerir, catálogo, CSRF y rendimiento (11 archivos) | 4 failed · 341 passed (los 4 de arriba) |
+| pytest en el arreglo con el ajuste: `test_cobro_corte1.py` y `test_excel2b.py` | 201 passed |
+| Los 4 casos en `76b50666`, sin arreglo | 9 passed (los dos casos completos) |
+| `chequeo-6 8d61bb09 76b50666` | avisos: 0 |
+
+Las 5 líneas del control del medidor:
+
+```
+BIEN  | sin sabotaje: salida 0, dice «sin conexiones tomadas»
+BIEN  | close_cancelado: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+BIEN  | close_cancelado_suelto: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+BIEN  | el producto guarda la sesión sin cerrar: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+BIEN  | el producto suelta la sesión sin cerrar: salida 1, dice «QUEDAN CONEXIONES TOMADAS»
+```
 
 <details><summary>chequeo-6, salida entera</summary>
 
 ```
-chequeo-6 c57b645e4321e1d41ef86f2b776dbce54b3ff6fc..dd0eab7e7989a1e6ff3c4b2c0d3b582e1ee47d1d: avisos para mirar, no un veredicto
+chequeo-6 8d61bb0909d18ccd7f773d41743241f75ebe0af0..76b50666: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +4/−2
+arnés +58/−27
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
@@ -110,15 +197,15 @@ avisos: 0
 </details>
 
 **Qué no corrí**
-- La suite completa: el cambio es el id de un caso y un patrón.
-- Mis otros 41 guiones: los revisé contra los ids que junta pytest, sin ejecutarlos.
-- `disco1.sh`, que es de MARIA.
-- Subagentes y `/code-review`: el diff son 6 líneas de arnés sin producto.
+- La suite completa con el arreglo: sólo los 11 archivos de la tabla y, con el ajuste, los dos de cobro y Excel. Si entra, va completa.
+- Subagentes, `/code-review` y `/security-review`: lo commiteado es arnés, y el arreglo es una propuesta. Si Emi dice que sí, el arreglo pasa por los tres.
+- `require_active_billing` en el medidor.
 
 **Riesgos**
-- Un guion nuevo que dependa de un id armado por pytest para un texto largo vuelve a depender de la versión, y hoy nada lo impide.
-- `requirements.txt` acepta cualquier pytest desde 9.1.0. Un cambio futuro de ids puede volver a separar tu entorno del mío.
+- **El arreglo es general.** Cambia la transacción de 8 endpoints, no sólo de los dos medidos. Ninguno deja algo pendiente al llegar al `commit` nuevo, según lo que leí en el código. Una dependencia futura que escriba sin confirmar antes de `require_billing_vigente` quedaría confirmada ahí, antes de la ruta. Hoy no hay ninguna.
+- **La subida es zona de MARIA:** su cuerpo empieza con la conexión ya suelta. No leí su código más allá de lo que toca la sesión.
+- **`require_active_billing` tiene el mismo patrón** y no lo medí.
+- **Sin explicar: en la subida y el login, máxT / máxPG sigue en 50 / 50 con el arreglo.** Aun así, la otra cuenta no espera (0.05 s y ≤3.48 s). No sé qué retiene esas conexiones. En el login, bcrypt corre con la conexión tomada.
+- **El login tiene poco margen:** 3.13 a 3.85 s contra los 5 s del criterio.
 
-**Archivos de producto tocados:** ninguno.
-
-**Sigue:** CONEXIONES-1 C, sólo arnés.
+**Archivos de producto tocados:** ninguno. Si D182 dice (a): `proyecto_maria/main.py` y `tests/test_cobro_corte1.py`.
