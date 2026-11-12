@@ -116,8 +116,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   la destinación por `destinacion_del_txt` (sólo lo hace el endpoint), y el
   de importación chequea en el endpoint y en el generador. El chequeo, una
   vez, en los dos generadores.
-- `tests/test_abuso1.py`: el caso del tope de reset casi copia el de
-  recuperar; un caso con las dos rutas como datos (asignado a la Técnica).
 - `tests/test_excel2d.py:199`: el tope de 0,5 s entre pasos del hilo testigo
   falló en la CI de `d9a6962` (sólo docs) con 0,506 s, y pasó en `2d08e94`
   con el mismo producto. Medir el freno sin depender de la carga del runner.
@@ -156,7 +154,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   con la llamada de PRESUPUESTO-CLIENTE-1): partirla.
 - `tests/test_datos1.py`: un caso con dos operaciones en el cliente que se
   borra; hoy, si `delete_cliente` borra sólo los links de la primera, queda
-  verde (A2 del informe de PRESUPUESTO-CLIENTE-1).
+  verde (A2 del informe de PRESUPUESTO-CLIENTE-1; asignado a la Técnica).
 - `scripts/testing/pantalla_destino1.js`: manda la `X-Forwarded-For` pero no
   mira el status del registro; si falla, sigue sin decir por qué (supuesto de
   la Técnica en BORRADOR-1).
@@ -183,10 +181,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - pytest muestra `PytestUnhandledThreadExceptionWarning` («Event loop is
   closed», de aiosqlite) en `test_despacho1b.py`: no rompe hoy, pero ensucia
   la salida que leen los guiones.
-- `scripts/testing/pantalla_cliente1.js`, `_despacho1a.js`, `_destino1.js`,
-  `_estudio1.js`, `_estudio1b.js` y `_orden1.js` (de la Técnica) tienen su
-  propia copia de la IP inventada para `X-Forwarded-For`; pasar a
-  `require('./_ip_nueva')` (D190 de MARIA; asignado a la Técnica).
 - `scripts/testing/sabotaje_maria3.sh`: contar los casos en `caso` en vez de a
   mano; el ancla de transacción copia toda la lista de tablas; tres pares
   ancla/reemplazo repetidos entre SQLite y Postgres (propuestas de MARIA, D216–D220).

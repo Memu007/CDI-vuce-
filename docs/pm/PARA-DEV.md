@@ -3,44 +3,43 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## SEPARADORES-1b-LIMPIEZA: aceptada sobre `bb0d3347` e integrada (2026-11-12 21:55 UTC)
+## ABUSO1-LIMPIEZA: aceptada sobre `c193af5d` e integrada (2026-11-12 23:00 UTC)
 
-Integro tu rama hasta `28236cc1`. Acta `REPRODUCCION-SEPARADORES-1b-LIMPIEZA-2026-11-12.md`.
+Integro tu rama hasta `465a98f2`. Acta `REPRODUCCION-ABUSO1-LIMPIEZA-2026-11-12.md`.
 **Traé mi rama con `merge`.**
 
-Reproducido sobre `bb0d3347`, con tu guion de esa versión: 105 passed;
-`chequeo-6` producto +0/−0, arnés +11/−18, 0 avisos; `anclas_perdidas` sin
-nada del archivo; el guion entero da 12 `ROJO` y sale 0. Mi mutación, distinta
-de las tuyas (saqué sólo el espacio fino de la clase de `_monto_factura`), da
-un solo rojo y es la entrada `[4 500.000-,]`: cada separador tiene la suya.
-Tu supuesto de dejar las 4 entradas sin espacio: de acuerdo, quedan.
+Reproducido sobre `c193af5d`, con tus guiones de esa versión: tus dos
+mutaciones dan rojo cada una en su entrada; `reset3.sh` y `abuso2.sh` los
+corrí con Postgres y dan 8 y 20 `ROJO` (los de Postgres que no mediste
+también), `abuso1.sh` 34; ningún `ROTO`; `chequeo-6` producto +0/−0, 0
+avisos; `anclas_perdidas` sin nada del archivo. El chequeo de links sigue
+visto: `reset3.sh` da «el cuarto pedido de la hora creó un link». Mis
+negativos (la clave por el texto del email en cada ruta, la ventana, el
+tope) dan rojo; los dos de la clave sólo los ve tu caso nuevo con variantes.
+Tu supuesto de que la rama de reset controla más: de acuerdo, queda.
 
-## Tarea activa (2026-11-12 21:55 UTC): los dos casos de tope por email en `test_abuso1.py`, sólo tests
+## Tarea activa (2026-11-12 23:00 UTC): borrar un cliente con dos operaciones, sólo tests
 
-De `COLA-LIMPIEZA.md`. Lo miré (leído, no corrido): los dos topes salen del
-mismo `_tope_por_cuenta` de `main.py` (claves `recuperar:cuenta:` y
-`reset-cuenta:`). Además,
-`test_s6_recuperar_usuario_corta_en_silencio_por_email` (línea 296) y
-`test_reset_tres_por_hora_por_cuenta_aunque_cambie_la_ip` (línea 477) son casi
-el mismo caso: tres pedidos por hora por cuenta con variantes del email, el
-cuarto contesta igual y no manda, a los 59 minutos sigue cortado, pasada la
-hora pasa. Cambian la ruta, el mensaje, el prefijo del usuario y que el reset
-además cuenta links.
+De `COLA-LIMPIEZA.md`. Comprobé la premisa: en `delete_cliente` cambié los
+dos `.in_([o.id for o in operaciones])` (presupuesto público e ítems) por
+sólo la primera operación, y `tests/test_datos1.py` da `11 passed`. Hoy
+nada ve que el borrado se quede en la primera.
 
-**Primero comprobá la premisa.** Si es la misma causa: un caso con las dos
-rutas como datos. Si no lo es (por ejemplo, un caso junto esconde algo que
-hoy se ve), decilo con la evidencia y la
-línea sale de la cola sin tocar el archivo.
+**Pedido:** un caso en `tests/test_datos1.py` con un cliente de dos
+operaciones, cada una con su presupuesto público y sus ítems. Después de
+borrar el cliente, no queda ni el presupuesto ni los ítems de ninguna de las
+dos, y lo de otro cliente sigue. Si el caso de hoy
+(`test_borrar_cliente_borra_sus_presupuestos_y_no_los_ajenos`) se puede
+extender con la segunda operación como dato, mejor que un caso nuevo
+(sugerencia).
 
-**Puertas:**
-- Con el tope por cuenta apagado en cada ruta (una por vez), el caso se pone
-  rojo en la entrada de esa ruta. El informe muestra los dos rojos una vez.
-- El chequeo de links del reset no se pierde.
-- `scripts/testing/sabotajes/reset3.sh`, `abuso2.sh` y `abuso1.sh` anclan en
-  este archivo: si cambia un id, el ancla cambia en el mismo commit; cada
-  guion que toques, entero, sin `ROTO`; `anclas_perdidas.py` sin nada de
-  este archivo.
-- `tests/test_abuso1.py` entero verde; `chequeo-6` entero, producto +0/−0.
+**Puertas** (datos pide revisión más fuerte, §3):
+- Dos sabotajes en `scripts/testing/sabotajes/datos1.sh`, uno por borrado
+  (presupuesto e ítems, sólo la primera operación), y cada uno da rojo por
+  su razón. El guion entero sin `ROTO` y con salida 0.
+- Si cambia un id que ancla un guion, el ancla cambia en el mismo commit;
+  `anclas_perdidas.py` sin nada de este archivo.
+- `tests/test_datos1.py` entero verde; `chequeo-6` entero, producto +0/−0.
 
 Sin adversarios. No toques las entradas de `test_email1` ni de
 `IS_PRODUCTION` de la cola: son de la comparación.
