@@ -4,7 +4,7 @@
 #   vencido <guion> <fecha> <dueño: la Dev que lo arregla> <salida: retirarlo o reescribirlo> <por qué; evidencia>
 # El selector de sabotajes antes de publicar no lo elige y lo nombra.
 vencido scripts/testing/sabotajes/catalogo_largo2.sh 2026-11-12 MARIA reescribirlo las anclas ya están; queda verde un sabotaje, «la clave junta ﬁ con fi», porque el producto las junta a propósito: espera D199 (retirarlo); anclas_perdidas.py a538124
-vencido scripts/testing/sabotaje_valor1.sh 2026-11-12 MARIA reescribirlo 5 anclas no están (122, 131, 136, 195, 199); anclas_perdidas.py f507763
+vencido scripts/testing/sabotaje_valor1.sh 2026-11-12 MARIA reescribirlo las anclas ya están; queda verde un sabotaje, «mal_escrito_se_borra», porque la guarda que saca ya no cambia nada que se vea: espera D222 (retirarlo); anclas_perdidas.py 38ee8e1
 vencido scripts/testing/sabotaje_maria8.sh 2026-11-12 MARIA reescribirlo 3 anclas no están (140, 145, 150); anclas_perdidas.py f507763
 vencido scripts/testing/sabotaje_maria1d.sh 2026-11-12 MARIA reescribirlo 2 anclas no están (97, 117); anclas_perdidas.py f507763
 vencido scripts/testing/sabotaje_maria5.sh 2026-11-12 MARIA reescribirlo 2 anclas no están (193, 227); anclas_perdidas.py f507763
