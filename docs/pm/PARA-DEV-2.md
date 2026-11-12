@@ -38,9 +38,13 @@ arnés y el producto queda en +0/−0.
   - si sigue, re-anclalo al texto de hoy;
   - si no, ese sabotaje no se toca y va como D que propone retirarlo.
 - Puerta: el guion entero sobre la cabeza da todos `ROJO` y sale 0, y
-  `anclas_perdidas.py` no da ninguna fila perdida para ese guion.
-- Al entregar, sacá su línea de `sabotajes-conocidos.txt` (o dejala, si
-  queda algún sabotaje esperando el D de retirarlo).
+  `anclas_perdidas.py` no da ninguna fila perdida para ese guion. Al
+  entregar, sacá su línea de `sabotajes-conocidos.txt`.
+- Si algún sabotaje va como D de retirarlo, el guion commiteado lo sigue
+  teniendo y su línea queda en `sabotajes-conocidos.txt` hasta que decida.
+  La puerta pasa a ser: una corrida con ese sabotaje salteado sólo en una
+  copia local (no en el commit) da `ROJO` en todos los demás y sale 0; las
+  únicas filas perdidas son las de ese D.
 - Después siguen `catalogo_largo2` y los demás, uno por pieza.
 - Si en el medio te llega la tarea de comparación, va primero.
 
