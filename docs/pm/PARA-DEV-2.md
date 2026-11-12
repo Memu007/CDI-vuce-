@@ -3,7 +3,7 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D194: aceptada sobre `f507763` e integrada (2026-11-12 16:50 UTC)
+## D194: aceptada sobre `f507763` e integrada (2026-11-12 16:45 UTC)
 
 Acta: `REPRODUCCION-D194-2026-11-12.md`.
 
