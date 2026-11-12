@@ -328,14 +328,14 @@ Informe de la Técnica en `PARA-PM.md` de `21df2a39`; sólo trae ese
 archivo (`git diff 759241ff 21df2a39 --stat`). El diff revisado, la
 alternativa D186 y `sabotajes_f.py` los saqué del informe con sus `awk`.
 Árboles descartables `/tmp/cdi-pm/wt-con1f` (`35c19be7`) y
-`wt-con1f-head` (`759241ff`); sin `conftest.py` en `/tmp` ni en
-`/tmp/cdi-pm`.
+`wt-con1f-head` (`759241ff`). `ls /tmp/conftest.py /tmp/cdi-pm/conftest.py`:
+«No such file or directory» los dos.
 
 ### Lo corrido por la PM
 
 | Qué | Dónde | Salida |
 |---|---|---|
-| `git apply --check` del diff revisado | `35c19be7` y `759241ff` | limpio en los dos |
+| `git apply --check` del diff revisado, en árboles nuevos | `35c19be7` y `759241ff` | «check limpio» en los dos |
 | Pruebas de F sin el diff (rojo) | `35c19be7` | 7 failed, 1 passed; `('impaga', 402, 402, 'sin leer') != ('impaga', 400, 402, 0)`; `('al leer', 200, '', 1, 200, 2) != ('al leer', 500, …, 0, 200, 1)` |
 | Con el diff revisado | `35c19be7` | `test_conexiones1.py` + `test_cobro_corte1.py`: 106 passed |
 | `sabotajes_f.py` | `35c19be7` + diff | los 9 ROJO, con el mismo texto de rojo que la tabla del informe; «sabotajes sin rojo: ninguno», rc=0 |

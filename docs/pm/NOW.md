@@ -166,7 +166,8 @@ antes de cerrar la Fase 3.
      - el pedido se lee entero antes de decir «falta pagar» o «sin cuota».
    - **Hay otra forma** que no trae esos dos cambios. La Técnica está
      midiendo si puede perder créditos extra pagos. Si no pierde, te la
-     traigo como la recomendada.
+     traigo como la recomendada. Tu «sí» es a arreglarlo; la forma la
+     confirmo después de esa medición.
    - Importar clientes con el sistema saturado durante 30 s puede dar error
      al guardar; no deja nada a medias y se vuelve a subir.
    - **Riesgo:** una cuenta impaga puede hacer leer un pedido grande. Un tope
@@ -260,7 +261,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-12 09:19 UTC: **CONEXIONES-1 F aceptada** sobre `21df2a39` e integrada (merge exacto; acta REPRODUCCION-CONEXIONES-1, sección F): 106 passed con el diff revisado, 9 sabotajes ROJO; mis negativos: analyze con pool lleno da 500 sólo si sigue lleno toda la espera; impaga con JSON roto da 402 hoy (el punto 4 de la Dev no valía). D186 (a) por ahora y D187 (a), por la PM; (b) se mide en G por `_expire_extra_ops`. Punto 13 actualizado. La Técnica sigue con **CONEXIONES-1 G** (tres columnas: cuerpos grandes de impaga y créditos extra vencidos con recarga a la vez). MARIA: despacho1b y el ROJO? del corte de CPU. Sin rechazos por límite, ninguna sin tarea.
+2026-11-12 09:19 UTC: **CONEXIONES-1 F aceptada** sobre `21df2a39` e integrada (merge exacto; acta REPRODUCCION-CONEXIONES-1, sección F): 106 passed con el diff revisado, 9 sabotajes ROJO; mis negativos: analyze con pool lleno da 500 sólo si sigue lleno toda la espera; impaga con JSON roto da 402 con el diff revisado (con _leer_json daría 400: el punto 4 de la Dev no valía). D186 (a) por ahora y D187 (a), por la PM; (b) se mide en G por `_expire_extra_ops`. Punto 13 actualizado. La Técnica sigue con **CONEXIONES-1 G** (tres columnas: cuerpos grandes de impaga y créditos extra vencidos con recarga a la vez). MARIA: despacho1b y el ROJO? del corte de CPU. Sin rechazos por límite, ninguna sin tarea.
 2026-11-12 08:55 UTC: vuelta sin entregas. La Técnica corre la suite de CONEXIONES-1 F (test sin commitear), 138k de 144k. MARIA subió `4292e0f7` (el caso de la hoja cara exige que el aviso del corte sea el único) y volvió a correr `despacho1b.sh` (28/136, todo ROJO), 156,5k de 184k; su informe de estado sigue siendo el de las 03:45. CI de `35c19be7` verde (tests 18 min 45 s, cerca del tope de 20: punto 14). Sin D abiertas, sin rechazos por límite, ninguna sin tarea.
 2026-11-12 06:52 UTC: **CONEXIONES-1 E aceptada como arnés** sobre `19714ecf` e integrada (merge exacto; acta REPRODUCCION-CONEXIONES-1, sección E): con el diff revisado, el corte a mitad del cuerpo da 400 (mis dos formas extra de corte: 400 con el arreglo, 500 sin él), medidor rc=0, control seis BIEN, 103 passed. D185 (a) por la PM: el tope de cuerpo, riesgo dentro del punto 13. Punto 13 reescrito (cambian 402→400 en el corte y el orden de lectura). La Técnica sigue con **CONEXIONES-1 F** (cuenta impaga y sin cuota, hallazgo 3, suite y e2e con el diff sin commitear). MARIA: su despacho1b.sh terminaba ~06:50; diagnostica el ROJO? del corte de CPU. Sin rechazos por límite, ninguna sin tarea.
 

@@ -20,8 +20,8 @@ revisado sigue afuera.
   - Pool lleno al leer, pero la otra cuenta suelta mientras analyze espera
     para guardar: 200 y un respaldo. Sin soltar: 500 y nada a medias. El 500
     aparece sólo si el pool sigue lleno durante toda la espera.
-  - Cuerpos raros en manual: una cuenta impaga con JSON roto completo da
-    **402** hoy. **Tu punto 4 no vale como está:** con `_leer_json` esa
+  - Cuerpos raros en manual: con el diff revisado, una cuenta impaga con
+    JSON roto completo da **402**. **Tu punto 4 no vale como está:** con `_leer_json` esa
     cuenta pasaría a 400, así que el contrato sí cambia en ese caso. Para la
     pieza de producto, el texto queda en un lugar sin cambiar ese 402, o el
     cambio va declarado.
@@ -70,6 +70,9 @@ de D188 a D189.
    Tiene que ser un caso o una fase del medidor que dé rojo si se pierde uno.
    Mostralo una vez en rojo con un sabotaje que lo haga perder. Si en las
    tres columnas da lo mismo, decilo con la salida.
+
+   Cómo lo leo: (b) pasa si no pierde más que «hoy». Si «hoy» también
+   pierde, es un hallazgo aparte de plata para Emi, no un motivo contra (b).
 3. El diff revisado y el de la alternativa van en el informe, con
    `git apply --check` limpio sobre tu cabeza.
 
