@@ -321,3 +321,181 @@ Por eso va a Emi como una línea de riesgo dentro del punto 13.
   el corte del segmento de log espera a las tareas de registro (ver arriba).
 - Los adversarios, `/security-review`, la suite completa y `e2e_maria.sh`
   con el diff revisado. Van en la pieza de producto.
+
+## F (sólo arnés y diff revisado): aceptada sobre `21df2a39` (2026-11-12 09:19 UTC)
+
+Informe de la Técnica en `PARA-PM.md` de `21df2a39`; sólo trae ese
+archivo (`git diff 759241ff 21df2a39 --stat`). El diff revisado, la
+alternativa D186 y `sabotajes_f.py` los saqué del informe con sus `awk`.
+Árboles descartables `/tmp/cdi-pm/wt-con1f` (`35c19be7`) y
+`wt-con1f-head` (`759241ff`). `ls /tmp/conftest.py /tmp/cdi-pm/conftest.py`:
+«No such file or directory» los dos.
+
+### Lo corrido por la PM
+
+| Qué | Dónde | Salida |
+|---|---|---|
+| `git apply --check` del diff revisado, en árboles nuevos | `35c19be7` y `759241ff` | «check limpio» en los dos |
+| Pruebas de F sin el diff (rojo) | `35c19be7` | 7 failed, 1 passed; `('impaga', 402, 402, 'sin leer') != ('impaga', 400, 402, 0)`; `('al leer', 200, '', 1, 200, 2) != ('al leer', 500, …, 0, 200, 1)` |
+| Con el diff revisado | `35c19be7` | `test_conexiones1.py` + `test_cobro_corte1.py`: 106 passed |
+| `sabotajes_f.py` | `35c19be7` + diff | los 9 ROJO, con el mismo texto de rojo que la tabla del informe; «sabotajes sin rojo: ninguno», rc=0 |
+| Alternativa D186 + `test_conexiones1.py` | `35c19be7` | 1 failed, 7 passed: `('impaga', 402, 402, 'sin leer') != ('impaga', 400, 402, 0)` |
+| Alternativa D186 + pruebas de cobro (`test_cobro_corte1`, `test_cobro_mp1*`, `mp2`, `mp3`, `test_billing_*`, `test_api_clientes_billing`, `test_g7_cobro`) | `35c19be7` | 482 passed |
+| Exención de `test_cobro_corte1.py`: `_commit_que_falla` sin `raise` | `759241ff` + diff | 4 failed, 94 passed (`importacion_al_confirmar`, `al_confirmar`, `al_confirmar_y_deshacer`, `al_confirmar_sin_enlaces`): los casos eximidos siguen llegando a la falla |
+| `chequeo-6 35c19be7` con el diff commiteado en un árbol descartable (`4d64fb8c`, no es un SHA entregado) | | igual al informe: producto +26/−1, 1 AVISO explicado (+25 netas), historia vacía |
+
+**Mis negativos** (en `759241ff` + el diff revisado; código abajo):
+
+1. **Pool lleno al leer, pero la otra cuenta suelta mientras analyze espera
+   para guardar** (espera del pool 10 s, como producción con 30 s): 200 y 1
+   respaldo; al pedir conexión el pool tenía 5 de 5 tomadas. Sabotaje: la
+   otra cuenta no suelta (espera 0,5 s) → `(500, 0, 5, [5]) != (200, 1, 5,
+   [5])`. O sea: el 500 de F aparece sólo si el pool queda lleno durante toda
+   la espera, y nunca deja medio respaldo.
+2. **Cuerpos raros en `/api/operations/manual`**, como datos de un caso:
+   corte sin un byte (al día y impaga) → 400 «Body JSON inválido»; JSON roto
+   completo, al día → 400 «Body JSON inválido»; JSON roto completo, impaga →
+   **402**. Ese último dato contradice el punto 4 del informe: con
+   `_leer_json` el JSON se parsearía antes del plan y esa cuenta pasaría a
+   400. El contrato HTTP sí cambia en ese caso.
+
+### Leído
+
+- `_FRIENDLY_5XX` (`main.py:466`) explica por qué el 500 de analyze dice
+  «No pudimos procesar tu solicitud» y no el texto de la ruta.
+- `expire_on_commit=False` (`database/connection.py:79`): los clientes y
+  el usuario siguen cargados después de los `commit` nuevos.
+- `sabotajes_f.py` ancla `SUELTA` y `COBRO` en líneas de comentario
+  (§6: el ancla es código). Hoy el script vive en el informe, no en el repo:
+  queda como condición cuando entre al repo.
+- Los `commit` nuevos de `require_billing_vigente` y de analyze no tienen
+  `try`, el de NCM sí. Lo que pasa con la base caída en cada uno no tiene
+  caso: condición de la pieza de producto.
+- La alternativa D186 pone un `commit` en `require_active_billing`, que
+  llama a `can_create_operation` → `_expire_extra_ops`
+  (`billing_service.py:109`, `:164`). En C quedó «no tocar
+  `require_active_billing` sin resolver `_expire_extra_ops`»: es la razón
+  para no elegir (b) todavía, no la del punto 1 de F (que se escribió para
+  el diseño de leer el cuerpo primero).
+
+### Decisiones
+
+- **D186: (a) por ahora, decidido por la PM.** (b) suelta igual la conexión
+  y no trae los dos cambios del punto 13 ni el riesgo del tope, pero guarda
+  en la dependencia el vencimiento de créditos extra. G lo mide en una
+  tercera columna, con un caso de créditos extra vencidos y una recarga a la
+  vez. Si sale bien, la PM le lleva (b) a Emi como la recomendada.
+- **D187: (a), decidido por la PM.** `pool_timeout=0.05` no es una espera
+  fija: el caso no duerme; el motor deja de esperar.
+
+### No corrido por la PM
+
+- La suite completa y `e2e_maria.sh` con el diff revisado: sólo la corrida
+  de la Dev (6085 passed, E2E MARIA OK). La puerta va sobre el SHA de la pieza
+  de producto.
+- Adversarios y `/security-review`: en la pieza de producto.
+
+<details><summary>Negativos de la PM (no van al repo)</summary>
+
+```python
+"""Negativos de la PM sobre CONEXIONES-1 F (no van al repo)."""
+import asyncio
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.pool import AsyncAdaptedQueuePool
+from starlette.requests import Request
+
+from proyecto_maria import main
+from proyecto_maria.database import connection as _conn
+from proyecto_maria.services import migration_service
+from tests.test_conexiones1 import _sesion, _respaldos, _impaga, MANUAL
+
+
+def test_pm_pool_lleno_al_leer_pero_se_libera_mientras_espera(monkeypatch):
+    """Con espera de pool larga (como producción), si la otra cuenta suelta
+    mientras analyze espera conexión para guardar, contesta 200 y guarda 1."""
+    c, nombre = _sesion(monkeypatch)
+    leer, guardar = migration_service.analyze_migration_file_async, AsyncSession.commit
+    archivo = {"file": ("clientes.csv", b"cuit,nombre\n20123456786,Cliente Uno\n", "text/csv")}
+    motor = create_async_engine(_conn.DATABASE_URL, poolclass=AsyncAdaptedQueuePool,
+                                pool_size=5, max_overflow=0, pool_timeout=10)
+    otras, liberar, pidio = [], [], []
+    pedir = motor.pool._do_get
+
+    def pedir_marcando():
+        if len(otras) == 5:
+            pidio.append(motor.pool.checkedout())
+        return pedir()
+    motor.pool._do_get = pedir_marcando
+
+    async def leer_y_llenar(*a, **k):
+        while motor.pool.checkedout() < motor.pool.size():
+            otras.append(await motor.connect())
+        return await leer(*a, **k)
+
+    async def guardar_soltando(self, *a, **k):
+        if otras and not liberar:
+            async def soltar():
+                # Suelta recién cuando el commit ya está esperando en la cola del pool.
+                while not pidio:
+                    await asyncio.sleep(0)
+                for o in otras:
+                    await o.close()
+            liberar.append(asyncio.ensure_future(soltar()))
+        return await guardar(self, *a, **k)
+
+    monkeypatch.setattr(migration_service, "analyze_migration_file_async", leer_y_llenar)
+    monkeypatch.setattr(AsyncSession, "commit", guardar_soltando)
+    antes = _respaldos(nombre)
+    _conn.AsyncSessionLocal.configure(bind=motor)
+    try:
+        with c:
+            r = c.post("/api/migrations/analyze", files=archivo)
+            c.portal.call(motor.dispose)
+    finally:
+        _conn.AsyncSessionLocal.configure(bind=_conn.engine)
+    assert (r.status_code, _respaldos(nombre) - antes, len(otras), pidio[:1]) == (200, 1, 5, [5]), r.text
+
+
+def _cortar_sin_nada(pedido):
+    mensajes = iter([{"type": "http.disconnect"}])
+
+    async def recibir():
+        return next(mensajes)
+    pedido._receive = recibir
+
+
+def test_pm_cuerpos_raros_en_manual(monkeypatch):
+    """Familia de cuerpos: corte sin un byte (impaga y al día), JSON roto
+    completo (impaga y al día). (cuenta, cuerpo, código)."""
+    CASOS = [
+        ("al dia", "corte vacio", 400),
+        ("impaga", "corte vacio", 400),
+        ("al dia", "json roto", 400),
+        ("impaga", "json roto", 402),
+    ]
+    leer, vieron = Request.body, []
+    for cuenta, cuerpo, _cod in CASOS:
+        with monkeypatch.context() as mp:
+            c, nombre = _sesion(mp)
+            if cuenta == "impaga":
+                _impaga(nombre)
+            if cuerpo == "corte vacio":
+                async def frenar(self):
+                    if not hasattr(self, "_body"):
+                        _cortar_sin_nada(self)
+                    return await leer(self)
+                mp.setattr(Request, "body", frenar)
+            with c:
+                if cuerpo == "json roto":
+                    r = c.post("/api/operations/manual", content=b'{"client_id": ',
+                               headers={"content-type": "application/json"})
+                else:
+                    r = c.post("/api/operations/manual", json=MANUAL)
+        detalle = r.json().get("detail")
+        vieron.append((cuenta, cuerpo, r.status_code,
+                       detalle if isinstance(detalle, str) else type(detalle).__name__))
+    print(vieron)
+    assert [v[:3] for v in vieron] == [(a, b, c) for a, b, c in CASOS], vieron
+```
+
+</details>

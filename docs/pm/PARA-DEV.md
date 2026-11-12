@@ -3,62 +3,84 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## CONEXIONES-1 E: aceptada como arnés sobre `19714ecf` e integrada (2026-11-12 06:52 UTC)
+## CONEXIONES-1 F: aceptada sobre `21df2a39` e integrada (2026-11-12 09:19 UTC)
 
-Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección E.
-Integré con `merge` exactamente `19714ecf`. Es arnés solo; el producto
-tiene 0 líneas.
+Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección F.
+Integré con `merge` exactamente `21df2a39`. Sólo trae tu informe: el diff
+revisado sigue afuera.
 
 - **Coincide con tu informe:**
-  - el caso del corte da `assert 500 == 400` con el diff de D y `103 passed` con el revisado;
-  - el medidor con el revisado da rc=0, con `corte_manual_a_medias` {400: 15} y `pico_cuerpo_manual` 60 de 60 con 0 tomadas;
-  - el control da seis `BIEN`;
-  - `chequeo-6` da lo mismo, con 0 avisos.
-- **Mis negativos:** corté sin mandar nada y en tres trozos. Con el
-  `except` las dos formas dan 400 sin ERROR; sin él, 500.
-- **Leído:**
-  - el ancla es código;
-  - no hay espera fija nueva;
-  - el segmento de log de cada fase se lee después de que terminan sus tareas de registro. La sonda cuenta el fin en el callback y la app corre sin búfer, así que el rc=4 sin arreglo no depende del orden del log. Esa corrida no la repetí.
-- **D185: (a), decidido por la PM.** El tope de cuerpo no entra en esta fila. Va a
-  Emi como riesgo dentro del punto 13.
+  - sin el diff, 7 failed y 1 passed, con tus dos textos de rojo;
+  - con el diff revisado, 106 passed;
+  - `sabotajes_f.py` da los 9 ROJO, «sin rojo: ninguno», rc=0;
+  - la alternativa D186 da 1 failed (`corta_el_cuerpo`, impaga 402) y 482 passed en las pruebas de cobro;
+  - `chequeo-6` da lo mismo, con el AVISO de +25 explicado.
+- **La exención de `test_cobro_corte1.py` está bien:** con `_commit_que_falla` sin `raise`, dan rojo 4 casos. O sea, los eximidos siguen llegando a la falla.
+- **Mis negativos:**
+  - Pool lleno al leer, pero la otra cuenta suelta mientras analyze espera
+    para guardar: 200 y un respaldo. Sin soltar: 500 y nada a medias. El 500
+    aparece sólo si el pool sigue lleno durante toda la espera.
+  - Cuerpos raros en manual: con el diff revisado, una cuenta impaga con
+    JSON roto completo da **402**. **Tu punto 4 no vale como está:** con `_leer_json` esa
+    cuenta pasaría a 400, así que el contrato sí cambia en ese caso. Para la
+    pieza de producto, el texto queda en un lugar sin cambiar ese 402, o el
+    cambio va declarado.
+- **D186: (a) por ahora, decidido por la PM.** La razón no es la del punto 1
+  de tu informe. Es la de C: (b) pone un `commit` en
+  `require_active_billing`, que guarda el vencimiento de créditos extra
+  (`_expire_extra_ops`, `billing_service.py:109`). Eso todavía no está medido.
+  G lo mide. Si (b) no pierde créditos pagos, se lo llevo a Emi como la
+  recomendada: suelta igual y no trae los dos cambios.
+- **D187: (a), decidido por la PM.** El pool de 0,05 s no es una espera fija.
+- **Condiciones de la pieza de producto (no ahora):**
+  - Base caída en cada uno de los tres `commit` nuevos
+    (`require_billing_vigente`, analyze, NCM): un caso, con los tres puntos
+    como datos. Hoy sólo el de NCM tiene `try`.
+  - Lo que el caso le cambia al motor o a la sesión se devuelve en un
+    `try/finally`.
+  - En `sabotajes_f.py`, `SUELTA` y `COBRO` se anclan en líneas de comentario.
+    Cuando el script entre al repo, se anclan en código (§6).
+- **Limpieza tuya:** si quedó un `conftest.py` viejo en una carpeta de
+  arriba del árbol (`/tmp`, `/tmp/…`), borralo. Poné el `ls` en el informe.
 
-## Tarea activa: CONEXIONES-1 F, casos y puertas con el diff revisado (2026-11-12 06:52 UTC)
+## Tarea activa: CONEXIONES-1 G, sólo arnés, tres columnas (2026-11-12 09:19 UTC)
 
-Seguimos en la fila abierta de CONEXIONES-1. No commiteás producto: el diff
-revisado sigue fuera de la rama, sólo en el informe. Tus D van de D186 a D189.
+Mide los dos riesgos que quedan antes de llevarle el arreglo a Emi. No
+commiteás producto. Cada medición va en tres columnas:
+- **hoy:** `35c19be7` o tu cabeza, sin diff;
+- **revisado:** el diff de F, (a);
+- **alternativa:** el diff de D186, (b).
 
-1. **Cuenta impaga y cuenta sin cuota.** Agregalas en `test_conexiones1.py`
-   como datos dentro de un caso. Para cada una:
-   - un corte a mitad del cuerpo contesta 400;
-   - el cuerpo completo contesta 402 la impaga y 429 la sin cuota.
+Ninguna espera fija nueva: se espera una condición observable. Tus D van
+de D188 a D189.
 
-   Si te sale distinto, mostrá la salida y no lo arregles.
-2. **Hallazgo 3,** con el diff revisado aplicado: analyze con el pool lleno al guardar el respaldo. Medí qué
-   contesta y mostrá que en la base no queda nada a medias. Tiene que ser un
-   caso o una fase del medidor, sin espera fija nueva.
-3. **Con el diff revisado aplicado y sin commitear**, corré la suite completa
-   (`DOLARAPI_BASE` local, `ENVIRONMENT=testing`, `GEMINI_API_KEY` vacía) y
-   `e2e_maria.sh`. Poné las dos salidas en el informe. Esto no reemplaza la
-   puerta sobre el SHA que entregues en la pieza de producto: decilo así.
-4. **Para la pieza de producto, sin hacerlo ahora:** el texto «Body JSON
-   inválido» está repetido en dos lugares (§6). Proponé cómo queda en uno
-   solo, o explicá por qué no se puede sin cambiar la firma de la ruta.
+1. **Cuerpos grandes de una cuenta impaga** en `/api/operations/manual`:
+   el más grande que acepte la app, uno solo y unos cuantos a la vez.
+   Contestá en cada columna:
+   - cuánto tarda el 402;
+   - cuánta memoria sube el proceso;
+   - si otra cuenta al día nota algo (espera o errores).
+2. **Créditos extra vencidos y una recarga a la vez.** Una cuenta con
+   créditos extra vencidos crea una operación y, al mismo tiempo, le entra
+   una recarga de créditos (el camino que use hoy el producto para sumarlos).
+   Contestá en cada columna:
+   - cuántos créditos quedan;
+   - si se pierde alguno pago.
 
-El diff revisado actualizado va en el informe, con `git apply --check`
-limpio sobre tu cabeza.
+   Tiene que ser un caso o una fase del medidor que dé rojo si se pierde uno.
+   Mostralo una vez en rojo con un sabotaje que lo haga perder. Si en las
+   tres columnas da lo mismo, decilo con la salida.
 
-**Apenas entregues F: CONEXIONES-1 G**, si Emi todavía no dijo que sí a D182.
-Es sólo arnés y mide el riesgo del cuerpo leído antes del 402. Una cuenta
-impaga manda cuerpos grandes a `/api/operations/manual`: el más grande que
-acepte la app y unos cuantos a la vez. Medilo hoy y con el diff revisado, y
-contestá:
-- cuánto tarda el 402;
-- cuánta memoria sube el proceso;
-- si otra cuenta lo nota.
+   Cómo lo leo: (b) pasa si no pierde más que «hoy». Si «hoy» también
+   pierde, es un hallazgo aparte de plata para Emi, no un motivo contra (b).
+3. El diff revisado y el de la alternativa van en el informe, con
+   `git apply --check` limpio sobre tu cabeza.
 
-Ninguna espera fija nueva. Si Emi ya dijo que sí, la pieza de producto de
-CONEXIONES-1 va antes que G, con E y F adentro y revisión fuerte.
+**Apenas entregues G:**
+- Si Emi dijo que sí a D182: la pieza de producto de CONEXIONES-1, con E, F
+  y G adentro, las condiciones de arriba y revisión fuerte.
+- Si no dijo nada todavía: el plan de esa pieza, sin producto. Lleva la
+  lista de casos (uno por causa), las puertas y los comandos copiables.
 
 ## FOCO-PERFIL: aceptada sobre `dc4cf077` e integrada (2026-11-12 03:37 UTC)
 
