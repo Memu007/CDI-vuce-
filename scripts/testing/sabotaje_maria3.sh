@@ -237,5 +237,9 @@ caso fecha_sin_productos "${T}test_sin_productos_los_avisos_tambien_piden_la_fec
 sin_flete_en_el_endpoint
 caso avisos_flete_sin_validar "${T}test_flete_o_seguro_que_no_son_un_importe_dan_400[/generate_maria/avisos-flete--500]"
 
+# 32. los avisos previos no validan el seguro: el pedido no llega a responder
+reemplazar $M '    request.seguro = importe_valido(request.seguro, "Seguro") or 0' '    request.seguro = request.seguro or 0'
+caso avisos_seguro_sin_validar "${T}test_flete_o_seguro_que_no_son_un_importe_dan_400[/generate_maria/avisos-seguro-nan]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 31 sabotajes dan rojo por la razón esperada"
+echo "OK: los 32 sabotajes dan rojo por la razón esperada"
