@@ -87,7 +87,12 @@ DETALLES_401 = {
     "login_clave_mala": {"Credenciales inválidas"},
 }
 ESPERADO = {"normal": 200, "otra": 200, "sugerir": 200, "pdf_sin_lector": 503,
-            "pico_gemini": 200, "pico_pdf": 422, "pico_bcrypt": 401}
+            "pico_gemini": 200, "pico_pdf": 422, "pico_bcrypt": 401, "pico_excel": 200,
+            "manual_lento": 404}
+EN_VUELO = ("bcrypt_en_vuelo", "gemini_en_vuelo", "pdf_en_vuelo", "excel_en_vuelo",
+            "cuerpo_en_vuelo")
+# Una planilla chica cuyos encabezados se reconocen sin la IA.
+CSV_CHICO = b"cuit,nombre\n20123456786,Cliente Uno\n"
 # Lo que el pico puede devolverle a la cuenta que lo carga sin que sea un rojo.
 LIMPIOS_DEL_PICO = {429, 503, 504}
 
@@ -153,7 +158,7 @@ def en_curso(p: dict) -> dict:
         "log": p.get("log_tareas", 0) - p.get("log_tareas_fin", 0)
         - p.get("log_tareas_canceladas", 0),
     }
-    for k in ("bcrypt_en_vuelo", "gemini_en_vuelo", "pdf_en_vuelo"):
+    for k in EN_VUELO:
         pendiente[k] = p.get(k, 0)
     return {k: v for k, v in pendiente.items() if v}
 
@@ -165,7 +170,7 @@ class Medicion:
         self.sonda_cli = httpx.AsyncClient(base_url=f"http://127.0.0.1:{puerto_sonda}", timeout=10)
         self.c = httpx.AsyncClient(base_url=f"http://127.0.0.1:{puerto}", timeout=90)
         self.filas, self.invalida, self.fuga, self.lleno = [], False, False, False
-        self.quinientos = 0
+        self.quinientos = self.filas_perdidas = 0
         self.pdf = pdf_en_blanco()
 
     async def sonda(self, ruta="/", **params) -> dict:
@@ -227,6 +232,14 @@ class Medicion:
             return httpx.Request("POST", url + "/upload_pdf/public",
                                  files={"file": ("medicion.pdf", self.pdf, "application/pdf")},
                                  headers={**auth, "X-Forwarded-For": ip_al_azar()})
+        if tipo == "pico_excel":
+            return httpx.Request("POST", url + "/api/migrations/analyze",
+                                 files={"file": ("clientes.csv", CSV_CHICO, "text/csv")}, headers=auth)
+        if tipo == "manual_lento":
+            # Un cliente que no existe: la ruta lee el cuerpo entero y responde 404.
+            return httpx.Request("POST", url + "/api/operations/manual", headers=auth, json={
+                "client_id": 999999999, "items": [{"ncm": "8471.30.12", "descripcion": DESCRIPCION,
+                                                   "cantidad": 1, "valor_unitario": 10}]})
         cabeceras = {}
         if tipo in self.t:
             cabeceras["Authorization"] = f"Bearer {self.t[tipo]}"
@@ -244,19 +257,23 @@ class Medicion:
                 detalle = ""
         codigos[(tipo, r.status_code, detalle)] += 1
 
-    async def cortar(self, tipo, clave, cuerpo_a_medias=False):
-        """Manda el pedido por un socket crudo y lo cierra cuando la sonda ve
-        que `clave` subió: el corte cae con el pedido en vuelo."""
+    def crudo(self, tipo, sobra=0):
+        """Cabecera y cuerpo del pedido para un socket crudo; `sobra` agranda el
+        content-length para que la app espere bytes que no llegan."""
         pedido = self.armar(tipo)
         cuerpo = pedido.read()
         cabeceras = dict(pedido.headers)
-        if cuerpo_a_medias:
-            cabeceras["content-length"] = str(len(cuerpo) + 64)
+        cabeceras["content-length"] = str(len(cuerpo) + sobra)
         linea = f"{pedido.method} {pedido.url.raw_path.decode()} HTTP/1.1\r\n"
-        crudo = linea + "".join(f"{k}: {v}\r\n" for k, v in cabeceras.items()) + "\r\n"
+        return (linea + "".join(f"{k}: {v}\r\n" for k, v in cabeceras.items()) + "\r\n").encode(), cuerpo
+
+    async def cortar(self, tipo, clave, cuerpo_a_medias=False):
+        """Manda el pedido por un socket crudo y lo cierra cuando la sonda ve
+        que `clave` subió: el corte cae con el pedido en vuelo."""
+        crudo, cuerpo = self.crudo(tipo, 64 if cuerpo_a_medias else 0)
         antes = (await self.sonda()).get(clave, 0)
         r, w = await asyncio.open_connection("127.0.0.1", self.puerto)
-        w.write(crudo.encode() + cuerpo)
+        w.write(crudo + cuerpo)
         await w.drain()
         ok, _, _ = await self.esperar(self._subio, 30, clave, antes)
         w.close()
@@ -265,19 +282,22 @@ class Medicion:
 
     # --- fases -------------------------------------------------------------
 
-    async def muestrear(self, maximo, fin):
+    async def muestrear(self, maximo, fin, serie):
+        t0 = time.monotonic()
         while not fin.is_set():
             p = await self.sonda()
             e = await estados_pg(self.pg, self.base)
             maximo["tomadas"] = max(maximo["tomadas"], p["tomadas"])
             maximo["pg"] = max(maximo["pg"], sum(e.values()))
+            serie.append((round(time.monotonic() - t0, 2), p["tomadas"],
+                          {k[:-9]: p[k] for k in EN_VUELO if p.get(k)}))
             await asyncio.sleep(0.05)
 
     async def fase(self, nombre, tareas, enviados_registrables=None):
         antes = await self.sonda()
         t0 = await self.pg.fetchval("select clock_timestamp()")
-        maximo, fin = {"tomadas": 0, "pg": 0}, asyncio.Event()
-        muestreo = asyncio.create_task(self.muestrear(maximo, fin))
+        maximo, fin, serie = {"tomadas": 0, "pg": 0}, asyncio.Event(), []
+        muestreo = asyncio.create_task(self.muestrear(maximo, fin, serie))
         resultados = await asyncio.gather(*tareas)
         cerrada, seg_c, pendiente = await self.esperar(self._cerrada, self.a.plazo)
         fin.set()
@@ -293,7 +313,8 @@ class Medicion:
                     quedaron=p["tomadas"], pg_final=e,
                     dispatch=delta("dispatch_entradas"), tareas_log=delta("log_tareas"),
                     filas=filas, codigos_en_api_logs=filas_por_codigo, cancelados=delta("dispatch_cancelados"),
-                    errores={k[15:]: delta(k) for k in p if k.startswith("dispatch_error_") and delta(k)})
+                    errores={k[15:]: delta(k) for k in p if k.startswith("dispatch_error_") and delta(k)},
+                    serie=serie)
         self.filas.append(fila)
         if not quieta:
             self.fuga = True
@@ -302,7 +323,9 @@ class Medicion:
             self.invalida = True
         if enviados_registrables is not None and filas != enviados_registrables:
             print(f"  {nombre}: {enviados_registrables} pedidos y {filas} filas nuevas en api_logs")
-            self.invalida = True
+            if filas > enviados_registrables:
+                self.invalida = True
+            self.filas_perdidas += max(0, enviados_registrables - filas)
         return resultados
 
     async def fase_de_pedidos(self, nombre, tipos):
@@ -364,6 +387,53 @@ class Medicion:
         # El 500 es el rojo del pool lleno, no una medición que no vale.
         self.revisar_codigos(nombre, codigos, {tipo: LIMPIOS_DEL_PICO | {500}, "otra": {500}})
 
+    async def _llegaron(self, n):
+        p = await self.sonda()
+        return p.get("cuerpo_en_vuelo", 0) >= n, (p.get("cuerpo_en_vuelo", 0), p["tomadas"])
+
+    async def fase_de_cuerpo_lento(self, nombre, tipo, n, normales):
+        """n pedidos mandan la cabecera y medio cuerpo; con los n esperando el
+        resto, la otra cuenta pide, y después se termina cada cuerpo."""
+        crudo, cuerpo = self.crudo(tipo)
+        mitad = len(cuerpo) // 2
+        codigos, latencias, llegados = collections.Counter(), [], []
+
+        async def lento(conexion):
+            r, w = conexion
+            await conexion_lista.wait()
+            w.write(cuerpo[mitad:])
+            await w.drain()
+            estado = await r.readline()
+            w.close()
+            await w.wait_closed()
+            codigos[(tipo, int(estado.split()[1]) if estado else 0, "")] += 1
+
+        async def todos():
+            conexiones = [await asyncio.open_connection("127.0.0.1", self.puerto) for _ in range(n)]
+            for _, w in conexiones:
+                w.write(crudo + cuerpo[:mitad])
+                await w.drain()
+            ok, seg, cuantos = await self.esperar(self._llegaron, 10, n)
+            llegados.append((ok, seg, cuantos))
+            await asyncio.gather(*(self.mandar("otra", codigos, latencias) for _ in range(normales)))
+            conexion_lista.set()
+            await asyncio.gather(*(lento(c) for c in conexiones))
+
+        conexion_lista = asyncio.Event()
+        await self.fase(nombre, [todos()], n + normales)
+        ok, seg, (cuantos, tomadas) = llegados[0]
+        espera = round(max(latencias, default=0), 2)
+        self.filas[-1].update(enviados=n + normales, latencia_otra_max=espera,
+                              esperando_cuerpo=cuantos, tomadas_esperando_cuerpo=tomadas)
+        quinientos = sum(v for (_, codigo, _), v in codigos.items() if codigo == 500)
+        self.quinientos += quinientos
+        print(f"{nombre}: {cuantos} de {n} esperando el cuerpo a la vez "
+              f"({'llegaron' if ok else 'no llegaron'} en {seg} s, con {tomadas} conexiones tomadas); la otra cuenta recibió "
+              f"{codigos[('otra', 500, '')]} × 500 y esperó hasta {espera} s; en total, {quinientos} × 500")
+        if quinientos or espera > self.a.espera_otra:
+            self.lleno = True
+        self.revisar_codigos(nombre, codigos, {tipo: {500}, "otra": {500}})
+
     async def todas(self):
         a, f = self.a, functools.partial
         mezcla = [t for t in list(DETALLES_401) + ["normal"] for _ in range(a.mezcla // 7)]
@@ -385,7 +455,8 @@ class Medicion:
                  ("pico_bcrypt", "pico_bcrypt", "bcrypt_en_vuelo_total", {}),
                  ("pico_gemini", "pico_gemini", "gemini_en_vuelo_total", {"gemini": a.lento}),
                  ("pico_pdf", "pico_pdf", "pdf_en_vuelo_total", {"pdf": a.lento}),
-             )]
+                 ("pico_excel", "pico_excel", "excel_en_vuelo_total", {"excel": a.lento}),
+             )] + [f(self.fase_de_cuerpo_lento, "pico_cuerpo_manual", "manual_lento", a.pico, a.pico_normales)]
         for paso in pasos:
             await paso()
             # Con una conexión tomada el veredicto ya es 1, y con el pool lleno
@@ -404,6 +475,20 @@ class Medicion:
             print(f"{f['nombre']:<23}{f['enviados']:>4}{f['dispatch']:>5}{f['tareas_log']:>5}"
                   f"{f['filas']:>6}{f['max_tomadas']:>5}{f['max_pg']:>6}{f['quedaron']:>7}  "
                   f"{'sí' if f['quieta'] else 'NO':<7}{f['seg']:>6}  {extra} pg={f['pg_final']}")
+        for f in self.filas:
+            if f["nombre"].startswith("pico_"):
+                print(f"serie {f['nombre']}: " + resumir(f["serie"]))
+
+
+def resumir(serie, paso=0.5) -> str:
+    """Una muestra cada `paso` segundos: alcanza para ver si las tomadas caen
+    mientras el punto lento sigue en meseta. Un pico de menos de 0,05 s se pierde."""
+    salida, proximo = [], 0.0
+    for t, tomadas, en_vuelo in serie:
+        if t >= proximo:
+            salida.append(f"{t}s T={tomadas} {en_vuelo or ''}".rstrip())
+            proximo = t + paso
+    return " · ".join(salida)
 
 
 def entorno_de_la_app(url_base, puerto, puerto_sonda, secreto, tmp, cuota_de_produccion) -> dict:
@@ -499,6 +584,12 @@ def leer_log(log, med) -> None:
         elif s in SEÑALES_DE_POOL_LLENO and med.quinientos:
             print(f"  {med.quinientos} × 500 en los picos sin {s!r} en el log: no sé de qué son")
             med.invalida = True
+    # Una fila perdida vale sólo si el log dice que el registro de métricas no
+    # consiguió conexión con el pool lleno; si no, no se sabe adónde fue.
+    errores = texto.count("Error logging metrics")
+    if med.filas_perdidas and (not med.lleno or errores < med.filas_perdidas):
+        print(f"  {med.filas_perdidas} filas de api_logs perdidas y {errores} 'Error logging metrics'")
+        med.invalida = True
     print(f"log completo: {log}")
 
 
