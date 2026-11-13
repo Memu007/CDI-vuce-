@@ -222,9 +222,19 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `docs/pm/herramientas/medir.py:34`: `PIEZA` exige número al final, así que
   no cuenta piezas como EXCEL2D-RELOJ o DOS-RELOJES (aceptadas, vueltas ni
   escapes).
+- «Mi perfil» reabierto a ~125 ms de cerrarlo queda con `is-open` y
+  `hidden`. Baja (MARIA, CUIT-PERFIL).
+- El perfil y el alta de estudio limpian el CUIT distinto antes de validar
+  (`main.py:2434` y `:7714`): una sola limpieza.
+- `profile.js:213` cuenta 11 dígitos; el verificador lo mira sólo el
+  servidor.
+- `sabotajes/cuit_perfil.sh` sobre `_entorno_comun.sh`.
 
 ## Riesgos que esperan a Emi (no son tareas: no se toman de esta cola)
 
 - `client_memory._norm_desc` pierde las ligaduras («Arandela ﬁna» queda
   `arandela na`). Arreglarlo cambia `descripcion_normalizada` ya guardada:
   es producto con migración de datos, y nadie lo midió en facturas reales (D220).
+- `cuit_valido` (`controles_maria.py:52`) acepta `00000000000`: no mira el
+  prefijo. Lo usan clientes, estudio y perfil; cerrarlo es una regla nueva
+  del CUIT, sin camino medido de daño hoy (adversario de CUIT-PERFIL).
