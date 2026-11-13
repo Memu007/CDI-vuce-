@@ -160,7 +160,7 @@ def test_cancel_from_none_returns_409(client):
             await db.commit()
             return
 
-    asyncio.new_event_loop().run_until_complete(_set_billing_status_none())
+    asyncio.run(_set_billing_status_none())
     
     resp = client.post("/api/billing/cancel")
     assert resp.status_code == 409
@@ -222,7 +222,7 @@ def test_reactivate_after_period_expired_returns_past_due_and_needs_checkout(cli
             await db.commit()
             return
 
-    asyncio.new_event_loop().run_until_complete(_expire_trial())
+    asyncio.run(_expire_trial())
 
     resp = client.post("/api/billing/reactivate")
     assert resp.status_code == 200, resp.text

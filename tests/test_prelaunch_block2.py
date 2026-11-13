@@ -92,7 +92,7 @@ def _set_user(username: str, **kwargs):
                 setattr(u, k, v)
             await db.commit()
             return
-    asyncio.new_event_loop().run_until_complete(_run())
+    asyncio.run(_run())
 
 
 def _get_user(username: str) -> dict:
@@ -112,7 +112,7 @@ def _get_user(username: str) -> dict:
             result["last_payment_id"] = u.last_payment_id
             result["plan"] = u.plan
             return
-    asyncio.new_event_loop().run_until_complete(_run())
+    asyncio.run(_run())
     return result
 
 

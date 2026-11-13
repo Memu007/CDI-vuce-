@@ -134,7 +134,7 @@ def test_un_mercado_pago_trabado_no_frena_el_servidor(client):
                 _Trabado.soltar.set()
             return entra, await asyncio.gather(*pedidos)
 
-    entra, respuestas = asyncio.new_event_loop().run_until_complete(_correr())
+    entra, respuestas = asyncio.run(_correr())
     assert [m for m, en_loop in LLAMADAS if en_loop] == []
     assert entra.status_code == 200, entra.text
     assert _Trabado.maximo <= _tope() < 40
