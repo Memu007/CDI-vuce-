@@ -78,6 +78,7 @@
 const { chromium, request } = require('/opt/node-tools/node_modules/playwright');
 const ipNueva = require('./_ip_nueva');
 const registrarCuenta = require('./_registrar');
+const cargarCuitDelPerfil = require('./_cuit_perfil');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const base = process.env.BASE_URL || 'http://127.0.0.1:8771';
 const INTERVALO_MS = 2500;  // el guardado periódico de app_v2.js
@@ -109,9 +110,7 @@ async function nuevoUsuario(ctx, nombre) {
   await registrarCuenta(p.request, base,
     { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: usuario, password: CLAVE, email: nombre + id + '@ejemplo.test' } });
   // Sin el CUIT del despachante no se genera el TXT (ESTUDIO-1); inventado.
-  const perfil = await p.request.put(base + '/api/user/profile',
-    { data: { cuit: '20999999998' }, headers: { 'X-CSRF-Token': await csrf(ctx) } });
-  if (!perfil.ok()) falla('no se pudo cargar el CUIT del perfil: ' + perfil.status());
+  await cargarCuitDelPerfil(p.request, base);
   await p.close();
   return usuario;
 }

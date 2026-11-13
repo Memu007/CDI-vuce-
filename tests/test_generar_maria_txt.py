@@ -513,7 +513,7 @@ def test_generate_maria_items_invalidos_devuelve_400(client):
 
 def test_generate_maria_usa_cuit_del_perfil(client):
     """Con SBT explícito + CUIT en perfil → 200 y el TXT usa el CUIT del perfil."""
-    _register(client, "maria3", cuit="20111222333")
+    _register(client, "maria3", cuit="20111222348")
     resp = client.post("/generate_maria", json={
         "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
         "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
@@ -524,7 +524,7 @@ def test_generate_maria_usa_cuit_del_perfil(client):
         # sin cuit_agr a propósito
     })
     assert resp.status_code == 200, resp.text
-    assert "CDDTAGR=20111222333" in resp.json()["content"]
+    assert "CDDTAGR=20111222348" in resp.json()["content"]
 
 
 def test_get_pais_codigo_vietnam_thailand_indonesia_malaysia():
