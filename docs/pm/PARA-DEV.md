@@ -3,28 +3,46 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## CONFTEST-TMP: aceptada sobre `8dd99fa1` (informe `eea0eab5`) e integrada (2026-11-13 08:05 UTC)
+## DOS-RELOJES: aceptada sobre `894bc67a` (informe `89d74bbe`) e integrada (2026-11-13 08:30 UTC)
 
-Integro `eea0eab5`. Acta `REPRODUCCION-CONFTEST-TMP-2026-11-13.md`. **Traé mi
-rama con `merge`.** EXCEL2D-RELOJ quedó en Git y en su acta.
+Integro `89d74bbe`. Acta `REPRODUCCION-DOS-RELOJES-2026-11-13.md`. **Traé mi
+rama con `merge`.** CONFTEST-TMP quedó en Git y en su acta. Sin D.
 
-**Lo reproducido.** Tu puerta sana: base 4149 → 4150, arreglo 4150 → 4150,
-`7 passed` las dos. `chequeo-6` igual que el tuyo. Lo demás (falla, Ctrl-C,
-importación rota, suite entera) es tuyo y no lo repetí.
+**Lo reproducido.** Tu preload, 4 de 4 «se cortó sin respuesta»; el viejo,
+1 «se cortó» y 3 «seguía retenida a los 10 s». Sobre `74e3cc74` sigue rc=1.
+`chequeo-6` igual. Mis negativos, una corrida cada uno: con la espera del
+producto en 14 s, «se cortó»; en 16 s, «seguía retenida a los 15 s de
+pedida». De `orden1b.sh` vi sólo la cola; los 30 `ROJO` son tuyos.
 
-**Riesgos que van a la cola, no devolución:**
-- Un hijo creado con `fork` hereda el `atexit` y, si sale normal, borra la
-  base del padre. Mi negativo da `1 passed` en la base y `1 failed` en tu
-  SHA. Hoy ninguna prueba hace `fork`. Sugerencia: borrar sólo desde el
-  proceso que creó la base.
-- Con SIGTERM (lo que manda `timeout`) `atexit` no corre y el archivo queda,
-  igual que en la base. Leído, no corrido.
+**Ahora: CONFTEST-FORK** (sólo pruebas, `tests/conftest.py`). Base: mi
+commit de este veredicto. Hoy un hijo creado con `fork` hereda el `atexit`
+de `_borrar_db_de_prueba` y, si sale normal, borra la base del padre (el
+negativo está entero en `REPRODUCCION-CONFTEST-TMP-2026-11-13.md`).
+Comportamiento pedido: el hijo que sale no borra nada; el padre la sigue
+borrando al salir. Puertas, cada una con su salida en el informe:
 
-**Ahora: DOS-RELOJES** (sólo arnés), la entrada de `forzar_orden1.js` en la
-cola: retiene el login `TOPE_MS` desde que llega y el producto corta
-`ESPERA_SESION_MS` desde que la pide, así que el mensaje cambia entre
-corridas. Puerta: el mensaje del comando 1 de tu informe de ORDEN1 sale igual
-cuatro veces seguidas; `orden1b.sh` sigue con 30 `ROJO`.
+1. Ese negativo queda en `tests/` y la suite lo recolecta: `1 failed`
+   («el hijo borró la base del padre») con tu arreglo revertido, `1 passed`
+   con tu SHA. Que corra dentro de la suite entera, no sólo solo.
+2. Corrida sana: `ls /tmp/cdi_pytest_* | wc -l` antes y después de
+   `pytest tests/test_excel2d.py --no-cov` da lo mismo (el padre borra).
+3. La prueba del pool del acta (`ProcessPoolExecutor(4)`) sigue `1 passed`;
+   a mano, no hace falta dejarla en `tests/`.
+4. Suite entera sobre tu SHA: los `passed` de la base más uno, sin rojos
+   nuevos.
+
+Fuera: SIGTERM (queda en la cola). Sugerencia, no criterio: borrar sólo
+desde el proceso que creó la base.
+
+**Apenas entregues: NAVEGADOR** (sólo arnés, tus pantallas).
+`pantalla_borrador1.js:41` abre el navegador por ruta fija y
+`pantalla_cliente1.js:28` y `pantalla_destino1.js:18` por `CHROMIUM` o ruta
+fija; las otras 27 pantallas usan `chromium.launch()`. Que las 30 lo pidan
+igual. Puertas: `grep -ho 'chromium.launch([^;]*' scripts/testing/*.js |
+sort | uniq -c` da una sola forma; las tres pantallas en verde con
+`correr_pantallas.sh`; `sabotajes/cliente1.sh` sigue con sus `ROJO` y
+«sabotajes sin rojo: 0». Fuera: las esperas fijas de `pantalla_maria1b.js` y
+`pantalla_excel1.js`, y todo lo de MARIA.
 
 Igual que antes: sin adversarios; no toques los guiones de MARIA. D182 / D206
 siguen igual: si Emi dice que sí, dejás esto donde esté. D205, D206 y D208

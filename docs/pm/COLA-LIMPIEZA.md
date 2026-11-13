@@ -111,7 +111,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `proyecto_maria/main.py` 1754, 1771, 2373 y 3406: comentarios con historia («EMAIL-1»), sacarlos.
 - `tests/conftest.py:19`: pisa `DATABASE_URL` con SQLite sin avisar, así que
   un `pytest` con la URL de Postgres corre en SQLite. Hoy se esquiva con
-  `--noconftest -p pg_nullpool`; que avise o que respete una URL de PG pedida.
+  `--noconftest -p pg_nullpool`. Si va, sólo «que avise»: el pisado impide
+  que un pytest toque la base de un `.env` (`load_dotenv()` corre antes).
 - `core/maria_generator_export.py:114`: el generador de exportación no pasa
   la destinación por `destinacion_del_txt` (sólo lo hace el endpoint), y el
   de importación chequea en el endpoint y en el generador. El chequeo, una
@@ -192,10 +193,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   el borrador y hace `goTo` igual; una subida en vuelo se descarta. Leído, no
   corrido (Técnica, D211).
 
-- `scripts/testing/forzar_orden1.js`: retiene el login `TOPE_MS` (10 s) y el
-  producto corta la consulta a los `ESPERA_SESION_MS` (10 s): casi empatan y
-  el mensaje cambia entre corridas («seguía retenida» o «se cortó»); el
-  resultado no. Que el mensaje no dependa del empate.
 - `static/v2/app_v2.js:24/1033`: con la sesión cerrada en otra pestaña, el
   autoguardado pasa por `api()` → `sesionEsDelDueno()` y un 401 manda al
   login, mientras `revisarSesion` ante el mismo 401 se queda y avisa. Medido
