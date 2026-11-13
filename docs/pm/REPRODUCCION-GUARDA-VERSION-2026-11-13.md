@@ -52,4 +52,28 @@ Revisado en un worktree en `9661f5d3`.
 | mi ejemplo guardado: `pytest_runtest_setup` sin la foto (`pass`) | `3 failed, 1 passed`: rojos «veredicto del cierre», «foto antes de los fixtures», «la culpa es de quien la deja» |
 | negativo mío: `or reporte.failed` → `or True` (el cierre nunca juzga) | `3 failed, 1 passed`: los mismos tres |
 | negativo mío: la foto vacía (`= set()`) | `1 failed, 3 passed`: rojo «la culpa es de quien la deja» |
-| pytest entero sobre `9661f5d3` | corriendo (empezó 17:08 UTC); el veredicto espera esta fila |
+| negativo mío: sin `tryfirst` | `4 passed`: verde, y es correcto (el hook de un conftest ya corre antes que el de pytest) |
+| negativo mío: `trylast=True` (la foto después de los fixtures) | `1 failed, 3 passed`: rojo sólo «foto antes de los fixtures» |
+| negativo mío: sin el chequeo de arranque (`if False:`) | `1 failed, 3 passed`: rojo sólo «chequeo de arranque» |
+| `git diff --name-only 32dfcd5b 9661f5d3` | `docs/pm/PARA-PM.md`, `tests/conftest.py`, `tests/test_guarda_conexiones.py` |
+| pytest entero sobre `9661f5d3` | `6130 passed, 110 skipped, 3 xfailed, 108 warnings in 1134.62s (0:18:54)`, rc=0, 0 «dejó» |
+| aiosqlite que instala la CI | `requirements.txt:94` `>=0.19.0` sin tope: hoy 0.22.1, la misma del venv donde la suite da verde |
+
+**Aceptada e integrada** (merge `0bd0d3d6`). Cada parte rota da rojo: el
+reconocimiento, la foto, su orden y el veredicto del cierre. El rojo nombra
+el dato que cae, no la parte rota. Sin foto o sin veredicto caen los mismos
+tres datos, porque el cierre juzga con la foto. Para separarlos alcanza el
+nombre del dato más el diff que rompió: **decidido por la PM** que eso cumple
+«dice cuál». El pytest de adentro usa su propia base (`mkstemp` por proceso).
+
+- Supuesto aceptado: sacar la línea del resumen. No mostrar nada cumple «sale
+  de lo que se vio».
+- Riesgo aceptado: `_TOPE_CIERRE = 0` da verde, y si el tope baja, lo que
+  aparece son falsas alarmas: ninguna fuga queda escondida.
+- Riesgo anotado: el caso escribe `asyncio_mode = auto` adentro. Si el
+  `pytest.ini` cambia, hay que cambiarlo también ahí.
+- Tiempo: el archivo suma 23.84 s acá (22.34 s en el informe), en una CI que
+  ya se corta a los 20 min (punto 14, ya preguntado a Emi).
+
+No corrido: los sabotajes 1–6 del informe (corrí los seis míos de arriba),
+aiosqlite 0.19 y 0.20, Postgres y adversarios (pieza sin adversarios).
