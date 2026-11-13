@@ -20,11 +20,14 @@ const bloquesSbt = txt => txt.replace(/\r\n/g, '\n').split('\n\n').filter(b => b
   .map(b => b.split('\n').filter(l => l && !l.startsWith('IDDT=')).map(l => l.trimEnd()).join('\n'));
 
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const b = await chromium.launch();
   const page = await (await b.newContext({ viewport: { width: 1400, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
   await registrarCuenta(page.request, base, { data: { username: 'sub1_' + id, password: 'Clave-Inventada-123', email: 'sub1' + id + '@ejemplo.test' } });
+  // El CDDTAGR sale del CUIT del perfil: sin él no se genera el TXT.
+  const perfil = await page.request.put(base + '/api/user/profile', { data: { cuit: '20999999998' } });
+  if (!perfil.ok()) falla('no se pudo cargar el CUIT del perfil: ' + perfil.status());
   await page.goto(base + '/dashboard');
   await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.api);
   await page.evaluate(() => {

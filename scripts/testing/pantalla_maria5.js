@@ -11,11 +11,14 @@ const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const centavos = s => Math.round(parseFloat(s) * 100);
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const b = await chromium.launch();
   const page = await (await b.newContext({ viewport: { width: 1280, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
   await registrarCuenta(page.request, base, { data: { username: 'm5_' + id, password: 'Clave-Inventada-123', email: 'm5' + id + '@ejemplo.test' } });
+  // El CDDTAGR sale del CUIT del perfil: sin él no se genera el TXT.
+  const perfil = await page.request.put(base + '/api/user/profile', { data: { cuit: '20999999998' } });
+  if (!perfil.ok()) falla('no se pudo cargar el CUIT del perfil: ' + perfil.status());
 
   await page.goto(base + '/dashboard');
   await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.despachante);
@@ -105,7 +108,8 @@ const centavos = s => Math.round(parseFloat(s) * 100);
                             vendedor_nombre: 'PROVEEDOR DEMO' };
     CDI.state.items = [
       { pieza: '84713012100F', descripcion: 'Notebook importada de prueba', origen: 'CN', cantidad: 10, valor_unitario: 10, peso_unitario: 2.5 },
-      { pieza: '84713012100F', descripcion: 'Notebook importada de prueba B', origen: 'CN', cantidad: 1, valor_unitario: 100, peso_unitario: 1 },
+      // De otro origen: con la misma posición y origen, los dos renglones irían en un solo ítem.
+      { pieza: '84713012100F', descripcion: 'Notebook importada de prueba B', origen: 'US', cantidad: 1, valor_unitario: 100, peso_unitario: 1 },
       { pieza: '84714900100D', descripcion: 'Equipo importado de prueba', origen: 'CN', cantidad: 4, valor_unitario: 100, peso_unitario: 0.5 },
       // Un grupo de tres de 6,675: el TXT declara una línea de 20,03.
       ...[1, 2, 3].map(n => ({ pieza: '84714900100D', descripcion: 'Accesorio importado de prueba ' + n, origen: 'CN',
