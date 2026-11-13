@@ -14,8 +14,7 @@ SHA="$(git -C "$REPO" rev-parse "${1:-HEAD}")"
 PY="${PY:-python}"
 TMPD="$(mktemp -d)"; WT="$TMPD/wt"
 git -C "$REPO" worktree add --detach "$WT" "$SHA" >/dev/null || exit 2
-API=""
-trap '[ -n "$API" ] && kill $API 2>/dev/null; git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMPD"' EXIT
+trap 'git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMPD"' EXIT
 cd "$WT"
 export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
        DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=.
@@ -38,9 +37,10 @@ correr_casos() {
 }
 
 # Levanta una API nueva con su base, corre la pantalla y la apaga: main.py no se
-# vuelve a leer con el servidor andando.
+# vuelve a leer con el servidor andando. Se llama dentro de «$(…)»: la trampa es
+# de ese subshell y apaga la API también si lo cortan.
 correr_pantalla() {
-  local puerto rc
+  local puerto rc api
   puerto="$("$PY" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')"
   rm -f "$TMPD/pantalla.db"
   env ENVIRONMENT=development DATABASE_URL="sqlite+aiosqlite:///$TMPD/pantalla.db" CDI_DATA_DIR="$TMPD/data" \
@@ -48,17 +48,18 @@ correr_pantalla() {
       ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x \
       nice -n 19 "$PY" -m uvicorn proyecto_maria.main:app --host 127.0.0.1 --port "$puerto" \
       > "$TMPD/api.log" 2>&1 < /dev/null &
-  API=$!
+  api=$!
+  trap "kill $api 2>/dev/null" EXIT
   local hasta=$((SECONDS + 90))
   until curl -fsS "http://127.0.0.1:$puerto/health" >/dev/null 2>&1; do
-    if ! kill -0 "$API" 2>/dev/null || [ $SECONDS -ge $hasta ]; then
-      echo "FALLA: la API no levanta"; tail -5 "$TMPD/api.log"; kill "$API" 2>/dev/null; API=""; return 2
+    if ! kill -0 "$api" 2>/dev/null || [ $SECONDS -ge $hasta ]; then
+      echo "FALLA: la API no levanta"; tail -5 "$TMPD/api.log"; return 2
     fi
     sleep 0.2
   done
   BASE_URL="http://127.0.0.1:$puerto" CDI_DB="$TMPD/pantalla.db" \
     nice -n 19 node scripts/testing/pantalla_cuit_perfil1.js 2>&1; rc=$?
-  kill "$API" 2>/dev/null; wait "$API" 2>/dev/null; API=""
+  kill "$api" 2>/dev/null; wait "$api" 2>/dev/null
   return $rc
 }
 

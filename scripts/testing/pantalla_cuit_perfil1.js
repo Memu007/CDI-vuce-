@@ -24,6 +24,8 @@ const sinGuiones = c => c.replace(/-/g, '');
 
   const guardado = async () => (await (await page.request.get(base + '/api/user/profile')).json()).profile;
   const abrir = async () => {
+    // Al cerrarse, la ventana se esconde un rato después: abierta antes de eso, queda escondida.
+    await page.waitForFunction(() => document.getElementById('profileModal').hidden);
     await page.evaluate(() => CDI.openProfileModal());
     await page.waitForSelector('#profileModal.is-open');
   };
