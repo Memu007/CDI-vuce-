@@ -39,7 +39,10 @@ def test_un_hijo_que_sale_no_borra_la_base_del_padre():
 Hoy no hay camino: sobre `8dd99fa1`, `git grep -nE '\bfork(pty)?\(' -- '*.py'`
 da vacío; `cdi_pytest` fuera de `tests/conftest.py` sólo aparece en `docs/pm`;
 `tests/medir_excel2.py` no es una prueba recolectada y sólo se nombra a sí
-mismo. Va a la cola con el negativo de arriba. Sugerencia (no criterio):
+mismo. El único pool de procesos en pruebas es `tests/medir_excel2.py:151`
+(`ProcessPoolExecutor`, se corre a mano con pytest, así que carga el
+`conftest`): una prueba mía con `ProcessPoolExecutor(4)` sobre `9d192d30`
+(Python 3.12, arranque `fork`) da `1 passed`, la base del padre sigue. Va a la cola con el negativo de arriba. Sugerencia (no criterio):
 borrar sólo desde el proceso que creó la base.
 
 ## SIGTERM: leído, no corrido
