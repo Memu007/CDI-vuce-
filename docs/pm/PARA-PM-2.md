@@ -2,297 +2,260 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## D218 y D219: entregadas en `1f8ffa6` (sólo arnés). Dos decisiones: D223 y D224
+## PANTALLAS-MARIA: entregada en `e0d2770` (sólo arnés). Dos decisiones: D225 y D226
+
+**Este informe reemplaza al de `c918f7e`, que subí mal**: lo commiteé en el
+mismo comando que traía tu rama, sin leer tu `598919f`. Decía que tu rama no
+tenía commits nuevos y que D223 y D224 seguían abiertas; las dos cosas ya eran
+falsas. Acá está corregido. Lo técnico no cambió; se suma el corredor y D226
+quedó reescrita.
+
+Leído tu veredicto: D218 y D219 aceptadas; D223 (a) y D224 (a), una pieza
+después de ésta; `maria7` y `maria1c` son de la Técnica.
 
 | qué | SHA |
 |---|---|
-| base (mi informe anterior) | `4b5ef68` |
-| D219: un proveedor de nombre largo con su id escrito | `9120475` |
-| D218: sabotaje que saca `operation_items` de la migración a `text` | `8f98a31` |
-| tu cabeza `6dc251e`, integrada con `merge` | `d5a96aa` |
-| `catalogo3_postgres.py` corre solo en una consola limpia (hallazgo del adversario) | `2211e6b` |
-| el encabezado del guion nombra sus dos arneses | `ea3256e` |
-| tu cabeza `67c8ff0`, integrada con `merge` | `636b889` |
-| el chequeo de base de los dos arneses, una vez y con su causa (hallazgo de `/code-review`): **el que se entrega** | `1f8ffa6` |
+| base (mi informe anterior) | `166c46c` |
+| los cuatro guiones vuelven a salir 0 | `0ec6343` |
+| el CUIT del perfil, en un ayudante (`_cuit_perfil.js`) | `3e195de` |
+| de la autorrevisión: token CSRF en el ayudante y los cuatro pesos en `maria5` (último cambio de los guiones) | `7ac0b4e` |
+| tu rama integrada hasta `90b66c5`; trae el corredor de la Técnica: **el que se entrega** | `e0d2770` |
 | informe | el commit siguiente |
 
-**Resultado.** Producto: **+0/−0**. Arnés: +14/−0, +3/−2 y +14/−9 en los tres
-tramos míos (abajo, `chequeo-6` entero).
+Entre `7ac0b4e` y `e0d2770` mis cinco archivos no cambian
+(`git diff 7ac0b4e e0d2770 -- scripts/testing/pantalla_{maria3,maria4,maria5,subitems1}.js scripts/testing/_cuit_perfil.js`
+da vacío).
 
-- **D218.** `catalogo_largo2.sh`, con `PG_URL`, corre ahora también
-  `catalogo3_postgres.py`: primero sin sabotaje y después con la tupla
-  `("operation_items", ("origen",))` sacada de `_migrate_catalogo_sin_tope`.
-  Guion entero con Postgres 16, **en una consola sin `DATABASE_URL` ni
-  `ENVIRONMENT`**, sobre `1f8ffa6`: **38 `ROJO`, `fallas: 0`, sale 0**. La línea
-  nueva:
-  `ROJO  | el arranque no pasa el origen de los ítems a text: dice «FALLA | operation_items.origen pasa a text y la fila vieja queda igual»`.
-- **D219.** `test_un_proveedor_latino_conserva_su_id` tiene un dato más: un
-  nombre de 71 caracteres con su id de 60 escrito a mano. Con el corte
-  cambiado de 39 a 38 y el resumen de 20 a 21 (el id sigue midiendo 60) es
-  **la única** prueba del catálogo que se pone roja: `1 failed, 185 passed`.
-  Antes de este dato esa mutación pasaba entera en verde.
+**Resultado.** Los cuatro, cada uno con servidor y base nuevos, sobre
+`7ac0b4e`: `maria3` 8 `OK`, `maria4` 7, `maria5` 9, `subitems1` 10; ninguna
+`FALLA`; los cuatro salen 0. Producto **+0/−0**; arnés +23/−8.
 
-**Mi primera versión estaba mal y no lo vi yo.** El bloque nuevo daba
-`BASE  | catalogo3_postgres.py ya está en rojo sin sabotaje` y salida 1 en una
-consola sin `DATABASE_URL` ni `ENVIRONMENT`: mi corrida de 38 `ROJO` sobre
-`8f98a31` los tenía exportados por mi propio envoltorio. Lo encontró el
-adversario. Tu comando de reproducción lo habría pisado. Arreglado en
-`2211e6b`; todo lo de este informe corrió con `env -u DATABASE_URL -u
-ENVIRONMENT`.
+**En el corredor** (`scripts/testing/correr_pantallas.sh e0d2770`): las cuatro
+salen `verde`, con los mismos `OK` (8, 7, 9, 10). Ninguna necesitó cabecera
+`// corredor:`. El resumen, en mi contenedor:
+`resumen: 25 verdes, 5 rojas: catalogo_ncm1 excel1 maria1b maria1c maria7`
+(sale 1). Ninguna de las cinco es de esta pieza: cuatro son D226 y `maria7` es
+de la Técnica.
 
-`anclas_perdidas.py 1f8ffa6`: sale 0, 22 filas, ninguna de `catalogo_largo2.sh` ni de `catalogo3.sh`. Las 22 son de `sabotaje_maria1d.sh`, `maria5`, `maria7`, `maria8`, `valor1b`, `e2e_rerun.sh`, `foco_cliente1.sh`, `guardar2.sh` y `limpieza1.sh`: las mismas que sobre `8f98a31`.
+**Ninguna causa es de producto**: no frené. Eran cuatro causas, no dos:
+
+| causa | guiones | el rojo sobre `166c46c` |
+|---|---|---|
+| 1. Falta el CUIT del importador: «Generar» queda deshabilitado (`finalize.js:606`; la regla es de MARIA-1b, `controles_maria.py:260-268`) | `maria3`, `maria4` | `maria3`: `page.waitForResponse: Timeout 15000ms exceeded while waiting for event "response"` (línea 73). `maria4`: `FALLA: page.click: Timeout 30000ms exceeded.` esperando `#validatingGenerate`. Con una copia que imprime el estado del botón antes del clic, los dos: `DBG {"dis":true,"st":"1 error para corregir","iss":"Errores críticos\n· 1\nFalta el CUIT del importador.…` |
+| 2. Falta el CUIT del despachante | `maria5`, `subitems1`, y `maria3` apenas se arregla la 1 | `FALLA: no se generó el TXT: {"detail":"Falta el CUIT del despachante (CDDTAGR): elegí el estudio en la operación o cargá uno en «Mi perfil», «Mis estudios». Sin él no se genera el TXT."}` |
+| 3. `maria5` esperaba 25 kg en el primer ítem y MARIA-8 junta en un ítem los dos renglones de la misma posición y origen (`renglones_por_posicion`, `3fd9f2e`). Estaba tapada por la 2 | `maria5` | `FALLA: las 10 notebooks de 2,5 kg declaran 26.000` |
+| 4. De entorno: la ruta fija `/opt/pw-browsers/chromium-1194/…` no existe en mi contenedor (hay `chromium` y `chromium-1243`) | los cuatro | `FALLA: browserType.launch: Failed to launch chromium because executable doesn't exist at /opt/pw-browsers/chromium-1194/chrome-linux/chrome` |
+
+La 4 en tu contenedor no debe pasar: vos llegaste al rojo del CUIT, así que
+ahí el navegador abre. `chromium.launch()` sin ruta es lo que usan otros 19
+guiones.
+
+**Te contradigo en la fecha.** «Desde MARIA-7 (24/10)» vale para la causa 2
+(`67d5688`, `609ec52`) y la 3 (`3fd9f2e`). Para `maria3` y `maria4` no:
+en `3dbfb4e` los dos cortan en el mismo paso con el mismo texto que hoy. No
+busqué el primer commit rojo ni confirmé la causa en ese commit con la copia
+que imprime el botón.
 
 ## Decisiones
 
-**D223. El candado de la migración de claves del catálogo no tiene sabotaje
-commiteado.** `_migrate_catalogo_claves` (`main.py:1339`) toma
-`pg_advisory_xact_lock(7302551)` con `lock_timeout` de 5 s para que dos
-workers no la corran a la vez. Los dos chequeos que lo miran viven sólo en
-`catalogo3_postgres.py`, y hasta esta pieza ningún guion de sabotaje corría
-ese arnés. El encabezado de `catalogo3.sh` ya lo decía («el candado de la
-migración sólo se ve en Postgres»): no es un olvido, es un hueco anotado sin
-negativo. Es una migración (§3).
+**D225. El perfil guarda un CUIT de despachante con el dígito verificador
+mal, y el TXT sale con él.** `PUT /api/user/profile` (`main.py:2428-2439`)
+sólo pide 11 dígitos. El alta de un estudio sí llama a `cuit_valido`
+(`main.py:7712-7714`) y el CUIT del importador también
+(`controles_maria.py:260-268`). `cuit_valido('20999999998')` da `False`, y es
+el que cargan `pantalla_orden1.js:112`, `pantalla_validacion1.js:126`,
+`pantalla_cobro_corte1.js:180` y `pantalla_cobro_mp1_v2.js:24`. El adversario
+generó un TXT con `CDDTAGR=20999999998`; yo leí el código y corrí
+`cuit_valido`, no repetí su corrida. No sé qué hace MARIA al recibirlo. No
+encontré el tema en `DECISIONS.md`, `NOW.md`, `COLA-LIMPIEZA.md` ni
+`PREGUNTAS-DESPACHANTE.md`.
 
-Lo que medí a mano, en un worktree fuera del repo:
+- (a) Pieza chica de producto: el perfil valida con `cuit_valido`, como los
+  estudios. Los cuatro guiones de arriba pasan a un CUIT válido (dos son de
+  la Técnica). La pieza decide qué pasa con un perfil ya guardado con CUIT
+  inválido.
+- (b) Riesgo anotado, o pregunta al despachante.
 
-| se saca | sobre | resultado |
-|---|---|---|
-| `pg_advisory_xact_lock(7302551)` (`main.py:1354`) | `8f98a31` | `FALLA \| dos workers esperan juntos la migración y arrancan los dos: juntos False, [True, True]`, los otros 9 `OK`, `1 fallas`, `rc=1`, 133 s |
-| `SET LOCAL lock_timeout = '5s'` (`main.py:1352`) | `ea3256e` | 6 `OK` y un `Traceback` donde va «un worker arranca mientras otro tiene tomada la migración de claves», `rc=1`, 610 s |
+Recomiendo **(a)**, después de AJUSTE-BORRADOR: es lo que sale en el TXT, y
+el producto ya tiene la regla escrita para los otros dos CUIT. En mis
+guiones puse `20111111112`, que pasa `cuit_valido`: no dependen de lo que
+decidas.
 
-Del segundo, mi filtro guardó sólo la palabra `Traceback`: por los 610 s leo
-que es el `communicate(timeout=600)` del arnés, **no vi el texto de la
-excepción**. Como sabotaje del guion daría `ROJO?` (rojo sin el texto
-esperado), que cuenta como falla.
+**D226. Cuatro guiones más tienen la ruta fija del navegador, y en mi
+contenedor salen rojos en el corredor:** `pantalla_catalogo_ncm1.js:12`,
+`pantalla_excel1.js:13`, `pantalla_maria1b.js:18`, `pantalla_maria1c.js:14`.
+Los cuatro cortan al abrir: `FALLA: browserType.launch: Failed to launch
+chromium because executable doesn't exist at
+/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. En el contenedor de la
+Técnica abren (su corrida sobre `907e1ed` los dio verdes), así que detrás de
+la ruta no hay otra causa conocida: es una línea por guion. El corredor ya le
+pasa `CHROMIUM` a cada pantalla.
 
-- (a) Pieza chica: un sabotaje del candado en el bloque nuevo de
-  `catalogo_largo2.sh`. Suma unos 2 minutos al guion. El `lock_timeout` queda
-  como riesgo anotado.
-- (b) Nada: los dos quedan como riesgo anotado.
-- (c) Los dos. Para el `lock_timeout` hay que cambiar el arnés: que espere
-  bastante menos que 600 s y lo diga con una `FALLA` propia.
+- (a) Una pieza chica mía: `catalogo_ncm1`, `excel1` y `maria1b` sin la ruta
+  fija, y esas tres verdes en el corredor de mi contenedor. `maria1c` es de la
+  Técnica: la línea la cambia ella dentro de INTERMITENTES.
+- (b) Las cuatro a la Técnica, con el corredor.
+- (c) A la cola.
 
-Recomiendo **(a)**. El candado es lo que evita que dos workers rearmen claves
-a la vez, y su negativo es barato y con nombre. El del `lock_timeout` hoy
-cuesta 10 minutos por corrida y no dice qué falló; (c) lo arregla, pero es
-tocar un arnés que anda para cubrir una línea que sólo cambia cuánto espera el
-arranque.
+Recomiendo **(a)**: mientras tanto, en mi contenedor el corredor no puede dar
+«0 rojas» y hay que comparar por nombre. Retiro lo que dije antes («detrás
+había tres causas más»): acá no vale, porque en otro contenedor ya corren.
 
-**D224. El borde del corte de `_vendor_key` no lo fija ninguna prueba.** Lo
-encontró el adversario con una sola prueba; lo medí con los cuatro archivos
-`tests/test_catalogo*.py` (186 pruebas), sobre `ea3256e`:
-
-| mutación en `catalog_service.py` | resultado |
-|---|---|
-| `if len(clave) <= _MAX_VENDOR_ID:` → `<` | `186 passed` |
-| `_MAX_VENDOR_ID = 60` → `70` | `186 passed` |
-
-Qué rompería cada una (**leído, no corrido**): con `<`, un proveedor cuya
-clave mide justo 60 pasa a tener id cortado con resumen; el arranque rearma
-las filas de 60 o más, así que no se pierden. Con el tope en 70, una clave de
-61 a 70 quedaría entera y el guardado la rechazaría con `vendor_id inválido`
-(`_VENDOR_ID_RE` admite hasta 60, `catalog_service.py:97`; es el rechazo que
-dio el id de 61 en la tabla de D219): ese proveedor no podría guardar
-catálogo.
-
-- (a) Dos datos más en la misma prueba: un nombre cuya clave mide 60 (queda
-  entera) y uno de 61 (se corta). Dos líneas, como D219.
-- (b) Riesgo anotado.
-
-Recomiendo **(a)**: con D219 el formato del corte quedó fijado y el borde no;
-son dos líneas. No lo hice acá porque D219 pedía un dato.
+**D223 y D224: decididas, (a) y (a).** Son mi próxima pieza.
 
 ## Supuestos (reversibles)
 
-1. **D218: dónde vive el sabotaje.** En `catalogo_largo2.sh`, que ya tiene
-   `PG_URL` y los sabotajes de las otras dos tablas de la misma función. No
-   extendí `catalogo_largo2_postgres.py` para que mire `operation_items`:
-   sería el mismo chequeo en dos arneses.
-2. **D218: el chequeo de base, una vez.** `base_en_verde` corre el arnés sin
-   sabotaje para los dos bloques de Postgres; si está rojo escribe
-   `BASE  | … ya está en rojo sin sabotaje`, **muestra las tres últimas líneas
-   del arnés** y suma una falla. Cambia el bloque que ya estaba (el de
-   `catalogo_largo2_postgres.py`): mismo texto de `BASE`, ahora con la causa.
-   El chequeo de base de pytest, arriba del guion, no lo toqué.
-3. **El arreglo de la consola limpia va en el arnés, no en el guion.**
-   `catalogo3_postgres.py` toma su propio `entorno()` antes de importar
-   `catalog_service`, como promete su «uso». Una línea.
-4. **D219: nombre en ASCII**, para que el id del parámetro no dependa de cómo
-   pytest escribe los acentos.
-5. **D219: sin sabotaje nuevo en `catalogo3.sh`.** No es de §3; el rojo va
-   mostrado una vez acá (§6). Si lo querés commiteado son 4 líneas en
-   `catalogo3.sh`.
-
-## D219: tu matiz y mi corrección
-
-Mi riesgo original («los proveedores largos ya guardados dejan de encontrarse
-y nada avisa») estaba exagerado. Tenías razón: `_migrate_catalogo_claves`
-rearma al arrancar los `vendor_id` largos desde `vendor_nombre`.
-
-- **Leído** en `main.py:1356-1362`: elige las filas con
-  `length(vendor_id) >= 60` y les pone `_vendor_key(vendor_nombre)`.
-- **Corrido, pero sólo para el paso de la versión anterior a la de hoy:**
-  `catalogo3_postgres.py` guarda dos proveedores largos con `07504e0`,
-  arranca la de hoy y da
-  `OK    | la migración da el proveedor y la clave de hoy sin perder filas`.
-  Ese chequeo compara contra `_vendor_key` de la misma versión: no fija el
-  formato.
-- **Límite, leído y no corrido:** el rearmado alcanza a los ids de 60 o más.
-  Los de hoy miden justo 60. Un cambio que los deje más cortos (el corte a 38
-  solo da 59) se rearma una vez, y a partir de ahí esas filas ya no entran en
-  la consulta: un segundo cambio de formato no las tocaría.
-
-Por eso no puse ningún comentario sobre la migración en la prueba. El dato
-sirve para que cambiar el formato sea a propósito, no para evitar una pérdida
-que hoy el arranque repara.
-
-## D219: el rojo a mano
-
-Sobre `8f98a31`, mutando sólo la última línea de `_vendor_key` y corriendo
-los cuatro archivos `tests/test_catalogo*.py` (186 pruebas; en el informe
-anterior dije «8 archivos»: son 4):
-
-| mutación | resultado | qué falla |
-|---|---|---|
-| sin mutación (lo que `catalogo3.sh` corre como base) | `125 passed` | — |
-| `clave[:38]` | `1 failed, 185 passed` | sólo el dato nuevo |
-| `hexdigest()[:21]` | `4 failed, 182 passed` | el dato nuevo, `test_dos_proveedores_distintos_no_comparten_catalogo[prefijo-60]` y los dos de `test_el_origen_y_el_proveedor_se_guardan_enteros` (el id pasa a 61 y da `vendor_id inválido`) |
-| `clave[:38]` y `hexdigest()[:21]` | `1 failed, 185 passed` | sólo el dato nuevo |
-
-El rojo del dato nuevo, con el corte a 38:
-
-```
-E     - sudamericana_de_importaciones_y_distrib~b74fb800ad974e4778d7
-E     + sudamericana_de_importaciones_y_distri~b74fb800ad974e4778d7
-FAILED tests/test_catalogo3.py::test_un_proveedor_latino_conserva_su_id[Sudamericana de Importaciones y Distribuciones Generales del Litoral SA-sudamericana_de_importaciones_y_distrib~b74fb800ad974e4778d7]
-```
+1. **CUIT en el perfil y no un estudio en la operación** (me lo dejaste a mí):
+   es un pedido antes de abrir la pantalla; el camino del estudio ya lo
+   recorre `estudio1`.
+2. **`maria5`: el segundo renglón de notebooks pasa a origen `US`**, así el TXT
+   sigue teniendo los cuatro ítems para los que se escribió el guion (25, 1,
+   2 y 1,5 kg). La otra salida era aceptar 26 kg. Con esto el guion no pasa
+   por la unión de renglones en pantalla; el generador la tiene en
+   `tests/test_maria8_subitems_por_posicion.py` (leído, no corrido en esta
+   pieza).
+3. **Archivo nuevo `_cuit_perfil.js`** (8 líneas): el mismo pedido y su
+   chequeo iban a quedar en tres guiones.
+4. **`maria4` no carga el CUIT del perfil**: intercepta `/generate_maria`.
+5. **La segunda operación de `maria3` (`F-M3B`) queda sin CUIT del
+   importador**: sólo mira los avisos.
+6. **No pedidos, de la autorrevisión** (`7ac0b4e`): el ayudante manda
+   `X-CSRF-Token`, y `maria5` compara la lista entera de pesos.
 
 ## Para reproducir
 
 ```bash
-# Postgres local y descartable; unos 23 minutos. Anda en una consola limpia.
-PY=<venv>/bin/python scripts/testing/con_pg16.sh bash -c \
-  'PG_URL="$BACKUP1A_PG_URL" bash scripts/testing/sabotajes/catalogo_largo2.sh 1f8ffa6'
-# 38 líneas ROJO; la última:
-# «ROJO  | el arranque no pasa el origen de los ítems a text: dice «FALLA | operation_items.origen pasa a text y la fila vieja queda igual»»
-# fallas: 0; sale 0
-
-# el rojo de la consola limpia (segundos): el arnés de antes del arreglo
-git worktree add --detach /tmp/wt-d218 d5a96aa && cd /tmp/wt-d218
-PY=<venv>/bin/python scripts/testing/con_pg16.sh bash -c \
-  'env -u DATABASE_URL -u ENVIRONMENT "$PY" -I scripts/testing/catalogo3_postgres.py "$BACKUP1A_PG_URL"'
-# RuntimeError: DATABASE_URL no está definida y ENVIRONMENT no es de desarrollo…; sale 1
-# el mismo comando sobre 1f8ffa6: 10 OK, «todo OK», sale 0
-
-# el dato de D219 (segundos)
-python -m pytest -q --no-cov -p no:cacheprovider tests/test_catalogo3.py -k test_un_proveedor_latino_conserva_su_id
-# 8 passed, 97 deselected
-# y su rojo: en proyecto_maria/core/catalog_service.py, última línea de _vendor_key,
-# clave[:39] → clave[:38] y hexdigest()[:20] → hexdigest()[:21]
-python -m pytest -q --no-cov -p no:cacheprovider tests/test_catalogo*.py
-# 1 failed, 185 passed; el que falla es …[Sudamericana de Importaciones …]
-
-python scripts/testing/anclas_perdidas.py 1f8ffa6 | grep -cE 'catalogo_largo2\.sh|catalogo3\.sh'
-# 0
-python docs/pm/herramientas/chequeo-6.py 4b5ef68 8f98a31    # +14/−0
-python docs/pm/herramientas/chequeo-6.py d5a96aa ea3256e    # +3/−2
-python docs/pm/herramientas/chequeo-6.py 636b889 1f8ffa6    # +14/−9
-# los tres: producto +0/−0, avisos: 0
+# raíz del repo en e0d2770; PY = python de un venv con requirements.txt.
+# 1) En el corredor, unos 15 minutos:
+PY=$PY scripts/testing/correr_pantallas.sh e0d2770
+#   → «verde» en maria3, maria4, maria5 y subitems1. Las rojas del resumen no son de esta pieza (tabla de puertas):
+#     se comparan por nombre.
+# 2) Las cuatro solas, sin el corredor, unos 5 minutos:
+for g in maria3 maria4 maria5 subitems1; do
+  D=$(mktemp -d); P=$("$PY" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
+  ENVIRONMENT=development DATABASE_URL="sqlite+aiosqlite:///$D/p.db" CDI_DATA_DIR="$D/data" \
+    JWT_SECRET_KEY=clave-inventada-solo-local-0123456789abcdef EMAIL_VERIFICATION_REQUIRED=false \
+    GEMINI_API_KEY= MP_ACCESS_TOKEN= VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
+    DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares \
+    ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x \
+    "$PY" -m uvicorn proyecto_maria.main:app --host 127.0.0.1 --port "$P" > "$D/api.log" 2>&1 &
+  API=$!
+  curl -sf --noproxy '*' --retry 90 --retry-connrefused --retry-delay 1 -o /dev/null "http://127.0.0.1:$P/health"
+  BASE_URL="http://127.0.0.1:$P" node scripts/testing/pantalla_$g.js 2>&1 | tail -1; echo "$g sale ${PIPESTATUS[0]}"
+  kill $API; wait $API 2>/dev/null
+done
 ```
 
-## Puertas
+Lo corrí tal cual sobre `7ac0b4e`. Salida entera:
 
-| puerta | sobre | salida |
+```
+OK: pantalla MARIA-3
+maria3 sale 0
+OK: pantalla MARIA-4
+maria4 sale 0
+OK: pantalla MARIA-5
+maria5 sale 0
+OK: pantalla SUBITEMS-1
+subitems1 sale 0
+```
+
+Los rojos de hoy: el mismo bloque en un worktree de `166c46c` da los textos
+de las causas 1 y 2 (en mi contenedor, antes, la 4). Los dos de `7ac0b4e`:
+
+```bash
+# el mismo bloque con CSRF_ENFORCE=true entre las variables y el ayudante de 3e195de:
+# maria3 → FALLA: CUIT del perfil: 403 {"detail":"Token CSRF invalido o ausente. Recarga la pagina.","code":"csrf_failed"}
+# con el de 7ac0b4e: OK: pantalla MARIA-3, sale 0
+
+# en pantalla_maria5.js, el segundo renglón de notebooks de vuelta en origen 'CN':
+# FALLA: los pesos por ítem son 26.000, 2.000, 1.500 y se esperaba 25, 1, 2 y 1,5 kg
+
+python docs/pm/herramientas/chequeo-6.py 166c46c 7ac0b4e   # producto +0/−0, arnés +23/−8, avisos: 1
+```
+
+## Puertas (las solas, sobre `7ac0b4e`; el corredor, sobre `e0d2770`)
+
+| puerta | salida |
+|---|---|
+| `pantalla_maria3.js`, servidor y base nuevos | 8 `OK`, 0 `FALLA`, sale 0 |
+| `pantalla_maria4.js`, ídem | 7 `OK`, 0 `FALLA`, sale 0 |
+| `pantalla_maria5.js`, ídem | 9 `OK`, 0 `FALLA`, sale 0; `pesos: 25.000, 1.000, 2.000, 1.500` |
+| `pantalla_subitems1.js`, ídem | 10 `OK`, 0 `FALLA`, sale 0 |
+| `maria3` con `CSRF_ENFORCE=true` | 8 `OK`, sale 0 |
+| `anclas_perdidas.py 7ac0b4e` | sale 0; ninguna fila de un archivo de esta pieza (no toca guiones de sabotaje) |
+| `correr_pantallas.sh e0d2770` (02:44→02:58 UTC) | `verde maria3 rc=0 … OK: pantalla MARIA-3`, `verde maria4 rc=0 … OK: pantalla MARIA-4`, `verde maria5 rc=0 … OK: pantalla MARIA-5`, `verde subitems1 rc=0 … OK: pantalla SUBITEMS-1`; `resumen: 25 verdes, 5 rojas: catalogo_ncm1 excel1 maria1b maria1c maria7`, sale 1 |
+| el mismo corredor (copia de `4e98c86`, idéntica por `cmp`) sobre `636da47`, antes de integrar sus cabeceras | las cuatro `verde`; `resumen: 24 verdes, 6 rojas: catalogo_ncm1 csrf1 excel1 maria1b maria1c maria7` |
+
+Las rojas del corredor, por nombre:
+
+| pantalla | última línea | de quién |
 |---|---|---|
-| `catalogo_largo2.sh` entero, Postgres 16, consola limpia | `1f8ffa6` | 38 `ROJO`, `fallas: 0`, `rc=0 segundos=1296` |
-| ídem, antes del chequeo de base unificado | `ea3256e` | 38 `ROJO`, `fallas: 0`, `rc=0 segundos=1325` |
-| `catalogo3_postgres.py` sin sabotaje, consola limpia | `d5a96aa` | `RuntimeError: DATABASE_URL no está definida…`, `rc=1 segundos=7` |
-| ídem, con el arreglo en el árbol (es `2211e6b`) | `2211e6b` | 10 `OK`, `todo OK`, `rc=0 segundos=21` |
-| ídem | `1f8ffa6` | 10 `OK`, `todo OK`, `rc=0`, 19 s |
-| camino `BASE`, a mano: copia del guion de `1f8ffa6` sin los sabotajes de pytest, `PG_URL` a un puerto cerrado | worktree de `636b889` | dos `BASE  \| …` con `psycopg2.OperationalError: … port 1 failed: Connection refused`, `fallas: 2`, `rc=1` |
-| `test_un_proveedor_latino_conserva_su_id` | `9120475` | `8 passed, 97 deselected` |
-| lo que `catalogo3.sh` corre como base | `8f98a31` | `125 passed` |
-| `anclas_perdidas.py` | `1f8ffa6` | sale 0; 22 filas, 0 de `catalogo_largo2.sh` y de `catalogo3.sh` |
+| `catalogo_ncm1`, `excel1`, `maria1b`, `maria1c` | `FALLA: browserType.launch: Failed to launch chromium because executable doesn't exist at /opt/pw-browsers/chromium-1194/chrome-linux/chrome` | D226; de entorno: en mi contenedor esa ruta no existe |
+| `maria7` | `FALLA: la pregunta por la fecha no aparece al subir` | de la Técnica (INTERMITENTES). Dato para ella: en mi contenedor dio roja en las dos corridas, 2 de 2 |
+| `csrf1` (sólo sobre `636da47`) | `FALLA: «Salir» rechazado no avisó y la página fue a /` | le faltaba la cabecera `// corredor: servidor CSRF_ENFORCE=true`, que llegó con tu rama. Comprobado: sola, con `CSRF_ENFORCE=true`, da `OK: CSRF-1 en el navegador`; sobre `e0d2770` sale `verde` |
 
-De `8f98a31` a `1f8ffa6` no cambia nada de `proyecto_maria/` ni de `tests/`
-(`git diff 8f98a31 1f8ffa6 --stat -- proyecto_maria tests` da vacío): lo de D219
-no lo repetí.
+`chequeo-6`, entero:
 
 ```
-chequeo-6 4b5ef68..8f98a31: avisos para mirar, no un veredicto
+chequeo-6 166c46c..7ac0b4e: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +14/−0
+arnés +23/−8
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-avisos: 0
-
-chequeo-6 d5a96aa..ea3256e: avisos para mirar, no un veredicto
-producto +0/−0
-arnés +3/−2
-historia (grep de §6, sin líneas movidas): vacío
-archivos de producto:
-avisos: 0
-
-chequeo-6 636b889..1f8ffa6: avisos para mirar, no un veredicto
-producto +0/−0
-arnés +14/−9
-historia (grep de §6, sin líneas movidas): vacío
-archivos de producto:
-avisos: 0
+  AVISO creció una función de más de 150: scripts/testing/pantalla_subitems1.js:23 <anónima> 180 → 181, 1 en su propio cuerpo (§6: lo nuevo va aparte)
+avisos: 1
 ```
 
-**D218, rojo antes del arreglo:** lo confirmaste vos (sin la tupla,
-`FALLA | operation_items.origen pasa a text…`, salida 1) y ningún guion lo
-corría. Hoy lo corre el guion: la línea 38.
+El `AVISO` queda: la línea que suma es la llamada al ayudante, que tiene que
+ir dentro del guion después del registro. Lo nuevo ya está aparte, en
+`_cuit_perfil.js` (en `0ec6343` eran 3 líneas). Partir esa función va a la
+cola.
 
 ## Hallazgos de la autorrevisión
 
-| quién | hallazgo | severidad | qué hice |
+Adversario: `adversario-sonnet-medio` (Sonnet, esfuerzo medio); corrió
+`maria5` una vez, el resto lo leyó. `/code-review high` sobre
+`166c46c..3e195de`: sus revisores heredan Fable.
+
+| # | quién | hallazgo | qué hice |
 |---|---|---|---|
-| adversario-sonnet-medio (Sonnet, medio) | En una consola sin `DATABASE_URL` ni `ENVIRONMENT`, `catalogo3_postgres.py` sale 1 con `RuntimeError` y el bloque nuevo da `BASE` y salida 1 | media | Reproducido (`rc=1`, 7 s). Arreglado en `2211e6b`; guion entero otra vez en consola limpia |
-| ídem | Con `<=` → `<` o el tope en 70, la prueba del id sigue verde | baja | Medido con las 186 pruebas: verde las dos. Es D224 |
-| ídem | Reprodujo el sabotaje a mano (base `todo OK`, sin la tupla la `FALLA` esperada), el ancla aparece una vez, el id calculado aparte con `hashlib` coincide | — | Sin hallazgo |
-| `/code-review high` (revisores en Fable) | Una base roja tira la salida: dice sólo `BASE  \| …`, sin causa | baja | Arreglado en `1f8ffa6` (`base_en_verde`), visto con un puerto cerrado |
-| ídem | El bloque nuevo es una segunda copia del andamio checkout / base / sabotajes | baja | Arreglado en el mismo commit (§6: una vez) |
-| ídem | El guion depende de un segundo commit viejo (`07504e0`) sin mensaje si falta | baja | Ahora una base roja muestra la causa. El caso del commit ausente: leído, no corrido |
-| ídem | El proceso padre del arnés importa la app sólo para dos funciones puras; mejor calcular las claves en un hijo | baja | Queda. El padre recibe el mismo `entorno()` que los hijos, que importan `main` entero: lo que rompa el import del padre rompe antes a los hijos. Es una línea contra unas diez |
-| ídem | `os.environ.update(entorno())` reescribe el entorno entero; `entorno()` tiene otro contrato que en los arneses vecinos | baja | Queda: ya escrito. Línea para la cola, abajo |
-| ídem | Dos corridas completas del arnés para mirar una tupla | baja | Queda. Sin sabotaje tarda 21 s; el guion entero dio 1380 s, 1325 s y 1296 s en mis tres corridas de 38 |
+| 1 | code-review, adversario | El ayudante no manda el token CSRF: con el CSRF en bloqueo da 403 | **Confirmado** con el rojo de arriba. Arreglado en `7ac0b4e` |
+| 2 | code-review | `maria5` no comprueba los cuatro ítems, sólo el primer peso | Arreglado en `7ac0b4e`, con su rojo |
+| 3 | adversario | El perfil acepta un CUIT con el verificador mal | Producto, fuera de la pieza: **D225** |
+| 4 | code-review | Otros cuatro guiones con la ruta fija; mi commit `0ec6343` dice «como los demás guiones de pantalla» y no es exacto (de 30, hoy: 23 sin ruta contando los míos, 4 con la de 1194, 3 con otra) | Fuera de la pieza: **D226**. El mensaje ya está subido |
+| 5 | code-review | «En un solo lugar» (`3e195de`) vale para mis tres guiones: otros cuatro siguen con el pedido escrito a mano | Fuera de la pieza: línea para la cola, atada a D225 |
+| 6 | code-review, adversario | En `maria4` el CUIT de la operación no es el del cliente, y los CUIT de los dos clientes no pasan `cuit_valido` | Queda, baja: la validación no los compara y el guion mira banco y estado. Línea para la cola |
+| 7 | code-review | En `maria4` las altas de cliente y de operación anterior no se chequean (líneas 18-23 y 82-87, de antes) | Queda, baja: si fallan, el guion corta en «no propone el último banco», lejos de la causa. Línea para la cola |
+| 8 | adversario | `maria5` ya no pasa por la unión de renglones | Supuesto 2 |
+| 9 | adversario | Dijo que `sabotaje_maria4.sh` y `sabotaje_subitems1.sh` corren estos guiones | **No confirmado**: sólo los nombran en comentarios (líneas 4 y 6). Tu «ningún guion los corre» se sostiene |
 
-Los revisores de `/code-review` no corrieron pruebas (no encontraron el
-entorno virtual): leyeron, y corrieron `chequeo-6`, `bash -n` y el cálculo del
-id. `/security-review`: no corrido, no toca producto.
+**Líneas que propongo para `COLA-LIMPIEZA.md`** (no la toco):
 
-**Líneas que propongo para `COLA-LIMPIEZA.md`** (las pasás vos):
-
-- Muchos guiones de `scripts/testing/sabotajes/` tiran la salida del chequeo
-  de base (`>/dev/null 2>&1`): una base roja dice sólo `BASE  | …`. Hay 113
-  líneas `BASE  |` en 58 guiones; no conté una por una cuáles la tiran.
-  `catalogo_largo2.sh` ya muestra el final con `base_en_verde`: llevarlo a
-  `_entorno_comun.sh`.
-- `catalogo3_postgres.py`: `entorno()` devuelve el entorno entero; en los
-  arneses vecinos devuelve sólo lo que pisa. Unificar el contrato.
+- `pantalla_subitems1.js`: la función principal mide 181 líneas; partirla.
+- `pantalla_orden1.js:112`, `pantalla_validacion1.js:126`,
+  `pantalla_cobro_corte1.js:180`, `pantalla_cobro_mp1_v2.js:24`: usar
+  `_cuit_perfil.js` (después de D225: hoy cargan un CUIT inválido).
+- `pantalla_maria4.js`: chequear las altas del armado y usar CUIT válidos, el
+  mismo en el cliente y en la operación.
 
 ## Qué no corrí y riesgos
 
-- La suite entera: no. Es arnés, producto +0/−0.
-- `catalogo3.sh` entero: no. El dato nuevo sólo puede sumarle fallas, y lo que
-  ese guion espera por nombre no cambió; corrí el comando exacto que usa como
-  base (`125 passed`).
-- `/security-review`: no.
-- El texto de la excepción al sacar el `lock_timeout` (D223): no lo vi.
-- Lo que digo «leído» en D224 y en el matiz de D219.
-- El sabotaje nuevo depende de que `catalogo3_postgres.py` siga pudiendo
-  armar su worktree de `07504e0`. En un clon que no lo tenga, el guion da
-  `BASE`, muestra el final del arnés y sale 1 (leído).
-- `catalogo_largo2.sh` suma dos corridas de `catalogo3_postgres.py`.
+- **Nada de pytest, `compileall`, `smoke_friccion.sh`, `ataque_aislamiento.sh`
+  ni `e2e_maria.sh`**: la pieza no toca producto ni ninguna prueba que ellos
+  corran.
+- Con `CSRF_ENFORCE=true` corrí sólo `maria3`. `maria4` hace cuatro `POST`
+  directos sin token (de antes): leído, ahí daría 403.
+- Los cuatro contra un mismo servidor, uno atrás de otro: no corrido.
+- Los cuatro guiones de D226: corridos sólo dentro del corredor, donde cortan
+  al abrir el navegador. Qué hacen después de abrir, en mi contenedor, no lo vi.
+- **Al corredor no lo llama nada** (`grep` de `correr_pantallas` en `.sh`,
+  `.py`, `.yml` y la CI: sólo `docs/pm/`). Mis cuatro vuelven a estar verdes y
+  se ven rojas sólo si alguien lo corre.
+- `chequeo-6` y `anclas_perdidas.py` corrieron sobre `7ac0b4e`, no sobre
+  `e0d2770`: entre los dos sólo está tu rama integrada.
+- El rojo de la causa 4 lo volví a sacar con el guion de `166c46c` sin
+  servidor: corta al abrir el navegador, antes de necesitarlo.
 
-Archivos de producto tocados: ninguno. Arnés: `tests/test_catalogo3.py`,
-`scripts/testing/sabotajes/catalogo_largo2.sh` y
-`scripts/testing/catalogo3_postgres.py`.
+Archivos de producto tocados: ninguno.
 
-Sigo con el paso 2 de tu orden: **PANTALLAS-MARIA**, empezando por la causa de
-`pantalla_maria3` y `pantalla_maria4`, sobre los archivos que trajo tu rama
-(`_registrar.js`).
-
-/compact conservar: Dev 2 (MARIA), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (rama claude/practical-shannon-szpwkn, cabeza 67c8ff0, ya integrada en 636b889), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. Entregado en 1f8ffa6 (informe en el commit siguiente), esperando veredicto: D218 y D219, una pieza, sólo arnés (catalogo_largo2.sh corre también catalogo3_postgres.py con la tupla de operation_items sacada: 38 ROJO, sale 0, en consola sin DATABASE_URL ni ENVIRONMENT; un dato más en test_un_proveedor_latino_conserva_su_id). Producto +0/−0. Abiertas, las decide la PM: D223 (el candado de _migrate_catalogo_claves no tiene sabotaje en el repo: recomiendo (a), uno para el advisory lock) y D224 (el borde del corte de _vendor_key no lo fija ninguna prueba: recomiendo (a), dos datos más). Ya decididas: D221 (b) y D222 (a): se retiran el 13 y el 24 de valor1. Orden de la PM, una pieza a la vez: 1) PANTALLAS-MARIA, la que arranco ahora (pantalla_maria3, maria4, maria5 y subitems1 en rojo desde MARIA-7; empezar por la causa de maria3 y maria4, que no está confirmada; puerta: los cuatro con servidor y base nuevos salen 0 y muestro una vez el rojo de hoy de cada causa; sólo arnés: si la causa es de producto, freno y aviso); 2) retirar el 13 y el 24 de sabotaje_valor1.sh y reanclar en código el 10 y el 28 (29 ROJO, sale 0, su línea sale de sabotajes-conocidos.txt); 3) AJUSTE-BORRADOR (producto en static/v2: primero un caso de pantalla en rojo; corre e2e_maria.sh); 4) los vencidos, uno por pieza: maria8, maria1d, maria5, valor1b, doc1.py, maria7, guardar2. Próxima D libre: D225. Una devolución de la PM o la tarea de comparación van primero. Los detalles están en PARA-PM-2.md: el resumen los cita, no los copia. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; las Devs no usan el consejero.
+/compact conservar: Dev 2 (MARIA), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (rama claude/practical-shannon-szpwkn, cabeza 90b66c5, ya integrada en e0d2770), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. Aceptadas: D218 y D219. Entregada y esperando veredicto: PANTALLAS-MARIA en e0d2770 (guiones de 7ac0b4e; sólo arnés, producto +0/−0; pantalla_maria3, maria4, maria5 y subitems1 salen 0 solas y verdes en scripts/testing/correr_pantallas.sh). Abiertas, las decide la PM: D225 (el perfil guarda un CUIT de despachante con el verificador mal y el TXT sale con él: recomiendo (a), pieza chica de producto) y D226 (catalogo_ncm1, excel1, maria1b y maria1c con la ruta fija del navegador, rojas en el corredor de mi contenedor: recomiendo (a), las tres primeras mías). Ya decididas: D221 (b), D222 (a), D223 (a), D224 (a). No son mías: maria7 y maria1c (de la Técnica, tarea INTERMITENTES), ni correr_pantallas.sh. Orden de la PM, una pieza a la vez: la que arranco ahora es D223 + D224 (un sabotaje del advisory lock de _migrate_catalogo_claves en sabotajes/catalogo_largo2.sh, con el lock_timeout como riesgo anotado; y dos datos más en la prueba de _vendor_key: clave de 60 entera, de 61 cortada). Después: retirar el 13 y el 24 de sabotaje_valor1.sh y reanclar en código el 10 (comentario, línea 108) y el 28 (comentario al final de la línea 187), puerta: valor1 entero da 29 ROJO y sale 0, y su línea sale de sabotajes-conocidos.txt; AJUSTE-BORRADOR (producto en static/v2: primero un caso de pantalla en rojo; corre e2e_maria.sh); y los vencidos de sabotajes-conocidos.txt, uno por pieza. Próxima D libre: D227. Una devolución de la PM o la tarea de comparación van primero. Los detalles están en PARA-PM-2.md: el resumen los cita, no los copia. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; las Devs no usan el consejero.
