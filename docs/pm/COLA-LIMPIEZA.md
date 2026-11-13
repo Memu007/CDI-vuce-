@@ -150,9 +150,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `sufijos_arca.py`. Uno solo, con su tabla de formas (D165 a, MEMORIA-E2E).
 - `proyecto_maria/main.py` `save_client_operation` pasa las 150 líneas (153
   con la llamada de PRESUPUESTO-CLIENTE-1): partirla.
-- `scripts/testing/pantalla_destino1.js`: manda la `X-Forwarded-For` pero no
-  mira el status del registro; si falla, sigue sin decir por qué (supuesto de
-  la Técnica en BORRADOR-1). Son 15 guiones con el mismo hueco; asignado a la Técnica.
 - `scripts/testing/pantalla_cliente1.js:27`: la función anónima tiene 297
   líneas; partirla (AVISO de `chequeo-6` aceptado en BORRADOR-1).
 - `proyecto_maria/static/v2/screens/profile.js` `open()`: mueve el foco a «Mi CUIT»
@@ -211,7 +208,12 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   distinga. `lock_timeout` sigue sin sabotaje (MARIA, D223).
 - `scripts/testing/catalogo3_postgres.py:218`: `esperando_candado` espera
   hasta 120 s fijos; y `tests/conftest.py:17` deja un `cdi_pytest_*.db` por
-  corrida en `/tmp` (contados 3869, 1,4 G): borrarlo al terminar.
+  corrida en `/tmp` (contados 3869, 1,4 G): borrarlo al terminar (asignado a
+  la Técnica, CONFTEST-TMP).
+- `tests/test_excel2d.py` `_otro_hilo_listo`: el testigo gasta CPU propia y,
+  si coincide en `R` con una espera, la tapa (verde falso); un hilo trabado
+  en disco (`D`) cuenta como espera. Cargas medidas sólo de CPU (Técnica,
+  EXCEL2D-RELOJ).
 - `scripts/testing/pantalla_borrador1.js:41` abre el navegador por ruta fija
   sin mirar `PLAYWRIGHT_BROWSERS_PATH`; `cliente1` y `destino1` por
   `CHROMIUM` o ruta fija: que las 30 pidan el navegador igual. Esperas fijas
