@@ -3,7 +3,7 @@
 Entrega `a2c6dc6` (informe `22e84e5`, canal `PARA-PM-2.md`). Base `6fbfefd`.
 Veredicto: **aceptada sobre `a2c6dc6`**. D240 (b), decidida por la PM. D239 y si «Holanda» también es 423 van a Emi.
 
-## Corrido por la PM (2026-11-13, 20:38–20:55 UTC, worktree descartable en `a2c6dc6`)
+## Corrido por la PM (2026-11-13, 20:38–21:09 UTC, worktree descartable en `a2c6dc6`)
 
 - `git diff 6fbfefd a2c6dc6 --stat` fuera de `docs/pm`: `maria_generator.py` (sale
   `"NL": 434` de `PAISES_INDEC`; queda `"NL": 423` en la línea 129), `paises_maria.js`
