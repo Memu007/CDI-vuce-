@@ -197,6 +197,13 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   el borrador y hace `goTo` igual; una subida en vuelo se descarta. Leído, no
   corrido (Técnica, D211).
 
+- `scripts/testing/pantalla_orden1.js:284`: la función anónima (1585 líneas)
+  se parte (Técnica, ORDEN1-INTERMITENTE).
+- `static/v2/app_v2.js:24/1033`: con la sesión cerrada en otra pestaña, el
+  autoguardado pasa por `api()` → `sesionEsDelDueno()` y un 401 manda al
+  login, mientras `revisarSesion` ante el mismo 401 se queda y avisa. Medido
+  en el `api.log`; si se pierde lo cargado, no corrido (Técnica, D213).
+
 ## Riesgos que esperan a Emi (no son tareas: no se toman de esta cola)
 
 - `client_memory._norm_desc` pierde las ligaduras («Arandela ﬁna» queda
