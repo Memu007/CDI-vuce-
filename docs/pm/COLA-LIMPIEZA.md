@@ -15,8 +15,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `main.py:1401`: comentarios de 3 a 5 líneas, a una o dos con el porqué.
 - La migración del historial deja el NCM y la descripción como estaban
   escritos (`'3926 90 90'`) en la fila que queda: dejarlos canónicos.
-- `scripts/testing/pantalla_orden1.js:280`: la función anónima del arnés
-  (1520 líneas) se parte por grupo de casos; los sabotajes de `orden1.sh` y
+- `scripts/testing/pantalla_orden1.js:306`: la función anónima del arnés
+  (1584 líneas) se parte por grupo de casos; los sabotajes de `orden1.sh` y
   `orden1b.sh` se reanclan en la misma pieza.
 - `proyecto_maria/static/v2/app_v2.js:7`: el IIFE de la pantalla (~1190
   líneas) se parte por sección; lo nuevo ya va en funciones aparte.
@@ -197,8 +197,10 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   el borrador y hace `goTo` igual; una subida en vuelo se descarta. Leído, no
   corrido (Técnica, D211).
 
-- `scripts/testing/pantalla_orden1.js:284`: la función anónima (1585 líneas)
-  se parte (Técnica, ORDEN1-INTERMITENTE).
+- `scripts/testing/forzar_orden1.js`: retiene el login `TOPE_MS` (10 s) y el
+  producto corta la consulta a los `ESPERA_SESION_MS` (10 s): casi empatan y
+  el mensaje cambia entre corridas («seguía retenida» o «se cortó»); el
+  resultado no. Que el mensaje no dependa del empate.
 - `static/v2/app_v2.js:24/1033`: con la sesión cerrada en otra pestaña, el
   autoguardado pasa por `api()` → `sesionEsDelDueno()` y un 401 manda al
   login, mientras `revisarSesion` ante el mismo 401 se queda y avisa. Medido
