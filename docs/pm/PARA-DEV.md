@@ -3,71 +3,57 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## INTERMITENTES: aceptada sobre `d1f82fe2` e integrada (2026-11-13 03:58 UTC)
+## ORDEN1-INTERMITENTE: devolución sobre `8e775b2b` (2026-11-13 04:50 UTC)
 
-Integro tu informe `d1f82fe2`. Acta `REPRODUCCION-INTERMITENTES-2026-11-13.md`.
-**Traé mi rama con `merge`.**
+No integro. Acta `REPRODUCCION-ORDEN1-INTERMITENTE-2026-11-13.md`. La carrera
+forzada se reproduce como en tu informe (base: la misma `FALLA` del null;
+`8e775b2b`: verde), `chequeo-6` da lo mismo y `orden1b.sh` sigue con
+29 `ROJO`, 0 sin rojo. TOPE 900 y `maria1c` con `chromium.launch()` están
+bien: quedan.
 
-**Lo reproducido, con tu corredor y tu `forzar_arranque.js`.** Carrera forzada
-sobre la base `90b66c5e`, dos veces: `0 verdes, 2 rojas: maria1c maria7`, con
-las mismas `FALLA` que diste y los dos modos en el log. Sobre `d1f82fe2`, dos
-veces forzada y dos sin forzar: `2 verdes, 0 rojas`. `sesion1`: leí el entorno
-del uvicorn en `/proc` mientras corría, `ENVIRONMENT=testing`. `kill -TERM` al
-corredor nuevo a mitad de `orden1`: 0 vivos y worktree borrado; al de la base,
-3 huérfanos (uvicorn, `timeout`, node). `chequeo-6`: +0/−0, arnés +75/−9,
-0 avisos. Diferencia menor: en mi corrida de la base el worktree sí se borró.
+**Causa de la devolución.** El z22 nuevo suelta la consulta de usuario antes
+de apretar Generar, así que ya no prueba la escritura con un chequeo de sesión
+lento por debajo del tope del producto. Lo medí: con `ESPERA_SESION_MS` en
+2000 (`app_v2.js:960`) y `CASOS=z22`, la base da dos veces
+`FALLA: A salió, volvió a entrar y generó enseguida y no generó: error: No se
+pudo comprobar la sesión. Recargá la página.`; `8e775b2b`, dos veces
+`OK=2`. Además, entre `soltar()` y el clic no queda fijado si la pestaña ya
+procesó la respuesta.
 
-**D211: (b), no es pieza ahora.** Antes de la primera pantalla la zona de
-carga está oculta, el input es `sr-only` con `tabindex="-1"`, soltar en la
-ventana sólo hace `preventDefault`, y «Nueva operación» fija `currentScreen`,
-así que el arranque no la pisa. Encontré un camino angosto, leído y no
-corrido (con un borrador guardado; está en el acta). Va a `COLA-LIMPIEZA.md`
-como riesgo.
-
-**D212: (a)**, en la tarea de abajo. En mi máquina, cuatro `orden1` sueltas
-llevaron unos 585 s cada una (por reloj).
-
-## Tarea activa (2026-11-13 03:58 UTC): ORDEN1-INTERMITENTE, sólo arnés
-
-**Premisa, medida por mí.** En mi corredor sobre `e0d2770f` (la rama de MARIA
-con tu corredor), `orden1` salió roja después de 52 `OK`:
-
-```
-OK entró otro usuario y la pestaña de A guardó un cliente: no queda en ninguna cuenta y la pestaña se tapa
-FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')
-```
-
-Sola, con servidor y base nuevos y `CSRF_ENFORCE=true`, dos veces en
-`90b66c5e` y dos en `e0d2770f`: las cuatro verdes, 71 `OK`. En mi corredor
-sobre `907e1edb` había salido verde. No reproducido; causa sin diagnosticar.
-No registré qué más corría en la máquina a esa hora. El null sale de
-`apretarGenerar` (`pantalla_orden1.js:1372`, `document.getElementById(...)
-.click()` sin esperar), después de `listaParaGenerar` (`:1362`), que sí
-esperó el botón visible. Es un lugar donde mirar, no la causa.
+Un reloj que decide si la consulta vuelve antes o después del login no vale:
+es la carrera. Una respuesta demorada a propósito por debajo del tope sí vale:
+es la entrada del caso.
 
 **Pedido:**
-1. Que `orden1` dé lo mismo siempre, esperando una condición que la pantalla
-   muestra, sin esperas fijas.
-2. `TOPE` por defecto de `correr_pantallas.sh` a 900 (D212).
-3. `pantalla_maria1c.js` sin la ruta fija del navegador
-   (`/opt/pw-browsers/chromium-1194/…`): `chromium.launch()` como los demás
-   (D226; las otras tres son de MARIA).
+1. z22 vuelve a probar Generar con el chequeo de sesión lento por debajo del
+   tope, y además da lo mismo siempre.
+2. La familia: z20a, z21, z23 y z24 también usan `retenerUsuario(t, 3000)`.
+   Mostrá qué da cada uno con la entrada forzada, y si `forzar_orden1.js` los
+   alcanza (hoy demora sólo el login que sigue a un logout).
+3. *Sugerencia, no criterio:* la demora de 3 s se puede dejar en la respuesta
+   y soltar el login recién cuando la pestaña mostró que la procesó.
 
-**Puertas (deterministas, como en INTERMITENTES):**
-- Una forma repetible de que la pantalla de hoy dé esa misma `FALLA`, y con
-  tu arreglo, bajo la misma condición, verde. Las dos salidas, en el informe.
-  Lo que fuerza la carrera es de la prueba: no queda en la pantalla ni en el
-  producto.
-- Si la causa es de producto, la informás con la salida y no la tocás.
-- Tu corredor entero sobre tu SHA, con el resumen.
-- `chequeo-6` entero: producto +0/−0.
+**Puertas:**
+- Con `ESPERA_SESION_MS` en 2000, `CASOS=z22` da rojo sobre tu SHA; ese
+  sabotaje entra a `orden1b.sh`, anclado en código.
+- La carrera forzada sigue: base con la `FALLA`, tu SHA verde.
+- Tu corredor entero sobre tu SHA, con el resumen. `chequeo-6` entero,
+  producto +0/−0.
 
-Sin adversarios. No toques `maria3`, `maria4`, `maria5`, `subitems1`,
-`catalogo_ncm1`, `excel1` ni `maria1b`. `pantalla_orden1.js` es tuya en esta
-pieza; MARIA la toca después (D225), cuando la tuya esté integrada.
+**D213: (b) por ahora, decidido por la PM, reencuadrado.** El 401 que forzamos
+llega con la sesión ya cerrada, y lo pide el autoguardado del hueco:
+`api()` → `sesionEsDelDueno()` → `irAlLogin()`, mientras `revisarSesion` ante
+el mismo 401 se queda y avisa. Es un riesgo con camino de hoy (salir en otra
+pestaña con una operación cargada); si se pierde lo cargado, no está corrido.
+Va a `COLA-LIMPIEZA.md`. No lo toques en esta pieza.
+
+Igual que antes: sin adversarios; no toques los guiones de MARIA;
+`pantalla_orden1.js` es tuya en esta pieza. La función de 1585 líneas va a la
+cola: no la partas acá. Mi corredor entero sobre `8e775b2b` estaba en curso al
+escribir esto; si trae un rojo, te lo sumo antes de que reentregues.
 
 Lo de D182 / D206 sigue igual: si Emi dice que sí, dejás esto donde esté.
-D205, D206 y D208 siguen con Emi. **Próxima D: D213** (rango D210–D215).
+D205, D206 y D208 siguen con Emi. **Próxima D: D214** (rango D210–D215).
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 
