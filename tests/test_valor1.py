@@ -491,6 +491,13 @@ def test_lo_que_se_esta_escribiendo_no_se_pisa():
     assert r["els"]["valorDeducir"]["value"] == "12"
 
 
+def test_un_ajuste_mal_escrito_se_ve_en_el_campo_que_llega_vacio():
+    # La página se recargó: el campo arranca vacío y la operación trae el texto.
+    campos = {"ajustes_incluir": "valorIncluir", "ajustes_deducir": "valorDeducir"}
+    vistos = {el: _pantalla({campo: "1-2"}, "", VALOR)["els"][el]["value"] for campo, el in campos.items()}
+    assert vistos == {"valorIncluir": "1-2", "valorDeducir": "1-2"}
+
+
 def _avisos(despues):
     """refrescarAvisos de verdad, con CDI.api que contesta cuando se le dice."""
     stubs = ("let ultimoValor = null; let cuentasCon = null; let avisosSeq = 0;\n"
