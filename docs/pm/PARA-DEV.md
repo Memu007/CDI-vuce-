@@ -3,6 +3,46 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## GUARDA-VERSION: devolución sobre `95e7a835` (informe `3f39ff36`), sin integrar (2026-11-13)
+
+Acta `REPRODUCCION-GUARDA-VERSION-2026-11-13.md`. Igual a tu informe: el
+`chequeo-6`, que fuera de `docs/pm/` sólo cambia `tests/conftest.py`, la
+puerta 1 (0.21.0 da rc=4 con tu mensaje y 0.22.1 da `76 passed`) y la
+puerta 2 (rc=4 con `'(_worker_thread)'`). El chequeo de arranque se queda.
+
+**Puerta 3: no la acepto como supuesto.** El pedido dice «por la versión
+instalada **o porque alguien la rompe**», y la razón de la pieza era que en
+el repo nada prueba que la guarda funciona.
+
+**Causa:** lo que queda en el repo prueba que la guarda *reconoce* una
+conexión, no que una fuga termine en rojo.
+
+**Dos defectos:**
+
+1. **El cierre anulado no da rojo.** Mi ejemplo: un test async que guarda
+   `aiosqlite.connect(":memory:")` en una lista del módulo. Con la guarda
+   entera, «dejó 1 conexión(es)…» y `1 error`. Con `if vivos:` cambiado por
+   `if vivos and False:`, `1 passed` y la línea «vio la conexión de prueba»:
+   todo verde.
+2. **La línea «vio la conexión de prueba» no sale de lo que se vio.**
+   `pytest_terminal_summary` imprime un texto fijo. Saqué el bloque
+   `if not _guarda_ve_una_conexion()` y corrí con 0.21.0: dijo «vio la
+   conexión de prueba de aiosqlite 0.21.0» y `76 passed`. Tiene que salir
+   del resultado del chequeo, o no salir.
+
+**Comportamiento pedido.** Si alguien rompe la guarda en cualquiera de sus
+partes, la suite normal da rojo y dice cuál se rompió. Hay que cubrir el
+reconocimiento, que la foto de antes del test se tome y el veredicto del
+cierre. Va como datos de un mismo caso, con el rojo de cada dato. En el
+informe, cuánto tiempo le suma a la suite. Lo que mostrás como evidencia
+tiene que cambiar cuando cambia lo que prueba.
+
+*Sugerencia, no criterio:* `pytester`, en un archivo propio. Así los ~5 s se
+pagan sólo cuando ese archivo entra en la corrida, no en cada una.
+
+Fuera, igual que antes: el producto, `requirements.txt`, `ci.yml` y lo de
+MARIA. Sin esperas fijas nuevas y sin adversarios. **Próxima D: D231.**
+
 ## FUGA-HILOS-GUARDA: aceptada sobre `a58d45d5` (informe `7e36ba88`) e integrada (2026-11-13 16:06 UTC)
 
 Acta `REPRODUCCION-FUGA-HILOS-GUARDA-2026-11-13.md`. **Traé mi rama con
