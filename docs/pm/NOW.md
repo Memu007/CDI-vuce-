@@ -212,7 +212,7 @@ Sesiones viejas, apagadas (historia): Dev 1 session_01VV5RVDA64AuzLaPBDnwH39
 `claude/dev2-maria`; las ramas `codex/*`.
 
 Archivos abiertos por Dev:
-- Dev técnica (sólo pruebas, EXCEL2D-TIEMPO): `tests/test_excel2d.py`. Sin producto hasta el sí de Emi (D182 o D206).
+- Dev técnica (sólo pruebas, EXCEL2D-RELOJ y después X-FORWARDED-STATUS): `tests/test_excel2d.py` y los guiones con `X-Forwarded-For` de `PARA-DEV.md`, menos `pantalla_orden1.js`. Sin producto hasta el sí de Emi (D182 o D206).
 - Dev MARIA: lo de su lista en `PARA-DEV-2.md`, y `pantalla_orden1.js` desde 2026-11-13 05:35 UTC.
 
 ## En curso
