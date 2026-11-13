@@ -137,7 +137,7 @@ const centavos = s => Math.round(parseFloat(s) * 100);
   const txt = generado.content;
   const campo = c => [...txt.matchAll(new RegExp('^' + c + '=(\\S+)', 'gm'))].map(m => m[1]);
   const pesos = campo('QARTKGRNET');
-  if (pesos[0] !== '25.000') falla('las 10 notebooks de 2,5 kg declaran ' + pesos[0]);
+  if (pesos.join() !== '25.000,1.000,2.000,1.500') falla('los pesos por ítem son ' + pesos.join(', ') + ' y se esperaba 25, 1, 2 y 1,5 kg');
   console.log('OK el TXT declara 25 kg para 10 × 2,5 kg (pesos: ' + pesos.join(', ') + ')');
   for (const [item, cab] of [['MARTFOB', 'MDDTFOB'], ['MARTFLE', 'MDDTFLE'], ['MARTASS', 'MDDTASS']]) {
     const suma = campo(item).reduce((a, v) => a + centavos(v), 0);
