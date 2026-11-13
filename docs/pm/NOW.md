@@ -171,6 +171,16 @@ antes de cerrar la Fase 3.
 14. **Preguntado el 13/11 a las 12:01 UTC, no repetir: tope de la CI de 20 a
    30 min** (recomendé sí). 9 cortes por tiempo, sin rojos hasta el corte.
    Con su sí, pieza chica de la Técnica antes de lo que esté haciendo.
+15. **PAIS-NL, por aceptar (13/11, falta mi suite); decide antes de publicarla.** «NL» y
+   «Países Bajos» pasan a 423; «Holanda» sigue en 434 (es otra fila de la
+   tabla oficial). Al publicar: lo ya guardado como «NL» (también renglones
+   de despachos «434 HOLANDA») pasa a 423, y un grupo guardado que mezcle
+   «NL» con «Holanda» o «434» deja de generar hasta corregirlo.
+   - ¿«Holanda» también 423? Recomiendo sí, salvo que el despachante todavía
+     use 434 para Países Bajos: eso lo sabe él.
+   - D239: ¿un despacho real trae a veces el código solo («434»), sin
+     nombre? Hoy queda sin origen con aviso, pero la pantalla de importar no
+     deja corregirlo. Si pasa, recomiendo (a), que lo guarde.
 
 ## Quién hace qué
 
@@ -254,7 +264,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-13 20:1x UTC: sabotaje_subitems1 rc=1 con 2 de 9 casos verdes: el control de forma de sub-ítems está dos veces en /generate_maria desde EXCEL-2 (7e9c4e00, posterior al sabotaje); el producto da 400 igual. Anotado vencido (dueño MARIA, primero de los vencidos o a mano al publicar: sus otros 7 casos dan rojo) y en COLA-LIMPIEZA. Sabotajes 13+/93. Sin entrega nueva; MARIA en PAIS-NL.
+2026-11-13 20:52 UTC: PAIS-NL (MARIA, a2c6dc6) reproducida y con adversario Sonnet alto (un hallazgo nuevo, sin camino de hoy: va con D239); veredicto escrito, se acepta e integra 22e84e5d si da verde la suite completa de la PM (scratchpad nl-suite.txt). Preguntas a Emi en «Para Emi» 15. Sabotajes siguen (run2.sh). MARIA en D237 (a); próxima D241.
 
 ## /compact conservar de la PM principal
 
