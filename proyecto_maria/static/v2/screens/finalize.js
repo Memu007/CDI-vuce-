@@ -80,6 +80,8 @@
         // Hasta que llegue la respuesta, nada de los avisos de otra operación.
         const avisosPanel = document.getElementById('validatingAvisosPanel');
         if (avisosPanel) avisosPanel.hidden = true;
+        // Antes que la tarjeta del despachante, que lee el sufijo del campo.
+        pintarSufijo();
         // ESTUDIO-1: el estudio elegido también cambia los avisos.
         Promise.all([
             Promise.resolve(CDI.despachante ? CDI.despachante.render() : null).catch(() => null),
@@ -185,11 +187,24 @@
         };
         wrap.addEventListener('change', programar);
         wrap.addEventListener('input', programar);
-        // El sufijo de la operación cambia lo que viaja por producto.
+        // El sufijo de la operación cambia lo que viaja por producto, y se
+        // guarda con ella al escribirlo: así vuelve con el borrador.
         const sbt = document.getElementById('sbtSufijoValor');
-        if (sbt) sbt.addEventListener('input', programar);
+        if (sbt) sbt.addEventListener('input', () => {
+            const op = CDI.state.operacion = CDI.state.operacion || {};
+            op.sbt_sufijo_valor = sbt.value.trim();
+            programar();
+        });
         const estudio = document.getElementById('estudioWrap');
         if (estudio) estudio.addEventListener('change', programar);
+    }
+
+    // El campo muestra el sufijo guardado con la operación. Sin uno guardado
+    // queda lo que tiene: «Generar» lo toma de ahí.
+    function pintarSufijo() {
+        const campo = document.getElementById('sbtSufijoValor');
+        const guardado = ((CDI.state || {}).operacion || {}).sbt_sufijo_valor;
+        if (campo && guardado) campo.value = guardado;
     }
 
     // SEPARADORES-1d (D25): el flete y el seguro van al TXT con dos
