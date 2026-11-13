@@ -192,7 +192,7 @@
     }
 
     // El campo muestra el sufijo de la operación en curso, vacío si no tiene:
-    // «Generar» y la tarjeta del despachante lo toman de ahí.
+    // la tarjeta del despachante lo toma de ahí.
     function pintarSufijo() {
         const campo = document.getElementById('sbtSufijoValor');
         if (campo) campo.value = ((CDI.state || {}).operacion || {}).sbt_sufijo_valor || '';
