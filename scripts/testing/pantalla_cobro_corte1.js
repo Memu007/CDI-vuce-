@@ -10,6 +10,7 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_cobro_corte1.js
 const { chromium } = require('playwright');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const OP = { moneda: 'DOL', incoterm: 'CFR', comprador_cuit: '30712345671', fecha_emision: '10/10/2026' };
 const LONA = { pieza: '39211390900F', descripcion: 'Lona de PVC gris', origen: 'CN', cantidad: 750,
@@ -173,8 +174,7 @@ async function reintentarConDobleClic({ page, clienteId, cargar, pedirTxt }) {
   const page = await ctx.newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  const reg = await page.request.post(base + '/auth/register', { data: { username: 'cc1_' + id, password: 'Clave-Inventada-123', email: 'cc1' + id + '@ejemplo.test' } });
-  if (!reg.ok()) falla('no se pudo registrar: ' + reg.status());
+  await registrarCuenta(page.request, base, { data: { username: 'cc1_' + id, password: 'Clave-Inventada-123', email: 'cc1' + id + '@ejemplo.test' } });
 
   // Sin el CUIT del despachante no se genera el TXT (ESTUDIO-1); inventado.
   const perfil = await page.request.put(base + '/api/user/profile', { data: { cuit: '20999999998' } });

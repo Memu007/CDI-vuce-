@@ -5,14 +5,14 @@
 // la pestaña lo avisa y no escribe. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_csrf3.js
 const { chromium } = require('playwright');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const base = process.env.BASE_URL || 'http://127.0.0.1:8876';
 
 async function registrar(ctx, prefijo) {
   const nombre = prefijo + Date.now();
-  const reg = await ctx.request.post(base + '/auth/register',
+  await registrarCuenta(ctx.request, base,
     { data: { username: nombre, password: 'Clave-Inventada-123', email: nombre + '@ejemplo.test' } });
-  if (!reg.ok()) falla('no se pudo registrar: ' + reg.status());
 }
 
 const quienEs = p => p.waitForFunction(() => (window.CDI && CDI.currentUser) || document.getElementById('pestanaAjena')?.open,

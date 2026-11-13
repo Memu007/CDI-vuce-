@@ -76,6 +76,7 @@
 // El servidor corre con CSRF_ENFORCE=true, como en producción.
 const { chromium, request } = require('/opt/node-tools/node_modules/playwright');
 const ipNueva = require('./_ip_nueva');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const base = process.env.BASE_URL || 'http://127.0.0.1:8771';
 const INTERVALO_MS = 2500;  // el guardado periódico de app_v2.js
@@ -104,9 +105,8 @@ async function nuevoUsuario(ctx, nombre) {
   const p = await ctx.newPage();
   const id = Date.now() + '_' + Math.floor(Math.random() * 1e6);
   const usuario = nombre + '_' + id;
-  const r = await p.request.post(base + '/auth/register',
+  await registrarCuenta(p.request, base,
     { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: usuario, password: CLAVE, email: nombre + id + '@ejemplo.test' } });
-  if (!r.ok()) falla('no se pudo registrar el usuario de prueba: ' + r.status());
   // Sin el CUIT del despachante no se genera el TXT (ESTUDIO-1); inventado.
   const perfil = await p.request.put(base + '/api/user/profile',
     { data: { cuit: '20999999998' }, headers: { 'X-CSRF-Token': await csrf(ctx) } });

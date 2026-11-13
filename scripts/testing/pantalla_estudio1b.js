@@ -7,6 +7,7 @@
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_estudio1b.js
 const { chromium } = require('playwright');
 const ipNueva = require('./_ip_nueva');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const CUIT_PERFIL = '20111111112';
 const CUIT_UNO = '30222222229';
@@ -18,8 +19,7 @@ const CUIT_UNO = '30222222229';
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
   const usuario = 'e1b_' + id;
-  let r = await page.request.post(base + '/auth/register', { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: usuario, password: 'Clave-Inventada-123', email: 'e1b' + id + '@ejemplo.test' } });
-  if (!r.ok()) falla('registro: ' + r.status() + ' ' + await r.text());
+  let r = await registrarCuenta(page.request, base, { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: usuario, password: 'Clave-Inventada-123', email: 'e1b' + id + '@ejemplo.test' } });
   r = await page.request.put(base + '/api/user/profile', { data: { cuit: CUIT_PERFIL } });
   if (!r.ok()) falla('CUIT del perfil: ' + r.status() + ' ' + await r.text());
   r = await page.request.post(base + '/api/estudios', { data: { nombre: 'Estudio Inventado Uno', cuit: CUIT_UNO } });

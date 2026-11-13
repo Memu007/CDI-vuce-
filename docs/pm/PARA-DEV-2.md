@@ -3,7 +3,7 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D199 y `sabotaje_valor1.sh`: aceptadas sobre `fe0f1b4` e integradas (2026-11-13 00:40 UTC)
+## D199 y `sabotaje_valor1.sh`: aceptadas sobre `fe0f1b4` e integradas (2026-11-13 00:31 UTC)
 
 Integro tu informe `4b5ef688`, no la punta de tu rama (que ya trae D218/D219
 a medio hacer). Acta: `REPRODUCCION-D199-VALOR1-2026-11-13.md`.
@@ -34,18 +34,29 @@ campo se ve vacío. Es lectura mía, **no lo vi en un navegador.**
 
 **Cómo sigue, en este orden:**
 1. D218 y D219, como venías.
-2. Retirar los sabotajes 13 y 24 de `valor1`. Como tocás el guion, reanclá en
+2. **PANTALLAS-MARIA** (D209 de la Técnica, agregado 00:44 UTC).
+   `pantalla_maria3`, `maria4`, `maria5` y `subitems1` dan rojo desde
+   MARIA-7 (24/10) y ningún guion los corre, así que nadie lo vio. Lo
+   reproduje en `08ae9654` y en `b832fc2`, igual. `maria5` y `subitems1`
+   cortan en «Falta el CUIT del despachante (CDDTAGR)…». `maria3` (espera un
+   `POST /generate_maria` que no llega) y `maria4` («Generar» deshabilitado)
+   **no tienen causa confirmada**: empezá por ahí. Vos decidís si el guion
+   carga el CUIT en el perfil o elige un estudio en la operación. Puerta: los
+   cuatro, cada uno con servidor y base nuevos, salen 0, y mostrás una vez el
+   rojo de hoy de cada causa. Sólo arnés; si la causa resulta de producto,
+   frená y avisá.
+3. Retirar los sabotajes 13 y 24 de `valor1`. Como tocás el guion, reanclá en
    código el 10 (hoy en un comentario, línea 108) y el 28 (comentario al final
    de la línea 187): es la regla de la familia D168 en `COLA-LIMPIEZA.md`.
    Puerta: `valor1` entero da 29 `ROJO` y salida 0, y su línea sale de
    `sabotajes-conocidos.txt`.
-3. **AJUSTE-BORRADOR** (producto). Primero un caso de pantalla: ajuste mal
+4. **AJUSTE-BORRADOR** (producto). Primero un caso de pantalla: ajuste mal
    escrito, borrador guardado, recargar, recuperar; el caso pide que el campo
    muestre lo que el aviso nombra. Mostralo en rojo sobre el código de hoy.
    Si da rojo, arreglalo (sugerencia: sacar las dos guardas resta antes de
    sumar). Si no reproduce, informalo con la salida y las guardas pasan a la
    cola. Producto en `static/v2`: corre `e2e_maria.sh`.
-4. Los vencidos que quedan en `sabotajes-conocidos.txt`, uno por pieza.
+5. Los vencidos que quedan en `sabotajes-conocidos.txt`, uno por pieza.
 
 **Próxima D: D223.**
 

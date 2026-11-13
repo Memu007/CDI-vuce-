@@ -8,6 +8,7 @@
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_validacion1.js
 const { chromium } = require('playwright');
 const ipNueva = require('./_ip_nueva');
+const registrarCuenta = require('./_registrar');
 const OP = { moneda: 'DOL', incoterm: 'CFR', comprador_cuit: '30712345671', fecha_emision: '10/10/2026' };
 const A = { pieza: '39211390900F', descripcion: 'Lona de PVC gris', origen: 'CN', cantidad: 750,
             valor_unitario: 1.85, peso_unitario: 0.62 };
@@ -121,8 +122,7 @@ async function simular(page, modo) {
   const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  const reg = await ctx.request.post(base + '/auth/register', { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: 'val1_' + id, password: 'Clave-Inventada-123', email: 'val1' + id + '@ejemplo.test' } });
-  if (!reg.ok()) throw new Error('no se pudo registrar: ' + reg.status());
+  await registrarCuenta(ctx.request, base, { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: 'val1_' + id, password: 'Clave-Inventada-123', email: 'val1' + id + '@ejemplo.test' } });
   const perfil = await ctx.request.put(base + '/api/user/profile', { data: { cuit: '20999999998' } });
   if (!perfil.ok()) throw new Error('no se pudo cargar el CUIT del perfil: ' + perfil.status());
   const cli = await ctx.request.post(base + '/api/clientes', { data: { nombre: 'Cliente de prueba', cuit: '30999999995' } });

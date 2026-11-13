@@ -7,6 +7,7 @@
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_estudio1.js [captura-telefono.png]
 const { chromium } = require('playwright');
 const ipNueva = require('./_ip_nueva');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const CUIT_PERFIL = '20111111112';
 const CUIT_UNO = '30222222229';
@@ -20,8 +21,7 @@ const NOMBRE_HTML = '<img src=x onerror="window.__xss=1">Estudio Inventado Uno';
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
   const usuario = 'e1_' + id;
-  let r = await page.request.post(base + '/auth/register', { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: usuario, password: 'Clave-Inventada-123', email: 'e1' + id + '@ejemplo.test' } });
-  if (!r.ok()) falla('registro: ' + r.status() + ' ' + await r.text());
+  let r = await registrarCuenta(page.request, base, { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: usuario, password: 'Clave-Inventada-123', email: 'e1' + id + '@ejemplo.test' } });
   r = await page.request.put(base + '/api/user/profile', { data: { cuit: CUIT_PERFIL } });
   if (!r.ok()) falla('CUIT del perfil: ' + r.status() + ' ' + await r.text());
 
@@ -187,8 +187,7 @@ const NOMBRE_HTML = '<img src=x onerror="window.__xss=1">Estudio Inventado Uno';
   const ctx2 = await b.newContext({ viewport: { width: 390, height: 844 } });
   const p2 = await ctx2.newPage();
   const usuario2 = 'e1b_' + id;
-  r = await p2.request.post(base + '/auth/register', { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: usuario2, password: 'Clave-Inventada-123', email: 'e1b' + id + '@ejemplo.test' } });
-  if (!r.ok()) falla('registro sin perfil: ' + r.status());
+  r = await registrarCuenta(p2.request, base, { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: usuario2, password: 'Clave-Inventada-123', email: 'e1b' + id + '@ejemplo.test' } });
   await p2.route('**/api/estudios', route => route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"x"}' }));
   await p2.goto(base + '/dashboard');
   await p2.waitForFunction(() => window.CDI && CDI.goTo && CDI.estudios && CDI.currentUser);

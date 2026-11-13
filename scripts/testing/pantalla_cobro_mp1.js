@@ -11,6 +11,7 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_cobro_mp1.js
 const { chromium } = require('playwright');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 
 // Cancelada que reactivó y abrió el checkout: tiene una suscripción que
@@ -50,8 +51,7 @@ async function salidaSinPeriodo(perfilCon, confirmacionDeCancelar, cancelar) {
   const page = await (await b.newContext({ viewport: { width: 1400, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  const reg = await page.request.post(base + '/auth/register', { data: { username: 'cmp1_' + id, password: 'Clave-Inventada-123', email: 'cmp1' + id + '@ejemplo.test' } });
-  if (!reg.ok()) falla('no se pudo registrar: ' + reg.status());
+  await registrarCuenta(page.request, base, { data: { username: 'cmp1_' + id, password: 'Clave-Inventada-123', email: 'cmp1' + id + '@ejemplo.test' } });
 
   const cancelar = page.locator('#pfBillingCancel');
   const activar = page.locator('#pfBillingActivate');

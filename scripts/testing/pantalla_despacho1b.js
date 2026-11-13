@@ -10,6 +10,7 @@
 // uso: BASE_URL=http://127.0.0.1:<puerto> PY=<python del proyecto> node scripts/testing/pantalla_despacho1b.js
 // (se corre desde la raíz del repositorio)
 const { chromium } = require('playwright');
+const registrarCuenta = require('./_registrar');
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -66,10 +67,9 @@ async function dentroDelAncho(page, ancho, selector, que) {
         falla(ancho + ' px: se pidió guardar antes de tocar «Guardar en el catálogo»');
       }
     });
-    let r = await page.request.post(base + '/auth/register', {
+    let r = await registrarCuenta(page.request, base, {
       data: { username: 'd1b_' + ancho + '_' + id, password: 'Clave-Inventada-123', email: 'd1b' + ancho + id + '@ejemplo.test' },
     });
-    if (!r.ok()) falla('registro: ' + r.status() + ' ' + await r.text());
     r = await page.request.post(base + '/api/clientes', { data: { nombre: 'Cliente Inventado D1b ' + ancho } });
     if (!r.ok()) falla('alta del cliente: ' + r.status() + ' ' + await r.text());
     const cid = (await r.json()).cliente.id;

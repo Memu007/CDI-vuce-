@@ -13,6 +13,7 @@
 // error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_sufijos1.js [captura-telefono.png]
 const { chromium } = require('playwright');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const FUENTE = 'arancel de ARCA del 07/10/2026';
 const NO_CONTESTO = 'El arancel de ARCA no contestó: no se propone sufijo ni unidad; va el de la operación.';
@@ -25,7 +26,7 @@ const D23 = 'El sufijo de la operación está vacío: cada producto sale sólo c
   const id = Date.now();
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
-  await page.request.post(base + '/auth/register', { data: { username: 's1_' + id, password: 'Clave-Inventada-123', email: 's1' + id + '@ejemplo.test' } });
+  await registrarCuenta(page.request, base, { data: { username: 's1_' + id, password: 'Clave-Inventada-123', email: 's1' + id + '@ejemplo.test' } });
   await page.route('**/generate_maria', async r => { await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, filename: 'MARIA_X.TXT', download_url: '#', content: '', supuestos: [] }) }); });
 
   // 3920.10.10.100F pide AA y AI, en kilos; 3921.13.90.999F no está en el

@@ -5,6 +5,7 @@
 // de la pantalla se medía en la v1, que se retiró. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_csrf2.js
 const { chromium } = require('playwright');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 
 async function escribe(p, ruta, accion, nombre) {
@@ -21,8 +22,7 @@ async function escribe(p, ruta, accion, nombre) {
   const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
   const id = Date.now();
   const cuenta = { username: 'csrf2_' + id, password: 'Clave-Inventada-123' };
-  const reg = await ctx.request.post(base + '/auth/register', { data: { ...cuenta, email: 'csrf2' + id + '@ejemplo.test' } });
-  if (!reg.ok()) falla('no se pudo registrar: ' + reg.status());
+  await registrarCuenta(ctx.request, base, { data: { ...cuenta, email: 'csrf2' + id + '@ejemplo.test' } });
 
   const landing = await ctx.newPage();
   // La CSP corta en el navegador los pedidos a otro origen: se mira lo que csrf.js le pasa a fetch nativo.
