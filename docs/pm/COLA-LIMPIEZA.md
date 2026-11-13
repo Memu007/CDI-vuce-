@@ -209,10 +209,10 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   el `atexit` y, si sale normal, borra la base del padre (negativo en
   `REPRODUCCION-CONFTEST-TMP-2026-11-13.md`; hoy ninguna prueba hace `fork`).
   Con SIGTERM (`timeout`) el archivo queda, como antes; leído, no corrido.
-- `tests/test_excel2d.py` `_otro_hilo_listo`: el testigo gasta CPU propia y,
-  si coincide en `R` con una espera, la tapa (verde falso); un hilo trabado
-  en disco (`D`) cuenta como espera. Cargas medidas sólo de CPU (Técnica,
-  EXCEL2D-RELOJ).
+- `tests/test_excel2d.py` `_otro_hilo_listo`: el recorrido es una sola foto
+  y su veredicto cubre el salto entero; un hilo en `R` en esa foto tapa ese
+  salto aunque haya sido espera (con carga, 3,92 s medidos de 4). Un hilo
+  trabado en disco (`D`) cuenta como espera. Cargas medidas sólo de CPU.
 - Esperas fijas en `pantalla_maria1b.js:58` y `:65` y
   `pantalla_excel1.js:36`.
 - `scripts/testing/sabotaje_valor1.sh`: el total del mensaje final se

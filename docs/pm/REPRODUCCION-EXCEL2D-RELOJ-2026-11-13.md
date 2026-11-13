@@ -102,3 +102,40 @@ quedar contado como salto con CPU.
 (merge `5c0faf45`): la unión es idéntica a `9059c696` fuera de `docs/pm`, y
 con ese test `pytest` entero da verde, mientras que el de antes daba el rojo
 de D234.
+
+## Vuelta 3: entregada en `d1ee0b71` (test `cc8c7b7d`, informe `c4b16b53`), aceptada (2026-11-13 12:20 UTC)
+
+El testigo ya no cuenta su propia CPU (`process_time - thread_time`), y el
+veredicto del recorrido de `/proc` vale para el salto entero, recorrido
+incluido. Diff fuera de `docs/pm`: sólo `tests/test_excel2d.py`. Corrido por
+la PM en un worktree en `d1ee0b71`, con `hilos_plugin.py` (`HILOS=n`) y la
+espera inyectada después de `validar_con_carril` en `main.py`.
+
+| espera inyectada | 0 hilos | 1000 hilos | 3000 hilos |
+|---|---|---|---|
+| ninguna | `1 passed` | `1 passed` | `1 passed` |
+| `asyncio.sleep(0.8)` | 0,79 s, `1 failed` | 0,78 s, `1 failed` | 0,78 s, `1 failed` |
+| `asyncio.sleep(4)` | 3,99 s, `1 failed` | 3,98 s, `1 failed` | 3,99 s, `1 failed` |
+| `asyncio.sleep(0.6)`, valor mío | 0,59 s, `1 failed` | 0,58 s, `1 failed` | 0,59 s, `1 failed` |
+| `time.sleep(0.8)`, otra clase de espera | 0,80 s, `1 failed` | 0,78 s, `1 failed` | 0,78 s, `1 failed` |
+
+- `scripts/testing/sabotajes/excel2d.sh d1ee0b71` con `HILOS=1000`: 21 `ROJO`,
+  «sabotajes con falla: 0». Son 21 en total; los 6 que pedí son los que caen
+  en `test_la_subida_cara_no_frena_a_nadie`.
+- `tests/test_excel2d.py` entero: `26 passed` con 0 y con 3000 hilos.
+- `chequeo-6.py 806f838c cc8c7b7d`: `producto +0/−0`, `arnés +9/−11`,
+  historia vacía, `avisos: 0`. Igual al informe.
+
+**Cambio no pedido, mirado y aceptado.** El gasto ya no incluye la CPU del
+testigo y se mide entre la primera y la última marca. Es lo correcto: el tope
+es para lo que gasta la subida, y recorrer `/proc` con miles de hilos lo
+inflaba.
+
+**No corrido por la PM:** `pytest` entero. Vale el de la Dev (`6112 passed`)
+y la corrida de la CI sobre mi integración, que miro en la próxima vuelta; un
+rojo de esta prueba ahí es devolución con causa, no se repite.
+
+**Riesgo, a la cola.** El recorrido es una sola foto, y su veredicto cubre el
+salto entero. Si en esa foto aparece un hilo listo (R), el salto no suma
+aunque haya sido espera. Con carga sin fijar a una CPU, la Dev midió 3,92 s de
+4 s. Reemplaza al residuo de la vuelta 2.

@@ -193,22 +193,20 @@ def test_la_subida_cara_no_frena_a_nadie(subida):
     # Se mide CPU del proceso y no reloj: un runner cargado alarga el reloj, no la CPU.
     # Una espera sin CPU se mide aparte: con carga, algún hilo queda listo para
     # correr (R); esperando, ninguno lo está.
+    # La CPU del testigo no cuenta: recorrer /proc cuesta según cuántos hilos haya,
+    # y el salto entero, recorrido incluido, lleva lo que el recorrido vio.
     pasos, listo = [(time.monotonic(), time.process_time(), True)], threading.Event()
 
     def marcar():
+        def ahora():
+            return time.monotonic(), time.process_time() - time.thread_time()
         while not listo.wait(0.01):
-            reloj, cpu = time.monotonic(), time.process_time()
-            if cpu - pasos[-1][1] >= (reloj - pasos[-1][0]) / 20:
-                pasos.append((reloj, cpu, True))
-                continue
-            # Recorrer /proc cuesta según cuántos hilos haya: se hace sólo tras un
-            # salto sin CPU, y el recorrido cuenta como un salto propio.
-            pasos.append((reloj, cpu, _otro_hilo_listo()))
-            pasos.append((time.monotonic(), time.process_time(), True))
-        pasos.append((time.monotonic(), time.process_time(), True))
+            reloj, cpu = ahora()
+            alguno = cpu - pasos[-1][1] >= (reloj - pasos[-1][0]) / 20 or _otro_hilo_listo()
+            pasos.append((*ahora(), alguno))
+        pasos.append((*ahora(), True))
     otro = threading.Thread(target=marcar)
     otro.start()
-    inicio = time.process_time()
     try:
         nombre = "factura.xls" if ".xls" in subida else "factura.xlsx"
         r = TestClient(main.app).post("/upload_excel_v2/", files={"file": (nombre, libro)})
@@ -220,7 +218,7 @@ def test_la_subida_cara_no_frena_a_nadie(subida):
     assert frenado < 1, f"el otro hilo no avanzó mientras el proceso gastó {frenado:.2f} s de CPU"
     espera = sum(reloj for reloj, cpu, alguno in saltos if cpu < reloj / 20 and not alguno)
     assert espera < 0.5, f"la subida esperó {espera:.2f} s sin gastar CPU"
-    gasto = time.process_time() - inicio
+    gasto = pasos[-1][1] - pasos[0][1]
     assert gasto < segundos, f"la subida gastó {gasto:.2f} s de CPU"
     assert r.status_code == status, r.text[:300]
     if palabra:
