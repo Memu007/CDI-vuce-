@@ -43,8 +43,8 @@ const AJUSTES = [
 
   await page.reload();
   await page.waitForFunction(f => window.CDI && CDI.state && CDI.state.operacion && CDI.state.operacion.numero_factura === f
-    && (document.querySelector('.screen.is-active') || {}).dataset.screen === 'review', OP.numero_factura, { timeout: 20000 })
-    .catch(() => falla('al recargar la operación no se recuperó'));
+    && document.querySelector('.screen.is-active')?.dataset.screen === 'review', OP.numero_factura, { timeout: 20000 })
+    .catch(e => falla('al recargar la operación no se recuperó: ' + e.message.split('\n')[0]));
   await page.evaluate(() => CDI.goTo('validating'));
   await avisoCompleto().catch(async () => falla('después de recargar el aviso no nombra los dos ajustes: «' + await aviso() + '»'));
 

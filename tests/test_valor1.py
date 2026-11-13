@@ -561,6 +561,8 @@ def test_las_cuentas_se_ven_y_el_error_tambien():
     r = _pantalla({"ajustes_deducir": "mal escrito"}, "", {"error": "Ajustes a deducir: x"})
     assert r["els"]["valorError"]["hidden"] is False
     assert r["els"]["valorError"]["textContent"] == "Ajustes a deducir: no es un número. Ajustes a deducir: x"
+    # El campo llega vacío (la página se recargó) y muestra lo que el aviso nombra.
+    assert r["els"]["valorDeducir"]["value"] == "mal escrito"
     assert r["els"]["valorCuentas"]["innerHTML"] == ""
     assert r["els"]["valorCalcularSeguro"]["hidden"] is True
 
