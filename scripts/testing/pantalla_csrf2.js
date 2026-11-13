@@ -4,6 +4,7 @@
 // otro origen ni tira antes de devolver la promesa. Hasta el 2026-11-05 la parte
 // de la pantalla se medía en la v1, que se retiró. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_csrf2.js
+// corredor: servidor CSRF_ENFORCE=true
 const { chromium } = require('playwright');
 const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }

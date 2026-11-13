@@ -4,6 +4,7 @@
 // borrarlo lo vuelve a mostrar; y que el del seguro sigue mientras tanto.
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_maria1c.js <pdf> [captura.png]
+// corredor: argumentos tests/test_factura.pdf
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
 const registrarCuenta = require('./_registrar');
 const FLETE = 'No pudimos leer el flete de la factura: completalo.';
