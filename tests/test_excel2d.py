@@ -162,7 +162,7 @@ def test_un_sqref_largo_se_parte_hasta_el_tope():
 # Los libros del adversario: (libro, status, palabra del rechazo, segundos).
 SUBIDAS = {
     "120 000 corchetes en un formato": (lambda: _con_formato("[" * 120_000), 400, "formato", 1),
-    "2499 combinadas en 4998 filas": (lambda: _con_combinadas(4_998), 200, None, 3),
+    "2499 combinadas en 4998 filas": (lambda: _con_combinadas(4_998), 200, None, 1.5),
     "9995 combinadas en 19 990 filas": (lambda: _con_combinadas(19_990), 400, "filas", 3),
     "640 000 rangos de formato condicional": (lambda: _con_rangos(640_000), 400, "rangos", 1),
     "300 000 combinadas fuera de las filas": (lambda: _con_refs("mergeCell", 300_000), 400, "rangos", 1),
