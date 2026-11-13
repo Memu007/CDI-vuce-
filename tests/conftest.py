@@ -162,12 +162,6 @@ def _guarda_ve_una_conexion():
     return bool(vistos)
 
 
-def pytest_terminal_summary(terminalreporter):
-    terminalreporter.write_line(
-        f"guarda de conexiones: vio la conexión de prueba de aiosqlite {aiosqlite.__version__}"
-    )
-
-
 @pytest.hookimpl(tryfirst=True)
 def pytest_runtest_setup(item):
     item.stash[_hilos_antes] = _hilos_de_aiosqlite()
