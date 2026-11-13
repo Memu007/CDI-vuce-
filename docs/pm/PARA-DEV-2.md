@@ -7,42 +7,21 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## SUFIJO-BORRADOR: devolución sobre `ee2ee3c` (informe `765db40`), sin integrar (2026-11-13)
+## SUFIJO-BORRADOR: aceptada sobre `52f13ca` (informe `6fbfefd`); se integra después de publicar (2026-11-13 19:19 UTC)
 
-Acta `REPRODUCCION-SUFIJO-BORRADOR-2026-11-13.md`. Reproduje tu rojo y tu
-verde, chequeo-6 (igual al tuyo; el AVISO explicado alcanza), `e2e_maria.sh`
-sobre la entrega y sobre la unión, la suite y los sabotajes. El recargar y
-recuperar quedó bien. Gracias por declarar D236 y no ampliar.
+Acta `REPRODUCCION-SUFIJO-BORRADOR-vuelta-2026-11-13.md`. Reproduje tu verde
+y tu rojo con `ee2ee3c`, `e2e_maria.sh` sobre `52f13ca` y chequeo-6 (igual al
+tuyo). Probé además un ejemplo que no te di: A **generada de verdad** con su
+sufijo, «Nueva operación» y B sin sufijo: frena y no sale ningún pedido; con
+`finalize.js` de `ee2ee3c`, B genera con el de A. Gracias por reconocer la
+objeción y por apartar CUIT-GENERAR con reversiones.
 
-**La causa.** `pintarSufijo` pinta sólo si la operación tiene sufijo; si no,
-el campo conserva el de la operación anterior y «Generar» lo copia. Tu
-informe dice que la herencia «venía de antes y no la cambié»: sin recargar
-es cierto, pero la entrega le suma un camino. Recargar, recuperar A con
-`AA(000123)`, «Nueva operación», B sin sufijo, «Generar»: sobre `9ed8b9a`
-frena con «Es obligatorio»; sobre `ee2ee3c` sale `/generate_maria` 200 y el
-TXT de B con `CSBTSVL=AA(000123)`, mientras los avisos se pidieron con `""`.
+**No la integro todavía:** Emi dio el «dale» para `7436c6e5` y la PR publica
+la cabeza de mi rama. Entra apenas se publique; no cambia nada de tu lado.
 
-**D236: (b), decidido por la PM, dentro de esta pieza.** Es la misma causa.
-Lo que pido es comportamiento:
-- al entrar a «Validación», el campo muestra el sufijo de la operación en
-  curso, vacío si no tiene;
-- una B sin sufijo no genera: «Generar» frena con el aviso y no sale ningún
-  `POST /generate_maria`. Mirar sólo el campo no alcanza;
-- avisos, tarjeta del despachante y TXT usan el mismo valor.
-
-La familia va como datos de un caso: B después de recuperar A, B sin
-recargar, y una operación con el sufijo borrado abierta después de otra con
-sufijo. Rojo sobre `ee2ee3c` antes del arreglo. Quien carga varias
-operaciones seguidas va a tener que escribir el sufijo en cada una: lo llevo
-a la nota del «dale». No va a `PREGUNTAS-DESPACHANTE`: la herencia no está
-escrita en ningún lado.
-
-**D237: (a), decidido por la PM**, como pieza aparte, después de esta
-devolución y de PAIS-NL, y antes de CUIT-GENERAR. Es tu archivo y espera una condición
-observable.
-
-**CUIT-GENERAR:** si ya lo empezaste, apartalo (`git stash` o una rama
-local). No lo mezcles con los commits de la devolución.
+- **D238: (a), decidido por la PM**, como pieza chica aparte, después de D237 (a).
+- Lo del campo sin evento `input` queda así (frena: es la dirección segura).
+- Tu línea de `despachante.js` va a `COLA-LIMPIEZA.md`.
 
 **PAIS-NL (Emi, 13/11: «El código de país de países bajos es 423»).** Hoy la
 sigla «NL» y «NLD» dan 434 (HOLANDA) en el TXT, el catálogo y la pantalla:
@@ -58,12 +37,11 @@ medido y no arreglado: qué queda guardado (operación, catálogo, memoria,
 en 434 sin forma de distinguirlo de un «HOLANDA» puesto a propósito. Sin
 migración dentro de la pieza: eso va como riesgo.
 
-**Cómo sigue:** 1) esta devolución; 2) PAIS-NL (chica; es un código mal en
-el despacho y frena publicar); 3) D237 (a); 4) CUIT-GENERAR (D235 a),
-producto con datos, con revisión fuerte (§3); 5) los vencidos de
+**Cómo sigue:** 1) PAIS-NL (ya); 2) D237 (a); 3) D238 (a); 4) CUIT-GENERAR
+(D235 a), producto con datos, con revisión fuerte (§3); 5) los vencidos de
 `sabotajes-conocidos.txt`, uno por pieza.
 
-**Próxima D: D238.**
+**Próxima D: D239.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
