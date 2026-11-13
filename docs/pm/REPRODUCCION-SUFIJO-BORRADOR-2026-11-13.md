@@ -11,8 +11,8 @@ worktrees en `ee2ee3c`. Veredicto: **devolución por la causa** (abajo).
 | `pantalla_sufijo_borrador1.js` con el `finalize.js` de `9ed8b9a` (commit descartable `ed8b57ce`; es el único archivo de producto que cambia) | rojo: las 3 `FALLA` del informe, idénticas |
 | la misma pantalla sobre `ee2ee3c` | 3 OK y `PANTALLA SUFIJO-BORRADOR OK` |
 | `e2e_maria.sh` sobre `ee2ee3c` y sobre la unión `76193061` (mi rama `64106289` + `ee2ee3c`, merge limpio) | `E2E MARIA OK…`, rc=0 en las dos |
-| `sabotaje_valor1.sh ee2ee3c` | corriendo al escribir el veredicto (17 de 32 `ROJO` hasta ahí); el resultado entra en el commit siguiente |
-| pytest entero sobre la unión `76193061` | corriendo al escribir el veredicto; el resultado entra en el commit siguiente. Un rojo se suma a la devolución |
+| `sabotaje_valor1.sh ee2ee3c`, con el guion del árbol de `ee2ee3c` | `OK: los 32 sabotajes dan rojo por la razón esperada`, rc=0. La primera corrida, la del «17 de 32» que figuraba acá, usó por error el guion de mi rama, que tiene 29 (`OK: los 29…`); no cuenta. Entre `b35d3cb8` y `ee2ee3c` cambian sólo dos guiones: este y `pantalla_sufijo_borrador1.js`, que corrió desde el árbol de la entrega |
+| pytest entero sobre la unión `76193061` | `6126 passed, 110 skipped, 3 xfailed, 109 warnings in 1190.02s`, rc=0; 0 «dejó» |
 
 **Negativos de la PM** (guiones propios fuera del repositorio, datos
 inventados). A = operación con `AA(000123)` escrito en el campo; después
