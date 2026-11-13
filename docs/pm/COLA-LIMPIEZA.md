@@ -232,6 +232,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `tests/conftest.py`, la guarda de conexiones: una fixture de módulo o de
   sesión que deje viva una conexión de aiosqlite haría rojo al primer test
   que la usa, culpándolo a él. Hoy no hay ninguna (FUGA-HILOS-GUARDA).
+- `despachante.js:255`, `sufijoDeLaOperacion()` lee el sufijo del campo del
+  DOM; que lea la operación, como «Generar» y los avisos.
 
 ## Riesgos que esperan a Emi (no son tareas: no se toman de esta cola)
 
