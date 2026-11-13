@@ -3,68 +3,58 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## FUGA-HILOS: aceptada sobre `07e0b2b9` (informe `d9dd73bc`) e integrada (2026-11-13)
+## FUGA-HILOS-GUARDA: aceptada sobre `a58d45d5` (informe `7e36ba88`) e integrada (2026-11-13 16:06 UTC)
 
-Acta `REPRODUCCION-FUGA-HILOS-2026-11-13.md`. **Traé mi rama con `merge`.**
-Sin D. Igual a tu informe: `chequeo-6`, nada fuera de `tests/` y `docs/pm/`,
-un solo `new_event_loop` (la fixture), 0 athrow con el arreglo y 393 con
-`_sql` de `guardar1` devuelto. El pytest entero de la unión con MARIA:
-`6126 passed` (tus 6112 más sus 14), 0 athrow. Conté athrow, no hilos: así
-consta. Los tres caminos de `main.py` que señalaste van a la cola: se toma
-sólo la medición; el arreglo es dinero y queda como riesgo.
+Acta `REPRODUCCION-FUGA-HILOS-GUARDA-2026-11-13.md`. **Traé mi rama con
+`merge`.**
 
-## FUGA-HILOS-GUARDA, decidido por la PM: pieza siguiente, ahora (2026-11-13)
+- Igual a tu informe: `chequeo-6`, sólo `tests/conftest.py` fuera de
+  `docs/pm/`, y el pytest entero sobre `7e36ba88`: `6126 passed, 110 skipped, 3 xfailed, 107 warnings in 1149.00s`, rc=0; 0 «dejó»; 8 «Event loop is closed», los mismos que sin la guarda
+- Mis negativos: `_sql` de `guardar1` devuelto a lo viejo da 12 errors, cada
+  uno con su «dejó»; un `async for … break` en un bucle propio que se cierra
+  sin `shutdown_asyncgens`, y una conexión guardada en una lista del módulo,
+  dan rojo. Doce archivos corridos de a uno, verdes.
+- **Distinto de tu informe, sin defecto:** `aiosqlite.connect` sin cerrar en
+  un test async da **verde** si nadie guarda la conexión (descartada o en una
+  variable local). aiosqlite 0.22 la cierra al soltarla (`Connection.__del__`
+  para el hilo) y el hilo ya no está: por el efecto, verde es lo correcto. Tu
+  caso «directo» seguramente la retenía; en la próxima, el caso va en el
+  repo y se ve.
+- **D230: ahora no, decidido por la PM; (a) va a Emi con mi recomendación.**
+  Es producto, toca cobro y está fuera del roadmap. Leído, no reproducido:
+  el `close` tardío devuelve la conexión al pool, que deshace lo abierto, así
+  que hoy el efecto sería el retraso, no datos a medias; falta medirlo. Va a
+  la cola junto con los otros tres `async for` (misma causa). Qué espera el
+  caso de `test_cobro_corte1` que se rompe lo decide esa pieza.
 
-Hoy nada se pone rojo si un ayudante de `tests/` vuelve a dejar el bucle o el
-generador de la sesión colgados: lo arreglado puede volver sin aviso.
+## GUARDA-VERSION, decidido por la PM: pieza siguiente, ahora (2026-11-13)
 
-**Comportamiento pedido.** Si un test deja una conexión de aiosqlite viva o
-un generador de la sesión sin cerrar, la corrida termina en rojo y nombra al
-test (o al archivo) que la dejó. Por el efecto, no por el texto: un bucle
-armado de otra forma también tiene que verse.
+La guarda reconoce las conexiones por el nombre que Python le pone al hilo de
+aiosqlite 0.22 (`Thread-N (_connection_worker_thread)`). En 0.19, 0.20 y
+0.21 (miré los paquetes) la conexión es ella misma el hilo y se llama
+`Thread-N`: la guarda no ve nada y no avisa. `requirements.txt:94` pide
+`>=0.19.0` sin tope: puede quedar ciega para atrás (un venv viejo) o para
+adelante (una versión nueva), sin ningún commit. Y en el repo nada prueba
+que la guarda funciona: tus casos de la puerta 2 quedaron afuera.
+
+**Comportamiento pedido.** Si la guarda deja de ver una conexión de
+aiosqlite que queda viva (por la versión instalada o porque alguien la
+rompe), la corrida de pytest termina en rojo y dice por qué. Sólo `tests/`.
 
 **Puertas.**
-1. Primero, quién deja los «Event loop is closed» que cambian de test en cada
-   corrida (`_connection_worker_thread`, la misma familia): la causa, con la
-   salida. Hasta tenerla, la guarda no los cuenta y el informe lo dice; si
-   los contara sin causa, saldría intermitente.
-2. Rojo con un ayudante que no sea `_sql` de `guardar1`, y con la fuga escrita
-   de otra forma que `new_event_loop().run_until_complete` (por ejemplo,
-   salir del `async for` sin cerrar el generador). Verde con el arreglo.
-3. No la disparan los hilos que viven todo el proceso: los 8 de los pools de
-   `main.py` y `file_security.py`, `MainThread` y el `_DummyThread`.
-4. `pytest` entero: mismos `passed` que tu base, y el tiempo antes y después.
+1. Rojo con aiosqlite 0.21 en un venv aparte, verde con 0.22.1: las dos
+   salidas.
+2. Rojo con la guarda rota a mano (por ejemplo, otro sufijo de nombre), una
+   vez, con la salida.
+3. Una fuga escrita de otra forma que `new_event_loop().run_until_complete`
+   queda en el repo y la suite normal muestra que la guarda la ve, sin quedar
+   roja.
+4. `pytest` entero: tus `passed` de antes más los nuevos, y el tiempo.
 
-Fuera: el producto, `ci.yml` (hasta que te lo escriba acá) y los guiones de
-MARIA. Sin esperas fijas nuevas. Sin adversarios. Si Emi dice que sí a subir
-el tope de la CI de 20 a 30 min, te lo paso como pieza chica y va antes. D182
-/ D206: si Emi dice que sí, dejás esto donde esté. D205, D206 y D208 siguen
-con Emi. **Próxima D: D230** (rango D228–D233).
-
-## EXCEL2D-RELOJ, vuelta 3: aceptada sobre `cc8c7b7d` (informe `c4b16b53`) e integrada (2026-11-13 12:21 UTC)
-
-Integro exactamente `d1ee0b71`. Acta `REPRODUCCION-EXCEL2D-RELOJ-2026-11-13.md`,
-«Vuelta 3». **Traé mi rama con `merge`.** Sin D.
-
-- Igual a tu informe: con 0,8 s y con 4 s, rojo con 0, 1000 y 3000 hilos y la
-  espera medida pareja (0,78 a 0,79 s; 3,98 a 3,99 s). Sin espera, verde en
-  los tres. `chequeo-6` igual.
-- Valores míos distintos de los tuyos: 0,6 s da rojo en los tres (0,58 a
-  0,59 s), y un `time.sleep(0.8)` (otra clase de espera) también.
-- `sabotajes/excel2d.sh` con 1000 hilos: 21 `ROJO`, falla 0. Tenías razón:
-  son 21; mis «6» eran los que caen en esta prueba.
-- El gasto sin la CPU del testigo: no lo pedí, lo miré y queda.
-- Riesgo a la cola, no devolución: el veredicto de la foto de `/proc` cubre el
-  salto entero; un hilo listo en esa foto esconde ese salto.
-
-## NAVEGADOR: aceptada sobre `740eac45` (informe `9059c696`) e integrada (2026-11-13 11:39 UTC)
-
-Integro `5c0faf45`. Acta `REPRODUCCION-NAVEGADOR-2026-11-13.md`. **Traé mi
-rama con `merge`.** Sin D. Lo reproducido: `31 chromium.launch()`, ningún
-`CHROMIUM` en `scripts/`, las tres pantallas en verde, 34 `ROJO` en
-`sabotajes/cliente1.sh`, y `chequeo-6` igual al tuyo. Negativo mío: ninguna
-ruta `pw-browsers` ni `executablePath` fuera de `docs`. Saqué de la cola de
-limpieza la parte del navegador; las esperas fijas siguen ahí.
+Fuera: el producto, `requirements.txt`, `ci.yml` y lo de MARIA. Sin esperas
+fijas nuevas. Sin adversarios. Lo que sigue después espera a Emi (punto 14,
+D182, D206): si al entregar no contestó, no arranques otra cosa; te aviso
+yo. **Próxima D: D231** (rango D228–D233).
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 
@@ -73,31 +63,6 @@ para la pieza: D201 con el dato de que los créditos extra vencidos no se
 gastan en un alta manual; D202 con tu condición (si el caso 4 da 200 con
 algo perdido, pasás a (b)); D203 con `cancel_billing`/`reactivate_billing` +
 alta como datos del caso 6.
-
-## CONEXIONES-1 G: aceptada sobre `6ce56cf9` e integrada (2026-11-12 10:13 UTC)
-
-Evidencia y detalle: acta `REPRODUCCION-CONEXIONES-1-2026-11-12.md`,
-sección G (en Git, `a7240cdb`). D188, D186 (b) y D182/D183 están con Emi;
-D189 (b) y D184 (a) los decidió la PM.
-
-## FOCO-PERFIL: aceptada sobre `dc4cf077` e integrada (2026-11-12 03:37 UTC)
-
-Evidencia: `docs/pm/REPRODUCCION-BORRADOR-1-2026-11-10.md`, «FOCO-PERFIL».
-Integré con `merge` exactamente `365ee834`. Sin D.
-
-- Igual a tu informe: `foco_perfil.sh` sobre `5f78311a`, dos veces, rc=1 y
-  PIERDE en los dos casos con los mismos valores robados; sobre `dc4cf077`,
-  rc=0 y NO PIERDE con el reloj a 3000 ms tres veces. `chequeo-6` igual.
-- Mi negativo: sólo el paso con `p2` vuelto a lo viejo da rc=1 y PIERDE en
-  los dos casos, en la tercera apertura. La reproducción distingue cada una.
-- `sabotajes/estudio1.sh` sobre `dc4cf077`: 37 ROJO, «sabotajes sin rojo:
-  0», rc=0. Tu corrida sobre `78d4188e` vale: lo que cambia después es sólo
-  `foco_perfil.sh`.
-- Alcance mirado: `cobro_mp1` no escribe en el perfil (bien sacado);
-  `sesion1` es de MARIA y ya está avisada.
-- `foco_perfil.sh` queda en el repo (tu supuesto, aceptado). El arreglo de
-  producto del foco, cuando salga de la cola, cambia `abrirMisEstudios` y
-  actualiza o saca `foco_perfil.sh` en el mismo commit.
 
 ## CONEXIONES-1 C: aceptada como medición sobre `9ecfd2ac` e integrada (2026-11-12 03:29 UTC)
 

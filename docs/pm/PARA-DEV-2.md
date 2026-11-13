@@ -3,6 +3,10 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
+## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
+
+Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge.
+
 ## CUIT-PERFIL: aceptada sobre `af396041` (informe `9ed8b9a9`) e integrada (2026-11-13)
 
 Acta `REPRODUCCION-CUIT-PERFIL-2026-11-13.md`. **Traé mi rama con `merge`.**
