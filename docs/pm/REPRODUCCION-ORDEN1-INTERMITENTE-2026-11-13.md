@@ -15,7 +15,7 @@ SHA entregado y en la base, con el `correr_pantallas.sh` y el
 | `api.log` de esa corrida de la base | `POST /api/session/state` y `POST /auth/logout` 200; un único 401 en `GET /auth/current_user`; después `GET /?next=%2Fdashboard`: la pestaña fue al login |
 | sabotaje de la PM: `ESPERA_SESION_MS` 10000 → 2000 en `app_v2.js`, `CASOS=z22`, servidor y base nuevos, `CSRF_ENFORCE=true`, dos veces por SHA | base: `rc=1 FALLA: A salió, volvió a entrar y generó enseguida y no generó: error: No se pudo comprobar la sesión. Recargá la página.` las dos; `8e775b2b`: `rc=0 OK=2` las dos |
 | `orden1b.sh 8e775b2b` (sabotajes de la pantalla) | 29 `ROJO`, `sabotajes sin rojo: 0` |
-| corredor entero sobre `8e775b2b` | en curso al escribir; el resultado va en la «Última vuelta» de `NOW.md` |
+| corredor entero sobre `8e775b2b` (terminó 04:51 UTC) | `resumen: 30 verdes, 0 rojas`, rc=0 |
 
 ## Lectura
 
