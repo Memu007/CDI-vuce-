@@ -225,6 +225,9 @@ de Git de este archivo y en sus `REPRODUCCION-*`.
   probó el Excel en el sitio y anda.
 - `8b45207` (2026-10-24 20:33 UTC): EXCEL-3 + CLIENTE-1, «dale 8b45207».
   Avance directo de `dddcf6d`. Falta lo que verifica Emi.
+- `7436c6e5` (2026-11-13 19:23 UTC, merge `f734fbb3`): «dale 7436c6e5» y copia
+  de la base confirmada por Emi. Código de `main` idéntico a `7436c6e5`. Falta
+  lo que verifica Emi: deploy activo, «quedan por un choque» = 0, login admin.
 
 ## Reglas
 
