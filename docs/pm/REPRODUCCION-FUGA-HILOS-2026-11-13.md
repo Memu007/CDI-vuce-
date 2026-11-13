@@ -13,11 +13,8 @@ MARIA `9ed8b9a9` + `d9dd73bc`). Veredicto: **aceptada e integrada**.
 | subconjunto de 8 archivos (los 5 de `_sql` de `guardar1` más `admin2`, `permisos2`, `cobro_corte1`), arreglo | `337 passed`, 0 `async_generator_athrow` |
 | el mismo subconjunto con `_sql` de `guardar1` devuelto a `new_event_loop().run_until_complete` | `337 passed`, 393 `async_generator_athrow` (el informe: 393 hilos de aiosqlite) |
 | pytest entero sobre la unión `f1403811`, con un plugin mío que deja 1075 hilos quietos desde el arranque (lo que la base acumulaba): la suite no depende de tener hilos libres | `6126 passed, 110 skipped, 3 xfailed`, rc=0, 19 min; 0 `async_generator_athrow`. Son los 6112 del informe más los 14 de `test_cuit_perfil.py` de MARIA |
+| censo de hilos al cerrar la sesión (plugin mío que mide antes de la limpieza de huérfanas de `conftest.py`), los 5 archivos de `_sql` de `guardar1` | arreglo: `210 passed`, 2 hilos, 0 de aiosqlite. Sabotaje de arriba: `210 passed`, 395 hilos, 393 de aiosqlite (el informe: 395 y 393) |
 | «Event loop is closed» en esa corrida | 3 avisos, en `clientes_crud`, `prelaunch_block1` y `separadores1b`: otros tests que los del informe, como dice la Dev |
-
-**Lo que medí distinto.** Conté líneas `async_generator_athrow`, no hilos: el
-censo de hilos de las puertas 1 y 4 no lo reproduje. Los dos números van
-juntos en el informe (1113/1113 y 393/393), y el de athrow sí lo reproduje.
 
 **Riesgo, sin test.** Ningún caso se pone rojo si un ayudante de `tests/`
 vuelve a `new_event_loop().run_until_complete`: la puerta 4 pedía una
@@ -30,4 +27,4 @@ Pago, 8 `return`), `main.py:1986` (`api_logs`, en cada pedido registrado) y
 `main.py:1695` (arranque). Nadie midió su efecto en el pool de Postgres. Va a
 la cola como riesgo; tocarlo es producto con dinero y pide revisión fuerte.
 
-No corrido: Postgres, el censo de hilos, adversarios (pieza sin adversarios).
+No corrido: Postgres, el censo de hilos de la suite entera (el informe: 1123 → 10), adversarios (pieza sin adversarios).
