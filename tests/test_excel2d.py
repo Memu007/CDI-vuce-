@@ -8,6 +8,7 @@ celda y más de 64 000 rangos entre los sqref, las celdas combinadas y los
 vínculos de la primera hoja: openpyxl arma un objeto por cada uno.
 """
 import io
+import os
 import re
 import struct
 import threading
@@ -171,6 +172,18 @@ SUBIDAS = {
 }
 
 
+def _otro_hilo_listo():
+    for tid in os.listdir("/proc/self/task"):
+        if int(tid) != threading.get_native_id():
+            try:
+                with open(f"/proc/self/task/{tid}/stat") as f:
+                    if f.read().rsplit(")", 1)[1].split()[0] == "R":
+                        return True
+            except OSError:  # el hilo terminó entre listar y leer
+                pass
+    return False
+
+
 @pytest.mark.parametrize("subida", list(SUBIDAS))
 def test_la_subida_cara_no_frena_a_nadie(subida):
     libro, status, palabra, segundos = SUBIDAS[subida]
@@ -178,12 +191,14 @@ def test_la_subida_cara_no_frena_a_nadie(subida):
     assert len(libro) < 1_500_000
     # Otro hilo marca el paso: con el GIL retenido por openpyxl se quedaba 9 s.
     # Se mide CPU del proceso y no reloj: un runner cargado alarga el reloj, no la CPU.
-    pasos, listo = [time.process_time()], threading.Event()
+    # Una espera sin CPU se mide aparte: con carga, algún hilo queda listo para
+    # correr (R); esperando, ninguno lo está.
+    pasos, listo = [(time.monotonic(), time.process_time(), True)], threading.Event()
 
     def marcar():
         while not listo.wait(0.01):
-            pasos.append(time.process_time())
-        pasos.append(time.process_time())
+            pasos.append((time.monotonic(), time.process_time(), _otro_hilo_listo()))
+        pasos.append((time.monotonic(), time.process_time(), True))
     otro = threading.Thread(target=marcar)
     otro.start()
     inicio = time.process_time()
@@ -193,8 +208,11 @@ def test_la_subida_cara_no_frena_a_nadie(subida):
     finally:
         listo.set()
         otro.join()
-    frenado = max(b - a for a, b in zip(pasos, pasos[1:]))
+    saltos = [(b[0] - a[0], b[1] - a[1], b[2]) for a, b in zip(pasos, pasos[1:])]
+    frenado = max(cpu for _, cpu, _ in saltos)
     assert frenado < 1, f"el otro hilo no avanzó mientras el proceso gastó {frenado:.2f} s de CPU"
+    espera = sum(reloj for reloj, cpu, alguno in saltos if cpu < reloj / 20 and not alguno)
+    assert espera < 0.5, f"la subida esperó {espera:.2f} s sin gastar CPU"
     gasto = time.process_time() - inicio
     assert gasto < segundos, f"la subida gastó {gasto:.2f} s de CPU"
     assert r.status_code == status, r.text[:300]
