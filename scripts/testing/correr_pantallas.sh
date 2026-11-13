@@ -76,7 +76,7 @@ verdes=0; rojas=()
 for f in "$WT"/scripts/testing/pantalla_*.js; do
   n=$(basename "$f" .js); n=${n#pantalla_}
   correr_una "$n"
-  ultima=$(grep -v '^[[:space:]]*$' "$SAL/$n.log" | tail -1)
+  ultima=$(sed -E 's/\x1b\[[0-9;]*m//g' "$SAL/$n.log" | grep -v '^[[:space:]]*$' | tail -1)
   if [ "$RC" -eq 0 ]; then estado=verde; verdes=$((verdes + 1)); else estado=ROJA; rojas+=("$n"); fi
   printf '%-5s %-14s rc=%-3s %s | %s\n' "$estado" "$n" "$RC" "$SAL/$n.log" "${ultima:0:160}"
 done
