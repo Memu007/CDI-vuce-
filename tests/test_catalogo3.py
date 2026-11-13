@@ -302,7 +302,7 @@ def test_paises_bajos_es_423_y_holanda_434():
     esperado = [423] * len(PAISES_BAJOS) + [434]
     assert [get_pais_codigo(origen_para_catalogo(p)[0]) for p in formas] == esperado
     assert [maria_generator_export.get_pais_codigo(p) for p in formas] == esperado
-    # Lo que un lector deja guardado genera el mismo código que lo que leyó.
+    # Escrito de estas formas, lo que cada lector deja guardado genera el mismo código.
     for lector in (pdf_extractor._origen_desde_factura, despacho_lector.origen_iso2):
         assert [maria_generator.codigo_de_pais(lector(p)) for p in formas] == esperado, lector.__name__
     items = [{"pieza": "84713000", "descripcion": f"Producto {i}", "cantidad": 1, "valor_unitario": 10,
