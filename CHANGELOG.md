@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-13 · fix: «NL» y «NLD» son Países Bajos, código 423 (PAIS-NL)
+
+- La sigla «NL» y «NLD» dan 423 (PAISES BAJOS) en el TXT, el catálogo y la pantalla: antes daban 434 (HOLANDA). «HOLANDA» escrito así sigue en 434.
+- Lo que ya estaba guardado como «NL» pasa a 423 sin tocarlo. Lo que se escribió como «NL» en el campo de origen de la pantalla antes de este cambio quedó guardado como «434» y sigue en 434: se corrige a mano.
+
 ## 2026-11-13 · fix: una operación sin sufijo de valor ya no genera con el de la operación anterior (SUFIJO-BORRADOR)
 
 - Al entrar a «Validación», el campo «Sufijo de valor SBT» muestra el de la operación en curso y queda vacío si no tiene: antes conservaba el de la operación anterior y «Generar» lo mandaba al TXT.
