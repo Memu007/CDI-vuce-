@@ -673,18 +673,13 @@
     async function onGenerate() {
         if (lastValidation && (lastValidation.errores || []).length > 0) return;
 
-        // Guardar SBT del input al estado antes de generar
-        CDI.state = CDI.state || {};
-        CDI.state.operacion = CDI.state.operacion || {};
-        if (sbtInput) {
-            CDI.state.operacion.sbt_sufijo_valor = sbtInput.value.trim();
-        }
         // Validación frontend: si está vacío, mostrar error junto al campo.
         // No hace falta si todos los productos llevan sufijo propio, en sus
         // subítems (SUBITEMS-1) o en «Lo que decide el despachante»
         // (SUFIJOS-1); el servidor tampoco lo pide.
         const todosConSufijoPropio = Boolean(CDI.despachante && CDI.despachante.todosConPropio());
-        if (!CDI.state.operacion.sbt_sufijo_valor && !todosConSufijoPropio) {
+        const sufijo = String(((CDI.state || {}).operacion || {}).sbt_sufijo_valor || '').trim();
+        if (!sufijo && !todosConSufijoPropio) {
             if (sbtError) {
                 sbtError.textContent = 'Ingresá el sufijo de valor SBT. Es obligatorio.';
                 sbtError.hidden = false;
