@@ -75,6 +75,9 @@ def test_dos_proveedores_distintos_no_comparten_catalogo(client, a, b):
     ("Industrias García Nº1", "industrias_garcia_n_1"),
     ("Hermanos 1ª SA", "hermanos_1_sa"),
     ("10µF Corp", "10_f_corp"),
+    # no entra en 60: corte y resumen
+    ("Sudamericana de Importaciones y Distribuciones Generales del Litoral SA",
+     "sudamericana_de_importaciones_y_distrib~b74fb800ad974e4778d7"),
 ])
 def test_un_proveedor_latino_conserva_su_id(nombre, vid):
     assert catalog_service._vendor_key(nombre) == vid

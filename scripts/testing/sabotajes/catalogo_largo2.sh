@@ -2,8 +2,8 @@
 # Negativos de CATALOGO-LARGO-2: cada sabotaje deshace una línea de la pieza y
 # tests/test_catalogo_largo2.py tiene que ponerse roja por ese motivo. Con
 # PG_URL (un Postgres local y descartable), también la migración contra
-# scripts/testing/catalogo_largo2_postgres.py. El tope medido en NFC lo
-# distinguen los sabotajes de catalogolargo1.sh.
+# scripts/testing/catalogo_largo2_postgres.py y catalogo3_postgres.py. El tope
+# medido en NFC lo distinguen los sabotajes de catalogolargo1.sh.
 #
 # uso: PY=/ruta/al/venv/bin/python [PG_URL=postgresql://cdi@127.0.0.1:5432/postgres] \
 #        scripts/testing/sabotajes/catalogo_largo2.sh [SHA]
@@ -25,6 +25,7 @@ FALLAS=0
 T=tests/test_catalogo_largo2.py
 PRUEBA=("$PY" -m pytest -q --no-cov -p no:cacheprovider "$T")
 PRUEBA_PG=("$PY" -I scripts/testing/catalogo_largo2_postgres.py "$PG_URL")
+PRUEBA_PG_ITEMS=("$PY" -I scripts/testing/catalogo3_postgres.py "$PG_URL")
 
 # sabotaje <archivo> <nombre> <texto original> <texto saboteado> <lo que el rojo tiene que decir>...
 # Corre la prueba de "${CORRE[@]}".
@@ -53,6 +54,16 @@ PYEOF
     echo "ROJO? | $nombre: rojo (salida $codigo), pero sin «$falta»"
     grep -E "^E |^FALLA" <<<"$salida" | head -5; FALLAS=$((FALLAS+1))
   fi
+}
+
+# base_en_verde <nombre>: corre "${CORRE[@]}" sin sabotaje. Si ya está roja,
+# suma una falla y muestra el final de su salida.
+base_en_verde() {
+  local salida
+  git checkout -q -- proyecto_maria/
+  salida="$("${CORRE[@]}" 2>&1)" && return
+  echo "BASE  | $1 ya está en rojo sin sabotaje"; tail -n 3 <<<"$salida"; FALLAS=$((FALLAS+1))
+  return 1
 }
 
 M=proyecto_maria/main.py
@@ -197,10 +208,7 @@ sabotaje $CS "cambiar cualquier campo mueve la clave de una fila vieja" \
 
 if [ -n "$PG_URL" ]; then
   CORRE=("${PRUEBA_PG[@]}")
-  git checkout -q -- proyecto_maria/
-  if ! "${CORRE[@]}" >/dev/null 2>&1; then
-    echo "BASE  | la prueba en Postgres ya está en rojo sin sabotaje"; FALLAS=$((FALLAS+1))
-  else
+  if base_en_verde "la prueba en Postgres"; then
     sabotaje $M "el arranque no pasa el origen a text" \
       '("product_key", "descripcion", "origen", "vendor_nombre")' \
       '("product_key", "descripcion", "vendor_nombre")' \
@@ -248,6 +256,14 @@ if [ -n "$PG_URL" ]; then
       '    return texto' \
       "FALLA | 2000 caracteres CJK por catálogo" "FALLA | 2000 caracteres CJK por guardar-uso" \
       "FALLA | 2000 caracteres CJK por cambiar la descripción"
+  fi
+  # operation_items sólo lo mira catalogo3_postgres.py
+  CORRE=("${PRUEBA_PG_ITEMS[@]}")
+  if base_en_verde "catalogo3_postgres.py"; then
+    sabotaje $M "el arranque no pasa el origen de los ítems a text" \
+      '                            ("operation_items", ("origen",))):' \
+      '                            ):' \
+      "FALLA | operation_items.origen pasa a text y la fila vieja queda igual"
   fi
 else
   echo "SALTO | sin PG_URL: la migración no se midió"
