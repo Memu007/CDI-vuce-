@@ -3,6 +3,40 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## EXCEL2D-RELOJ vuelve: con muchos hilos en el proceso, `pytest` entero da rojo (2026-11-13 09:30 UTC)
+
+Lo encontró MARIA (D234, informe `fdaa2da5`) y lo reproduje 2 de 2. Es un
+escape mío: acepté sin `pytest` entero (la CI de la PR dio verde).
+
+**Causa.** `_otro_hilo_listo()` (`tests/test_excel2d.py:175`) recorre
+`/proc/self/task` en cada marca. En la suite entera el proceso llega a esta
+prueba con ~1080 hilos dormidos: el testigo casi no marca (3 o 4 marcas contra
+~40) y `frenado` mide al testigo, no a la subida. En un contenedor de 4
+núcleos, `test_la_subida_cara_no_frena_a_nadie[9995 combinadas en 19 990
+filas]` dio rojo 2 de 2 (1,01 y 1,26 s).
+
+**Camino de hoy (4 s):** un plugin que arranca 1075 hilos dormidos en
+`pytest_sessionstart` (está entero en `PARA-PM-2.md` de `fdaa2da5`, «Para
+reproducir», comando 4) y `pytest tests/test_excel2d.py -k no_frena -p
+hilos_plugin`. Mío: `1 failed` (1,47 y 1,13 s); sin el plugin, `7 passed`.
+
+**Si tu suite entera de CONFTEST-FORK da este rojo, es éste:** no lo
+diagnostiques ahí. Las puertas 1 y 4 de abajo se leen contra los rojos de la
+base, que ya trae éste.
+
+**Cuándo: apenas entregues CONFTEST-FORK, antes de NAVEGADOR.** Que la prueba
+no dependa de cuántos hilos tenga el proceso. Puertas:
+
+1. El caso en verde con 0, ~1000 y ~3000 hilos dormidos puestos.
+2. `sabotajes/excel2d.sh` sigue con sus `ROJO` (GIL retenido y espera sin
+   CPU) también con ~1000 hilos puestos.
+3. `pytest` entero sobre tu SHA sin este rojo.
+4. El informe dice quién deja los ~1080 hilos (arnés o producto), sin
+   arreglarlo. Si es producto, es una fuga en un proceso que en Railway vive
+   mucho y va a pieza aparte.
+
+Fuera: subir el tope de 1 s.
+
 ## DOS-RELOJES: aceptada sobre `894bc67a` (informe `89d74bbe`) e integrada (2026-11-13 08:30 UTC)
 
 Integro `89d74bbe`. Acta `REPRODUCCION-DOS-RELOJES-2026-11-13.md`. **Traé mi
@@ -28,20 +62,26 @@ borrando al salir. Puertas, cada una con su salida en el informe:
    `pytest tests/test_excel2d.py --no-cov` da lo mismo (el padre borra).
 3. La prueba del pool del acta (`ProcessPoolExecutor(4)`) sigue `1 passed`;
    a mano, no hace falta dejarla en `tests/`.
-4. Suite entera sobre tu SHA: los `passed` de la base más uno, sin rojos
-   nuevos.
+4. Suite entera sobre tu SHA: los `passed` de la base más uno y los mismos
+   rojos que la base (hoy trae el de EXCEL2D-RELOJ, arriba).
+
+Para la puerta 1 vale otra prueba que también distinga: ojo que
+`atexit._run_exitfuncs()` corre todos los cierres registrados, no sólo el del
+conftest.
 
 Fuera: SIGTERM (queda en la cola). Sugerencia, no criterio: borrar sólo
 desde el proceso que creó la base.
 
-**Apenas entregues: NAVEGADOR** (sólo arnés, tus pantallas).
+**Después de EXCEL2D-RELOJ: NAVEGADOR** (sólo arnés, tus pantallas).
 `pantalla_borrador1.js:41` abre el navegador por ruta fija y
 `pantalla_cliente1.js:28` y `pantalla_destino1.js:18` por `CHROMIUM` o ruta
 fija; las otras 27 pantallas usan `chromium.launch()`. Que las 30 lo pidan
 igual. Puertas: `grep -ho 'chromium.launch([^;]*' scripts/testing/*.js |
 sort | uniq -c` da una sola forma; las tres pantallas en verde con
 `correr_pantallas.sh`; `sabotajes/cliente1.sh` sigue con sus `ROJO` y
-«sabotajes sin rojo: 0». Fuera: las esperas fijas de `pantalla_maria1b.js` y
+«sabotajes sin rojo: 0». La forma única la elegís vos y la decís; si al
+final ninguna pantalla lee `CHROMIUM`, sale también de `correr_pantallas.sh`
+(`:24` y `:56`). Fuera: las esperas fijas de `pantalla_maria1b.js` y
 `pantalla_excel1.js`, y todo lo de MARIA.
 
 Igual que antes: sin adversarios; no toques los guiones de MARIA. D182 / D206

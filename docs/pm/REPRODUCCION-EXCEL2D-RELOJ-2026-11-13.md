@@ -54,3 +54,16 @@ tope. El margen del tope va a Emi
 
 No corrido: pytest entero, adversarios (sólo pruebas) y el corredor entero
 para D228 (sólo `destino1` y `cliente1`).
+
+## Escape (2026-11-13 09:25 UTC)
+
+Lo encontró MARIA (D234, informe `fdaa2da5`): `pytest` entero da rojo en
+`test_la_subida_cara_no_frena_a_nadie[9995 combinadas en 19 990 filas]`, 2 de
+2 en su contenedor (1,01 y 1,26 s contra el tope de 1 s). Acepté sin `pytest`
+entero y la CI de la PR, que sí lo corre, dio verde.
+
+Causa, reproducida por mí: `_otro_hilo_listo()` recorre `/proc/self/task` en
+cada marca. La suite llega a esta prueba con ~1080 hilos dormidos; el testigo
+casi no marca y `frenado` mide al testigo. La prueba sola con 1075 hilos
+dormidos puestos por un plugin: `1 failed` 2 de 2 (1,47 y 1,13 s); sin el
+plugin, `7 passed`. Vuelve a la Técnica (`PARA-DEV.md`).
