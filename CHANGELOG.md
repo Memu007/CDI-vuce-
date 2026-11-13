@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-13 · fix: «Mi perfil» no guarda un CUIT con el dígito verificador equivocado (CUIT-PERFIL)
+
+- Al guardar el perfil, un CUIT que no cierra con su verificador se rechaza y el error queda junto al campo: antes alcanzaba con que tuviera 11 dígitos, y de ahí sale el CUIT del despachante en el TXT.
+- Un CUIT inválido que ya estaba guardado no se cambia: «Mi perfil» lo muestra y pide corregirlo (o borrarlo) antes de guardar.
+
 ## 2026-11-13 · fix: un ajuste del valor mal escrito se sigue viendo después de recargar (AJUSTE-BORRADOR)
 
 - Si en «Ajustes a incluir» o «Ajustes a deducir» quedó algo que no se puede leer y se recarga la página, la operación recuperada lo muestra en su campo: antes el aviso lo nombraba y el campo aparecía vacío.

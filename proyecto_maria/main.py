@@ -2395,6 +2395,7 @@ async def update_user_profile(
     el generador TXT lo use siempre en el mismo formato.
     """
     import re
+    from proyecto_maria.core.controles_maria import cuit_valido
 
     result = await db.execute(select(User).where(User.username == user["username"]))
     u = result.scalars().first()
@@ -2424,17 +2425,17 @@ async def update_user_profile(
         raw_name = body.get("name") or ""
         u.name = _guardable_en_pg(str(raw_name).strip()[:100]) or None
 
-    # CUIT: solo digitos, 11 chars. Permitimos limpiar con string vacio
+    # CUIT: 11 digitos con su verificador. Permitimos limpiar con string vacio
     if "cuit" in body:
         raw_cuit = str(body.get("cuit") or "").strip()
         if raw_cuit == "":
             u.cuit = None
         else:
             digits = re.sub(r"\D", "", raw_cuit)
-            if len(digits) != 11:
+            if not cuit_valido(digits):
                 raise HTTPException(
                     status_code=400,
-                    detail="CUIT debe tener 11 digitos",
+                    detail="El CUIT no es válido: 11 dígitos, con o sin guiones, y el último es el verificador.",
                 )
             u.cuit = digits
 
