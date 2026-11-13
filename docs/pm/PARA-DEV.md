@@ -3,67 +3,25 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## EXCEL2D-RELOJ, vuelta 2: devolución sobre `c4a30b5a` (informe `25e13c44`) (2026-11-13 11:39 UTC)
+## EXCEL2D-RELOJ, vuelta 3: aceptada sobre `cc8c7b7d` (informe `c4b16b53`) e integrada (2026-11-13 12:21 UTC)
 
-Integré tu rama entera con NAVEGADOR (abajo), así que `c4a30b5a` ya está en
-la mía: con él, `pytest` entero da `6112 passed` sin rojos. **Integrada no es
-aceptada.** Las puertas 1 a 3 pasan, y el frenado ya no depende de los hilos. Pero la
-**espera** sí depende. Evidencia en
-`docs/pm/REPRODUCCION-EXCEL2D-RELOJ-2026-11-13.md`, «Vuelta 2».
+Integro exactamente `d1ee0b71`. Acta `REPRODUCCION-EXCEL2D-RELOJ-2026-11-13.md`,
+«Vuelta 3». **Traé mi rama con `merge`.** Sin D.
 
-**Causa.** El salto en el que el testigo recorre `/proc/self/task` se marca
-como «otro hilo listo» (`True`) y no suma a la espera. Con muchos hilos, ese
-recorrido dura más que el tic de 10 ms, y de cada vuelta sólo cuenta como
-espera el tic. Con una espera real de 4 s: 3,91 s
-medidos con 0 hilos, 1,95 s con 1000 y 0,87 s con 3000. El sabotaje de 4 s
-sigue rojo porque sobra margen, no porque la prueba lo mida bien.
+- Igual a tu informe: con 0,8 s y con 4 s, rojo con 0, 1000 y 3000 hilos y la
+  espera medida pareja (0,78 a 0,79 s; 3,98 a 3,99 s). Sin espera, verde en
+  los tres. `chequeo-6` igual.
+- Valores míos distintos de los tuyos: 0,6 s da rojo en los tres (0,58 a
+  0,59 s), y un `time.sleep(0.8)` (otra clase de espera) también.
+- `sabotajes/excel2d.sh` con 1000 hilos: 21 `ROJO`, falla 0. Tenías razón:
+  son 21; mis «6» eran los que caen en esta prueba.
+- El gasto sin la CPU del testigo: no lo pedí, lo miré y queda.
+- Riesgo a la cola, no devolución: el veredicto de la foto de `/proc` cubre el
+  salto entero; un hilo listo en esa foto esconde ese salto.
 
-Recorrer `/proc` hace falta: con un negativo que nunca lo recorre, «la subida
-espera 4 s sin gastar CPU» queda `VERDE` con 1000 hilos.
-
-**Lo avisaste vos** («El margen del sabotaje de espera»), pero no es sólo
-margen: la suite entera de hoy ya llega a ~1080 hilos, y con 1000 una espera
-de 0,8 s pasa sin que nadie la vea. D229 (a) baja los hilos, pero la prueba
-tiene que medir bien igual: otra fuga la volvería a cegar.
-
-**Camino de hoy.** Con el plugin de hilos de MARIA, con la cantidad por
-variable (`hilos_plugin.py`):
-
-```python
-import os, threading
-_fin = threading.Event()
-def pytest_sessionstart(session):
-    for _ in range(int(os.environ.get("HILOS", "1075"))):
-        threading.Thread(target=_fin.wait, daemon=True).start()
-def pytest_sessionfinish(session):
-    _fin.set()
-```
-
-En `proyecto_maria/main.py`, después de
-`    contents, liviano = await validar_con_carril(file, 'excel', max_size=max_upload_bytes)`,
-agregá `await __import__("asyncio").sleep(0.8)`. Después, para 0, 1000 y 3000:
-
-```bash
-HILOS=1000 PYTHONPATH=<carpeta del plugin> pytest -p hilos_plugin \
-  tests/test_excel2d.py -k "no_frena and 2499" --no-cov
-```
-
-Mío sobre `c4a30b5a`: `1 failed` (0,77 s medidos) con `HILOS=0`, y
-`1 passed` con 1000 y con 3000.
-
-**Pedido.** Que la espera medida no dependa de cuántos hilos tenga el
-proceso. Puertas:
-
-1. Con la espera de 0,8 s, el caso da rojo con 0, ~1000 y ~3000 hilos.
-2. Sin sabotaje, el caso en verde con 0, ~1000 y ~3000 hilos.
-3. Con la espera de 4 s, el informe trae la espera medida con 0, ~1000 y
-   ~3000 hilos, y las tres dan parecido (hoy 3,91 / 1,95 / 0,87 s).
-4. `sabotajes/excel2d.sh` con sus 6 `ROJO`, también con ~1000 hilos.
-5. `pytest` entero sobre tu SHA sin rojos nuevos.
-
-Fuera: subir el tope de 1 s y bajar el de 0,5 s.
-
-**Cuándo:** ahora, antes de la pieza de D229.
+**Sigue:** FUGA-HILOS (abajo), ahora. Si Emi dice que sí a subir el tope de
+la CI de 20 a 30 min, te lo paso como pieza chica y va antes; hasta que te lo
+escriba acá, no toques `ci.yml`.
 
 ## NAVEGADOR: aceptada sobre `740eac45` (informe `9059c696`) e integrada (2026-11-13 11:39 UTC)
 
