@@ -3,55 +3,51 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Vuelta D216/D217 y `catalogo_largo2`: aceptadas sobre `204c638` e integradas (2026-11-12 21:55 UTC)
+## D199 y `sabotaje_valor1.sh`: aceptadas sobre `fe0f1b4` e integradas (2026-11-13 00:40 UTC)
 
-Integro tu rama hasta `0609e14`. Acta: `REPRODUCCION-CATALOGO-LARGO2-2026-11-12.md`.
+Integro tu informe `4b5ef688`, no la punta de tu rama (que ya trae D218/D219
+a medio hacer). Acta: `REPRODUCCION-D199-VALOR1-2026-11-13.md`.
 **Traé mi rama con `merge`.**
 
-**Lo reproducido, con los guiones de `204c638`.** `sabotaje_maria3.sh`: 136
-passed sin sabotaje, 32 `ROJO`, salida 0. `catalogo_largo2.sh` con Postgres 16:
-37 `ROJO`, el `VERDE` de `ﬁ`, `fallas: 1`, salida 1. `chequeo-6` por tramo y
-`anclas_perdidas` coinciden con tu informe. Escape mío: la primera corrida la
-hice con los guiones de mi rama y dio 8 `ROTO` que no eran tuyos; queda en el
-acta.
+**Lo reproducido, con los guiones de `fe0f1b4`.** `catalogo3.sh`: 51 `ROJO`,
+`fallas: 0`, salida 0, con el de D199 en rojo por «Industrias Garc».
+`catalogo_largo2.sh` con Postgres 16: 37 `ROJO`, `fallas: 0`, salida 0.
+`sabotaje_valor1.sh`: 30 `ROJO` y la `FALLA` de `mal_escrito_se_borra`,
+salida 1. `chequeo-6` y `anclas_perdidas` coinciden con tu informe. Negativo
+mío: `NFD`→`NFKC` da 6 failed en `test_catalogo3.py`. Escape mío otra vez: la
+primera corrida la hice con los guiones de mi rama; queda en el acta.
 
-**D199: no (a). El sabotaje sí detecta algo, pero lo vigila otro archivo.**
-Comparé `NFD` y `NFKD` en `_normalize` para todo U+0080–U+2FFFF: la clave
-cambia en 5 caracteres, `ª º № ℠ ™` (los que `_compatible` deja sin NFKC;
-«Nº 5» pasa de `n 5` a `no 5`). Con la mutación, `tests/test_catalogo3.py` da
-5 failed: `[Tornillo Nº 8-Tornillo N° 8-exact]`, `[Bolt™ M8-Bolt M8-exact]`,
-dos ids de proveedor («Industrias García Nº1», «Hermanos 1ª SA») y
-`test_acelerar_no_cambia_ninguna_clave`. `catalogo_largo2.sh` corre sólo
-`test_catalogo_largo2.py` y por eso da verde. Puerta: esa mutación da rojo
-en un guion que corre la prueba que la ve, la línea de `catalogo_largo2` sale
-de `sabotajes-conocidos.txt`, y los guiones que toques salen 0 enteros.
-Sugerencia: mudarlo a `catalogo3.sh`, esperando el rojo del tornillo o de un
-id de proveedor.
+**D221: (b), se retira el 13.** Lo confirmé: todo error de `montos_ar.js`
+lleva `valor: null`, el sabotaje 5 de `separadores1b` aplicado a mano da 4
+failed (entre ellos `[abc-ajusteDelPedido]`), y el 14 de `valor1` sigue
+nombrando la prueba del pedido.
 
-**D218: (a).** Confirmé el rojo: sin la tupla de `operation_items`,
-`catalogo3_postgres.py` da `FALLA | operation_items.origen pasa a text…`,
-salida 1.
-
-**D219: (a).** Mi matiz lo leí, no lo corrí: `_migrate_catalogo_claves`
-rearma al arrancar los `vendor_id` largos desde `vendor_nombre`. Si lo usás
-en el comentario del caso, corrélo; si no, decí «leído».
-
-**D220: no es limpieza.** Lo confirmé (`ﬁna` se pierde en `_norm_desc`), pero
-cambiarlo cambia `descripcion_normalizada` ya guardada: es producto con
-migración y hoy nadie lo midió en facturas reales. Lo anoto como riesgo en
-`COLA-LIMPIEZA.md`, no como tarea.
-
-**Tus tres propuestas de limpieza** (contar los casos de `maria3` en `caso`,
-el ancla de transacción que copia toda la lista de tablas, los tres pares
-repetidos entre SQLite y PG) van a la cola.
+**D222: (a), se retira el 24. Pero las guardas no van a la cola como
+limpieza.** Tu premisa es que la pantalla no produce el estado donde la guarda
+actúa. Leyendo el código, sí lo produce: recuperar un borrador.
+`guardarBorrador` (`app_v2.js:1082`) guarda la operación con el ajuste mal
+escrito; al recargar, `adoptarBorrador` la trae, el campo arranca vacío
+(`dashboard_v2.html:622`), `pintarValor(null)` corre al entrar
+(`finalize.js:90`) y la guarda (`:451`, `:454`) no lo copia. El aviso
+(`:475–476`) dice «Ajustes a incluir: …» y el pedido manda ese texto, pero el
+campo se ve vacío. Es lectura mía, **no lo vi en un navegador.**
 
 **Cómo sigue, en este orden:**
-1. D199 (mudar el sabotaje) junto con `sabotaje_valor1.sh`, que ya empezaste
-   (`38ee8e1a`, sin revisar). Un informe; las dos cosas en commits aparte.
-2. D218 y D219, una pieza.
-3. Los vencidos que quedan en `sabotajes-conocidos.txt`, uno por pieza.
+1. D218 y D219, como venías.
+2. Retirar los sabotajes 13 y 24 de `valor1`. Como tocás el guion, reanclá en
+   código el 10 (hoy en un comentario, línea 108) y el 28 (comentario al final
+   de la línea 187): es la regla de la familia D168 en `COLA-LIMPIEZA.md`.
+   Puerta: `valor1` entero da 29 `ROJO` y salida 0, y su línea sale de
+   `sabotajes-conocidos.txt`.
+3. **AJUSTE-BORRADOR** (producto). Primero un caso de pantalla: ajuste mal
+   escrito, borrador guardado, recargar, recuperar; el caso pide que el campo
+   muestre lo que el aviso nombra. Mostralo en rojo sobre el código de hoy.
+   Si da rojo, arreglalo (sugerencia: sacar las dos guardas resta antes de
+   sumar). Si no reproduce, informalo con la salida y las guardas pasan a la
+   cola. Producto en `static/v2`: corre `e2e_maria.sh`.
+4. Los vencidos que quedan en `sabotajes-conocidos.txt`, uno por pieza.
 
-**Próxima D: D221.**
+**Próxima D: D223.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
