@@ -6,6 +6,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-13 · fix: una operación sin sufijo de valor ya no genera con el de la operación anterior (SUFIJO-BORRADOR)
+
+- Al entrar a «Validación», el campo «Sufijo de valor SBT» muestra el de la operación en curso y queda vacío si no tiene: antes conservaba el de la operación anterior y «Generar» lo mandaba al TXT.
+- Quien carga varias operaciones seguidas escribe el sufijo en cada una.
+
+## 2026-11-13 · fix: el sufijo de valor de la operación vuelve a su campo después de recargar (SUFIJO-BORRADOR)
+
+- El sufijo de valor de la operación se guarda con ella apenas se escribe, y al recuperar la operación el campo lo muestra: antes aparecía vacío aunque la operación lo tuviera guardado, y lo escrito sin generar se perdía.
+- Mientras se escribe el sufijo, «Calcular seguro» se esconde hasta que vuelven las cuentas, igual que al escribir un ajuste.
+
 ## 2026-11-13 · fix: «Mi perfil» no guarda un CUIT con el dígito verificador equivocado (CUIT-PERFIL)
 
 - Al guardar el perfil, un CUIT que no cierra con su verificador se rechaza y el error queda junto al campo: antes alcanzaba con que tuviera 11 dígitos, y de ahí sale el CUIT del despachante en el TXT.
