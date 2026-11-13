@@ -3,7 +3,7 @@
 Entrega `a2c6dc6` (informe `22e84e5`, canal `PARA-PM-2.md`). Base `6fbfefd`.
 Veredicto: **aceptada sobre `a2c6dc6`**. D240 (b), decidida por la PM. D239 y si «Holanda» también es 423 van a Emi.
 
-## Corrido por la PM (2026-11-13, 20:38–20:55 UTC, worktree descartable en `a2c6dc6`)
+## Corrido por la PM (2026-11-13, 20:38–21:09 UTC, worktree descartable en `a2c6dc6`)
 
 - `git diff 6fbfefd a2c6dc6 --stat` fuera de `docs/pm`: `maria_generator.py` (sale
   `"NL": 434` de `PAISES_INDEC`; queda `"NL": 423` en la línea 129), `paises_maria.js`
@@ -20,6 +20,8 @@ Veredicto: **aceptada sobre `a2c6dc6`**. D240 (b), decidida por la PM. D239 y si
   (`test_catalogo3`, `test_catalogo_largo2`, `test_country_catalog_frontend`,
   `test_generar_maria_txt`, `test_maria1a_lectura_factura`, `test_maria3_antes_de_generar`,
   `test_ncm_batch_frontend`, `test_punta_a_punta1`): `425 passed, 2 xfailed`.
+- Suite entera sobre `a2c6dc6` (20:50–21:09 UTC, sqlite, `ENVIRONMENT=test`, dólar local,
+  `GEMINI_API_KEY` vacía): `6131 passed, 110 skipped, 3 xfailed`, igual a la de la Dev.
 
 ### Mis ejemplos, no dados a la Dev
 
@@ -86,7 +88,7 @@ reconoce, como dice su docstring; `pais_reconocido()` es el que avisa.
 
 ## No corrido por la PM
 
-Suite entera (la Dev: `6131 passed, 110 skipped, 3 xfailed`), las 34 pantallas, los cuatro
+Las 34 pantallas, los cuatro
 rojos por mitades y los dos sabotajes del informe, `smoke_friccion.sh`, `anclas_perdidas.py`.
 La tabla de lo que queda guardado, lo que guarda la pantalla escrito a mano y el volcado
 de 2.515 formas son medición de la Dev; no los repetí.
