@@ -43,11 +43,13 @@ entrada de «15 guiones» sale de la cola.
   la primera hipótesis.
 - Mis negativos y cargas corrieron con `--no-cov`, como la CI (`ci.yml:49`).
 
-**Ninguna otra máquina lo midió todavía.** Las corridas de la PR sobre
-`ccd40350` y `927d35fe` se cancelaron al llegar el push siguiente. La primera
-medición de EXCEL2D-TIEMPO y de EXCEL2D-RELOJ fuera de acá es la CI de la PR
-sobre la rama con este acta: no se sube otra cosa hasta que «Suite completa»
-termine, y un rojo de esta prueba ahí es de la pieza.
+**La CI de la PR.** Un push no cancela la corrida anterior (`ci.yml` no
+tiene `cancel-in-progress`); lo que corta es el tope `timeout-minutes: 20`
+de `ci.yml:15`. La de `ccd40350` murió por tope al 88 %. La de `927d35fe`
+(trae EXCEL2D-TIEMPO, no RELOJ) dio verde: «Suite completa» 18:01, a 1:22 del
+tope; la verde de `205b7457` tardó 14:47. RELOJ se mide en la de `5eb910fe`:
+un rojo de esta prueba ahí es de la pieza. El margen del tope va a Emi
+(punto 14) o como pieza de la Técnica; no frena subir docs.
 
 No corrido: pytest entero, adversarios (sólo pruebas) y el corredor entero
 para D228 (sólo `destino1` y `cliente1`).

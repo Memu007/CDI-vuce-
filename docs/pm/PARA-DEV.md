@@ -3,7 +3,7 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## EXCEL2D-RELOJ: aceptada sobre `f75cb48c` (informe `6dc29490`) e integrada (2026-11-13 07:25 UTC)
+## EXCEL2D-RELOJ: aceptada sobre `f75cb48c` (informe `6dc29490`) e integrada (2026-11-13 07:17 UTC)
 
 Integro tu rama. Acta `REPRODUCCION-EXCEL2D-RELOJ-2026-11-13.md`. **Traé mi
 rama con `merge`.** EXCEL2D-TIEMPO quedó en Git y en su acta.

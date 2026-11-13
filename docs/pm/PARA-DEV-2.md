@@ -3,34 +3,30 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D223 + D224 y D226: aceptadas e integradas (2026-11-13 07:25 UTC)
+## valor1: aceptada sobre `0334800` (trabajo `b1a70d1`, informe `a647bee`) e integrada (2026-11-13 07:32 UTC)
 
-D223 + D224 sobre `32f09ba` (trabajo `77cb691`, informe `9abd828`); D226
-sobre `bdb8130` (informe `a88f62f`). Actas
-`REPRODUCCION-D223-D224-2026-11-13.md` y `REPRODUCCION-D226-2026-11-13.md`.
-Integro tu rama **hasta `a88f62f`**: tu punta va adelante (valor1) y eso
-todavía no entra. **Traé mi rama con `merge`.**
+Acta `REPRODUCCION-VALOR1-2026-11-13.md`. **Traé mi rama con `merge`.**
+Integro tu rama **hasta `a647bee`**: AJUSTE-BORRADOR (`a57b584`, `c4620ca`)
+todavía no entra.
 
-**Lo reproducido.** Desde el árbol de `32f09ba`: `catalogo3.sh` 53 `ROJO` y
-`catalogo_largo2.sh` 39 `ROJO`, los dos con `fallas: 0` y salida 0.
-`chequeo-6` igual que el tuyo. Mis negativos del candado: una clave por
-proceso da la misma `FALLA` del 39; el candado movido después del `SELECT`
-sale verde. El 39 prueba que el candado se pide con una clave compartida, no
-que se pida antes de leer: va a la cola como riesgo, no es devolución (hoy
-está bien puesto). D226: con `PLAYWRIGHT_BROWSERS_PATH` a una carpeta vacía,
-tu `excel1` da rojo y la base verde: ahora sí pide el navegador a
-Playwright.
+**Lo reproducido.** Desde el árbol de `0334800`: `sabotaje_valor1.sh` da
+29 `ROJO`, 0 `FALLA` y salida 0; `descuento_solo` 2 failed y
+`respuesta_vieja` 1, como tu informe. `anclas_perdidas.py` da 0 para el guion
+y el grep de comentarios, vacío. `chequeo-6`, igual que el tuyo. Mis dos
+negativos en `finalize.js`, sobre `tests/test_valor1.py`: tolerar respuestas
+un poco viejas (`seq < avisosSeq - 5`) pone rojo
+`test_una_respuesta_vieja_no_pisa_las_cuentas_nuevas`; poner el descuento
+solo cuando el campo está vacío pone rojo
+`test_el_descuento_de_la_planilla_se_ofrece_y_no_se_pone_solo`. Los dos son
+distintos de tu 26 y tu 10.
 
-**Corrección mía.** En el veredicto anterior escribí «como en los otros 19
-guiones»: son 24 (`git grep -l "chromium.launch()"` da 27 con tus tres).
-Quedan tres con ruta: `borrador1`, `cliente1` y `destino1`; no son tuyas.
+**Tus tres supuestos, aceptados.** A la cola, no devolución, dos cosas del
+guion: el total del mensaje final (`los 29`) se cuenta de los `caso` que
+corrieron en vez de escribirlo a mano, y una corrida sin sabotear antes de
+los casos (si el árbol sano ya está rojo en la prueba que nombra un `caso`,
+ese `caso` da `ROJO` igual).
 
-**Tus cuatro supuestos de D223 + D224, aceptados.** Los dos sabotajes de
-más en `catalogo3.sh` dan negativo propio a los datos nuevos.
-
-**valor1 (`0334800`, informe `a647bee`): en revisión.** Corro
-`sabotaje_valor1.sh` entero desde tu árbol cuando termine lo de la Técnica.
-Seguí con AJUSTE-BORRADOR.
+D223 + D224 y D226 siguen aceptadas e integradas (actas del 13/11).
 
 **Cómo sigue, en este orden:**
 1. **AJUSTE-BORRADOR** (producto), en curso. Primero un caso de pantalla:

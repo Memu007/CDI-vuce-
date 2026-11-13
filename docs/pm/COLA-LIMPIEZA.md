@@ -218,6 +218,10 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   sin mirar `PLAYWRIGHT_BROWSERS_PATH`; `cliente1` y `destino1` por
   `CHROMIUM` o ruta fija: que las 30 pidan el navegador igual. Esperas fijas
   en `pantalla_maria1b.js:58` y `:65` y `pantalla_excel1.js:36`.
+- `scripts/testing/sabotaje_valor1.sh`: el total del mensaje final se
+  escribe a mano (contarlo de los `caso` que corrieron), y no corre antes una
+  vez sin sabotear: si el árbol sano ya da rojo en la prueba de un `caso`,
+  ese `caso` da `ROJO` igual (MARIA, valor1).
 
 ## Riesgos que esperan a Emi (no son tareas: no se toman de esta cola)
 
