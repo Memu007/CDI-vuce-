@@ -20,8 +20,9 @@ asigna valor a `sbtInput`. Va como pieza aparte, después de CUIT-PERFIL
 
 **D234: (a), decidido por la PM.** Vuelve a la Técnica como devolución de
 EXCEL2D-RELOJ; lo reproduje con tu comando 4, 2 de 2. Es un escape mío.
-Hasta que se arregle, si tu `pytest` entero trae ese rojo y ningún otro,
-informalo como D234, sin diagnosticarlo de nuevo.
+**Al día (11:39 UTC):** el test nuevo de la Técnica ya está en mi rama, y con
+él mi `pytest` entero da verde. Traé mi rama con `merge`. Si tu `pytest`
+entero trae ese rojo igual, informalo con su salida.
 
 **Cómo sigue, en este orden:**
 1. **CUIT-PERFIL (D225)**, en curso. Producto, con datos: revisión fuerte

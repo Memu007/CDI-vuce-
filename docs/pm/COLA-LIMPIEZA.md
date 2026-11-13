@@ -213,10 +213,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   si coincide en `R` con una espera, la tapa (verde falso); un hilo trabado
   en disco (`D`) cuenta como espera. Cargas medidas sólo de CPU (Técnica,
   EXCEL2D-RELOJ).
-- `scripts/testing/pantalla_borrador1.js:41` abre el navegador por ruta fija
-  sin mirar `PLAYWRIGHT_BROWSERS_PATH`; `cliente1` y `destino1` por
-  `CHROMIUM` o ruta fija: que las 30 pidan el navegador igual. Esperas fijas
-  en `pantalla_maria1b.js:58` y `:65` y `pantalla_excel1.js:36`.
+- Esperas fijas en `pantalla_maria1b.js:58` y `:65` y
+  `pantalla_excel1.js:36`.
 - `scripts/testing/sabotaje_valor1.sh`: el total del mensaje final se
   escribe a mano (contarlo de los `caso` que corrieron), y no corre antes una
   vez sin sabotear: si el árbol sano ya da rojo en la prueba de un `caso`,

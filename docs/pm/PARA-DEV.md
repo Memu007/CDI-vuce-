@@ -3,74 +3,101 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## EXCEL2D-RELOJ vuelve: con muchos hilos en el proceso, `pytest` entero da rojo (2026-11-13 09:30 UTC)
+## EXCEL2D-RELOJ, vuelta 2: devolución sobre `c4a30b5a` (informe `25e13c44`) (2026-11-13 11:39 UTC)
 
-Lo encontró MARIA (D234, informe `fdaa2da5`) y lo reproduje 2 de 2. Es un
-escape mío: acepté sin `pytest` entero (la CI de la PR dio verde).
+Integré tu rama entera con NAVEGADOR (abajo), así que `c4a30b5a` ya está en
+la mía: con él, `pytest` entero da `6112 passed` sin rojos. **Integrada no es
+aceptada.** Las puertas 1 a 3 pasan, y el frenado ya no depende de los hilos. Pero la
+**espera** sí depende. Evidencia en
+`docs/pm/REPRODUCCION-EXCEL2D-RELOJ-2026-11-13.md`, «Vuelta 2».
 
-**Causa.** `_otro_hilo_listo()` (`tests/test_excel2d.py:175`) recorre
-`/proc/self/task` en cada marca. En la suite entera el proceso llega a esta
-prueba con ~1080 hilos dormidos: el testigo casi no marca (3 o 4 marcas contra
-~40) y `frenado` mide al testigo, no a la subida. En un contenedor de 4
-núcleos, `test_la_subida_cara_no_frena_a_nadie[9995 combinadas en 19 990
-filas]` dio rojo 2 de 2 (1,01 y 1,26 s).
+**Causa.** El salto en el que el testigo recorre `/proc/self/task` se marca
+como «otro hilo listo» (`True`) y no suma a la espera. Con muchos hilos, ese
+recorrido dura más que el tic de 10 ms, y de cada vuelta sólo cuenta como
+espera el tic. Con una espera real de 4 s: 3,91 s
+medidos con 0 hilos, 1,95 s con 1000 y 0,87 s con 3000. El sabotaje de 4 s
+sigue rojo porque sobra margen, no porque la prueba lo mida bien.
 
-**Camino de hoy (4 s):** un plugin que arranca 1075 hilos dormidos en
-`pytest_sessionstart` (está entero en `PARA-PM-2.md` de `fdaa2da5`, «Para
-reproducir», comando 4) y `pytest tests/test_excel2d.py -k no_frena -p
-hilos_plugin`. Mío: `1 failed` (1,47 y 1,13 s); sin el plugin, `7 passed`.
+Recorrer `/proc` hace falta: con un negativo que nunca lo recorre, «la subida
+espera 4 s sin gastar CPU» queda `VERDE` con 1000 hilos.
 
-**Si tu suite entera de CONFTEST-FORK da este rojo, es éste:** no lo
-diagnostiques ahí. Las puertas 1 y 4 de abajo se leen contra los rojos de la
-base, que ya trae éste.
+**Lo avisaste vos** («El margen del sabotaje de espera»), pero no es sólo
+margen: la suite entera de hoy ya llega a ~1080 hilos, y con 1000 una espera
+de 0,8 s pasa sin que nadie la vea. D229 (a) baja los hilos, pero la prueba
+tiene que medir bien igual: otra fuga la volvería a cegar.
 
-**Cuándo: apenas entregues CONFTEST-FORK, antes de NAVEGADOR.** Que la prueba
-no dependa de cuántos hilos tenga el proceso. Puertas:
+**Camino de hoy.** Con el plugin de hilos de MARIA, con la cantidad por
+variable (`hilos_plugin.py`):
 
-1. El caso en verde con 0, ~1000 y ~3000 hilos dormidos puestos.
-2. `sabotajes/excel2d.sh` sigue con sus `ROJO` (GIL retenido y espera sin
-   CPU) también con ~1000 hilos puestos.
-3. `pytest` entero sobre tu SHA sin este rojo.
-4. El informe dice quién deja los ~1080 hilos (arnés o producto), sin
-   arreglarlo. Si es producto, es una fuga en un proceso que en Railway vive
-   mucho y va a pieza aparte.
+```python
+import os, threading
+_fin = threading.Event()
+def pytest_sessionstart(session):
+    for _ in range(int(os.environ.get("HILOS", "1075"))):
+        threading.Thread(target=_fin.wait, daemon=True).start()
+def pytest_sessionfinish(session):
+    _fin.set()
+```
 
-Fuera: subir el tope de 1 s.
+En `proyecto_maria/main.py`, después de
+`    contents, liviano = await validar_con_carril(file, 'excel', max_size=max_upload_bytes)`,
+agregá `await __import__("asyncio").sleep(0.8)`. Después, para 0, 1000 y 3000:
 
-## CONFTEST-FORK: aceptada sobre `caad310a` (informe `3392daf4`) e integrada (2026-11-13 10:28 UTC)
+```bash
+HILOS=1000 PYTHONPATH=<carpeta del plugin> pytest -p hilos_plugin \
+  tests/test_excel2d.py -k "no_frena and 2499" --no-cov
+```
 
-Integro `70d5f962`. Acta `REPRODUCCION-CONFTEST-FORK-2026-11-13.md`. **Traé mi
-rama con `merge`.** Sin D.
+Mío sobre `c4a30b5a`: `1 failed` (0,77 s medidos) con `HILOS=0`, y
+`1 passed` con 1000 y con 3000.
 
-**Lo reproducido.** El test, `1 passed` con tu SHA y `1 failed` («el hijo
-borró la base del padre») con el conftest de `fa6df9bc`. Usa el mismo
-`tests.conftest` que cargó pytest. Mi suite entera sobre `caad310a`: `1 failed,
-6110 passed, 110 skipped, 3 xfailed`, con el único rojo de D234, como la tuya.
-`chequeo-6` igual.
+**Pedido.** Que la espera medida no dependa de cuántos hilos tenga el
+proceso. Puertas:
 
-**Un dato para tu informe.** Decías que la puerta 2 no distingue: no
-distingue el defecto original, pero sí un arreglo pasado de rosca. Con la
-guarda que siempre vuelve (nadie borra), tu test queda verde y sólo la cuenta
-de `/tmp` lo muestra (4151 → 4152). Las dos puertas juntas cubren los dos
-lados.
+1. Con la espera de 0,8 s, el caso da rojo con 0, ~1000 y ~3000 hilos.
+2. Sin sabotaje, el caso en verde con 0, ~1000 y ~3000 hilos.
+3. Con la espera de 4 s, el informe trae la espera medida con 0, ~1000 y
+   ~3000 hilos, y las tres dan parecido (hoy 3,91 / 1,95 / 0,87 s).
+4. `sabotajes/excel2d.sh` con sus 6 `ROJO`, también con ~1000 hilos.
+5. `pytest` entero sobre tu SHA sin rojos nuevos.
 
-**Ahora: EXCEL2D-RELOJ** (arriba).
+Fuera: subir el tope de 1 s y bajar el de 0,5 s.
 
-**Después de EXCEL2D-RELOJ: NAVEGADOR** (sólo arnés, tus pantallas).
-`pantalla_borrador1.js:41` abre el navegador por ruta fija y
-`pantalla_cliente1.js:28` y `pantalla_destino1.js:18` por `CHROMIUM` o ruta
-fija; las otras 27 pantallas usan `chromium.launch()`. Que las 30 lo pidan
-igual. Puertas: `grep -ho 'chromium.launch([^;]*' scripts/testing/*.js |
-sort | uniq -c` da una sola forma; las tres pantallas en verde con
-`correr_pantallas.sh`; `sabotajes/cliente1.sh` sigue con sus `ROJO` y
-«sabotajes sin rojo: 0». La forma única la elegís vos y la decís; si al
-final ninguna pantalla lee `CHROMIUM`, sale también de `correr_pantallas.sh`
-(`:24` y `:56`). Fuera: las esperas fijas de `pantalla_maria1b.js` y
-`pantalla_excel1.js`, y todo lo de MARIA.
+**Cuándo:** ahora, antes de la pieza de D229.
+
+## NAVEGADOR: aceptada sobre `740eac45` (informe `9059c696`) e integrada (2026-11-13 11:39 UTC)
+
+Integro `5c0faf45`. Acta `REPRODUCCION-NAVEGADOR-2026-11-13.md`. **Traé mi
+rama con `merge`.** Sin D. Lo reproducido: `31 chromium.launch()`, ningún
+`CHROMIUM` en `scripts/`, las tres pantallas en verde, 34 `ROJO` en
+`sabotajes/cliente1.sh`, y `chequeo-6` igual al tuyo. Negativo mío: ninguna
+ruta `pw-browsers` ni `executablePath` fuera de `docs`. Saqué de la cola de
+limpieza la parte del navegador; las esperas fijas siguen ahí.
+
+## D229 (a), decidido por la PM: FUGA-HILOS, pieza siguiente (2026-11-13 11:39 UTC)
+
+Tu recomendación. Va después de EXCEL2D-RELOJ.
+
+**Comportamiento pedido.** Que los ayudantes de `tests/` que abren un bucle
+con `asyncio.new_event_loop().run_until_complete` no dejen hilos ni
+generadores colgados. Puertas:
+
+1. Al final de `pytest` entero, el censo de hilos (`threading.active_count()`
+   en `pytest_sessionfinish`, o el que uses) baja de ~1129. El informe trae el
+   número antes y después, y quién deja cada hilo que quede.
+2. `pytest` entero con los mismos `passed` que la base.
+3. Desaparecen de la salida los «Task was destroyed but it is pending» con
+   `async_generator_athrow`: la cuenta antes y después.
+4. Con un ayudante devuelto a como estaba, la cuenta de la puerta 1 sube.
+
+Fuera: el producto. Si encontrás el mismo patrón en `proyecto_maria/` (por
+ejemplo, el webhook de Mercado Pago en `main.py:11688`, que hace `return`
+dentro de `async for session in get_async_session()`), va al informe como
+riesgo, sin arreglarlo.
 
 Igual que antes: sin adversarios; no toques los guiones de MARIA. D182 / D206
 siguen igual: si Emi dice que sí, dejás esto donde esté. D205, D206 y D208
-siguen con Emi. **Próxima D: D229** (rango D228–D233).
+siguen con Emi. **Próxima D: D230** (rango D228–D233).
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 
