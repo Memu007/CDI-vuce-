@@ -47,8 +47,9 @@ entrada de «15 guiones» sale de la cola.
 tiene `cancel-in-progress`); lo que corta es el tope `timeout-minutes: 20`
 de `ci.yml:15`. La de `ccd40350` murió por tope al 88 %. La de `927d35fe`
 (trae EXCEL2D-TIEMPO, no RELOJ) dio verde: «Suite completa» 18:01, a 1:22 del
-tope; la verde de `205b7457` tardó 14:47. RELOJ se mide en la de `5eb910fe`:
-un rojo de esta prueba ahí es de la pieza. El margen del tope va a Emi
+tope; la verde de `205b7457` tardó 14:47. La de `5eb910fe`, con RELOJ, dio
+verde (`tests` y `e2e-maria`): «Suite completa» 19:09, job 19:49, a 11 s del
+tope. El margen del tope va a Emi
 (punto 14) o como pieza de la Técnica; no frena subir docs.
 
 No corrido: pytest entero, adversarios (sólo pruebas) y el corredor entero
