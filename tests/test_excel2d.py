@@ -181,9 +181,9 @@ def test_la_subida_cara_no_frena_a_nadie(subida):
     pasos, listo = [time.process_time()], threading.Event()
 
     def marcar():
-        while not listo.is_set():
-            time.sleep(0.01)
+        while not listo.wait(0.01):
             pasos.append(time.process_time())
+        pasos.append(time.process_time())
     otro = threading.Thread(target=marcar)
     otro.start()
     inicio = time.process_time()
