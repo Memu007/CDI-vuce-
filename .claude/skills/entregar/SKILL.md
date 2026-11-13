@@ -13,21 +13,30 @@ comandos.
 
 - **Auto-revisión:** leé `git diff <base>..HEAD` completo y sacá lo que la
   tarea no pide. Lo que agregaste sin que se pidiera va en el informe como
-  supuesto reversible, para que la PM pueda rechazarlo.
+  supuesto reversible, para que la PM pueda rechazarlo. Para `CLAUDE.md` §6,
+  `docs/pm/herramientas/chequeo-6.py <base> HEAD` (lee JS/TS con
+  `typescript`: el del proyecto, o uno global por `NODE_PATH`): su salida va
+  entera en el informe, y cada `AVISO` se arregla o lleva una línea de por
+  qué queda. Lo que no mide (un caso por causa, un chequeo en un solo lugar,
+  el porqué de cada comentario) lo mirás vos.
 - **Subagentes adversariales:** los que pide la tabla «Modelo y esfuerzo»
   de `docs/pm/ONBOARDING-PM.md` («Subagentes»); en la vuelta de una
   devolución de plata, sesión o permisos, uno solo, Sonnet alto («Cuántos y
   quién los corre»). Lo que encuentren lo reproducís; el informe lleva la tabla de hallazgos con
   modelo y esfuerzo de cada uno.
 - **`/code-review`:** corré `/code-review high` sobre lo que cambió
-  la rama desde la base. Lo confirmado dentro de la tarea se arregla, con su
-  rojo antes. Lo que quede afuera va al informe como riesgo, con su
-  severidad. Si la pieza toca dinero, sesión, permisos, órdenes, stock,
-  migraciones o datos, corré también `/security-review`.
-- **Negativos:** cada caso nuevo o cambiado tiene su sabotaje discriminante
-  (un script por pieza, uno por motivo), con lo que el rojo tiene que decir y
-  lo que no. Ningún sabotaje toca datos compartidos de prueba: el caso
-  trabaja sobre lo que crea y retira.
+  la rama desde la base. Lo confirmado, de acá o de los subagentes, se
+  arregla con su rojo antes si está dentro de la tarea y tiene camino de hoy
+  («Código de producto sólo con camino de hoy» en `ONBOARDING-PM.md`). Lo
+  demás va al informe como riesgo, con su severidad. Si la pieza toca
+  dinero, sesión, permisos, órdenes, stock, migraciones o datos, corré
+  también `/security-review`.
+- **Negativos:** cada caso nuevo o cambiado muestra su rojo discriminante.
+  Guion de sabotaje propio sólo donde lo pide `CLAUDE.md` §6, uno por
+  motivo, anclado en código, con lo que el rojo tiene que decir y lo que no;
+  en lo demás, el informe muestra el rojo una vez con el arreglo revertido.
+  Ningún sabotaje toca datos compartidos de prueba: el caso trabaja sobre lo
+  que crea y retira.
 - **Sabotajes de piezas anteriores:** al entregar corrés sólo los de tu
   pieza. Los de lo que cambió en la tanda los corre la PM antes de publicar
   («Publicar» en `ONBOARDING-PM.md`); si ahí falla uno que toca lo tuyo,
@@ -48,7 +57,8 @@ export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRO
 python -m pytest -q --no-cov --timeout=120    # base 2026-10-06 en e8344d0: 680 passed, 102 skipped, 0 failed
 python -m compileall -q proyecto_maria
 BASE_URL=http://127.0.0.1:<puerto> ./scripts/testing/smoke_friccion.sh   # si tocaste backend
-PUERTO=<puerto libre> ./scripts/testing/ataque_aislamiento.sh             # si tocaste datos, sesión o permisos (cubre sólo clientes y descargas)
+PUERTO=<puerto libre> ./scripts/testing/ataque_aislamiento.sh             # si tocaste datos, sesión o permisos
+./scripts/testing/e2e_maria.sh   # si tocaste el recorrido MARIA o static/v2 (cómo, en ONBOARDING-DEV.md)
 ```
 
 - Un rojo se diagnostica; no se repite hasta que pase. Los rojos de entorno
@@ -56,7 +66,7 @@ PUERTO=<puerto libre> ./scripts/testing/ataque_aislamiento.sh             # si t
 
 ## 4. Informe en tu canal
 
-`PARA-PM.md` para la Dev 1, `PARA-PM-2.md` para la Dev 2. El de la otra no
+`PARA-PM.md` para la Dev 1, `PARA-PM-N.md` para la Dev N. El de las otras no
 se toca.
 
 - Reemplazá todo el cuerpo. Conservá el encabezado `# Dev → PM` y «Este
@@ -82,7 +92,7 @@ git fetch origin <rama Dev> && git log --oneline HEAD..origin/<rama Dev>
 ```
 
 - Si la PM escribió mientras tanto (en su rama): integrá con `merge` y releé
-  tu canal (`PARA-DEV.md` o `PARA-DEV-2.md`). Puede haber cambiado la tarea
+  tu canal (`PARA-DEV.md` o `PARA-DEV-N.md`). Puede haber cambiado la tarea
   activa.
 - Ningún archivo privado ni secreto en el árbol (`.env`, `.env.afip`, bases locales `*.db`, PDFs, Excel o TXT de clientes reales, `viejo/`, `venv/`). Si aparece, no subas.
 - `git push -u origin <rama Dev>`; sólo por fallas de red, reintentá a los

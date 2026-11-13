@@ -7,14 +7,17 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_maria5.js [captura.png]
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
+const registrarCuenta = require('./_registrar');
+const cargarCuitDelPerfil = require('./_cuit_perfil');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const centavos = s => Math.round(parseFloat(s) * 100);
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const b = await chromium.launch();
   const page = await (await b.newContext({ viewport: { width: 1280, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  await page.request.post(base + '/auth/register', { data: { username: 'm5_' + id, password: 'Clave-Inventada-123', email: 'm5' + id + '@ejemplo.test' } });
+  await registrarCuenta(page.request, base, { data: { username: 'm5_' + id, password: 'Clave-Inventada-123', email: 'm5' + id + '@ejemplo.test' } });
+  await cargarCuitDelPerfil(page.request, base);
 
   await page.goto(base + '/dashboard');
   await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.despachante);
@@ -104,7 +107,8 @@ const centavos = s => Math.round(parseFloat(s) * 100);
                             vendedor_nombre: 'PROVEEDOR DEMO' };
     CDI.state.items = [
       { pieza: '84713012100F', descripcion: 'Notebook importada de prueba', origen: 'CN', cantidad: 10, valor_unitario: 10, peso_unitario: 2.5 },
-      { pieza: '84713012100F', descripcion: 'Notebook importada de prueba B', origen: 'CN', cantidad: 1, valor_unitario: 100, peso_unitario: 1 },
+      // De otro origen: con la misma posición y origen, los dos renglones irían en un solo ítem.
+      { pieza: '84713012100F', descripcion: 'Notebook importada de prueba B', origen: 'US', cantidad: 1, valor_unitario: 100, peso_unitario: 1 },
       { pieza: '84714900100D', descripcion: 'Equipo importado de prueba', origen: 'CN', cantidad: 4, valor_unitario: 100, peso_unitario: 0.5 },
       // Un grupo de tres de 6,675: el TXT declara una línea de 20,03.
       ...[1, 2, 3].map(n => ({ pieza: '84714900100D', descripcion: 'Accesorio importado de prueba ' + n, origen: 'CN',
@@ -133,7 +137,7 @@ const centavos = s => Math.round(parseFloat(s) * 100);
   const txt = generado.content;
   const campo = c => [...txt.matchAll(new RegExp('^' + c + '=(\\S+)', 'gm'))].map(m => m[1]);
   const pesos = campo('QARTKGRNET');
-  if (pesos[0] !== '25.000') falla('las 10 notebooks de 2,5 kg declaran ' + pesos[0]);
+  if (pesos.join() !== '25.000,1.000,2.000,1.500') falla('los pesos por ítem son ' + pesos.join(', ') + ' y se esperaba 25, 1, 2 y 1,5 kg');
   console.log('OK el TXT declara 25 kg para 10 × 2,5 kg (pesos: ' + pesos.join(', ') + ')');
   for (const [item, cab] of [['MARTFOB', 'MDDTFOB'], ['MARTFLE', 'MDDTFLE'], ['MARTASS', 'MDDTASS']]) {
     const suma = campo(item).reduce((a, v) => a + centavos(v), 0);

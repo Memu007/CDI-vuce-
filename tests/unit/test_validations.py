@@ -12,7 +12,7 @@ Cada test cubre: casos válidos, inválidos, edge cases, vacíos, None
 import pytest
 import re
 from pathlib import Path
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock
 from io import BytesIO
 from fastapi import HTTPException, UploadFile
 
@@ -874,7 +874,6 @@ class TestPasswordStrength:
 # TESTS PARA proyecto_maria.security.file_security
 # ============================================================================
 
-@pytest.mark.skip(reason="Requires python-magic module")
 @pytest.mark.unit
 class TestSanitizeFilename:
     """Tests para sanitize_filename."""
@@ -936,7 +935,6 @@ class TestSanitizeFilename:
         assert len(result) <= 255
 
 
-@pytest.mark.skip(reason="Requires python-magic module")
 @pytest.mark.unit
 class TestValidateFilePath:
     """Tests para validate_file_path."""
@@ -982,7 +980,6 @@ class TestValidateFilePath:
             assert ";" not in str(result)
 
 
-@pytest.mark.skip(reason="Requires python-magic module")
 @pytest.mark.unit
 class TestGetSafeTempFilename:
     """Tests para get_safe_temp_filename."""
@@ -1019,7 +1016,6 @@ class TestGetSafeTempFilename:
         assert result.endswith(".pdf")
 
 
-@pytest.mark.skip(reason="Requires python-magic module + pytest-asyncio")
 @pytest.mark.unit
 class TestValidateFileUpload:
     """Tests para validate_file_upload (async)."""
@@ -1029,24 +1025,23 @@ class TestValidateFileUpload:
         """Test: Upload de PDF válido."""
         from proyecto_maria.security.file_security import validate_file_upload
 
-        # Mock PDF content (PDF header)
-        pdf_content = b"%PDF-1.4\n%\xE2\xE3\xCF\xD3\n" + b"0" * 100
+        import io
+        from pypdf import PdfWriter
+
+        # Un PDF real: el que lo abre corre en otro proceso, donde un mock no llega.
+        w = PdfWriter()
+        w.add_blank_page(width=72, height=72)
+        buf = io.BytesIO()
+        w.write(buf)
+        pdf_content = buf.getvalue()
 
         mock_file = AsyncMock(spec=UploadFile)
         mock_file.filename = "test.pdf"
         mock_file.read = AsyncMock(return_value=pdf_content)
         mock_file.seek = AsyncMock()
 
-        # pypdf se importa dentro de la función que abre el PDF
-        with patch('proyecto_maria.security.file_security.magic.from_buffer', return_value='application/pdf'):
-            with patch('pypdf.PdfReader') as mock_pdf:
-                mock_pdf_instance = Mock()
-                mock_pdf_instance.is_encrypted = False
-                mock_pdf_instance.pages = [Mock()]
-                mock_pdf.return_value = mock_pdf_instance
-
-                result = await validate_file_upload(mock_file, 'pdf')
-                assert result == pdf_content
+        result = await validate_file_upload(mock_file, 'pdf')
+        assert result == pdf_content
 
     @pytest.mark.asyncio
     async def test_invalid_file_type_parameter(self):

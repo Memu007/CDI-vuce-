@@ -14,7 +14,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from proyecto_maria import main
-from tests.test_generar_maria_txt import GOLDEN_INPUTS
+from tests.conftest import cuenta_de_prueba
+from tests.test_generar_maria_txt import GOLDEN_INPUTS, golden_con_destino
 
 USUARIO = {"username": "m1b", "roles": ["operador"], "effective_owner": "m1b",
            "plan": "premium", "billing_status": "active"}
@@ -27,7 +28,7 @@ CUIT_VALIDO = "30999999995"
 
 def _esperado() -> str:
     with open(GOLDEN_PATH, "r", newline="") as f:
-        return f.read().replace("NDDTIMMIOE=30999999990", f"NDDTIMMIOE={CUIT_VALIDO}")
+        return golden_con_destino(f.read()).replace("NDDTIMMIOE=30999999990", f"NDDTIMMIOE={CUIT_VALIDO}")
 
 
 @pytest.fixture(autouse=True)
@@ -37,7 +38,8 @@ def _entorno(monkeypatch):
     main.app.dependency_overrides[main.get_current_user] = lambda: dict(USUARIO)
     from types import SimpleNamespace
     main.app.dependency_overrides[main.require_active_billing] = lambda: SimpleNamespace(organization_id=None)
-    yield
+    with cuenta_de_prueba(USUARIO["username"]):
+        yield
     main.app.dependency_overrides.pop(main.get_current_user, None)
     main.app.dependency_overrides.pop(main.require_active_billing, None)
 

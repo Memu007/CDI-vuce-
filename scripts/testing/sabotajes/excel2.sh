@@ -31,12 +31,20 @@ if s.count(viejo) != 1:
 open(p, "w").write(s.replace(viejo, nuevo))
 PYEOF
   then echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return; fi
-  local salida codigo
-  salida="$("$PY" -m pytest -q --no-cov -p no:cacheprovider tests/test_excel2.py 2>&1)"; codigo=$?
+  # Sólo la prueba que el sabotaje nombra: el archivo entero tarda medio
+  # minuto, casi todo en las dos pruebas de los ocho libros (PRUEBAS-1).
+  local prueba="${esperado#FAILED }"; prueba="${prueba%%\[*}"
+  # Con un límite: el sabotaje de la combinada falla a los 15 s, pero el hilo
+  # de la lectura saboteada sigue siete minutos y pytest no sale hasta que
+  # termina. El resumen ya está impreso (sin búfer), así que se lee igual.
+  local salida codigo inicio=$SECONDS corte=""
+  salida="$(PYTHONUNBUFFERED=1 timeout "${LIMITE:-90}" "$PY" -m pytest -q --no-cov -p no:cacheprovider "$prueba" 2>&1)"; codigo=$?
+  local tardo=$((SECONDS-inicio))
+  [ "$codigo" -eq 124 ] && corte=", cortado a los ${LIMITE:-90} s"
   if [ "$codigo" -eq 0 ]; then
     echo "VERDE | $nombre: la prueba no lo vio"; FALLAS=$((FALLAS+1))
   elif grep -qF -- "$esperado" <<<"$salida"; then
-    echo "ROJO  | $nombre: dice «$esperado»"
+    echo "ROJO  | $nombre: dice «$esperado» (${tardo} s$corte)"
   else
     echo "ROJO? | $nombre: rojo (salida $codigo), pero sin «$esperado»"; grep -E "^E " <<<"$salida" | head -5; FALLAS=$((FALLAS+1))
   fi
@@ -89,8 +97,8 @@ sabotaje $F "una primera hoja enorme vuelve a pasar" \
   '        if False:' \
   "FAILED $T::test_una_primera_hoja_enorme_se_rechaza_antes_de_abrir"
 sabotaje $M "leer la factura vuelve a abrir el libro entero" \
-  $'        contenido, combinadas = _xlsx_solo_primera_hoja(ruta)\n        origen = _io.BytesIO(contenido)' \
-  $'        contenido, combinadas = _xlsx_solo_primera_hoja(ruta)\n        origen = ruta' \
+  $'        contenido, combinadas = _xlsx_solo_primera_hoja(ruta, max_filas=_MAX_FILAS_EXCEL)\n        origen = _io.BytesIO(contenido)' \
+  $'        contenido, combinadas = _xlsx_solo_primera_hoja(ruta, max_filas=_MAX_FILAS_EXCEL)\n        origen = ruta' \
   "FAILED $T::test_leer_la_factura_abre_un_libro_con_una_sola_hoja"
 sabotaje $M "el historial vuelve a abrir el libro entero" \
   '        contenido, _ = _xlsx_solo_primera_hoja(content)' \
@@ -102,15 +110,15 @@ sabotaje $M "el encabezado vuelve a buscarse sólo en la fila 1" \
   '    if True:' \
   "FAILED $T::test_el_encabezado_no_tiene_que_estar_en_la_fila_1"
 sabotaje $M "la columna de origen vuelve a ser obligatoria" \
-  '    if not all([pieza_col, desc_col, cant_col, valor_col]):' \
-  '    if not all([pieza_col, desc_col, origen_col, cant_col, valor_col]):' \
+  '    if not all([desc_col, cant_col, valor_col]):' \
+  '    if not all([desc_col, origen_col, cant_col, valor_col]):' \
   "FAILED $T::test_sin_columna_de_origen_entra_con_el_origen_vacio_y_avisa"
 sabotaje $M "sin columna de origen deja de avisarse" \
   '        if not find_column(df.columns, ["origen", "Origen", "pais", "País", "country", "Country"]):' \
   '        if False:' \
   "FAILED $T::test_sin_columna_de_origen_entra_con_el_origen_vacio_y_avisa"
 sabotaje $M "una celda combinada vuelve a valer sólo en su primera fila" \
-  '            df.loc[filas, col] = valor' \
+  '            nuevas[col][i:j] = valor' \
   '            pass' \
   "FAILED $T::test_una_celda_combinada_hacia_abajo_vale_para_todas_sus_filas"
 # Aviso de mapeo
@@ -160,15 +168,17 @@ sabotaje $M "el CUIT del despachante vuelve a aceptar cualquier cosa" \
   '            if not _re_cuit.fullmatch(r"[0-9]{11}", effective_cuit_agr):' \
   '            if False:' \
   "FAILED $T::test_el_cuit_del_despachante_va_solo_con_11_digitos"
+# El control de los sub-ítems de ese mismo bucle no tiene sabotaje propio:
+# sin él, el de más abajo (KIT Maria) da el mismo 400 (PRUEBAS-1).
 sabotaje $M "un producto mal formado vuelve a dar 500" \
-  '            if not isinstance(_it, dict) or (' \
-  '            if False and (' \
-  "FAILED $T::test_productos_mal_formados_dan_400"
+  '            if not isinstance(_it, dict):' \
+  '            if False:' \
+  "FAILED $T::test_productos_mal_formados_dan_400[cambio0]"
 
 # Devolución (veredicto 2034b85)
-sabotaje $M "una combinada vuelve a recorrerse hasta su última fila (la función de 3e6e63e)" \
-  $'    hasta_donde = {}\n    for f1, c1, f2, _c2 in sorted(set(combinadas)):\n        if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:\n            continue\n        col = columnas[c1 - 1]\n        if campos.get(col) not in _COMBINADAS_SE_COPIAN or f1 <= hasta_donde.get(c1, 0):\n            continue\n        hasta_donde[c1] = f2\n        ancla = f1 - 2\n        if ancla not in df.index or f1 >= ultima:\n            continue\n        valor = df.at[ancla, col]\n        if not isinstance(valor, str) or not valor.strip() or _re.fullmatch(r"[\\d\\s.,+\\-]+", valor.strip()):\n            continue\n        desde, hasta = max(f1 + 1, primera) - 2, min(f2, ultima) - 2\n        if desde <= hasta:\n            filas = df.index[(df.index >= desde) & (df.index <= hasta)]\n            df.loc[filas, col] = valor\n' \
-  $'    for f1, c1, f2, _c2 in combinadas:\n        if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:\n            continue\n        col = columnas[c1 - 1]\n        if campos.get(col) not in _COMBINADAS_SE_COPIAN:\n            continue\n        ancla = f1 - 2\n        if ancla not in df.index:\n            continue\n        valor = df.at[ancla, col]\n        if not isinstance(valor, str) or not valor.strip() or _re.fullmatch(r"[\\d\\s.,+\\-]+", valor.strip()):\n            continue\n        for fila in range(f1 + 1, f2 + 1):\n            if fila - 2 in df.index:\n                df.at[fila - 2, col] = valor\n' \
+sabotaje $M "una combinada vuelve a recorrerse hasta su última fila (la función de 3e6e63e, con las celdas rellenadas)" \
+  $'    for f1, c1, f2, _c2 in sorted(set(combinadas)):\n        if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:\n            continue\n        col = columnas[c1 - 1]\n        if campos.get(col) not in _COMBINADAS_SE_COPIAN or f1 <= hasta_donde.get(c1, 0):\n            continue\n        hasta_donde[c1] = f2\n        ancla = f1 - 2\n        if ancla not in df.index or f1 >= ultima:\n            continue\n        valor = df.at[ancla, col]\n        if not isinstance(valor, str) or not valor.strip() or _re.fullmatch(r"[\\d\\s.,+\\-]+", valor.strip()):\n            continue\n        desde, hasta = max(f1 + 1, primera) - 2, min(f2, ultima) - 2\n        if desde <= hasta:\n            i, j = df.index.searchsorted([desde, hasta + 1])\n            if col not in nuevas:\n                nuevas[col] = df[col].to_numpy(copy=True)\n            nuevas[col][i:j] = valor\n            rellenadas.setdefault(col, set()).update(df.index[i:j])\n' \
+  $'    for f1, c1, f2, _c2 in combinadas:\n        if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:\n            continue\n        col = columnas[c1 - 1]\n        if campos.get(col) not in _COMBINADAS_SE_COPIAN:\n            continue\n        ancla = f1 - 2\n        if ancla not in df.index:\n            continue\n        valor = df.at[ancla, col]\n        if not isinstance(valor, str) or not valor.strip() or _re.fullmatch(r"[\\d\\s.,+\\-]+", valor.strip()):\n            continue\n        for fila in range(f1 + 1, f2 + 1):\n            if fila - 2 in df.index:\n                df.at[fila - 2, col] = valor\n                rellenadas.setdefault(col, set()).add(fila - 2)\n' \
   "FAILED $T::test_una_combinada_gigante_repetida_no_traba_la_lectura"
 sabotaje $M "cantidad y precio combinados vuelven a copiarse" \
   '_COMBINADAS_SE_COPIAN = {"descripcion", "origen", "pieza"}' \
@@ -201,7 +211,7 @@ sabotaje $C "con la cantidad mala vuelve a nombrar valor y peso" \
 sabotaje $F "los estilos vuelven a tener sólo tope de MB" \
   '                                     or _mas_elementos_que(z, parte, tope_elementos)):' \
   '                                     or False):' \
-  "FAILED $T::test_estilos_con_millones_de_elementos_se_rechazan_antes_de_abrir[xf]"
+  "FAILED $T::test_estilos_con_millones_de_elementos_se_rechazan_antes_de_abrir[font]"
 sabotaje $F "una relación de Type raro vuelve a no ser hoja" \
   '        destinos[r.get("Id")] = (destino, "chartsheet" in (r.get("Type") or ""))' \
   '        destinos[r.get("Id")] = (destino, not (r.get("Type") or "").endswith("/worksheet"))' \
@@ -227,8 +237,8 @@ sabotaje $F "los .rels vuelven a no tener tope" \
   '            if False:' \
   "FAILED $T::test_un_rels_de_hoja_enorme_se_rechaza"
 sabotaje $F "una celda en la columna XFD vuelve a pasar" \
-  '        if hojas and _ultima_columna(z.read(hojas[0][1])) > _EXCEL_MAX_COLUMNAS:' \
-  '        if False:' \
+  $'        if columna > _EXCEL_MAX_COLUMNAS:\n            raise' \
+  $'        if False:\n            raise' \
   "FAILED $T::test_una_celda_en_la_ultima_columna_se_rechaza_antes_de_abrir"
 
 echo "sabotajes con falla: $FALLAS"

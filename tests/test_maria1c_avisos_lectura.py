@@ -20,7 +20,7 @@ def _factura(**operacion):
 
 @pytest.mark.parametrize("copia", COPIAS)
 def test_flete_y_seguro_ilegibles_se_marcan(monkeypatch, copia):
-    r = _leer(monkeypatch, copia, _factura(flete="1,500", seguro="350 USD/kg"))
+    r = _leer(monkeypatch, copia, _factura(flete="12x3", seguro="350 USD/kg"))
     op = r["operacion"]
     assert op["campos_sin_leer"] == ["flete", "seguro"]
     assert op["flete"] == 0 and op["seguro"] == 0
@@ -44,14 +44,3 @@ def test_lo_que_no_estaba_o_se_leyo_no_se_marca(monkeypatch, copia, operacion):
     assert r["operacion"]["campos_sin_leer"] == []
 
 
-V2 = pathlib.Path(__file__).resolve().parents[1] / "proyecto_maria" / "static"
-
-
-def test_la_pantalla_vieja_no_repone_cantidad_ni_origen():
-    """`static/app.js` (dashboard viejo) mandaba cantidad 1 y origen CN
-    cuando estaban vacíos; ahora manda lo que hay."""
-    fuente = (V2 / "app.js").read_text(encoding="utf-8")
-    assert not re.search(r'data-field="cantidad"\]\'\)\?\.value\)\s*\|\|\s*1\b', fuente)
-    assert not re.search(r'data-field="origen"\]\'\)\?\.value\?\.trim\(\)\s*\|\|\s*\'CN\'', fuente)
-    # ni el país del vendedor
-    assert not re.search(r"vendedor_pais\b[^\n]*\|\|\s*'CN'", fuente)

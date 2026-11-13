@@ -44,17 +44,9 @@ def test_conectores_admin_con_detalle():
     assert "base_url" in data["vuce"] and "has_cert" in data["afip"]
 
 
-def test_conectores_admin_por_admin_usernames_con_detalle(monkeypatch):
+def test_conectores_en_admin_usernames_sin_el_rol_sin_detalle(monkeypatch):
     monkeypatch.setenv("ADMIN_USERNAMES", COMUN["username"])
-    assert "ncm_scraper" in _conectores(COMUN)
-
-
-def _run(coro):
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+    assert "ncm_scraper" not in _conectores(COMUN)
 
 
 @pytest.fixture
@@ -78,9 +70,9 @@ def cuenta_en_trial():
             await s.execute(delete(User).where(User.username == nombre))
             await s.commit()
 
-    _run(_crear())
-    yield nombre, (lambda: _run(_estado()))
-    _run(_borrar())
+    asyncio.run(_crear())
+    yield nombre, (lambda: asyncio.run(_estado()))
+    asyncio.run(_borrar())
 
 
 def test_simulate_webhook_ya_no_existe_sin_sesion(cuenta_en_trial, monkeypatch):

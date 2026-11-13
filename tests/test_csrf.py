@@ -85,10 +85,107 @@ def test_enforce_no_afecta_bearer_sin_cookie(monkeypatch, sin_bypass_de_test):
     assert resp.status_code == 401  # rebota por auth, no por CSRF
 
 
-def test_logout_borra_csrf_cookie(cookie_client):
-    resp = cookie_client.post(
-        "/auth/logout",
-        headers={"X-CSRF-Token": cookie_client.cookies.get("csrf_token") or ""},
-    )
-    assert resp.status_code == 200
+@pytest.mark.parametrize("ruta", ["/auth/logout", "/logout"])
+def test_logout_con_token_borra_las_dos_cookies(cookie_client, monkeypatch, ruta):
+    monkeypatch.setenv("CSRF_ENFORCE", "true")
+    resp = cookie_client.post(ruta, headers={"X-CSRF-Token": cookie_client.cookies.get("csrf_token")})
+    assert resp.status_code == 200, resp.text
+    assert not cookie_client.cookies.get("access_token")
     assert not cookie_client.cookies.get("csrf_token")
+
+
+RUTAS_SIN_TOKEN = [
+    ("DELETE", "/api/catalog/x/productos/abc-webhook", None, False),
+    ("POST", "/api/payments/webhook/x", {}, False),
+    ("POST", "/healthx", {}, False),
+    ("POST", "/staticx", {}, False),
+    ("POST", "/auth/loginx", {}, False),
+    ("POST", "/auth/login", {"username": "nadie", "password": "x"}, True),
+    ("POST", "/auth/register", {}, True),
+    ("POST", "/auth/request-password-reset", {"email": "nadie@test.cdi"}, True),
+    ("POST", "/auth/recover-username", {"email": "nadie@test.cdi"}, True),
+    ("POST", "/auth/reset-password", {"token": "x", "new_password": "otraClave123"}, True),
+]
+
+
+@pytest.mark.parametrize("metodo,ruta,cuerpo,exenta", RUTAS_SIN_TOKEN, ids=[f"{m} {r}" for m, r, _, _ in RUTAS_SIN_TOKEN])
+def test_sin_token_solo_pasan_las_rutas_exentas_exactas(cookie_client, monkeypatch, metodo, ruta, cuerpo, exenta):
+    # Con una cookie de sesión vieja, las rutas públicas que no usan la sesión
+    # tienen que andar; cualquier otra ruta, aunque se le parezca, pide el token.
+    monkeypatch.setenv("CSRF_ENFORCE", "true")
+    resp = cookie_client.request(metodo, ruta, json=cuerpo)
+    pidio_token = resp.json().get("code") == "csrf_failed"
+    assert pidio_token != exenta, f"{metodo} {ruta} sin token dio {resp.status_code}: {resp.text}"
+
+
+@pytest.mark.parametrize("ruta,con_token,esperado", [
+    ("/auth/logout", False, 403),
+    ("/auth/logout", True, 200),
+    ("/api/session/state", False, 403),
+    ("/api/session/state", True, 200),
+])
+def test_enforce_pide_token_a_logout_y_telemetria(cookie_client, monkeypatch, ruta, con_token, esperado):
+    monkeypatch.setenv("CSRF_ENFORCE", "true")
+    headers = {"Origin": "https://otro-sitio.example"}
+    if con_token:
+        headers = {"X-CSRF-Token": cookie_client.cookies.get("csrf_token")}
+    resp = cookie_client.post(ruta, json={"event": "csrf1", "payload": {}}, headers=headers)
+    assert resp.status_code == esperado, resp.text
+    cerro = ruta == "/auth/logout" and esperado == 200
+    assert bool(cookie_client.cookies.get("access_token")) != cerro
+
+
+@pytest.mark.parametrize("enforce", ["true", "false"])
+@pytest.mark.parametrize("ruta", ["/auth/logout", "/logout"])
+def test_logout_desde_otro_sitio_no_borra_la_sesion(monkeypatch, ruta, enforce):
+    # Así llega un <form> de otro sitio: la cookie SameSite=Strict no viaja,
+    # pero el navegador sí aplica los Set-Cookie de borrado de la respuesta.
+    monkeypatch.setenv("CSRF_ENFORCE", enforce)
+    resp = TestClient(app).post(ruta, headers={"Origin": "https://otro-sitio.example"})
+    assert resp.status_code == 200, resp.text
+    borrados = resp.headers.get("set-cookie", "")
+    assert "access_token" not in borrados and "csrf_token" not in borrados, borrados
+
+
+def _token_firmado(token_valido, **cambios):
+    import jwt
+    from proyecto_maria.config import get_settings
+    s = get_settings()
+    datos = jwt.decode(token_valido, s.jwt_secret, algorithms=[s.jwt_algorithm])
+    return "Bearer " + jwt.encode({**datos, **cambios}, s.jwt_secret, algorithm=s.jwt_algorithm)
+
+
+SESIONES_SIN_TOKEN_CSRF = {
+    # caso: (cómo queda la cookie de sesión, valor de la cookie csrf_token o None, sesión válida, recibe token)
+    "ausente": (lambda t: f"Bearer {t}", None, True, True),
+    "vacia": (lambda t: f"Bearer {t}", "", True, True),
+    "presente": (lambda t: f"Bearer {t}", "token-de-antes", True, False),
+    "vencida": (lambda t: _token_firmado(t, exp=1), None, False, False),
+    "revocada": (lambda t: _token_firmado(t, jti="otra-sesion"), None, False, False),
+    "sin_sesion": (None, None, False, False),
+}
+
+
+@pytest.mark.parametrize("ruta", ["/auth/current_user", "/dashboard"])
+@pytest.mark.parametrize("caso", SESIONES_SIN_TOKEN_CSRF)
+def test_sesion_sin_token_csrf_lo_recibe_y_escribe(cookie_client, monkeypatch, sin_bypass_de_test, caso, ruta):
+    # Una sesión válida que perdió su csrf_token lo recupera en la próxima
+    # pedida autenticada; si lo tiene no se le cambia, y sin sesión no se emite.
+    monkeypatch.setenv("CSRF_ENFORCE", "true")
+    sesion, csrf, valida, recibe = SESIONES_SIN_TOKEN_CSRF[caso]
+    token = cookie_client.cookies.get("access_token").strip('"').split(" ")[1]
+    cliente = TestClient(app)
+    if sesion:
+        cliente.cookies.set("access_token", sesion(token))
+    if csrf is not None:
+        cliente.cookies.set("csrf_token", csrf)
+    resp = cliente.get(ruta)
+    assert resp.status_code == (200 if valida or ruta == "/dashboard" else 401), resp.text
+    nuevo = resp.cookies.get("csrf_token")
+    assert bool(nuevo) == recibe, resp.headers.get("set-cookie")
+    if recibe:
+        cliente.cookies.clear()
+        cliente.cookies.set("access_token", sesion(token))
+        cliente.cookies.set("csrf_token", nuevo)
+        escritura = cliente.post("/api/backup/localStorage", json={"x": 1}, headers={"X-CSRF-Token": nuevo})
+        assert escritura.status_code == 200, escritura.text

@@ -2,15 +2,16 @@
 
 - Estado de la mercadería (CARTUSO), por producto: 1 a 6; por defecto 2 con
   origen extranjero; con origen argentino no hay por defecto.
-- IVA adicional (IVAADICIONAL1): reventa (NO_VALIDA, por defecto) o uso
-  particular (IVAAD1), por operación con cambio por producto.
+- IVA adicional (IVAADICIONAL1): por operación con cambio por producto. Desde
+  DESTINO-1 sale de a pares con GANANCIASOP3 (`test_destino1.py`).
 - Banco (BANCOSARGENTINA): código BCRA de 3 dígitos; sin banco la línea no sale.
 - Empresa de digitalización (ARDIG-CUIT-PSAD): PSAD06 Modoc (por defecto) o
   PSAD01 Lakaut.
 
 Prueba: respuestas 1, 2, 4 y 5 del despachante y los dos archivos reales
 (2025: estado 3, uso particular, sin banco, PSAD06; 2026: estado 2,
-reventa, banco 191, PSAD01). El archivo de 2025 sale idéntico en
+reventa, banco 191, PSAD01). El archivo de 2025 sale idéntico, salvo el
+GANANCIASOP3 que corrige DESTINO-1, en
 `test_generar_maria_txt.py::test_golden_reproduce_estructura_real`.
 """
 import pytest
@@ -84,15 +85,6 @@ def test_supuestos_leen_el_origen_como_el_generador():
     assert "estado de la mercadería: en el/los ítem(s) 1" in texto
 
 
-def test_la_pantalla_vieja_muestra_los_avisos_de_generate_maria():
-    """Devolución de la PM: la v1 muestra warnings y supuestos de la respuesta."""
-    import pathlib
-    fuente = (pathlib.Path(__file__).resolve().parents[1] / "proyecto_maria" / "static" / "app.js").read_text(encoding="utf-8")
-    tramo = fuente[fuente.index("endpoint = '/generate_maria';"):]
-    tramo = tramo[:tramo.index("window.location.href = data.download_url")]
-    assert "data.supuestos" in tramo and "data.warnings" in tramo
-
-
 def test_estado_distinto_en_cada_producto():
     items = [dict(ITEM_BASE, estado=2), dict(ITEM_BASE, estado=6)]
     assert _cartuso(_gen(items)) == ["2", "6"]
@@ -120,7 +112,7 @@ def test_iva_uso_particular_por_operacion_y_cambio_por_producto():
     assert _valor(txt, "IVAADICIONAL1", "0002") == ["NO_VALIDA"]
 
 
-@pytest.mark.parametrize("kw", [{"iva_adicional": "IVAAD2"}, {"empresa_digitalizacion": "PSAD99"},
+@pytest.mark.parametrize("kw", [{"iva_adicional": "IVAAD3"}, {"empresa_digitalizacion": "PSAD99"},
                                 {"banco_bcra": "19"}, {"banco_bcra": "abc"}])
 def test_valores_no_validos_se_rechazan(kw):
     with pytest.raises(ValueError):
@@ -177,6 +169,7 @@ def test_endpoint_pasa_los_valores_y_avisa_lo_que_falta(client, auth_override):
         incoterm="EXW", flete=365.0, seguro=75.47, fecha_emision="22/06/2026",
         aduana_codigo="073", sbt_sufijo_valor=SUF_A,
         banco_bcra="191", empresa_digitalizacion="PSAD01", iva_adicional="IVAAD1",
+        cuit_agr="20111111112",  # sin CUIT del despachante no se genera (MARIA-7)
     )
     r = client.post("/generate_maria", json=cuerpo)
     assert r.status_code == 200, r.text
@@ -219,7 +212,7 @@ def test_iva_en_minusculas_se_normaliza():
 def test_grupo_con_iva_distinto_se_rechaza():
     items = [dict(ITEM_BASE, grupo_id=1, iva_adicional="IVAAD1"),
              dict(ITEM_BASE, grupo_id=1, iva_adicional="NO_VALIDA")]
-    with pytest.raises(ValueError, match="mismo IVA"):
+    with pytest.raises(ValueError, match="mismo destino"):
         _gen(items)
 
 

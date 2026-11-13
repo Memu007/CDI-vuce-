@@ -57,7 +57,8 @@ dice.
 
 **Dev del canal.** Leé `CLAUDE.md` y, una vez, `docs/pm/ONBOARDING-DEV.md`.
 Después, tu canal: la Dev 1 lee `docs/pm/PARA-DEV.md` y responde en
-`docs/pm/PARA-PM.md`; la Dev 2, si se suma, `PARA-DEV-2.md` y `PARA-PM-2.md`.
+`docs/pm/PARA-PM.md`; la Dev N, `PARA-DEV-N.md` y `PARA-PM-N.md` («Estructura» en
+`docs/pm/ONBOARDING-PM.md`).
 
 **Otro asistente en un chat suelto con Emi** (Cursor, Copilot, etc., fuera
 del canal):
@@ -96,9 +97,9 @@ Vale para PMs y Devs; esta es su única copia.
   segundo plano sigue). Con menos de ~180k se compacta sin parar y gasta
   más. Lo que conserva lo dice `# Compact instructions` en `CLAUDE.md`: por
   eso cada sesión deja **siempre al día** su `/compact conservar: …` (Dev 1,
-  al final de `docs/pm/PARA-PM.md`; Dev 2, al final de `docs/pm/PARA-PM-2.md`;
+  al final de `docs/pm/PARA-PM.md`; Dev N, al final de `docs/pm/PARA-PM-N.md`;
   PM principal, en `NOW.md`).
-- **Control:** en su vuelta horaria la PM principal mira cada sesión con
+- **Control:** en cada vuelta la PM principal mira cada sesión con
   `get_session`. Sólo si una muestra un `max_tokens` distinto de 200000
   (contenedor nuevo) o `used_tokens` pasa ~170k, le pasa a Emi el
   `/compact conservar: …` de esa sesión y le pide `/autocompact 200k` en

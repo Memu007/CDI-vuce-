@@ -98,9 +98,5 @@ caso "estado_contra_origen" "FAILED $T::test_estado_que_no_corresponde_al_origen
 reemplazar $F '        and get_pais_codigo(item.get("pais_origen") or item.get("origen")) != PAIS_ARGENTINA' '        and get_pais_codigo(item.get("origen") or item.get("pais_origen")) != PAIS_ARGENTINA'
 caso "orden_del_origen" "FAILED $T::test_supuestos_leen_el_origen_como_el_generador"
 
-# 9. (devolución) la pantalla vieja deja de mostrar los supuestos
-reemplazar proyecto_maria/static/app.js "const avisosMaria = [...(data.warnings || []), ...(data.supuestos || [])];" "const avisosMaria = [];"
-caso "vieja_sin_avisos" "FAILED $T::test_la_pantalla_vieja_muestra_los_avisos_de_generate_maria"
-
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 9 sabotajes dan rojo por la razón esperada"
+echo "OK: los 8 sabotajes dan rojo por la razón esperada"

@@ -20,11 +20,12 @@ import zipfile
 from collections import defaultdict
 from collections.abc import Awaitable, Iterable, Mapping
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol, TypeAlias
 
 import pandas as pd
+
+from proyecto_maria.services.fecha_inic_activ import fecha_del_alta
 
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
@@ -242,6 +243,7 @@ def analyze_migration_file(
     sheet_summaries: list[dict[str, Any]] = []
     rows: list[dict[str, Any]] = []
     omitted: list[dict[str, Any]] = []
+    invalid_dates: list[dict[str, Any]] = []
     total_rows = 0
 
     for sheet in sheets:
@@ -271,7 +273,7 @@ def analyze_migration_file(
             for offset in range(len(sheet.frame)):
                 omitted.append(_omitted(sheet.name, offset + 2, "missing_cuit_column"))
             continue
-        _collect_rows(sheet, mapping, rows, omitted)
+        _collect_rows(sheet, mapping, rows, omitted, invalid_dates)
 
     return _build_preview(
         content=content,
@@ -282,6 +284,7 @@ def analyze_migration_file(
         rows=rows,
         omitted=omitted,
         existing_clients=existing_clients,
+        invalid_dates=invalid_dates,
     )
 
 
@@ -295,7 +298,7 @@ async def analyze_migration_file_async(
     """Version async para FastAPI cuando el mapeador opcional llama a Gemini.
 
     Leer el archivo y analizarlo corre en otro hilo: no frena al resto del
-    servidor (EXCEL-1). Los clientes existentes se normalizan antes, acá, para
+    servidor. Los clientes existentes se normalizan antes, acá, para
     no tocar objetos de la base desde otro hilo.
     """
     import asyncio
@@ -415,6 +418,7 @@ def _collect_rows(
     mapping: Mapping[str, str],
     rows: list[dict[str, Any]],
     omitted: list[dict[str, Any]],
+    invalid_dates: list[dict[str, Any]] | None = None,
 ) -> None:
     for offset, (_, source) in enumerate(sheet.frame.iterrows(), start=2):
         values = {
@@ -429,6 +433,12 @@ def _collect_rows(
             omitted.append(_omitted(sheet.name, offset, reason, raw_cuit))
             continue
         values["cuit"] = cuit
+        date_column = mapping.get("fecha_inic_activ")
+        if invalid_dates is not None and date_column is not None and not values.get("fecha_inic_activ"):
+            # La fecha que no sirve queda vacía y se avisa con la fila.
+            raw_date = _cell_text(source.get(date_column, ""), limit=32)
+            if raw_date:
+                invalid_dates.append({"sheet": sheet.name, "row": offset, "cuit": cuit, "value": raw_date})
         invalid_fields: list[str] = []
         if not values.get("nombre"):
             invalid_fields.append("nombre")
@@ -453,7 +463,9 @@ def _build_preview(
     rows: list[dict[str, Any]],
     omitted: list[dict[str, Any]],
     existing_clients: Iterable[Any],
+    invalid_dates: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    invalid_dates = list(invalid_dates or [])
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         grouped[row["cuit"]].append(row)
@@ -552,6 +564,7 @@ def _build_preview(
         "existing": len(found_existing),
         "conflicts": len(conflicts),
         "omitted": len(omitted),
+        "fechas_que_no_sirven": len(invalid_dates),
         "staged": len(staged),
         # Alias explicitos para que el contrato HTTP sea autoexplicativo.
         "new_clients": len(new_clients),
@@ -569,6 +582,7 @@ def _build_preview(
         "existing_clients": found_existing,
         "conflicts": conflicts,
         "omitted": omitted,
+        "fechas_que_no_sirven": invalid_dates,
         "staged_records": staged,
     }
 
@@ -637,15 +651,9 @@ def _same_field(field: str, left: str, right: str) -> bool:
 def _field_text(field: str, value: Any) -> str:
     text = _cell_text(value, limit=_FIELD_LIMITS.get(field, 500))
     if field == "fecha_inic_activ" and text:
-        for date_format in (
-            "%Y-%m-%d", "%Y-%m-%d %H:%M:%S", "%d/%m/%Y", "%d-%m-%Y",
-            "%d/%m/%y", "%d-%m-%y",
-        ):
-            try:
-                return datetime.strptime(text, date_format).strftime("%Y-%m-%d")
-            except ValueError:
-                continue
-        return ""
+        # D25 (b): la regla del alta. Una celda con formato fecha llega de
+        # pandas como «AAAA-MM-DD 00:00:00»; esa hora se saca y nada más.
+        return fecha_del_alta(re.sub(r" 00:00:00\Z", "", text)) or ""
     return text.casefold() if field == "email" else text
 
 

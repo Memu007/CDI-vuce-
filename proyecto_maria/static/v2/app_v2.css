@@ -1,8 +1,8 @@
 /* ============================================================
    CDI v2 — Apple minimal design system (PROD base CSS)
    Fuente: proyecto_maria/mockups/styles.css
-   Alcance: solo dashboard_v2.html (opt-in via cookie cdi_ui=v2).
-   v1 (dashboard.html + app.css) NO se ve afectado.
+   Alcance: dashboard_v2.html, la única interfaz
+   (la v1, dashboard.html + app.css, se retiró el 2026-11-05).
    ============================================================ */
 
 /* ---------- Billing banner (trial restante / past_due) ---------- */
@@ -4377,6 +4377,94 @@ tr:hover .ncm-note-pill.is-empty {
     padding: 1px 6px;
     border-radius: 999px;
 }
+
+.cx-catalogo-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--s-2);
+}
+
+/* Productos desde un despacho (DESPACHO-1b) */
+.cx-despacho {
+    margin: 0 0 var(--s-4);
+    padding: var(--s-3);
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
+}
+.cx-despacho-titulo {
+    margin: 0 0 var(--s-2);
+    font-size: var(--t-13);
+    font-weight: 600;
+    color: var(--c-text);
+}
+.cx-despacho-estado { margin: 0 0 var(--s-2); color: var(--c-text-2); }
+.cx-despacho-avisos,
+.cx-despacho-renglon-avisos,
+.cx-despacho-errores {
+    margin: 0 0 var(--s-2);
+    padding-left: 1.2em;
+    font-size: var(--t-13);
+}
+.cx-despacho-avisos,
+.cx-despacho-renglon-avisos { color: var(--c-warning-strong, #7a4a00); }
+.cx-despacho-errores { color: var(--c-error); }
+.cx-despacho-renglones {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+}
+.cx-despacho-renglon {
+    padding: var(--s-3);
+    background: var(--c-surface-2);
+    border-radius: 8px;
+    border: 1px solid transparent;
+}
+.cx-despacho-renglon.is-error { border-color: var(--c-error); }
+.cx-despacho-renglon-titulo {
+    font-size: var(--t-13);
+    font-weight: 600;
+    color: var(--c-text-2);
+    margin-bottom: var(--s-2);
+}
+.cx-despacho-campos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--s-2);
+}
+.cx-despacho-campo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cx-despacho-campo.is-ancho { grid-column: 1 / -1; }
+.cx-despacho-campo label { font-size: var(--t-11); color: var(--c-text-3); }
+.cx-despacho-campo input,
+.cx-despacho-campo textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--c-border);
+    border-radius: 6px;
+    padding: 4px 6px;
+    font: inherit;
+    font-size: var(--t-13);
+    background: var(--c-surface);
+    color: var(--c-text);
+}
+.cx-despacho-campo textarea { resize: vertical; }
+.cx-despacho-campo.is-faltante input,
+.cx-despacho-campo.is-faltante textarea {
+    border-color: var(--c-warning);
+    background: var(--c-warning-soft);
+}
+.cx-despacho-nota { font-size: var(--t-11); color: var(--c-text-3); }
+.cx-despacho-campo.is-faltante .cx-despacho-nota { color: var(--c-warning-strong, #7a4a00); }
+.cx-despacho-dato {
+    margin-top: var(--s-2);
+    font-size: var(--t-13);
+    color: var(--c-text-2);
+    overflow-wrap: anywhere;
+}
+.cx-despacho-sufijos { margin: 2px 0 0; padding-left: 1.2em; }
 
 /* Datos (tab) */
 .cx-datos-grid {

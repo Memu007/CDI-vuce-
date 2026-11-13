@@ -6,13 +6,14 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_maria4.js [captura.png]
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const b = await chromium.launch();
   const page = await (await b.newContext({ viewport: { width: 1280, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  await page.request.post(base + '/auth/register', { data: { username: 'm4_' + id, password: 'Clave-Inventada-123', email: 'm4' + id + '@ejemplo.test' } });
+  await registrarCuenta(page.request, base, { data: { username: 'm4_' + id, password: 'Clave-Inventada-123', email: 'm4' + id + '@ejemplo.test' } });
   // Un cliente con una operación anterior que usó el banco 191.
   const rc = await page.request.post(base + '/api/clientes', { data: { nombre: 'Cliente M4', cuit: '30712345678' } });
   const cj = await rc.json(); const cliente = cj.cliente || cj;
@@ -27,7 +28,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.despachante);
   await page.evaluate((cl) => {
     CDI.setClienteActivo(cl);
-    CDI.state.operacion = { numero_factura: 'F-M4', moneda: 'DOL', incoterm: 'FOB', sbt_sufijo_valor: 'AA(1)-CA00' };
+    CDI.state.operacion = { numero_factura: 'F-M4', moneda: 'DOL', incoterm: 'FOB', comprador_cuit: '30712345671', sbt_sufijo_valor: 'AA(1)-CA00' };
     CDI.state.items = [
       { pieza: '84714900100D', descripcion: 'Equipo importado', origen: 'CN', cantidad: 1, valor_unitario: 10, peso_unitario: 1 },
       { pieza: '84714900100D', descripcion: 'Equipo argentino', origen: 'AR', cantidad: 1, valor_unitario: 10, peso_unitario: 1 },
@@ -58,7 +59,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   if (p.banco_bcra !== '191' || p.empresa_digitalizacion !== 'PSAD01' || p.iva_adicional !== 'IVAAD1') falla('operación: ' + JSON.stringify([p.banco_bcra, p.empresa_digitalizacion, p.iva_adicional]));
   // El importado no se eligió: no va (el servidor usa 2 y lo avisa).
   if (p.items[0].estado != null || String(p.items[1].estado) !== '3') falla('estados: ' + JSON.stringify(p.items.map(i => i.estado)));
-  console.log('OK el pedido lleva banco 191, Lakaut, uso particular, el estado 3 elegido y el importado sin elegir');
+  console.log('OK el pedido lleva banco 191, Lakaut, bien de uso de una persona (IVAAD1), el estado 3 elegido y el importado sin elegir');
 
   // Se vuelve atrás y el importado pasa a argentino: el 2 por defecto no quedó
   // guardado, así que se vuelve a pedir el estado.

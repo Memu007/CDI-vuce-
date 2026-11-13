@@ -23,6 +23,7 @@ os.environ.setdefault("EMAIL_VERIFICATION_REQUIRED", "false")
 
 from proyecto_maria import main  # noqa: E402
 from proyecto_maria.main import app  # noqa: E402
+from tests.mp_firma import aviso_firmado  # noqa: E402
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -76,9 +77,11 @@ def _mock_sdk_approved(username: str, plan: str = "premium"):
         "response": {
             "id": "999000111",
             "status": "approved",
+            "date_approved": datetime.now(timezone.utc).isoformat(),
             "external_reference": f"{username}:{plan}",
             "payer": {"id": "payer_g7"},
-            "transaction_amount": 30000.00,
+            "transaction_amount": 45000.00,  # el precio del plan (COBRO-MP-1)
+            "currency_id": "ARS",
         },
     }
     return sdk
@@ -99,10 +102,11 @@ async def _set_trial_ends_at(username: str, when: datetime):
 
 
 # ---------------------------------------------------------------------------
-# G7.1 — Cobro: webhook de pago aprobado lleva al usuario a `active` (+30 d).
+# G7.1 — Cobro: webhook de pago aprobado lleva al usuario a `active` (fin + 30 d).
 # ---------------------------------------------------------------------------
 def test_g7_1_cobro_aprobado_activa_el_plan(client, monkeypatch):
-    """trial --(webhook payment approved)--> active con trial_ends_at a +30 d.
+    """trial --(webhook payment approved)--> active con trial_ends_at al fin de
+    la prueba + 30 d: los días de prueba que quedan se suman (COBRO-MP-2, D7.1).
 
     SDK de MP mockeado: no se toca ninguna cuenta real ni webhook a producción.
     """
@@ -115,20 +119,25 @@ def test_g7_1_cobro_aprobado_activa_el_plan(client, monkeypatch):
 
     antes = _me(client)
     assert antes["billing_status"] == "trial", antes
+    fin_prueba = datetime.fromisoformat(antes["trial_ends_at"])
+    if fin_prueba.tzinfo is None:
+        fin_prueba = fin_prueba.replace(tzinfo=timezone.utc)
+    # La prueba recién empieza: si su fin no estuviera lejos, «fin de la prueba
+    # + 30» y «ahora + 30» no se distinguirían.
+    assert fin_prueba > datetime.now(timezone.utc) + timedelta(days=1), antes
 
     with patch.object(main.mercadopago, "SDK", return_value=_mock_sdk_approved(uname)):
-        wh = client.post(f"/api/payments/webhook?id=999000111&topic=payment")
+        wh = client.post("/api/payments/webhook", **aviso_firmado("payment", "999000111", "test-secret"))
         assert wh.status_code == 200, wh.text
         assert wh.json()["success"] is True
 
     despues = _me(client)
     assert despues["billing_status"] == "active", despues
-    # trial_ends_at debe quedar ~+30 d (proceso setea now + 30 días).
+    # trial_ends_at queda en el fin de la prueba + 30 d, no en ahora + 30 d.
     fin = datetime.fromisoformat(despues["trial_ends_at"])
     if fin.tzinfo is None:  # la API puede devolverlo naive (SQLite)
         fin = fin.replace(tzinfo=timezone.utc)
-    delta_dias = (fin - datetime.now(timezone.utc)).days
-    assert 29 <= delta_dias <= 30, f"trial_ends_at a {delta_dias} días, esperaba ~30"
+    assert abs(fin - (fin_prueba + timedelta(days=30))) < timedelta(minutes=5), (fin, fin_prueba)
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +153,7 @@ def test_g7_2_corte_por_vencimiento_devuelve_402(client):
     assert _me(client)["billing_status"] == "trial"
 
     # Vencer el trial en la base (ayer).
-    asyncio.new_event_loop().run_until_complete(
+    asyncio.run(
         _set_trial_ends_at(uname, datetime.now(timezone.utc) - timedelta(days=1))
     )
 
@@ -180,7 +189,7 @@ def test_g7_4_reactivacion_tras_corte_vuelve_a_active(client):
     _register(client, uname)
 
     # Llevarlo a past_due: vencer el trial y disparar el gate con una operación.
-    asyncio.new_event_loop().run_until_complete(
+    asyncio.run(
         _set_trial_ends_at(uname, datetime.now(timezone.utc) - timedelta(days=1))
     )
     corte = client.post("/api/operations/manual", json={"client_id": "x", "items": []})

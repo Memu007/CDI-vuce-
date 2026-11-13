@@ -18,9 +18,12 @@
 
     let lastValidation = null;    // { errores, advertencias, sugerencias, estadisticas }
     let lastValidationTs = 0;
+    let lastValidationPedido = '';  // el pedido del que salió lastValidation
     let lastMaria = null;         // { filename, download_url, content }
-    let validatingInFlight = false;
+    let turnoValidacion = 0;      // sólo la validación más reciente pinta la pantalla
     let generateInFlight = false;
+    // Lo que se pide mientras otra generación espera se genera cuando ésa vuelve.
+    let pedidaMientrasOtra = false;
 
     function $(id) { return document.getElementById(id); }
     function show(el) { if (el) el.hidden = false; }
@@ -77,9 +80,14 @@
         // Hasta que llegue la respuesta, nada de los avisos de otra operación.
         const avisosPanel = document.getElementById('validatingAvisosPanel');
         if (avisosPanel) avisosPanel.hidden = true;
-        Promise.resolve(CDI.despachante ? CDI.despachante.render() : null)
-            .catch(() => null).then(refrescarAvisos);
+        // ESTUDIO-1: el estudio elegido también cambia los avisos.
+        Promise.all([
+            Promise.resolve(CDI.despachante ? CDI.despachante.render() : null).catch(() => null),
+            Promise.resolve(CDI.estudios ? CDI.estudios.render() : null).catch(() => null),
+        ]).then(refrescarAvisos);
         enlazarAvisos();
+        enlazarValor();
+        pintarValor(null);
         refrescarAvisos();
         init();
         if (!vLoading) return;
@@ -94,43 +102,39 @@
 
     async function runValidation(force) {
         init();
-        if (validatingInFlight) return;
-        const now = Date.now();
-        // Cache: si ya tenemos resultado de hace menos de 60s y no forzamos, reusar
-        if (!force && lastValidation && (now - lastValidationTs) < 60000) {
-            renderValidation(lastValidation);
-            return;
-        }
-
-        validatingInFlight = true;
         show(vLoading);
         hide(vResults);
-
+        const turno = ++turnoValidacion;
         const items = buildItemsForValidation();
+        const startedAt = Date.now();
+        let pedido = '', data = null, err = null;
         try {
-            const startedAt = Date.now();
-            const res = await CDI.api('/api/validate/smart', {
-                method: 'POST',
-                body: JSON.stringify({ items, operacion: cabeceraParaValidar() })
-            });
-            const data = await res.json();
-            const dur = Date.now() - startedAt;
+            pedido = JSON.stringify({ items, operacion: cabeceraParaValidar() });
+            // Se reusa sólo el resultado de este mismo pedido, de hace menos de 60 s.
+            if (!force && lastValidation && pedido === lastValidationPedido && (Date.now() - lastValidationTs) < 60000) {
+                renderValidation(lastValidation);
+                return;
+            }
+            const res = await CDI.api('/api/validate/smart', { method: 'POST', body: pedido });
+            data = await res.json();
             if (!res.ok || !data || data.success === false) {
                 throw new Error((data && data.detail) || 'No se pudo validar');
             }
-            lastValidation = data;
-            lastValidationTs = Date.now();
-            CDI.track('validation_ok', {
-                errores: (data.errores || []).length,
-                advertencias: (data.advertencias || []).length,
-                sugerencias: (data.sugerencias || []).length,
-                duration_ms: dur
-            });
-            renderValidation(data);
-        } catch (err) {
+        } catch (e) {
+            err = e;
+        }
+        // Otra carga pidió después: esta respuesta ya no es la que se ve.
+        if (turno !== turnoValidacion) return;
+        if (err) {
             console.error('[validating]', err);
             CDI.track('validation_error', { message: String(err && err.message || err) });
             CDI.toast('Error al validar', String(err && err.message || err), 'error');
+            // Volver a validar la misma carga: su resultado anterior sigue valiendo.
+            if (lastValidation && pedido === lastValidationPedido) {
+                renderValidation(lastValidation);
+                return;
+            }
+            lastValidation = null;
             // Mostrar resultados "vacios" para no bloquear: permitimos seguir
             renderValidation({
                 errores: [],
@@ -138,9 +142,18 @@
                 sugerencias: [],
                 estadisticas: { total_items: items.length, total_valor_usd: 0, total_peso_kg: 0, ncms_unicos: 0 }
             });
-        } finally {
-            validatingInFlight = false;
+            return;
         }
+        lastValidation = data;
+        lastValidationTs = Date.now();
+        lastValidationPedido = pedido;
+        CDI.track('validation_ok', {
+            errores: (data.errores || []).length,
+            advertencias: (data.advertencias || []).length,
+            sugerencias: (data.sugerencias || []).length,
+            duration_ms: Date.now() - startedAt
+        });
+        renderValidation(data);
     }
 
     function buildItemsForValidation() {
@@ -172,6 +185,39 @@
         };
         wrap.addEventListener('change', programar);
         wrap.addEventListener('input', programar);
+        // El sufijo de la operación cambia lo que viaja por producto.
+        const sbt = document.getElementById('sbtSufijoValor');
+        if (sbt) sbt.addEventListener('input', programar);
+        const estudio = document.getElementById('estudioWrap');
+        if (estudio) estudio.addEventListener('change', programar);
+    }
+
+    // SEPARADORES-1d (D25): el flete y el seguro van al TXT con dos
+    // decimales. Si tienen más, se avisa sin frenar qué se escribió y qué
+    // lleva el TXT. Lo que no se lee o es negativo ya lo frena la revisión.
+    function avisosDeLosMontos(op) {
+        return [['Flete', op.flete], ['Seguro', op.seguro]].map(function (par) {
+            const r = CDI.montos.leer(par[1]);
+            if (r.error || r.valor === null || r.valor < 0) return null;
+            const txt = alCentavoDelTxt(r.valor);
+            if (txt === null) return null;
+            const escrito = typeof par[1] === 'string' ? par[1].trim() : CDI.montos.escribir(r.valor);
+            return par[0] + ': escribiste «' + escrito + '». El TXT lleva ' + txt + '.';
+        }).filter(Boolean);
+    }
+
+    // Como centavos() del generador: el número más corto que lo escribe
+    // (String de JS da lo mismo que repr de Python) y la mitad hacia arriba,
+    // con cuentas de texto: Math.round(2.675 * 100) da 267. null si tiene dos
+    // decimales o menos.
+    function alCentavoDelTxt(n) {
+        const s = String(n);
+        if (/e/i.test(s)) return /e-/i.test(s) ? '0,00' : null;   // menos de 0,000001 o más de 1e21
+        const [entero, dec = ''] = s.split('.');
+        if (dec.length <= 2) return null;
+        const cent = BigInt(entero + dec.slice(0, 2)) + (dec[2] >= '5' ? 1n : 0n);
+        const t = cent.toString().padStart(3, '0');
+        return t.slice(0, -2) + ',' + t.slice(-2);
     }
 
     async function refrescarAvisos() {
@@ -182,23 +228,36 @@
         if (!panel || !list) return;
         if (!(CDI.state && (CDI.state.items || []).length)) { panel.hidden = true; return; }
         let avisos;
+        let valor = null;
+        let firma = null;
+        // SUFIJOS-1: lo que dicen las celdas del sufijo (el arancel no
+        // contestó, lo escrito con otro de la operación, D23). SEPARADORES-1d:
+        // el flete o el seguro con más de dos decimales.
+        const deLaPantalla = (CDI.despachante && CDI.despachante.avisos ? CDI.despachante.avisos() : [])
+            .concat(avisosDeLosMontos((CDI.state && CDI.state.operacion) || {}));
         try {
+            const pedido = buildMariaRequest();
+            firma = firmaDelPedido(pedido);
             const res = await CDI.api('/generate_maria/avisos', {
                 method: 'POST',
-                body: JSON.stringify(buildMariaRequest())
+                body: JSON.stringify(pedido)
             });
             const data = await res.json();
             if (!res.ok) {
                 const detail = data && data.detail;
-                avisos = [typeof detail === 'string' ? detail : 'No se pudieron revisar los avisos.'];
+                avisos = deLaPantalla.concat([typeof detail === 'string' ? detail : 'No se pudieron revisar los avisos.']);
+                valor = { error: SIN_CUENTAS };
             } else {
-                avisos = (data && data.avisos) || [];
+                avisos = deLaPantalla.concat((data && data.avisos) || []);
+                valor = (data && data.valor) || null;
             }
         } catch (err) {
             console.warn('[avisos] no se pudieron pedir', err);
-            avisos = ['No se pudieron revisar los avisos; aparecen al generar.'];
+            avisos = deLaPantalla.concat(['No se pudieron revisar los avisos; aparecen al generar.']);
+            valor = { error: SIN_CUENTAS };
         }
         if (seq !== avisosSeq) return;   // llegó uno más nuevo
+        pintarValor(valor, firma);
         panel.hidden = !avisos.length;
         if (count) count.textContent = avisos.length ? '· ' + avisos.length : '';
         list.innerHTML = avisos.map(function (msg) {
@@ -209,6 +268,273 @@
                 '<span class="issue-msg">' + CDI.escapeHtml(clean) + '</span>' +
                 '</li>';
         }).join('');
+    }
+
+    /* ---------- Ajustes y seguro (VALOR-1) ---------- */
+    // Los ajustes los carga la persona: el descuento de la planilla se ofrece
+    // con un botón y nunca se pone solo. Las cuentas las hace el servidor,
+    // con la misma cuenta del MDDTFOB del TXT.
+    let valorEnlazado = false;
+    let ultimoValor = null;
+    let cuentasCon = null;   // el pedido con el que se hizo ultimoValor
+    const SIN_CUENTAS = 'No se pudieron hacer las cuentas: mirá los avisos.';
+
+    // Vacío es sin ajuste (null). Lo que no se puede leer viaja tal cual: el
+    // servidor lo dice en las cuentas y no frena el TXT (SEPARADORES-1b, D19).
+    // SEPARADORES-1: «1.500» es mil quinientos (montos_ar.js).
+    function ajusteDelPedido(v) {
+        const r = CDI.montos.leer(v);
+        return r.error ? String(v).trim() : r.valor;
+    }
+
+    // Por qué un ajuste escrito no se puede leer, o null.
+    function ajusteMalEscrito(v) {
+        const error = CDI.montos.leer(v).error;
+        if (!error) return null;
+        return error === CDI.montos.NO_ES_NUMERO ? 'no es un número.' : error;
+    }
+
+    // Flete, seguro o gastos de la revisión, que ya frena lo que no se lee.
+    // Si igual llega uno así, viaja tal cual y el servidor lo rechaza con su
+    // mensaje: nunca un 0 silencioso (SEPARADORES-1b, D19). Vacío es 0.
+    function montoDelPedido(v) {
+        const r = CDI.montos.leer(v);
+        if (r.error) return String(v).trim();
+        return r.valor === null ? 0 : r.valor;
+    }
+
+    function importeEscrito(n) {
+        return Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // El pedido sin lo que cambia solo (el número de operación sin factura
+    // lleva la hora): si cambia, las cuentas que se hicieron con él no valen.
+    function firmaDelPedido(pedido) {
+        const resto = Object.assign({}, pedido);
+        delete resto.operation_id;
+        return JSON.stringify(resto);
+    }
+
+    // Cambió algo de la cuenta: las cuentas a la vista ya no valen, ni las
+    // que están por llegar, hasta que vuelvan las nuevas.
+    function cuentasViejas() {
+        ultimoValor = null;
+        avisosSeq++;
+        ['valorCalcularSeguro', 'valorDejarSeguro'].forEach(function (id) {
+            const boton = document.getElementById(id);
+            if (boton) boton.hidden = true;
+        });
+    }
+
+    function enlazarValor() {
+        const wrap = document.getElementById('valorWrap');
+        if (valorEnlazado || !wrap) return;
+        valorEnlazado = true;
+        const programar = () => {
+            clearTimeout(avisosTimer);
+            avisosTimer = setTimeout(refrescarAvisos, 400);
+        };
+        const campos = { valorIncluir: 'ajustes_incluir', valorDeducir: 'ajustes_deducir' };
+        Object.keys(campos).forEach(function (id) {
+            const input = document.getElementById(id);
+            if (!input) return;
+            input.addEventListener('input', function () {
+                const op = CDI.state.operacion = CDI.state.operacion || {};
+                op[campos[id]] = input.value;
+                cuentasViejas();
+                programar();
+            });
+        });
+        const usar = document.getElementById('valorUsarDescuento');
+        if (usar) usar.addEventListener('click', usarDescuento);
+        const seguro = document.getElementById('valorCalcularSeguro');
+        if (seguro) seguro.addEventListener('click', calcularSeguro);
+        const dejar = document.getElementById('valorDejarSeguro');
+        if (dejar) dejar.addEventListener('click', dejarSeguro);
+    }
+
+    // El seguro que calculó el sistema con otros importes queda como está:
+    // pasa a ser de la persona. El servidor lo frena sólo si el incoterm ya
+    // lleva el seguro en el precio.
+    function dejarSeguro() {
+        const op = CDI.state.operacion = CDI.state.operacion || {};
+        op.seguro_dejado = true;
+        delete op.seguro_calculado;
+        cuentasViejas();
+        refrescarAvisos();
+    }
+
+    function usarDescuento() {
+        const op = CDI.state.operacion = CDI.state.operacion || {};
+        const descuento = Number(op.descuento);
+        if (!(descuento > 0) || otroDeducir(op, descuento)) return;
+        op.ajustes_deducir = CDI.montos.escribir(descuento);
+        const input = document.getElementById('valorDeducir');
+        if (input) input.value = op.ajustes_deducir;
+        cuentasViejas();
+        refrescarAvisos();
+    }
+
+    // Ajustes a deducir ya trae algo distinto del descuento: no se pisa.
+    function otroDeducir(op, descuento) {
+        const v = op.ajustes_deducir;
+        return v !== undefined && v !== null && String(v).trim() !== '' && ajusteDelPedido(v) !== descuento;
+    }
+
+    // El seguro sugerido lo calculó el servidor con el pedido de ahora. Si
+    // algo cambió desde entonces (un ajuste, el descuento, el seguro, otra
+    // operación), no se usa: se piden las cuentas de nuevo.
+    function calcularSeguro() {
+        if (!ultimoValor || ultimoValor.error || ultimoValor.seguro_en_el_precio) return;
+        let ahora = null;
+        try { ahora = firmaDelPedido(buildMariaRequest()); } catch (err) { ahora = null; }
+        if (!cuentasCon || cuentasCon !== ahora) {
+            cuentasViejas();
+            refrescarAvisos();
+            return;
+        }
+        const op = CDI.state.operacion = CDI.state.operacion || {};
+        op.seguro = ultimoValor.seguro_sugerido;
+        op.seguro_calculado = true;
+        delete op.seguro_dejado;
+        delete op.seguro_borrado;
+        // Ya está completo: deja de avisarse que no se leyó (MARIA-1c).
+        if (Array.isArray(op.campos_sin_leer) && op.campos_sin_leer.includes('seguro')) {
+            const completados = new Set(op.campos_completados || []);
+            completados.add('seguro');
+            op.campos_completados = Array.from(completados);
+        }
+        cuentasViejas();
+        refrescarAvisos();
+        if (CDI.semaforo && CDI.semaforo.refresh) CDI.semaforo.refresh();
+    }
+
+    function seguroSinLeer(op) {
+        return Array.isArray(op.campos_sin_leer) && op.campos_sin_leer.includes('seguro') &&
+            !(Array.isArray(op.campos_completados) && op.campos_completados.includes('seguro'));
+    }
+
+    // Con un incoterm que ya lleva el seguro en el precio, el 1 % que puso el
+    // sistema no va: se borra, queda para completar y marcado como borrado para
+    // que los avisos no digan que no se leyó. Sólo con las cuentas del pedido de
+    // ahora; el seguro leído o escrito por la persona no se toca.
+    function borrarSeguroCalculado(valor, firma) {
+        const op = CDI.state && CDI.state.operacion;
+        if (!op || !valor || !valor.seguro_en_el_precio || !(op.seguro_calculado || op.seguro_dejado)) return false;
+        let ahora = null;
+        try { ahora = firmaDelPedido(buildMariaRequest()); } catch (err) { ahora = null; }
+        if (!firma || firma !== ahora) return false;
+        op.seguro_borrado = true;
+        op.seguro = '';
+        delete op.seguro_calculado;
+        delete op.seguro_dejado;
+        const sinLeer = Array.isArray(op.campos_sin_leer) ? op.campos_sin_leer : [];
+        if (!sinLeer.includes('seguro')) op.campos_sin_leer = sinLeer.concat(['seguro']);
+        if (Array.isArray(op.campos_completados)) {
+            op.campos_completados = op.campos_completados.filter(c => c !== 'seguro');
+        }
+        cuentasViejas();
+        refrescarAvisos();
+        if (CDI.semaforo && CDI.semaforo.refresh) CDI.semaforo.refresh();
+        return true;
+    }
+
+    function pintarValor(valor, firma) {
+        ultimoValor = valor;
+        cuentasCon = firma || null;
+        if (borrarSeguroCalculado(valor, firma)) return;
+        const op = (CDI.state && CDI.state.operacion) || {};
+        const incluir = document.getElementById('valorIncluir');
+        const deducir = document.getElementById('valorDeducir');
+        // Lo que la persona está escribiendo no se pisa. Lo demás se muestra
+        // como está guardado, también lo mal escrito: el aviso lo nombra.
+        if (incluir && document.activeElement !== incluir) {
+            incluir.value = op.ajustes_incluir == null ? '' : op.ajustes_incluir;
+        }
+        if (deducir && document.activeElement !== deducir) {
+            deducir.value = op.ajustes_deducir == null ? '' : op.ajustes_deducir;
+        }
+
+        const ofrece = document.getElementById('valorDescuento');
+        const ofreceTexto = document.getElementById('valorDescuentoTexto');
+        const descuento = Number(op.descuento);
+        // Ya usado como ajuste, no se vuelve a ofrecer.
+        if (ofrece) ofrece.hidden = !(descuento > 0) || ajusteDelPedido(op.ajustes_deducir) === descuento;
+        const otro = descuento > 0 && otroDeducir(op, descuento);
+        const usar = document.getElementById('valorUsarDescuento');
+        if (usar) usar.hidden = otro;
+        if (ofreceTexto && descuento > 0) {
+            const filas = Array.isArray(op.filas_excel_descuento) ? op.filas_excel_descuento : [];
+            ofreceTexto.textContent = 'La planilla trae un descuento de ' + importeEscrito(descuento) +
+                (filas.length ? ' (fila ' + filas.slice(0, 5).join(', ') + ')' : '') + '.' +
+                (otro ? ' Ajustes a deducir ya tiene otro importe: si el descuento va aparte, sumalo a mano.' : '');
+        }
+
+        const error = document.getElementById('valorError');
+        const errores = [];
+        if (ajusteMalEscrito(op.ajustes_incluir)) errores.push('Ajustes a incluir: ' + ajusteMalEscrito(op.ajustes_incluir));
+        if (ajusteMalEscrito(op.ajustes_deducir)) errores.push('Ajustes a deducir: ' + ajusteMalEscrito(op.ajustes_deducir));
+        if (valor && valor.error) errores.push(valor.error);
+        if (error) {
+            error.textContent = errores.join(' ');
+            error.hidden = !errores.length;
+            error.style.color = 'var(--danger,#c0392b)';
+        }
+
+        const cuentas = document.getElementById('valorCuentas');
+        const boton = document.getElementById('valorCalcularSeguro');
+        const nota = document.getElementById('valorSeguroNota');
+        const ok = valor && !valor.error;
+        if (cuentas) {
+            const filas = ok ? [
+                ['FOB de la factura (va al TXT)', valor.fob_factura],
+                ['+ Ajustes a incluir', valor.ajustes_incluir],
+                ['− Ajustes a deducir', valor.ajustes_deducir],
+                ['= FOB casillero', valor.fob_casillero],
+                ['Flete', valor.flete],
+                ['Seguro', valor.seguro]
+            ] : [];
+            cuentas.innerHTML = filas.map(function (f) {
+                return '<tr><td>' + CDI.escapeHtml(f[0]) + '</td><td style="text-align:right">' +
+                    CDI.escapeHtml(importeEscrito(f[1])) + '</td></tr>';
+            }).join('');
+        }
+        // El botón, cuando no hay seguro o cuando el que hay lo puso él.
+        const calculado = ok && op.seguro_calculado;
+        // Sobre qué FOB va el 1 % lo dice el servidor (BASE_SEGURO_SUGERIDO, D13).
+        const base = (ok && valor.base_seguro) || 'FOB';
+        // Con CIF, CIP, DPU, DAP o DDP no hay 1 %: lo dice el servidor (SEGURO-1).
+        const enElPrecio = !!(valor && valor.seguro_en_el_precio);
+        const mostrar = ok && !enElPrecio && (!(valor.seguro > 0) || calculado) &&
+            valor.seguro !== valor.seguro_sugerido;
+        if (boton) {
+            boton.hidden = !mostrar;
+            boton.textContent = (calculado ? 'Recalcular seguro' : 'Calcular seguro') +
+                ' (1 % de ' + base + ' + flete): ' + (mostrar ? importeEscrito(valor.seguro_sugerido) : '');
+        }
+        // Lo calculó con otros importes, o ya no se puede comprobar: el
+        // servidor no genera hasta que se recalcule o se deje (VALOR-1c).
+        // Sin respuesta de los avisos no se sabe si el incoterm lleva el
+        // seguro en el precio: dejarlo mandaría el 1 % con CIF (SEGURO-1).
+        const dejar = document.getElementById('valorDejarSeguro');
+        if (dejar) dejar.hidden = !(valor && !enElPrecio && op.seguro_calculado &&
+            valor.error !== SIN_CUENTAS &&
+            (valor.error || valor.seguro !== valor.seguro_sugerido));
+        const incoterm = String(op.incoterm || '').trim().toUpperCase() || 'este incoterm';
+        if (nota) {
+            nota.textContent = !ok ? '' :
+                enElPrecio ? 'Con ' + incoterm + ' el seguro ya está en el precio: el sistema no lo calcula.' +
+                    (seguroSinLeer(op) ? (op.seguro_borrado ?
+                        ' El que calculó el sistema se borró: cargá el de la factura en la revisión; si la factura no trae seguro, escribí 0.' :
+                        ' No pudimos leerlo de la factura: completalo en la revisión; si no trae seguro, escribí 0.') :
+                        valor.seguro > 0 ? '' : ' Si la factura lo trae, cargalo en la revisión.') :
+                (calculado && valor.seguro !== valor.seguro_sugerido) ? 'El seguro se calculó con otros importes.' :
+                calculado ? 'Seguro calculado: 1 % de (' + base + ' + flete).' :
+                valor.seguro > 0 ? 'La operación ya trae seguro.' :
+                mostrar && seguroSinLeer(op) ? (op.seguro_borrado ?
+                    'El seguro que calculó el sistema se borró al cambiar el incoterm: calculalo de nuevo o cargá el de la factura.' :
+                    'La factura puede traer un seguro que no pudimos leer: revisala antes de calcularlo.') : '';
+        }
     }
 
     function subitemsDelPedido(it) {
@@ -277,7 +603,7 @@
         vIssues.innerHTML = groups.join('');
 
         // Generate button
-        vGenerate.disabled = errores.length > 0 || generateInFlight;
+        vGenerate.disabled = errores.length > 0;
         vGenerate.title = errores.length > 0 ? 'Corregí los errores antes de generar' : '';
     }
 
@@ -335,8 +661,7 @@
     /* ==========================================================
        Pantalla 5: ready (generar + descargar)
        ========================================================== */
-    function onGenerate() {
-        if (generateInFlight) return;
+    async function onGenerate() {
         if (lastValidation && (lastValidation.errores || []).length > 0) return;
 
         // Guardar SBT del input al estado antes de generar
@@ -346,11 +671,10 @@
             CDI.state.operacion.sbt_sufijo_valor = sbtInput.value.trim();
         }
         // Validación frontend: si está vacío, mostrar error junto al campo.
-        // No hace falta si todos los productos van en subítems con sufijo
-        // propio (SUBITEMS-1; el servidor tampoco lo pide).
-        const itemsSufijo = CDI.state.items || [];
-        const todosConSufijoPropio = itemsSufijo.length > 0 && itemsSufijo.every(it =>
-            Array.isArray(it.subitems) && it.subitems.length && it.subitems.every(s => String(s.sufijo || '').trim()));
+        // No hace falta si todos los productos llevan sufijo propio, en sus
+        // subítems (SUBITEMS-1) o en «Lo que decide el despachante»
+        // (SUFIJOS-1); el servidor tampoco lo pide.
+        const todosConSufijoPropio = Boolean(CDI.despachante && CDI.despachante.todosConPropio());
         if (!CDI.state.operacion.sbt_sufijo_valor && !todosConSufijoPropio) {
             if (sbtError) {
                 sbtError.textContent = 'Ingresá el sufijo de valor SBT. Es obligatorio.';
@@ -376,8 +700,9 @@
     }
 
     async function generateMaria() {
-        if (generateInFlight) return;
+        if (generateInFlight) { pedidaMientrasOtra = true; return; }
         generateInFlight = true;
+        if (CDI.estudios) await CDI.estudios.listo();
 
         const items = (CDI.state && CDI.state.items) || [];
         if (!items.length) {
@@ -386,7 +711,12 @@
             return;
         }
 
+        // Una carga nueva reemplaza CDI.state: la respuesta tardía se anota en la suya.
+        const carga = CDI.state;
+        const foto = fotoDeLaPantalla();
         const body = buildMariaRequest();
+        // Regenerar la misma operación no la cuenta otra vez: el servidor la reconoce por su id.
+        body.operacion_id = carga.operacionId || '';
         try {
             const startedAt = Date.now();
             const res = await CDI.api('/generate_maria', {
@@ -395,18 +725,24 @@
             });
             const data = await res.json();
             const dur = Date.now() - startedAt;
-            if (!res.ok || !data || data.success === false) {
+            const fallo = !res.ok || !data || data.success === false;
+            // El error de una carga que ya no está en pantalla no la cambia de paso.
+            if (fallo && carga !== CDI.state) return;
+            if (fallo) {
                 const detail = (data && (data.detail || data.message)) || res.statusText;
                 // El error de un subítem (su sufijo incluido) va bajo ese
-                // subítem, en el paso de NCM (SUBITEMS-1).
-                const sub = typeof detail === 'string' && /^Item (\d+), sub-ítem (\d+): /.exec(detail);
+                // subítem, en el paso de NCM (SUBITEMS-1, MARIA-9).
+                const sub = typeof detail === 'string' &&
+                    /^(?:Item|Sufijo de valor del ítem) (\d+), sub-ítem (\d+): /.exec(detail);
                 if (sub && CDI.ncmBatch && CDI.ncmBatch.marcarErrorDeSubitem &&
                         CDI.ncmBatch.marcarErrorDeSubitem(parseInt(sub[1], 10) - 1, parseInt(sub[2], 10) - 1, detail)) {
                     CDI.goTo('ncm');
                     throw new Error(detail);
                 }
-                // Si el error es de SBT, mostrar junto al campo y volver a validación
-                if (typeof detail === 'string' && detail.toLowerCase().includes('sbt')) {
+                // Si el error es de SBT o del sufijo de la operación, mostrar
+                // junto al campo y volver a validación
+                if (typeof detail === 'string' && (detail.toLowerCase().includes('sbt') ||
+                        detail.startsWith('Sufijo de valor de la operación: '))) {
                     if (sbtError) {
                         sbtError.textContent = detail;
                         sbtError.hidden = false;
@@ -414,29 +750,48 @@
                     CDI.goTo('validating');
                     throw new Error(detail);
                 }
+                // El seguro calculado con otros importes se resuelve en
+                // «Ajustes y seguro» (VALOR-1c).
+                if (typeof detail === 'string' && detail.startsWith('Seguro: lo calculó el sistema')) {
+                    CDI.goTo('validating');
+                    throw new Error(detail);
+                }
+                // Lo que falta del seguro se completa en la revisión, junto al campo.
+                if (typeof detail === 'string' && /^Seguro: (no pudimos leerlo|el que calculó el sistema se borró)/.test(detail)) {
+                    CDI.goTo('review');
+                    if (CDI.marcarEnLaRevision) CDI.marcarEnLaRevision('seguro', detail);
+                    throw new Error(detail);
+                }
                 // Los controles de antes de generar llegan como {errors: [...]}.
                 const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ') : detail;
                 throw new Error(texto || 'No se pudo generar el archivo');
             }
-            lastMaria = {
-                filename: data.filename,
-                download_url: data.download_url,
-                content: data.content || '',
-                warnings: data.warnings || []
-            };
+            carga.operacionId = data.operacion_id || '';
             CDI.track('maria_generated', {
                 items: items.length,
                 filename: data.filename,
                 duration_ms: dur
             });
-            renderReady();
-            // Best-effort: guardar en historial del cliente activo (si hay)
-            saveOperationToHistory(items, data).catch(err => {
-                console.warn('[history] no se pudo guardar operacion', err);
+            if (carga === CDI.state) mostrarListo(data);
+            // A la vez y best-effort. Toast reemplaza al anterior: si la operación ya
+            // avisó algo (que puede ser un error), el aviso del catálogo no lo tapa.
+            let avisoDeLaOperacion = false;
+            saveOperationToHistory(items, data, carga, foto).then(r => {
+                avisoDeLaOperacion = (!r.ok && r.reason !== 'sin_cliente') || r.historial_guardado === false;
+            }).catch(err => {
+                console.warn('[history] no se pudo armar la operacion', err);
+                avisoDeLaOperacion = true;
+                CDI.toast && CDI.toast('No se guardó al cliente',
+                    'La operación no quedó en el historial. Volvé a Listo y reintentá.', 'error');
             });
-            // Best-effort: aprender productos en catalogo del proveedor
-            saveCatalogLearn(items).catch(err => {
-                console.warn('[catalog] no se pudo aprender', err);
+            saveCatalogLearn(items, carga).then(r => {
+                if (!r.ok && !avisoDeLaOperacion && CDI.toast) {
+                    CDI.toast('Algunos productos no quedaron en la memoria',
+                        (r.detail ? r.detail + ' ' : '') +
+                        'La operación está lista, pero la próxima vez esos productos no se van a sugerir solos.', 'warning');
+                } else if (r.avisos && r.avisos.length && !avisoDeLaOperacion && CDI.toast) {
+                    CDI.toast('Origen no reconocido', r.avisos.join(' ') + ' No se guardó su origen.', 'warning');
+                }
             });
         } catch (err) {
             console.error('[ready] generate error', err);
@@ -444,7 +799,22 @@
             showReadyError(String(err && err.message || err));
         } finally {
             generateInFlight = false;
+            const otra = pedidaMientrasOtra;
+            pedidaMientrasOtra = false;
+            // Con lo que hay ahora en pantalla, que puede haber cambiado mientras ésta esperaba.
+            if (otra) onEnterReady();
         }
+    }
+
+    // Lo que muestra «Listo» es de la carga en pantalla: una respuesta tardía no lo pisa.
+    function mostrarListo(data) {
+        lastMaria = {
+            filename: data.filename,
+            download_url: data.download_url,
+            content: data.content || '',
+            warnings: data.warnings || []
+        };
+        renderReady();
     }
 
     // La cabecera que controla el servidor antes de generar (MARIA-1b), tal
@@ -467,10 +837,13 @@
         const incoterm = (op.incoterm || '').toString().trim().toUpperCase();
 
         const factura = numeroDeFactura(op);
+        // Sin factura, el nombre del archivo sale de cuándo se cargó la operación,
+        // así regenerarla no lo cambia. La operación se reconoce por operacionId.
+        const cargada = (CDI.state && CDI.state.uploadedAt) || new Date().toISOString();
         const operation_id = factura ? ('FAC_' + factura.replace(/[^a-zA-Z0-9_-]/g, '')) :
-            ('OP_' + new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14));
+            ('OP_' + String(cargada).replace(/[^0-9]/g, '').slice(0, 17));
 
-        const items = (CDI.state.items || []).map(it => ({
+        const items = (CDI.state.items || []).map((it, i) => ({
             pieza: String(it.pieza || '').trim(),
             descripcion: String(it.descripcion || '').trim(),
             origen: String(it.origen || 'XX').trim().toUpperCase() || 'XX',
@@ -479,9 +852,14 @@
             peso_unitario: toNumber(it.peso_unitario, 0),
             codigo_parte: String(it.codigo_parte || '').trim(),
             grupo_id: it.grupo_id || null,
-            unidad: it.unidad || null,
+            // MARIA-7: la de la factura y la estadística, elegidas en «Lo
+            // que decide el despachante».
+            ...(CDI.despachante && CDI.despachante.unidadesDe ? CDI.despachante.unidadesDe(it, i)
+                : { unidad: it.unidad || null }),
             estado: it.estado || null,
             iva_adicional: it.iva_adicional || null,
+            // El suyo o el propuesto del arancel; vacío, el de la operación (SUFIJOS-1).
+            sufijo: (CDI.despachante && CDI.despachante.sufijoDe ? CDI.despachante.sufijoDe(it, i) : '') || null,
             // Partido en subítems (SUBITEMS-1); sin subítems no va el campo.
             subitems: subitemsDelPedido(it)
         }));
@@ -497,12 +875,16 @@
 
         return {
             operation_id: operation_id,
+            // El número real, para LDVDREFDOC (MARIA-7).
+            numero_factura: factura,
             items: items,
             ...(CDI.despachante ? CDI.despachante.valores()
                 : { banco_bcra: '', empresa_digitalizacion: null, iva_adicional: null }),
             moneda: moneda,
             incoterm: incoterm,
             cuit_agr: cuit_agr,
+            // ESTUDIO-1: si hay uno elegido, su CUIT manda sobre cuit_agr.
+            estudio_id: CDI.estudios ? CDI.estudios.elegido() : '',
             vendedor_nombre: String(op.vendedor_nombre || '').trim(),
             vendedor_id: String(op.vendedor_id || '').trim(),
             comprador_nombre: String(op.comprador_nombre || '').trim(),
@@ -515,10 +897,17 @@
                 op.comprador_fecha_inic_activ ||
                 (cliente && cliente.fecha_inic_activ) || ''
             ).trim(),
-            flete: toNumber(op.flete, 0),
-            seguro: toNumber(op.seguro, 0),
+            flete: montoDelPedido(op.flete),
+            seguro: montoDelPedido(op.seguro),
+            seguro_calculado: !!op.seguro_calculado,
+            seguro_dejado: !!op.seguro_dejado,
+            seguro_borrado: !!op.seguro_borrado,
+            seguro_para_completar: seguroSinLeer(op),
             // MARIA-3: el servidor decide si van al TXT (sólo EXW, FCA o FAS).
-            gastos_anteriores_fob: toNumber(op.gastos_anteriores_fob, 0),
+            gastos_anteriores_fob: montoDelPedido(op.gastos_anteriores_fob),
+            // VALOR-1: sólo para las cuentas; no van al TXT (D12).
+            ajustes_incluir: ajusteDelPedido(op.ajustes_incluir),
+            ajustes_deducir: ajusteDelPedido(op.ajustes_deducir),
             procedencia: (function () {
                 const raw = String(op.procedencia || '').trim();
                 return (raw && CDI.paisesMaria && CDI.paisesMaria.resolve(raw)) || raw;
@@ -540,6 +929,7 @@
     }
 
     function renderReady() {
+        hide($('readyClientSuccess'));
         hide(rGenerating);
         hide(rError);
         show(rDone);
@@ -598,6 +988,7 @@
         if (wasDismissed) { panel.hidden = true; return; }
 
         panel.hidden = false;
+        clienteCreadoAca = null;
         // Reset del form interno por si quedó abierto antes
         const form = document.getElementById('readyOrphanCreateForm');
         if (form) form.hidden = true;
@@ -608,6 +999,7 @@
         try { CDI.track && CDI.track('op_orphan_panel_shown'); } catch (_) {}
     }
 
+    let clienteCreadoAca = null;
     let _orphanListenersWired = false;
     function setupOrphanPanelListeners() {
         if (_orphanListenersWired) return;
@@ -718,17 +1110,6 @@
         } catch (_) { return null; }
     }
 
-    function humanizeApiError(detail, fallback) {
-        if (!detail) return fallback;
-        if (typeof detail === 'string') return detail;
-        if (Array.isArray(detail)) {
-            const msg = detail.map(d => (d && d.msg) || '').filter(Boolean).join('; ');
-            return msg || fallback;
-        }
-        if (detail.msg) return String(detail.msg);
-        try { return JSON.stringify(detail); } catch (_) { return fallback; }
-    }
-
     async function orphanCreateSubmit() {
         const btn = document.getElementById('orphanCreateSaveBtn');
         const inpNom = document.getElementById('orphanCreateNombre');
@@ -751,6 +1132,13 @@
         }
         if (btn) btn.disabled = true;
         try {
+            // Ya se creó en este panel y falló el guardado (aunque después se haya
+            // probado asignar otro): se reintenta con ese, sin crear otro.
+            if (clienteCreadoAca) {
+                CDI.setClienteActivo(clienteCreadoAca);
+                await reSaveOperationAndClosePanel('create');
+                return;
+            }
             // Pre-check: si ya existe un cliente con este CUIT, ofrecer usar ese.
             if (cuit) {
                 const existente = await lookupClienteByCuit(cuit);
@@ -781,10 +1169,11 @@
             });
             const out = await res.json().catch(() => ({}));
             if (!res.ok || !out.success || !out.cliente) {
-                showOrphanCreateError(humanizeApiError(out.detail, 'No se pudo crear el cliente.'));
+                showOrphanCreateError(textoDeError(out.detail, 'No se pudo crear el cliente.'));
                 return;
             }
             CDI.clientesCache = [];
+            clienteCreadoAca = out.cliente;
             CDI.setClienteActivo(out.cliente);
             await reSaveOperationAndClosePanel('create');
         } catch (err) {
@@ -821,42 +1210,49 @@
 
     async function reSaveOperationAndClosePanel(via) {
         const items = (CDI.state && CDI.state.items) || [];
-        await saveOperationToHistory(items, lastMaria || {});
+        const guardado = await saveOperationToHistory(items, lastMaria || {});
+        // El error ya está a la vista y el panel queda abierto para reintentar.
+        if (!guardado.ok) return;
         const panel = document.getElementById('readyOrphanPanel');
         if (panel) panel.hidden = true;
         const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
         const nombre = (cliente && cliente.nombre) || 'cliente';
+        const sinMemoria = guardado.historial_guardado === false;
         showReadyClientSuccess(
             via === 'assign' ? 'Cliente asignado a esta operación' : 'Cliente creado con éxito',
-            'Operación asociada a ' + nombre + '. La próxima factura con este CUIT se detecta sola.'
+            'Operación asociada a ' + nombre + (sinMemoria
+                ? '. Algunos productos no quedaron en la memoria: la próxima vez no se van a sugerir solos.'
+                : '. La próxima factura con este CUIT se detecta sola.')
         );
-        CDI.toast && CDI.toast(
-            'Cliente guardado',
-            'La próxima factura con este CUIT se detecta sola. Operación asociada a ' + nombre + '.',
-            'success'
-        );
+        // toast reemplaza al anterior: no tapar el aviso de lo que no quedó en la memoria.
+        if (!sinMemoria && CDI.toast) {
+            CDI.toast(
+                'Cliente guardado',
+                'La próxima factura con este CUIT se detecta sola. Operación asociada a ' + nombre + '.',
+                'success'
+            );
+        }
         CDI.track && CDI.track('op_orphan_resolved', { via: via });
     }
 
-    async function saveOperationToHistory(items, mariaData) {
-        const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
-        if (!cliente || !cliente.id) {
-            console.warn('[history] no hay cliente activo, no se guarda al historial');
-            return { ok: false, reason: 'sin_cliente' };
-        }
+    // Cliente, totales y valores del despachante, tomados al pedir: lo que cambie después no los pisa.
+    function fotoDeLaPantalla() {
+        return { cliente: (CDI.state && CDI.state.clienteActivo) || null,
+                 stats: (lastValidation && lastValidation.estadisticas) || {},
+                 maria: CDI.despachante ? CDI.despachante.valores() : {} };
+    }
+
+    function armarOperacion(items, mariaData, carga, foto) {
+        // Sin cliente al pedir, el que se le eligió a esa carga mientras esperaba.
+        const cliente = foto.cliente || carga.clienteActivo || null;
         const opCode = (mariaData && mariaData.filename) || null;
-        // Idempotencia: si ya guardamos esta misma operación para este mismo
-        // cliente, no la re-posteamos (cubre re-entry a Listo, F5 suave, etc.).
-        const savedFor = (CDI.state && CDI.state.operationSavedFor) || null;
-        if (savedFor && savedFor.cliente_id === cliente.id && savedFor.op_code === opCode) {
-            return { ok: true, reason: 'ya_guardada' };
-        }
-        const stats = (lastValidation && lastValidation.estadisticas) || {};
-        const op = (CDI.state && CDI.state.operacion) || {};
+        const stats = foto.stats;
+        const op = carga.operacion || {};
         const total_valor = Number(stats.total_valor_usd || 0);
         const total_peso = Number(stats.total_peso_kg || 0);
         const body = {
             operation_id: opCode,
+            operacion_id: carga.operacionId || '',
             source: 'pdf_v2',
             currency: (op.moneda || 'USD').toString().toUpperCase(),
             comprador_domicilio: op.comprador_domicilio || '',
@@ -871,7 +1267,7 @@
                 // MARIA-4: para proponer el último banco y la última empresa.
                 maria: Object.assign(
                     { banco_bcra: '', empresa_digitalizacion: '', iva_adicional: '' },
-                    CDI.despachante ? CDI.despachante.valores() : {},
+                    foto.maria,
                     { items: items.map(it => ({ estado: it.estado || null, iva_adicional: it.iva_adicional || null })) }
                 )
             },
@@ -887,6 +1283,22 @@
                 unidad: it.unidad || null
             }))
         };
+        return { cliente, opCode, body };
+    }
+
+    async function saveOperationToHistory(items, mariaData, carga, foto = fotoDeLaPantalla()) {
+        carga = carga || (CDI.state = CDI.state || {});
+        const { cliente, opCode, body } = armarOperacion(items, mariaData, carga, foto);
+        if (!cliente || !cliente.id) {
+            console.warn('[history] no hay cliente activo, no se guarda al historial');
+            return { ok: false, reason: 'sin_cliente' };
+        }
+        // Idempotencia: si ya guardamos esta misma operación para este mismo
+        // cliente, no la re-posteamos (cubre re-entry a Listo, F5 suave, etc.).
+        const savedFor = carga.operationSavedFor || null;
+        if (savedFor && savedFor.cliente_id === cliente.id && savedFor.op_code === opCode) {
+            return { ok: true, reason: 'ya_guardada' };
+        }
         try {
             const res = await CDI.api(
                 '/api/clientes/' + encodeURIComponent(cliente.id) + '/operaciones',
@@ -894,18 +1306,25 @@
             );
             const data = await res.json().catch(() => ({}));
             if (res.ok && data && data.success) {
-                CDI.state = CDI.state || {};
-                CDI.state.operationSavedFor = { cliente_id: cliente.id, op_code: opCode };
+                // Guardar antes de generar crea la operación: generar después la completa, no cuenta otra.
+                carga.operacionId = data.operation_id || '';
+                carga.operationSavedFor = { cliente_id: cliente.id, op_code: opCode };
                 CDI.track('operation_saved_to_history', {
                     cliente_id: cliente.id,
                     items: items.length
                 });
-                return { ok: true, cliente_id: cliente.id };
+                if (data.historial_guardado === false) {
+                    CDI.toast && CDI.toast(
+                        'Algunos productos no quedaron en la memoria',
+                        'La operación se guardó, pero la próxima vez esos productos no se van a sugerir solos.',
+                        'warning'
+                    );
+                }
+                return { ok: true, cliente_id: cliente.id, historial_guardado: data.historial_guardado };
             }
             // Error real: mostrar al user en vez de silenciar.
-            // Preferimos dev_detail (técnico) si vino, para diagnosticar; si no, el detail amigable.
-            const dev = data && data.dev_detail;
-            const msg = dev || (data && data.detail) || ('HTTP ' + res.status);
+            // El servidor ya no manda el detalle técnico (DATOS-1, D6): queda en su log.
+            const msg = (data && data.detail) || ('HTTP ' + res.status);
             console.error('[history] save_client_operation fallo:', msg, data);
             CDI.track('operation_save_failed', {
                 cliente_id: cliente.id,
@@ -914,13 +1333,14 @@
             });
             CDI.toast && CDI.toast(
                 'No se guardó al cliente',
-                'La operación no quedó en el historial de ' + (cliente.nombre || 'el cliente') + '. Detalle: ' + String(msg).slice(0, 100),
+                'La operación no quedó en el historial de ' + (cliente.nombre || 'el cliente') + '. Detalle: ' + String(msg).slice(0, 200),
                 'error'
             );
             return { ok: false, reason: 'http_error', error: msg };
         } catch (err) {
-            if (err && err.message === 'payment_required') {
+            if (err && err.code === 'payment_required') {
                 console.warn('[history] save_client_operation: 402 payment required');
+                CDI.toast && CDI.toast('No se guardó al cliente', err.message || 'Plan vencido o límite alcanzado', 'error');
                 return { ok: false, reason: 'payment_required', error: 'Plan vencido o límite alcanzado' };
             }
             console.error('[history] save_client_operation excepción:', err);
@@ -939,11 +1359,13 @@
 
     // Expongo para que el panel huérfano u otro lugar pueda forzar un reintento.
     CDI.saveOperationToHistory = saveOperationToHistory;
+    CDI.seguroSinLeer = seguroSinLeer;
 
-    async function saveCatalogLearn(items) {
-        const op = (CDI.state && CDI.state.operacion) || {};
+    // ok si aprendió o no había nada para aprender; detail, qué producto rechazó el servidor.
+    async function saveCatalogLearn(items, carga) {
+        const op = (carga && carga.operacion) || {};
         const vendorName = String(op.vendedor_nombre || '').trim();
-        if (!vendorName || !Array.isArray(items) || !items.length) return;
+        if (!vendorName || !Array.isArray(items) || !items.length) return { ok: true };
 
         const productos = items.map(it => ({
             descripcion: String(it.descripcion || '').trim(),
@@ -952,13 +1374,13 @@
             unidad_medida: String(it.unidad_medida || '').trim(),
         })).filter(p => p.descripcion && p.ncm);
 
-        if (!productos.length) return;
+        if (!productos.length) return { ok: true };
 
         // Derivar vendor_id slug (mismo criterio que backend: alfanumerico lowercased sin acentos)
         const vendor_id = vendorName
             .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
             .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
-            .slice(0, 64) || 'proveedor';
+            .slice(0, 60) || 'proveedor';
         try {
             const res = await CDI.api('/api/catalog/' + encodeURIComponent(vendor_id) + '/productos', {
                 method: 'POST',
@@ -974,7 +1396,14 @@
                     updated: data && data.updated || 0,
                 });
             }
-        } catch (_) { /* best-effort */ }
+            return {
+                ok: res.ok,
+                detail: res.ok ? '' : textoDeError(data && data.detail, ''),
+                avisos: res.ok && Array.isArray(data && data.avisos) ? data.avisos : []
+            };
+        } catch (_) {
+            return { ok: false, detail: '' };
+        }
     }
 
     function trimPreview(text, maxLines) {
@@ -1031,7 +1460,8 @@
         const retry = e.target.closest('[data-action="retry-generate"]');
         if (retry) {
             e.preventDefault();
-            generateMaria();
+            // Oculta el error, y con él el botón: un segundo clic no pide otra generación.
+            onEnterReady();
         }
     });
 
@@ -1045,8 +1475,8 @@
         onLeave() {
             // Si el usuario va a 'upload' (nueva operacion), limpiamos cache
             lastMaria = null;
-            lastValidation = null;
-            lastValidationTs = 0;
+            // Fuera de «Listo», la carga que esperaba no genera sola.
+            pedidaMientrasOtra = false;
         }
     });
 

@@ -4,22 +4,25 @@
 // borrarlo lo vuelve a mostrar; y que el del seguro sigue mientras tanto.
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_maria1c.js <pdf> [captura.png]
+// corredor: argumentos tests/test_factura.pdf
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
+const registrarCuenta = require('./_registrar');
 const FLETE = 'No pudimos leer el flete de la factura: completalo.';
 const SEGURO = 'No pudimos leer el seguro de la factura: completalo.';
 function falla(msg) { console.error('FALLA: ' + msg); process.exit(1); }
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const b = await chromium.launch();
   const page = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  await page.request.post(base + '/auth/register', { data: { username: 'prueba_' + id, password: 'Clave-Inventada-123', email: 'p' + id + '@ejemplo.test' } });
+  await registrarCuenta(page.request, base, { data: { username: 'prueba_' + id, password: 'Clave-Inventada-123', email: 'p' + id + '@ejemplo.test' } });
   await page.route('**/upload_pdf/public', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
     message: 'ok', filename: 'factura.pdf', items_count: 1,
     operacion: { numero_factura: 'F-1', flete: 0, seguro: 0, campos_sin_leer: ['flete', 'seguro'] },
     items: [{ descripcion: 'Tornillo de acero inoxidable M6', cantidad: 2, valor_unitario: 3, peso_unitario: 1, origen: 'CN', pieza: '' }] }) }));
   await page.goto(base + '/dashboard');
-  await page.waitForSelector('#uploadFileInput', { state: 'attached' });
+  // Una subida anterior a la primera pantalla del tablero se descarta o no prende el semáforo.
+  await page.waitForSelector('[data-screen="upload"].is-active', { state: 'attached' });
   await page.setInputFiles('#uploadFileInput', process.argv[2]);
 
   await page.locator('#toastHost .toast', { hasText: FLETE }).waitFor({ timeout: 10000 }).catch(() => falla('el aviso de la subida no nombra el flete'));

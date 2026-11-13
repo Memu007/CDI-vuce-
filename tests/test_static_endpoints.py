@@ -41,40 +41,37 @@ def test_estilos_landing_css(client):
     assert r.status_code == 200
 
 
-def test_app_css(client):
-    """GET /app.css sirve el CSS de la app."""
-    r = client.get("/app.css")
+def test_app_v2_css(client):
+    """GET /static/v2/app_v2.css sirve el CSS de la app."""
+    r = client.get("/static/v2/app_v2.css")
     assert r.status_code == 200
 
 
-def test_app_js(client):
-    """GET /app.js sirve el JS de la app."""
-    r = client.get("/app.js")
-    assert r.status_code == 200
-
-
-def test_dashboard_v2_default(client):
-    """GET /dashboard sirve v2 por defecto."""
+def test_dashboard_sirve_v2(client):
+    """GET /dashboard sirve la v2, la única interfaz."""
     r = client.get("/dashboard")
     assert r.status_code == 200
+    assert "/static/v2/app_v2.js" in r.text
 
 
-def test_dashboard_v1_query(client):
-    """GET /dashboard?v=1 sirve v1 y setea cookie."""
-    r = client.get("/dashboard?v=1", follow_redirects=False)
+def test_dashboard_ignora_v1_y_borra_la_cookie_vieja(client):
+    """Ni `?v=1` ni la cookie `cdi_ui=v1` de la transición traen la v1: se sirve
+    v2 y la cookie se borra. Las rutas /app.js y /app.css ya no existen."""
+    r = client.get("/dashboard?v=1", cookies={"cdi_ui": "v1"}, follow_redirects=False)
     assert r.status_code == 200
-
-
-def test_dashboard_v2_query(client):
-    """GET /dashboard?v=2 sirve v2 y limpia cookie."""
-    r = client.get("/dashboard?v=2", follow_redirects=False)
-    assert r.status_code == 200
+    assert "/static/v2/app_v2.js" in r.text
+    assert "/app.js?v=" not in r.text
+    set_cookie = r.headers.get("set-cookie", "")
+    assert "cdi_ui=" in set_cookie and ("Max-Age=0" in set_cookie or "expires=" in set_cookie.lower())
+    assert client.get("/app.js").status_code == 404
+    assert client.get("/app.css").status_code == 404
 
 
 def test_session_state(client):
-    """POST /api/session/state acepta eventos de telemetría."""
+    """POST /api/session/state acepta eventos de telemetría (sin sesión, sólo
+    los de la lista de ABUSO-1)."""
     r = client.post("/api/session/state", json={
-        "version": "v2", "screen": "test", "action": "click",
+        "version": "v2", "screen": "test", "action": "hero_cta_clicked",
     })
     assert r.status_code == 200
     assert r.json()["ok"] is True

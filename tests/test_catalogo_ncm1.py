@@ -112,10 +112,12 @@ def test_la_validacion_avisa_la_baja_sin_frenar(client, auth_override):
 def test_la_sugerencia_del_historial_marca_la_baja(client, auth_override, monkeypatch):
     from proyecto_maria import main
     monkeypatch.setenv("NCM_GEMINI_FALLBACK", "false")
-    monkeypatch.setattr(main, "load_ncm_historial", lambda usuario: {
-        "telefono celular de prueba": {"ncm": "85171231", "count": 3},
-        "notebook de prueba": {"ncm": "84713012", "count": 1},
-    })
+    async def _historial(db, usuario):
+        return {
+            "telefono celular de prueba": {"ncm": "85171231", "count": 3},
+            "notebook de prueba": {"ncm": "84713012", "count": 1},
+        }
+    monkeypatch.setattr(main, "load_ncm_historial", _historial)
     r = client.post("/api/ncm/sugerir", json={"descripcion": "telefono celular de prueba"})
     assert r.status_code == 200, r.text
     sug = {s["ncm"]: s for s in r.json()["sugerencias"]}
@@ -172,8 +174,9 @@ def test_la_sugerencia_parcial_dada_de_baja_lo_dice(client, auth_override, monke
 def test_una_sugerencia_que_no_esta_en_el_vigente_avisa(client, auth_override, monkeypatch):
     from proyecto_maria import main
     monkeypatch.setenv("NCM_GEMINI_FALLBACK", "false")
-    monkeypatch.setattr(main, "load_ncm_historial", lambda usuario: {
-        "pieza inventada de prueba": {"ncm": "99999999", "count": 1}})
+    async def _historial(db, usuario):
+        return {"pieza inventada de prueba": {"ncm": "99999999", "count": 1}}
+    monkeypatch.setattr(main, "load_ncm_historial", _historial)
     sug = client.post("/api/ncm/sugerir", json={"descripcion": "pieza inventada de prueba"}).json()["sugerencias"]
     assert sug and "no está en el nomenclador vigente" in sug[0]["aviso"] and not sug[0].get("baja"), sug
 

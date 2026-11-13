@@ -77,6 +77,9 @@ class User(Base):
 
     # Ola 4: contadores y metadata de suscripción/tarjeta.
     mp_preapproval_id = Column(String(100), nullable=True)
+    # La suscripción que Mercado Pago no confirmó cancelar cuando esta cuenta lo pidió:
+    # sólo con ella un miembro concilia el reintento.
+    cancelar_sin_confirmar = Column(String(100), nullable=True)
     mp_plan_id = Column(String(100), nullable=True)
     ops_used_this_period = Column(Integer, default=0)
     extra_ops_remaining = Column(Integer, default=0)
@@ -156,6 +159,73 @@ class Client(Base):
     ncm_notes = relationship("NCMNote", back_populates="client")
 
 
+class Estudio(Base):
+    """Estudio de despachante de la cuenta: su CUIT va al CDDTAGR (ESTUDIO-1).
+
+    Es de la cuenta, como los clientes: `owner_username` decide quién lo ve y
+    lo usa. No es `Organization` (los equipos). `users.cuit` sigue como
+    respaldo cuando la operación no elige un estudio.
+    """
+    __tablename__ = "estudios"
+    __table_args__ = (
+        UniqueConstraint("owner_username", "cuit", name="uq_estudios_owner_cuit"),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    owner_username = Column(String(50), ForeignKey("users.username"), nullable=False, index=True)
+    nombre = Column(String(200), nullable=False)
+    cuit = Column(String(11), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # La última vez que generó un TXT: el más reciente se preselecciona.
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class UsoCuitPerfil(Base):
+    """La última vez que la cuenta generó un TXT con el CUIT de su perfil
+    (ESTUDIO-1b, D23 b): compite con `Estudio.last_used_at` por la
+    preselección. Tabla aparte, creada por `create_all`, para no sumar un
+    ALTER sobre `users` al arranque."""
+    __tablename__ = "usos_cuit_perfil"
+
+    owner_username = Column(String(50), ForeignKey("users.username"), primary_key=True)
+    last_used_at = Column(DateTime(timezone=True), nullable=False)
+
+
+class NcmHistorial(Base):
+    """Historial de NCM confirmadas por dueño (DISCO-1): una fila por
+    descripción, tal cual se guardó, con su NCM y cuántas veces se confirmó.
+    Antes era `ncm_historial_<usuario>.json` en DATA_DIR, que en Railway se
+    borra con cada deploy. `clave` es el sha256 de la descripción: la
+    unicidad no depende del largo del texto. `id` conserva el orden en que
+    se agregaron, que es el orden en que se sugieren."""
+    __tablename__ = "ncm_historial"
+    __table_args__ = (
+        UniqueConstraint("owner_username", "clave", name="uq_ncm_historial_owner_clave"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    owner_username = Column(String(50), ForeignKey("users.username"), nullable=False)
+    clave = Column(String(64), nullable=False)
+    descripcion = Column(Text, nullable=False)
+    ncm = Column(Text, nullable=False)
+    count = Column(Integer, nullable=False, default=1)
+
+
+
+class LimiteAuth(Base):
+    """Contadores de intentos de login, recuperación y registro (ABUSO-1).
+    Antes vivían en un dict de cada proceso: se perdían con cada reinicio y
+    cada worker contaba por su lado. Una fila por clave (`login:<ip>`,
+    `reset:<ip>`, ...); los tiempos son epoch en segundos. Una fila con
+    `vence` pasado ya no cuenta y se borra en la próxima escritura."""
+    __tablename__ = "limites_auth"
+
+    clave = Column(String(120), primary_key=True)
+    cuenta = Column(Integer, nullable=False, default=0)
+    bloqueado_hasta = Column(Float, nullable=False, default=0.0)
+    vence = Column(Float, nullable=False, index=True)
+
+
 class Operation(Base):
     """Operación de importación procesada."""
     __tablename__ = "operations"
@@ -213,7 +283,7 @@ class OperationItem(Base):
 
     pieza = Column(String(20), nullable=False)  # NCM code (8 digitos + 3 SIM + letra)
     descripcion = Column(Text, nullable=False)
-    origen = Column(String(3), nullable=False)
+    origen = Column(Text, nullable=False)
     cantidad = Column(Float, nullable=False)
     valor_unitario = Column(Float, nullable=False)
     peso_unitario = Column(Float, nullable=False)
@@ -317,6 +387,7 @@ class ClientProductHistory(Base):
     __tablename__ = "client_product_history"
     __table_args__ = (
         Index("ix_cph_owner_client", "owner_username", "client_id"),
+        Index("ux_cph_owner_client_clave", "owner_username", "client_id", "clave", unique=True),
     )
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -331,13 +402,21 @@ class ClientProductHistory(Base):
     ncm = Column(String(10), nullable=False)
     descripcion = Column(Text, nullable=False)
     descripcion_normalizada = Column(String(200), nullable=True)
+    # El producto (NCM de 8 dígitos y descripción): una fila por cliente.
+    # Vacía en las filas que no son un producto.
+    clave = Column(String(64), nullable=True)
 
     peso_unitario_avg = Column(Float, default=0.0)
-    origen_frecuente = Column(String(3), default="XX")
+    origen_frecuente = Column(Text, default="XX")
     veces_usado = Column(Integer, default=1)
 
     valor_unitario_avg = Column(Float, nullable=True)
     cantidad_avg = Column(Float, nullable=True)
+    # Cuántos usos trajeron cada valor: el promedio cuenta sólo esos. En las
+    # filas de antes quedan vacíos y se toma veces_usado.
+    veces_peso = Column(Integer, nullable=True)
+    veces_valor = Column(Integer, nullable=True)
+    veces_cantidad = Column(Integer, nullable=True)
 
     primera_vez = Column(DateTime(timezone=True), server_default=func.now())
     ultima_vez = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -350,8 +429,8 @@ class VendorCatalogProduct(Base):
 
     Reemplaza `product_catalog.json` que se perdia con cada deploy. Tenant
     aislado por `owner_username`. Para el mismo vendor, cada combinacion
-    (owner, vendor_id, product_key) es unica. `product_key` es la
-    descripcion normalizada (ver `catalog_service._normalize`).
+    (owner, vendor_id, product_key) es unica. `product_key` es la clave
+    de identidad del producto (ver `catalog_service.clave_de_producto`).
     """
     __tablename__ = "vendor_catalog_products"
     __table_args__ = (
@@ -370,12 +449,12 @@ class VendorCatalogProduct(Base):
         nullable=False,
     )
     vendor_id = Column(String(100), nullable=False)
-    vendor_nombre = Column(String(200), nullable=True)
+    vendor_nombre = Column(Text, nullable=True)
 
-    product_key = Column(String(300), nullable=False)
-    descripcion = Column(String(500), nullable=True)
+    product_key = Column(Text, nullable=False)
+    descripcion = Column(Text, nullable=True)
     ncm = Column(String(20), nullable=True)
-    origen = Column(String(5), nullable=True)
+    origen = Column(Text, nullable=True)
     valor_unitario = Column(Float, nullable=True)
     peso_unitario = Column(Float, nullable=True)
 
@@ -500,3 +579,39 @@ class Invitation(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False)
 
     org = relationship("Organization", back_populates="invitations")
+
+
+class PagoMercadoPagoAplicado(Base):
+    """Cada pago de Mercado Pago que llegó a una cuenta, una sola vez.
+
+    Antes sólo se recordaba el último pago (`last_payment_id`): alternando
+    dos pagos viejos reales, cualquiera renovaba una cuenta sin pagar
+    (COBRO-MP-1, D8). La clave es el id del pago: un reenvío no se aplica.
+    Un pago que no alcanza queda «rechazado» con su motivo, para que el
+    admin lo vea en /dev/dashboard: es un cliente que pagó y no recibió nada.
+    """
+    __tablename__ = "mp_pagos_aplicados"
+
+    payment_id = Column(String(100), primary_key=True)
+    cuenta = Column(String(200), nullable=False, index=True)  # usuario u «org:<id>»
+    tipo = Column(String(40), nullable=False)  # plan o «topup»
+    monto = Column(Float, nullable=True)
+    moneda = Column(String(10), nullable=True)
+    aprobado_en = Column(String(40), nullable=True)  # date_approved de MP, tal cual
+    estado = Column(String(20), nullable=False, default="aplicado")  # «aplicado» o «rechazado»
+    monto_esperado = Column(Float, nullable=True)
+    motivo = Column(String(300), nullable=True)  # por qué se rechazó
+    aplicado_en = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class InicioRegistroPagosMP(Base):
+    """Desde cuándo mp_pagos_aplicados anota cada pago (COBRO-MP-1, A).
+
+    Un pago aplicado antes no tiene fila: si no es el último de la cuenta,
+    last_payment_id tampoco lo frena. El webhook no aplica un pago aprobado
+    antes de este momento. Una sola fila (id=1), sembrada por init_db.
+    """
+    __tablename__ = "mp_registro_pagos_inicio"
+
+    id = Column(Integer, primary_key=True)
+    desde = Column(DateTime(timezone=True), nullable=False)

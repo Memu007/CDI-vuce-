@@ -13,7 +13,7 @@ import pytest
 from tests.test_prelaunch_block2 import _register, _unique, client  # noqa: F401
 from proyecto_maria.database.connection import get_async_session
 from proyecto_maria.services.client_memory import (
-    NCM_HISTORIAL_MAX, lookup_client_memory, ncm_para_historial,
+    lookup_client_memory, ncm_para_historial,
 )
 
 SIM = "84714900100D"
@@ -22,16 +22,23 @@ SIM = "84714900100D"
 @pytest.mark.parametrize("entra, sale", [
     (SIM, "84714900"),
     ("8471.49.00.100D", "84714900"),
-    ("8471.49.00", "8471.49.00"),
+    ("8471.49.00", "84714900"),
     ("84714900", "84714900"),
     ("  84714900  ", "84714900"),
+    ("8471.30.00.900 R", "84713000"),
     ("ABCDEFGHIJKLMN", None),
+    ("8471.30.00.900  R", None),
+    ("8471.30.00 R", None),
+    ("8471.30.00.900 RR", None),
+    ("8471.30.00.900 -R", None),
+    ("8471.30.00.900\tR", None),
+    ("8471.30.00.900\u00a0R", None),
     ("", None),
     (None, None),
 ])
 def test_la_forma_del_ncm_que_guarda_el_historial(entra, sale):
     assert ncm_para_historial(entra) == sale
-    assert sale is None or len(sale) <= NCM_HISTORIAL_MAX
+    assert sale is None or len(sale) == 8
 
 
 def _sql(consulta, **params):
@@ -40,7 +47,7 @@ def _sql(consulta, **params):
     async def _run():
         async for db in get_async_session():
             return (await db.execute(text(consulta), params)).fetchall()
-    return asyncio.new_event_loop().run_until_complete(_run())
+    return asyncio.run(_run())
 
 
 def _cliente(client) -> str:
@@ -69,7 +76,7 @@ def test_guardar_con_la_sim_completa_deja_el_ncm_en_el_historial(client):
     piezas = sorted(p for (p,) in _sql("select pieza from operation_items where operation_id=:o",
                                        o=r.json()["operation_id"]))
     assert piezas == ["8471.30.12", SIM]
-    assert _historial(cid) == {"COMPUTADORA PORTATIL": "84714900", "TABLETA": "8471.30.12"}
+    assert _historial(cid) == {"COMPUTADORA PORTATIL": "84714900", "TABLETA": "84713012"}
 
 
 def test_la_sugerencia_del_cliente_devuelve_el_ncm_de_la_sim(client):
@@ -80,7 +87,7 @@ def test_la_sugerencia_del_cliente_devuelve_el_ncm_de_la_sim(client):
     async def _buscar():
         async for db in get_async_session():
             return await lookup_client_memory(db, usuario, cid, "computadora portatil")
-    encontrado = asyncio.new_event_loop().run_until_complete(_buscar())
+    encontrado = asyncio.run(_buscar())
     assert encontrado and encontrado["ncm"] == "84714900", encontrado
 
 
@@ -188,7 +195,8 @@ def test_datos_largos_de_la_operacion_no_impiden_guardarla(client):
     """Mismo defecto en otras columnas de largo fijo del mismo guardado
     (Postgres): moneda String(3), origen String(50), fecha de inicio de
     actividades del cliente String(10); y el carácter NUL, que Postgres no
-    acepta en un texto."""
+    acepta en un texto. Desde CLIENTE-1c (D15 b) la fecha con hora no se
+    copia a la ficha: queda vacía y la operación se guarda igual."""
     cid = _cliente(client)
     r = client.post(f"/api/clientes/{cid}/operaciones", json={
         "currency": "DOLARES", "source": "x" * 80,
@@ -198,7 +206,7 @@ def test_datos_largos_de_la_operacion_no_impiden_guardarla(client):
     op = r.json()["operation_id"]
     assert _sql("select currency, length(source) from operations where id=:o", o=op) == [("DOL", 50)]
     assert _sql("select descripcion from operation_items where operation_id=:o", o=op) == [("COMPUTADORA",)]
-    assert _sql("select fecha_inic_activ from clients where id=:c", c=cid) == [("2020-01-15",)]
+    assert _sql("select fecha_inic_activ from clients where id=:c", c=cid) == [("",)]
 
 
 def _con_un_producto_que_la_base_rechaza(monkeypatch):

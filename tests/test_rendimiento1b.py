@@ -18,6 +18,7 @@ import httpx
 import pytest
 
 from proyecto_maria import main
+from tests.conftest import cuenta_de_prueba
 
 AQUI = Path(__file__).parent
 PDF = (AQUI / "test_factura.pdf").read_bytes()
@@ -29,8 +30,9 @@ def test_pdfs_armados_en_paralelo_y_despues_uno_bueno_se_lee():
     env = {**os.environ, "PDF_READ_WORKERS": "4", "PDF_VENDOR_TIMEOUT_S": "1",
            "PDF_READ_TIMEOUT_S": "3"}
     try:
-        p = subprocess.run([sys.executable, str(AQUI / "escenario_pdf_armado.py")],
-                           capture_output=True, text=True, timeout=60, env=env)
+        with cuenta_de_prueba(USUARIO["username"]):
+            p = subprocess.run([sys.executable, str(AQUI / "escenario_pdf_armado.py")],
+                               capture_output=True, text=True, timeout=60, env=env)
     except subprocess.TimeoutExpired:
         pytest.fail("el escenario no terminó en 60 s: la lectura se volvió a colgar")
     lineas = [l for l in p.stdout.splitlines() if l.startswith("{")]
@@ -50,7 +52,8 @@ def _entorno(monkeypatch):
     monkeypatch.setattr(ai_quota, "enforce_pdf_quota", lambda *a, **k: None)
     monkeypatch.setattr(main, "_POOL_LECTURA_PDF", None)
     main.app.dependency_overrides[main.get_current_user] = lambda: dict(USUARIO)
-    yield
+    with cuenta_de_prueba(USUARIO["username"]):
+        yield
     main.app.dependency_overrides.pop(main.get_current_user, None)
 
 

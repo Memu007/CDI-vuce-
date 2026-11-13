@@ -1,118 +1,80 @@
-# 🚀 CDI - Sistema MARÍA (Optimizador de Carga)
+# CDI
 
-**Sistema integral para la validación, enriquecimiento y generación de archivos de carga (AVG) para el sistema MARIA.**
+App web para despachantes de aduana argentinos. Lee la factura del proveedor
+(Excel o PDF), ayuda a clasificar cada ítem (NCM) y genera el archivo que se
+pega en el sistema MARIA de ARCA. El despachante revisa y confirma en pantalla;
+el archivo es trazable a lo que aprobó.
 
-## 🌟 Resumen y Objetivo
+**Si sos un asistente de IA, empezá por `AGENTS.md`.** Si vas a tocar código,
+leé también `CLAUDE.md`. El estado vigente del proyecto (qué está hecho, qué
+sigue, qué espera decisión) está en `docs/pm/NOW.md`.
 
-Este sistema fue desarrollado para modernizar y asegurar el flujo de trabajo de los despachantes de aduana. El objetivo principal es **eliminar errores humanos** en la carga de datos y **automatizar la generación de archivos AVG**, garantizando la integridad y seguridad de la información sensible.
+## Stack
 
-| Característica    | Detalle                                                       |
-| :---------------- | :------------------------------------------------------------ |
-| **Arquitectura**  | Monolito Modular (FastAPI + Vanilla JS)                       |
-| **Base de Datos** | PostgreSQL (Async con SQLAlchemy)                             |
-| **Seguridad**     | **Nivel Bancario** (Rate Limiting, CSRF Strict, JWT HttpOnly) |
-| **IA Integrada**  | Google Gemini 2.0 (Extracción de datos de PDFs)               |
-| **Validación**    | Pydantic (Backend) + Validación en Tiempo Real (Frontend)     |
-| **Despliegue**    | Docker Ready / VPS (Ubuntu)                                   |
+| Capa | Qué se usa |
+|------|------------|
+| Backend | Python 3.12, FastAPI, SQLAlchemy async |
+| Base de datos | SQLite local; PostgreSQL en producción (`DATABASE_URL`) |
+| Frontend | HTML + JavaScript sin framework (`proyecto_maria/static/v2/`) |
+| Lectura de PDF | Gemini, con fallback a texto y OCR |
+| Pagos | Mercado Pago |
+| Producción | Railway construye el `Dockerfile` y publica cada push a `main` |
 
-## ⚙️ Arquitectura y Seguridad
-
-El sistema no es solo un generador de Excel; es una plataforma robusta diseñada para ser expuesta a internet de forma segura.
-
-### 1. Núcleo de Seguridad (Hardening)
-
-Implementamos una estrategia de defensa en profundidad para proteger el acceso y los datos:
-
-- **Rate Limiting (Anti-Brute Force):** Bloqueo automático de IPs tras 5 intentos fallidos de login (ban de 15 minutos). Implementado en memoria para máxima velocidad.
-- **Protección CSRF:** Cookies de sesión con `SameSite=Strict`, impidiendo que sitios maliciosos ejecuten acciones en nombre del usuario.
-- **Sanitización XSS:** Todo input y output es sanitizado para prevenir inyección de código en el navegador.
-- **Manejo de Sesiones:** JWT (JSON Web Tokens) almacenados exclusivamente en Cookies `HttpOnly`, inaccesibles via JavaScript.
-
-### 2. Lógica de Negocio (Core)
-
-El sistema procesa archivos complejos (Excel/PDF) y los normaliza:
-
-- **Validación Básica:** Reglas estrictas de negocio antes de procesar cualquier dato.
-- **Validación Inteligente (Premium):** Detecta errores comunes ANTES de oficializar:
-  - NCM inválido o sospechoso
-  - Peso/valor fuera de rango típico para el producto
-  - Descripciones cortas que AFIP puede rechazar
-  - Certificados requeridos (ANMAT, INTI, etc.)
-- **Generación AVG:** Motor dedicado (`core/excel_generator.py`) que construye el formato binario exacto requerido por el Sistema MARIA.
-- **IA Fallback:** Si el parser tradicional falla con un PDF, Google Gemini entra en acción para estructurar la data desordenada.
-
-## 🛠️ Despliegue y Configuración
-
-El proyecto está diseñado para ser "Plug & Play". Incluye scripts de automatización para el setup inicial.
-
-### Archivos Clave
-
-| Archivo                  | Función                                                                   |
-| :----------------------- | :------------------------------------------------------------------------ |
-| `setup.sh`               | **Script Mágico.** Crea entorno virtual, instala deps y configura la BD.  |
-| `start_server.sh`        | Inicia el servidor de producción (Gunicorn) con la configuración óptima.  |
-| `proyecto_maria/main.py` | Punto de entrada de la aplicación FastAPI.                                |
-| `requirements.txt`       | Lista de dependencias optimizada (incluye `bcrypt`, `fastapi`, `pandas`). |
-
-### 🚀 Instalación Rápida (VPS / Local)
+## Correr en local
 
 ```bash
-# 1. Clonar y preparar entorno
-git clone https://github.com/Memu007/CDI.git
-cd CDI
-./setup.sh
-
-# 2. Configurar secretos
-nano .env  # (Agregar GEMINI_API_KEY y credenciales DB)
-
-# 3. Iniciar
-./start_server.sh
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env        # mínimo: JWT_SECRET_KEY (32+ caracteres), ENVIRONMENT=development
+PYTHONPATH=. uvicorn proyecto_maria.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-## 🔒 Variables de Entorno
+Abrí <http://127.0.0.1:8000/>. Sin `GEMINI_API_KEY` todo funciona salvo la
+lectura de PDF. Las tablas se crean solas al arrancar y los cambios de esquema
+corren en ese mismo arranque, dentro de `main.py` (funciones `_migrate_*`,
+cada una verifica si ya está aplicada); no hay herramienta de migraciones
+aparte. `start_server.sh` arranca con Gunicorn, como en producción.
 
-La configuración sensible se maneja exclusivamente via variables de entorno (`.env`).
+## Pruebas
 
-| Variable          | Propósito                                                      |
-| :---------------- | :------------------------------------------------------------- |
-| `GEMINI_API_KEY`  | Llave para el motor de IA de Google.                           |
-| `DATABASE_URL`    | String de conexión a PostgreSQL (o SQLite por defecto).        |
-| `JWT_SECRET_KEY`  | Semilla para la firma criptográfica de tokens.                 |
-| `MP_ACCESS_TOKEN` | (Opcional) Token de MercadoPago para pagos. Sin él, usa modo demo. |
-| `SMTP_SERVER`     | (Opcional) Configuración para envío de emails transaccionales. |
+```bash
+ENVIRONMENT=testing EMAIL_VERIFICATION_REQUIRED=false \
+  JWT_SECRET_KEY=clave-de-prueba-con-mas-de-32-caracteres \
+  python -m pytest --no-cov          # suite completa
+./scripts/testing/e2e_maria.sh       # recorrido real en navegador (necesita Node 22)
+```
 
-## 🤝 Contribuciones
+La CI (`.github/workflows/ci.yml`) corre las dos cosas en cada pull request a
+`main`, pero Railway no la espera para publicar: empujar a `main` publica aunque
+la CI esté roja.
 
-Este es un proyecto privado para uso profesional.
+## Producción
 
----
+`main` es de Emi. Railway publica cada push a `main` sin esperar los tests, así
+que empujar a `main` es publicar: se hace sólo con su «dale» para un SHA
+concreto. Todo trabajo va a una rama. La configuración está en
+`docs/deployment/RAILWAY_SETUP.md`; las puertas de publicación, en
+`docs/deployment/PLAN_DEPLOY_ADVERSARIAL.md`.
 
-**Estado del Proyecto:** ✅ LISTO PARA PRODUCCIÓN (v2.1 - Ene 2026)
+## Dónde está cada cosa
 
-## 🚂 Deploy Rápido en Railway (Recomendado)
+```
+proyecto_maria/     la aplicación
+  main.py           FastAPI, rutas y lógica (un solo módulo, grande)
+  core/             generación del archivo MARIA, conectores (VUCE, Tarifar), dólar
+  database/         modelos y conexión
+  templates/        landing, dashboard (v2), panel de desarrollo
+  static/v2/        frontend vigente
+tests/              pytest; conftest con base y usuario de prueba
+scripts/testing/    e2e, smokes, sabotajes y capturas de pantalla
+scripts/datos/      generadores de datos de referencia
+config/             Puppeteer para el e2e (package.json)
+docs/pm/            el canal de trabajo: NOW, ROADMAP, DECISIONS, PARA-DEV, PARA-PM
+docs/deployment/    Railway y puertas de publicación
+docs/negocio/       planes de valuación y venta
+docs/archive/       historia, sólo lectura
+```
 
-El proyecto está 100% pre-configurado para un despliegue automático en [Railway.app](https://railway.app/) gracias a los archivos `Dockerfile` y `railway.json`.
-
-**Pasos para el despliegue:**
-1. Crear una cuenta en [Railway](https://railway.app/).
-2. Crear un nuevo proyecto y seleccionar **"Deploy from GitHub repo"**.
-3. Conectar tu cuenta de GitHub y seleccionar este repositorio (`CDI`).
-4. Añadir un plugin de base de datos **PostgreSQL** dentro del mismo proyecto de Railway.
-5. Ir a la pestaña **Variables** del servicio de la aplicación y configurar:
-   - `GEMINI_API_KEY`: Tu API Key de Google Gemini.
-   - `JWT_SECRET_KEY`: Una cadena segura generada aleatoriamente.
-   - `DATABASE_URL`: Referenciar a la variable de base de datos de Railway (ej. `${{Postgres.DATABASE_URL}}`).
-6. El despliegue comenzará automáticamente. Railway detectará el `Dockerfile` y expondrá la aplicación en la web.
-
-## 🚀 Deploy Alternativo (Google Cloud)
-
-**[Ver DEPLOY.md](./DEPLOY.md)** - Guía de 3 pasos para deploy manual en GCP Cloud Run.
-
-### 📋 Últimos Cambios (Marzo 2026)
-
-- ✅ Preparación para Railway deployment con `railway.json`
-- ✅ Security Pentest: Fixed IDOR + JWT vulnerabilities, Middlewares actualizados
-- ✅ Rate Limiting robusto implementado (`core/rate_limit.py`)
-- ✅ Database Stress Test y optimizaciones
-- ✅ Pruebas Unitarias para Validaciones y Uploads mejoradas
-
+`HANDOFF.md` describe cómo funciona el producto, pero está desactualizado
+desde julio: ante una contradicción mandan Git y `docs/pm/NOW.md`.
+`CHANGELOG.md` tiene una a tres líneas por cambio, con fecha.

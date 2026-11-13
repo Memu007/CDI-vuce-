@@ -44,6 +44,7 @@ PYEOF
 
 M=proyecto_maria/main.py
 C=proyecto_maria/core/controles_maria.py
+F=proyecto_maria/security/file_security.py
 T=tests/test_maria1b_controles.py
 D=tests/test_maria1b_devolucion.py
 
@@ -57,8 +58,8 @@ sabotaje $M "/generate_maria deja de usar los controles" \
   '        if kit_errors:' \
   "FAILED $T::test_moneda_que_impide_el_txt"
 sabotaje $M "los textos vuelven a entrar sin limpiar" \
-  '            setattr(request, _campo, limpiar_texto(getattr(request, _campo)))' \
-  '            pass' \
+  '        setattr(request, campo, limpiar_texto(getattr(request, campo)))' \
+  '        pass' \
   "FAILED $T::test_un_texto_no_mete_lineas_ni_igual_en_el_txt[comprador_nombre]"
 sabotaje $C "el «=» vuelve a pasar" \
   '    limpio = re.sub(_SALTOS_Y_CONTROLES + "+", " ", valor).replace("=", "-")' \
@@ -109,8 +110,8 @@ sabotaje $M "el servidor vuelve a inventar DOL y FOB" \
     incoterm: str = "FOB"' \
   "FAILED $T::test_sin_moneda_ni_incoterm_el_servidor_no_inventa_dol_ni_fob"
 sabotaje $M "el TXT vuelve a llevar el valor sin normalizar" \
-  '        request.incoterm = (request.incoterm or "").strip().upper()' \
-  '        pass' \
+  '    request.incoterm = (request.incoterm or "").strip().upper()' \
+  '    pass' \
   "FAILED $T::test_el_txt_lleva_lo_que_se_controla_normalizado"
 # Con CATALOGO-NCM-1 el aviso sale de ncm_catalog.aviso_de_ncm: el sabotaje
 # le hace recorrer el catálogo entero por cada producto.
@@ -123,12 +124,12 @@ sabotaje $M "la validación previa deja de mirar la cabecera" \
   '        if False:' \
   "FAILED $T::test_la_validacion_previa_devuelve_los_mismos_errores"
 sabotaje $M "vuelve la cantidad 1 al guardar la operación" \
-  '                    cantidad=float(item.get("cantidad") or 0),' \
-  '                    cantidad=float(item.get("cantidad") or 1),' \
+  'cantidad=_numero_de_afuera(item.get("cantidad"), "La cantidad"),' \
+  'cantidad=_numero_de_afuera(item.get("cantidad") or 1, "La cantidad"),' \
   "FAILED $T::test_guardar_la_operacion_no_inventa_cantidad_peso_ni_origen"
 sabotaje $M "vuelve el peso 0,5 al guardar la operación" \
-  '                    peso_unitario=float(item.get("peso_unitario") or 0),' \
-  '                    peso_unitario=float(item.get("peso_unitario") or 0.5),' \
+  'peso_unitario=_numero_de_afuera(item.get("peso_unitario"), "El peso unitario"),' \
+  'peso_unitario=_numero_de_afuera(item.get("peso_unitario") or 0.5, "El peso unitario"),' \
   "FAILED $T::test_guardar_la_operacion_no_inventa_cantidad_peso_ni_origen"
 sabotaje $M "las filas sin leer dejan de quedar en la operación" \
   '            operacion["filas_excel_sin_leer"] = descartes[:50]' \
@@ -146,8 +147,8 @@ sabotaje $M "una hoja vacía se avisa como hoja con datos" \
   "FAILED $T::test_el_excel_deja_en_la_operacion_lo_que_no_se_leyo"
 # Devolución de MARIA-1b
 sabotaje $C "NaN e inf vuelven a pasar en la cantidad" \
-  '        if _fuera_de_rango(cantidad):' \
-  '        if False:' \
+  '        cantidad_mala = _fuera_de_rango(cantidad)' \
+  '        cantidad_mala = False' \
   "FAILED $D::test_nan_o_inf_en_un_producto_no_dejan_generar[cantidad-"
 sabotaje $C "los subítems dejan de controlarse" \
   '        for m, sub in enumerate(subitems if isinstance(subitems, list) else [], start=1):' \
@@ -169,7 +170,7 @@ sabotaje $M "una fórmula sin valor guardado deja de ser un dato" \
   '            if formula is not None and (formula.text or "").strip():' \
   '            if False:' \
   "FAILED $D::test_una_hoja_con_formulas_sin_valor_guardado_se_avisa"
-sabotaje $M "una hoja de gráfico vuelve a contar como hoja" \
+sabotaje $F "una hoja de gráfico vuelve a contar como hoja" \
   '        destinos[r.get("Id")] = (destino, "chartsheet" in (r.get("Type") or ""))' \
   '        destinos[r.get("Id")] = (destino, False)' \
   "FAILED $D::test_una_hoja_de_grafico_primero_no_corre_las_hojas"

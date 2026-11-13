@@ -3,7 +3,7 @@
 # ========================================================================
 # Test Docker Local - CDI Sistema MARÍA
 # ========================================================================
-# Prueba la imagen Docker localmente antes de deployar a Cloud Run
+# Prueba la imagen Docker localmente antes de publicar en Railway
 # ========================================================================
 
 set -e
@@ -101,4 +101,4 @@ echo -e "  docker rm cdi-test"
 
 echo -e ""
 echo -e "${GREEN}✅ Docker test exitoso!${NC}"
-echo -e "${GREEN}La imagen está lista para deployar a Cloud Run${NC}"
+echo -e "${GREEN}La imagen está lista para publicar en Railway${NC}"

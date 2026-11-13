@@ -174,6 +174,35 @@
             </div>
         </div>
 
+        <!-- Pagos de Mercado Pago rechazados (COBRO-MP-1) -->
+        <div class="card mb-4">
+            <div class="card-header border-bottom border-secondary bg-transparent py-3 d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Pagos de Mercado Pago no aplicados</h5>
+                <button type="button" class="refresh-btn py-1" onclick="fetchPagosRechazados()" style="font-size:0.82rem;">Actualizar</button>
+            </div>
+            <div class="card-body p-0">
+                <p class="text-muted small px-3 pt-3">Pagos aprobados por Mercado Pago que no se aplicaron: no alcanzaban el precio, venían en otra moneda, su fecha es anterior al registro de pagos o no se lee, la recarga superaba el tope de operaciones extra, o no se sabe de qué cuenta son. El cliente pagó y no recibió el servicio. Hay que revisarlos uno por uno.</p>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0 log-table">
+                        <thead>
+                            <tr>
+                                <th>FECHA</th>
+                                <th>CUENTA</th>
+                                <th>TIPO</th>
+                                <th>PAGÓ</th>
+                                <th>PRECIO</th>
+                                <th>MOTIVO</th>
+                                <th>PAGO MP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pagos-rechazados-body">
+                            <tr><td colspan="7" class="text-center py-4 text-muted">Cargando…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- Logs Section -->
         <div class="card">
             <div class="card-header border-bottom border-secondary bg-transparent py-3">
@@ -202,6 +231,17 @@
     </div>
 
     <script>
+        // Lo que llega de la API va como texto: nunca se interpreta como HTML.
+        function fila(celdas) {
+            const tr = document.createElement('tr');
+            celdas.forEach((texto) => {
+                const td = document.createElement('td');
+                td.textContent = texto == null ? '—' : String(texto);
+                tr.appendChild(td);
+            });
+            return tr;
+        }
+
         async function fetchStats() {
             try {
                 const response = await fetch('/api/dev/stats');
@@ -218,24 +258,17 @@
 
                 // Update Logs
                 const tbody = document.getElementById('logs-body');
-                tbody.innerHTML = '';
-                
-                data.logs.forEach(log => {
-                    const statusClass = log.status >= 500 ? 'status-500' : 
-                                      log.status >= 400 ? 'status-400' : 'status-200';
-                    
-                    const row = `
-                        <tr>
-                            <td class="text-muted">${log.time}</td>
-                            <td><span class="badge bg-secondary">${log.method}</span></td>
-                            <td>${log.endpoint}</td>
-                            <td class="${statusClass}">${log.status}</td>
-                            <td>${log.latency} ms</td>
-                            <td class="text-muted">${log.ip}</td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += row;
-                });
+                tbody.replaceChildren(...data.logs.map((log) => {
+                    const tr = fila([log.time, log.method, log.endpoint, log.status, log.latency + ' ms', log.ip]);
+                    const metodo = document.createElement('span');
+                    metodo.className = 'badge bg-secondary';
+                    metodo.textContent = log.method;
+                    tr.cells[1].replaceChildren(metodo);
+                    tr.cells[0].className = tr.cells[5].className = 'text-muted';
+                    tr.cells[3].className = log.status >= 500 ? 'status-500' :
+                                            log.status >= 400 ? 'status-400' : 'status-200';
+                    return tr;
+                }));
             } catch (error) {
                 console.error('Error fetching stats:', error);
             }
@@ -293,7 +326,32 @@
             }
         }
 
+        async function fetchPagosRechazados() {
+            const tbody = document.getElementById('pagos-rechazados-body');
+            try {
+                const response = await fetch('/api/dev/pagos-mp-rechazados');
+                const data = await response.json();
+                tbody.replaceChildren();
+                if (!response.ok) {
+                    tbody.appendChild(fila(['No se pudo leer: ' + response.status, '', '', '', '', '', '']));
+                    return;
+                }
+                if (!data.pagos.length) {
+                    tbody.appendChild(fila(['Ninguno', '', '', '', '', '', '']));
+                    return;
+                }
+                data.pagos.forEach((p) => tbody.appendChild(fila([
+                    p.aprobado_en || p.registrado_en, p.cuenta, p.tipo,
+                    p.monto == null ? null : p.monto + ' ' + (p.moneda || ''),
+                    p.monto_esperado, p.motivo, p.payment_id,
+                ])));
+            } catch (e) {
+                console.error('Pagos rechazados', e);
+            }
+        }
+
         fetchWave1();
+        fetchPagosRechazados();
 
         // Initial load
         fetchStats();

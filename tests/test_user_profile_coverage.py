@@ -25,9 +25,9 @@ def test_update_user_profile_name(auth_override, client):
 
 def test_update_user_profile_cuit_valido(auth_override, client):
     """PUT /api/user/profile guarda CUIT normalizado (solo dígitos)."""
-    r = client.put("/api/user/profile", json={"cuit": "20-111-22233-3"})
+    r = client.put("/api/user/profile", json={"cuit": "20-111-11111-2"})
     assert r.status_code == 200
-    assert r.json()["profile"]["cuit"] == "20111222333"
+    assert r.json()["profile"]["cuit"] == "20111111112"
 
 
 def test_update_user_profile_cuit_invalido_400(auth_override, client):
@@ -42,17 +42,20 @@ def test_update_user_profile_cuit_vacio_limpia(auth_override, client):
     assert r.status_code == 200
 
 
-def test_update_user_profile_email_valido(auth_override, client):
-    """PUT con email válido lo actualiza."""
+def test_update_user_profile_email_sin_clave_400(auth_override, client):
+    """PUT con email válido pero sin la contraseña actual → 400 y no cambia
+    (SESION-1). El cambio con la contraseña está en tests/test_sesion1.py."""
     r = client.put("/api/user/profile", json={"email": "nuevo@test.com"})
-    assert r.status_code == 200
-    assert r.json()["profile"]["email"] == "nuevo@test.com"
+    assert r.status_code == 400
+    assert "contraseña" in r.json()["detail"]
+    assert client.get("/api/user/profile").json()["profile"]["email"] != "nuevo@test.com"
 
 
 def test_update_user_profile_email_invalido_400(auth_override, client):
     """PUT con email inválido → 400."""
     r = client.put("/api/user/profile", json={"email": "no-es-email"})
     assert r.status_code == 400
+    assert r.json()["detail"].startswith("Email no válido")
 
 
 def test_update_user_profile_defaults(auth_override, client):
@@ -113,7 +116,7 @@ def test_simulate_charge_sin_metodo_pago_trial(auth_override, client):
                 u.payment_method_last4 = None
                 await db.commit()
             return
-    asyncio.new_event_loop().run_until_complete(_set_trial())
+    asyncio.run(_set_trial())
 
     r = client.post("/api/billing/simulate-charge")
     assert r.status_code == 400
@@ -127,7 +130,7 @@ def test_simulate_charge_sin_metodo_pago_trial(auth_override, client):
                 u.billing_status = "active"
                 await db.commit()
             return
-    asyncio.new_event_loop().run_until_complete(_set_active())
+    asyncio.run(_set_active())
 
 
 def test_billing_me_devuelve_plan(auth_override, client):

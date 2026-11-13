@@ -42,7 +42,8 @@ FACTURAS = {
                     precio=1197.00, peso=33.0, pais="China")],
         cabecera=dict(operation_id="002720126", moneda="DOL", incoterm="EXW",
                       flete=365.00, seguro=75.47, fecha_emision="22/06/2026",
-                      aduana_codigo="073", sbt_sufijo_valor="AA(DEMO)-CA00-"),
+                      aduana_codigo="073", sbt_sufijo_valor="AA(DEMO)-CA00-",
+                      cuit_agr="20111111112"),  # sin CUIT del despachante no se genera (MARIA-7)
     ),
 }
 

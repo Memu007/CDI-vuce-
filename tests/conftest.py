@@ -1,3 +1,6 @@
+import atexit
+import contextlib
+import glob
 import pytest
 import tempfile
 from fastapi.testclient import TestClient
@@ -12,9 +15,21 @@ os.environ['ENVIRONMENT'] = 'testing'
 os.environ['SENTRY_DSN'] = ''  # Disable Sentry in tests
 # DB en archivo temporal (no in-memory): SQLite in-memory crea una DB nueva
 # por cada conexión async, lo que rompe tests que abren más de una sesión.
-# Archivo en /tmp se borra al final del proceso de tests (lo limpia OS).
 _test_db_fd, _test_db_path = tempfile.mkstemp(suffix='.db', prefix='cdi_pytest_')
 os.close(_test_db_fd)
+_pid_creador = os.getpid()
+
+
+@atexit.register
+def _borrar_db_de_prueba():
+    # atexit y no pytest_sessionfinish: también corre si la corrida se corta
+    # antes de la sesión. Con la base se van su -journal, -wal y -shm.
+    # Un hijo con fork hereda este atexit: la base es del padre.
+    if os.getpid() != _pid_creador:
+        return
+    for ruta in glob.glob(glob.escape(_test_db_path) + '*'):
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(ruta)
 os.environ['DATABASE_URL'] = f'sqlite+aiosqlite:///{_test_db_path}'
 
 from proyecto_maria.main import app  # noqa: E402
@@ -53,11 +68,20 @@ def _set_sqlite_pragma(dbapi_connection, _):
     cursor.execute("PRAGMA busy_timeout=30000")  # 30s: esperar el lock, no fallar
     cursor.close()
 import asyncio  # noqa: E402
+import aiosqlite  # noqa: E402
 import threading  # noqa: E402
+import time  # noqa: E402
 
 
 def pytest_sessionstart(session):
-    """Crear tablas antes de la sesión de tests (idempotente con checkfirst)."""
+    """Comprobar que la guarda ve las conexiones y crear las tablas (checkfirst)."""
+    if not _guarda_ve_una_conexion():
+        pytest.exit(
+            f"La guarda de conexiones no ve una conexión abierta de aiosqlite "
+            f"{aiosqlite.__version__}: busca hilos que terminen en "
+            f"{_HILO_AIOSQLITE!r}. Ajustá _hilos_de_aiosqlite a esta versión.",
+            returncode=pytest.ExitCode.USAGE_ERROR,
+        )
     asyncio.run(init_db())
 
 
@@ -108,6 +132,59 @@ def pytest_sessionfinish(session, exitstatus):
             conexion._thread.join(timeout=2)
     except Exception:
         pass
+
+
+# Cada conexión abierta de aiosqlite tiene un hilo vivo con este nombre; mirar
+# los hilos ve la fuga por su efecto, venga del ayudante que venga.
+_HILO_AIOSQLITE = "(_connection_worker_thread)"
+_TOPE_CIERRE = 5  # segundos; un hilo de una conexión cerrada sale enseguida
+_hilos_antes = pytest.StashKey[set]()
+
+
+def _hilos_de_aiosqlite():
+    return {h for h in threading.enumerate() if h.name.endswith(_HILO_AIOSQLITE)}
+
+
+def _guarda_ve_una_conexion():
+    # El nombre del hilo depende de la versión de aiosqlite: si deja de
+    # coincidir, la guarda no vería ninguna fuga y tampoco avisaría.
+    async def probar():
+        antes = _hilos_de_aiosqlite()
+        conexion = await aiosqlite.connect(":memory:")
+        try:
+            return _hilos_de_aiosqlite() - antes
+        finally:
+            await conexion.close()
+
+    vistos = asyncio.run(probar())
+    for hilo in vistos:
+        hilo.join(_TOPE_CIERRE)
+    return bool(vistos)
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_setup(item):
+    item.stash[_hilos_antes] = _hilos_de_aiosqlite()
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(item, call):
+    reporte = yield
+    if call.when != "teardown" or _hilos_antes not in item.stash or reporte.failed:
+        return reporte
+    nuevos = _hilos_de_aiosqlite() - item.stash[_hilos_antes]
+    fin = time.monotonic() + _TOPE_CIERRE
+    for hilo in nuevos:
+        hilo.join(max(0, fin - time.monotonic()))
+    vivos = sorted(h.name for h in nuevos if h.is_alive())
+    if vivos:
+        reporte.outcome = "failed"
+        reporte.longrepr = (
+            f"{item.nodeid} dejó {len(vivos)} conexión(es) de aiosqlite abiertas "
+            f"después de {_TOPE_CIERRE} s: {vivos}. Cerrá el generador de la "
+            "sesión (aclose) y el bucle que la abrió."
+        )
+    return reporte
 
 
 @pytest.fixture(scope="session")
@@ -178,19 +255,52 @@ def auth_headers():
     return {"Authorization": "Bearer test-token"}
 
 
-@pytest.fixture
-def auth_override():
-    """Autentica los endpoints sobreescribiendo la dependencia get_current_user.
-
-    Evita escribir en la DB (sin locks ni flakiness por orden de tests).
-    Devuelve el dict de user falso por si el test quiere inspeccionarlo.
-    Limpia el override al terminar.
-    """
-    from proyecto_maria.main import get_current_user
+@contextlib.contextmanager
+def cuenta_de_prueba(username):
+    """La fila del usuario que simula una prueba: generar cuenta en su cuenta y el plan
+    tiene tope, así que al salir le devuelve el cupo y retira las operaciones de MARIA nuevas."""
     from proyecto_maria.database.connection import AsyncSessionLocal
     from proyecto_maria.database.models import User as DBUser
-    from sqlalchemy import select
-    import asyncio
+    from proyecto_maria.database.models import Operation as DBOperation, OperationItem as DBOperationItem
+    from sqlalchemy import delete, select, update
+
+    async def _crear():
+        async with AsyncSessionLocal() as session:
+            u = (await session.execute(select(DBUser).where(DBUser.username == username))).scalars().first()
+            if not u:
+                u = DBUser(username=username, password="dummy_password_hash", name=username,
+                           email=f"{username}@test.cdi", plan="premium", billing_status="active",
+                           is_verified=True)
+                session.add(u)
+                await session.commit()
+            return u.ops_used_this_period or 0, set(
+                (await session.execute(select(DBOperation.id).where(
+                    DBOperation.owner_username == username))).scalars())
+
+    async def _retirar(usadas, previas):
+        async with AsyncSessionLocal() as session:
+            nuevas = [i for i in (await session.execute(select(DBOperation.id).where(
+                DBOperation.owner_username == username,
+                DBOperation.generated_file.is_not(None)))).scalars() if i not in previas]
+            if nuevas:
+                await session.execute(delete(DBOperationItem).where(DBOperationItem.operation_id.in_(nuevas)))
+                await session.execute(delete(DBOperation).where(DBOperation.id.in_(nuevas)))
+            await session.execute(update(DBUser).where(DBUser.username == username)
+                                  .values(ops_used_this_period=usadas))
+            await session.commit()
+
+    usadas, previas = asyncio.run(_crear())
+    try:
+        yield
+    finally:
+        asyncio.run(_retirar(usadas, previas))
+
+
+@pytest.fixture
+def auth_override():
+    """Autentica los endpoints sobreescribiendo get_current_user con test_user, que
+    existe en la base (cuenta_de_prueba). Devuelve el dict por si la prueba lo mira."""
+    from proyecto_maria.main import get_current_user
 
     fake_user = {
         "username": "test_user",
@@ -207,29 +317,18 @@ def auth_override():
         "team_owner_username": None,
         "effective_owner": "test_user",
     }
-    
-    async def _ensure_test_user_exists():
-        async with AsyncSessionLocal() as session:
-            res = await session.execute(select(DBUser).where(DBUser.username == "test_user"))
-            u = res.scalars().first()
-            if not u:
-                u = DBUser(
-                    username="test_user",
-                    password="dummy_password_hash",
-                    name="Test User",
-                    email="test_user@test.cdi",
-                    plan="premium",
-                    billing_status="active",
-                    is_verified=True,
-                )
-                session.add(u)
-                await session.commit()
-                
-    asyncio.run(_ensure_test_user_exists())
-    
-    app.dependency_overrides[get_current_user] = lambda: fake_user
-    yield fake_user
-    app.dependency_overrides.pop(get_current_user, None)
+    with cuenta_de_prueba("test_user"):
+        app.dependency_overrides[get_current_user] = lambda: fake_user
+        yield fake_user
+        app.dependency_overrides.pop(get_current_user, None)
+
+@pytest.fixture(autouse=True)
+def _limitador_apagado(monkeypatch):
+    """Cada caso arranca con el limitador apagado, sin importar qué corrió antes;
+    los que miden un tope lo prenden ellos."""
+    from proyecto_maria.core.rate_limit import limiter
+    monkeypatch.setattr(limiter, "enabled", False)
+
 
 @pytest.fixture(autouse=True)
 def reset_environment():

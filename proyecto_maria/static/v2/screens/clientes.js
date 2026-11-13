@@ -21,7 +21,8 @@
     let heroEl, kpiOps, kpiItems, kpiPromedio, kpiOrigen, kpiValor, kpiUltimo;
     let tabOps, tabCatalogo, tabDatos, panelOps, panelCatalogo, panelDatos;
     let opsList, opsEmpty, opsExpand, opsExpandBtn, exportCsvBtn;
-    let catalogoList, catalogoEmpty, catalogoActions, catalogoReset, catalogoSave, catalogoBadge, catalogoProductosList, catalogoProductosEmpty;
+    let catalogoList, catalogoEmpty, catalogoActions, catalogoReset, catalogoSave, catalogoBadge, catalogoProductosList, catalogoProductosEmpty, catalogoExcelBtn;
+    let despachoBtn, despachoFile, despachoPanel, despachoEstado, despachoAvisos, despachoRenglones, despachoAcciones, despachoDescartar, despachoGuardar;
     let datosGrid;
     let filterChips = [], sortSelect;
 
@@ -44,6 +45,8 @@
     let opsExpanded = false;
 
     let editingId = null;            // null = nuevo, string = edit
+    let fechaInicOculta = '';        // fecha guardada que el campo de fecha no puede mostrar (D3)
+    let fechaInicOcultaSirve = false; // si esa fecha le sirve al TXT: lo dice el servidor (CLIENTE-1c)
     let detailClienteId = null;
     let activeIndex = -1;            // indice del item "focuseado" por teclado en vista filtrada
     let visibleIds = [];             // ids en el orden renderizado (para flechas)
@@ -100,6 +103,16 @@
         catalogoBadge          = $('cxCatalogoBadge');
         catalogoProductosList  = $('cxCatalogoProductosList');
         catalogoProductosEmpty = $('cxCatalogoProductosEmpty');
+        catalogoExcelBtn       = $('cxCatalogoExcelBtn');
+        despachoBtn            = $('cxDespachoBtn');
+        despachoFile           = $('cxDespachoFile');
+        despachoPanel          = $('cxDespacho');
+        despachoEstado         = $('cxDespachoEstado');
+        despachoAvisos         = $('cxDespachoAvisos');
+        despachoRenglones      = $('cxDespachoRenglones');
+        despachoAcciones       = $('cxDespachoAcciones');
+        despachoDescartar      = $('cxDespachoDescartar');
+        despachoGuardar        = $('cxDespachoGuardar');
         datosGrid      = $('cxDatosGrid');
         filterChips    = Array.from(screenEl.querySelectorAll('.cx-chip[data-filter]'));
         sortSelect     = $('cxSort');
@@ -170,6 +183,11 @@
         if (tabDatos)    tabDatos.addEventListener('click', () => switchTab('datos'));
         if (catalogoReset) catalogoReset.addEventListener('click', resetCatalogo);
         if (catalogoSave)  catalogoSave.addEventListener('click', saveCatalogo);
+        if (catalogoExcelBtn) catalogoExcelBtn.addEventListener('click', downloadCatalogoExcel);
+        if (despachoBtn) despachoBtn.addEventListener('click', onDespachoElegir);
+        if (despachoFile) despachoFile.addEventListener('change', onDespachoArchivo);
+        if (despachoDescartar) despachoDescartar.addEventListener('click', cerrarDespacho);
+        if (despachoGuardar) despachoGuardar.addEventListener('click', onDespachoGuardar);
 
         // Export CSV e expand de operaciones
         if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportClientCsv);
@@ -262,7 +280,7 @@
     let importModalEl, importInput, importDropzone, importPickBtn, importFilenameEl;
     let importProgress, importProgressTitle, importResult, importCancel, importClose;
     let importUploadStep, importPreviewStep, importDoneStep, importConfirm, importTryInvoice;
-    let importPreviewFilename, importPreviewSummary, importPreviewDoubts, importPreviewDoubtsList, importPreviewOmitted;
+    let importPreviewFilename, importPreviewSummary, importPreviewDoubts, importPreviewDoubtsList, importPreviewOmitted, importPreviewFechas;
     let importDoneSummary, importDoneMessage, importUndoBtn, importChooseAnother;
     let importBatchId = null;
     let importSelectedFilename = '';
@@ -293,6 +311,7 @@
         importPreviewDoubts = $('importPreviewDoubts');
         importPreviewDoubtsList = $('importPreviewDoubtsList');
         importPreviewOmitted = $('importPreviewOmitted');
+        importPreviewFechas = $('importPreviewFechas');
         importDoneSummary = $('importDoneSummary');
         importDoneMessage = $('importDoneMessage');
         importUndoBtn = $('importUndoBtn');
@@ -564,6 +583,24 @@
         if (importPreviewOmitted) {
             importPreviewOmitted.hidden = omitted === 0;
             importPreviewOmitted.textContent = omitted ? omitted + ' ' + (omitted === 1 ? 'fila queda' : 'filas quedan') + ' afuera para evitar datos incorrectos.' : '';
+        }
+        // CLIENTE-1c: la fecha de inicio que no sirve no se importa; se dice dónde.
+        const fechas = Array.isArray(preview && preview.fechas_que_no_sirven) ? preview.fechas_que_no_sirven : [];
+        if (importPreviewFechas) {
+            importPreviewFechas.replaceChildren();
+            importPreviewFechas.hidden = fechas.length === 0;
+            const variasHojas = Array.isArray(preview.sheets) && preview.sheets.length > 1;
+            fechas.slice(0, 8).forEach(item => {
+                const li = document.createElement('li');
+                const lugar = (variasHojas && item.sheet ? 'Hoja ' + item.sheet + ', fila ' : 'Fila ') + item.row;
+                li.textContent = lugar + ': la fecha de inicio «' + item.value + '» no es válida y no se importa.';
+                importPreviewFechas.appendChild(li);
+            });
+            if (fechas.length > 8) {
+                const li = document.createElement('li');
+                li.textContent = 'Y ' + (fechas.length - 8) + ' fechas más que no se importan.';
+                importPreviewFechas.appendChild(li);
+            }
         }
         const newCount = collectionCount(preview && preview.new_clients);
         const fillCount = [
@@ -1012,6 +1049,8 @@
         renderOps(null);
         renderCatalogo(null);
         renderDatos(c);
+        // Lo leído de un despacho es de un cliente: con otro, se descarta.
+        if (despachoCliente !== c.id) cerrarDespacho();
         currentMapping = null;
         mappingDraft = null;
         switchTab('ops');
@@ -1518,6 +1557,245 @@
         }
     }
 
+    // DESPACHO-1a: el catálogo del cliente, tal como se ve, en Excel.
+    /* ==========================================================
+       Productos desde un despacho (DESPACHO-1b): se leen, se
+       revisan renglón por renglón y recién ahí se guardan en el
+       catálogo del cliente para el que se leyó el despacho.
+       ========================================================== */
+    let despachoCliente = null;
+    let despachoSeq = 0;
+    let despachoDivisa = null;
+
+    const DESPACHO_CAMPOS = [
+        ['posicion_sim', 'Posición SIM'],
+        ['descripcion', 'Descripción'],
+        ['origen', 'Origen (código de 2 letras)'],
+        ['cantidad', 'Cantidad'],
+        ['valor_unitario', 'Valor unitario'],
+        ['kilo_neto', 'Kilo neto'],
+    ];
+    const DESPACHO_NUMEROS = ['cantidad', 'valor_unitario', 'kilo_neto'];
+
+    function cerrarDespacho() {
+        despachoSeq++;
+        despachoCliente = null;
+        despachoDivisa = null;
+        if (!despachoPanel) return;
+        despachoPanel.hidden = true;
+        despachoEstado.textContent = '';
+        despachoAvisos.innerHTML = '';
+        despachoAvisos.hidden = true;
+        despachoRenglones.innerHTML = '';
+        despachoAcciones.hidden = true;
+    }
+
+    function onDespachoElegir() {
+        if (!despachoFile || !detailClienteId) return;
+        despachoFile.value = '';
+        despachoFile.click();
+    }
+
+    function mensajeDeRespuesta(data, status) {
+        if (data && typeof data.detail === 'string' && data.detail) return data.detail;
+        if (data && typeof data.message === 'string' && data.message) return data.message;
+        return 'No pude leer el despacho (error ' + status + ').';
+    }
+
+    async function onDespachoArchivo() {
+        const file = despachoFile.files && despachoFile.files[0];
+        if (!file || !detailClienteId) return;
+        cerrarDespacho();
+        const cid = detailClienteId;
+        const seq = despachoSeq;
+        despachoCliente = cid;
+        despachoPanel.hidden = false;
+        despachoEstado.textContent = 'Leyendo ' + file.name + '…';
+        despachoBtn.disabled = true;
+        const form = new FormData();
+        form.append('file', file);
+        try {
+            const res = await CDI.api('/api/clientes/' + encodeURIComponent(cid) + '/catalogo/despacho/leer', { method: 'POST', body: form });
+            const data = await res.json().catch(() => ({}));
+            if (seq !== despachoSeq) return;
+            if (!res.ok) throw new Error(mensajeDeRespuesta(data, res.status));
+            renderDespacho(data);
+            CDI.track && CDI.track('catalogo_despacho_leido', { id: cid, renglones: (data.renglones || []).length });
+        } catch (err) {
+            if (seq !== despachoSeq) return;
+            despachoEstado.textContent = String(err.message || err);
+        } finally {
+            despachoBtn.disabled = false;
+        }
+    }
+
+    // Los números se muestran y se escriben como en el despacho: 1.234,56.
+    function numeroComoDespacho(x) {
+        if (x == null || !Number.isFinite(x)) return '';
+        const [entero, decimales] = String(x).split('.');
+        const conMiles = entero.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        return decimales ? conMiles + ',' + decimales : conMiles;
+    }
+
+    // Lo que no tiene esa forma se manda como vino, para que el servidor lo
+    // rechace y se vea: nada se pierde en silencio.
+    function numeroDesdeTexto(texto) {
+        const t = texto.trim();
+        if (t === '') return null;
+        if (/^(\d{1,3}(\.\d{3})+|\d+)(,\d+)?$/.test(t)) return Number(t.replace(/\./g, '').replace(',', '.'));
+        return t;
+    }
+
+    function renderDespacho(data) {
+        const renglones = Array.isArray(data.renglones) ? data.renglones : [];
+        const avisos = Array.isArray(data.avisos) ? data.avisos : [];
+        despachoDivisa = data.divisa || null;
+        despachoAvisos.innerHTML = avisos.map(a => '<li>' + CDI.escapeHtml(a) + '</li>').join('');
+        despachoAvisos.hidden = !avisos.length;
+        if (!renglones.length) {
+            despachoEstado.textContent = data.sin_texto
+                ? 'El PDF no tiene texto (parece escaneado): no guardé nada.'
+                : 'No encontré productos en el despacho: no guardé nada.';
+            return;
+        }
+        const faltan = renglones.filter(r => (r.faltantes || []).length).length;
+        despachoEstado.textContent = 'Encontré ' + renglones.length + (renglones.length === 1 ? ' producto' : ' productos') +
+            (faltan ? '; a ' + faltan + ' les falta algo (marcado en naranja)' : '') +
+            '. Revisalos y corregí lo que haga falta: nada se guarda hasta que toques «Guardar en el catálogo».';
+        despachoRenglones.innerHTML = renglones.map(renderRenglonDespacho).join('');
+        despachoRenglones.querySelectorAll('[data-campo]').forEach(input => {
+            input.addEventListener('input', () => {
+                const campo = input.closest('.cx-despacho-campo');
+                if (campo && input.value.trim()) campo.classList.remove('is-faltante');
+            });
+        });
+        despachoAcciones.hidden = false;
+    }
+
+    function renderRenglonDespacho(r, i) {
+        const faltantes = r.faltantes || [];
+        const heredados = r.heredados || [];
+        const titulo = 'Ítem ' + (r.item || '?') + (r.subitem ? ' · subítem ' + r.subitem : '');
+        const campos = DESPACHO_CAMPOS.map(([campo, rotulo]) => {
+            const id = 'cxDesp' + i + '_' + campo;
+            const falta = faltantes.includes(campo);
+            const valor = DESPACHO_NUMEROS.includes(campo) ? numeroComoDespacho(r[campo]) : (r[campo] || '');
+            let etiqueta = rotulo;
+            if (campo === 'valor_unitario') etiqueta += ' (' + (despachoDivisa || 'divisa no encontrada') + ')';
+            const notas = [];
+            if (falta) notas.push('No estaba en el despacho' + (campo === 'origen' && r.origen_leido ? ': decía «' + r.origen_leido + '»' : ''));
+            if (heredados.includes(campo)) notas.push('Del ítem');
+            const control = campo === 'descripcion'
+                ? '<textarea id="' + id + '" data-campo="' + campo + '" rows="2" maxlength="2000">' + CDI.escapeHtml(valor) + '</textarea>'
+                : '<input id="' + id + '" type="text" data-campo="' + campo + '" value="' + CDI.escapeHtml(valor) + '"' +
+                  (DESPACHO_NUMEROS.includes(campo) ? ' inputmode="decimal" placeholder="1.234,56"' : '') +
+                  (campo === 'origen' ? ' maxlength="2" autocapitalize="characters"' : '') + '>';
+            return '<div class="cx-despacho-campo' + (falta ? ' is-faltante' : '') + (campo === 'descripcion' ? ' is-ancho' : '') + '">' +
+                '<label for="' + id + '">' + CDI.escapeHtml(etiqueta) + '</label>' + control +
+                (notas.length ? '<span class="cx-despacho-nota">' + CDI.escapeHtml(notas.join(' · ')) + '</span>' : '') +
+            '</div>';
+        }).join('');
+        const sufijos = (r.sufijos || []).map(s =>
+            '<li><code>' + CDI.escapeHtml(s.texto) + '</code>' + (s.significado ? ' ' + CDI.escapeHtml(s.significado) : '') + '</li>').join('');
+        const avisos = (r.avisos || []).map(a => '<li>' + CDI.escapeHtml(a) + '</li>').join('');
+        return '<li class="cx-despacho-renglon" data-indice="' + i + '">' +
+            '<div class="cx-despacho-renglon-titulo">' + CDI.escapeHtml(titulo) + '</div>' +
+            '<div class="cx-despacho-campos">' + campos + '</div>' +
+            '<div class="cx-despacho-dato">Unidad: ' + CDI.escapeHtml(r.unidad || '—') + ' <span class="cx-despacho-nota">(no se guarda)</span></div>' +
+            (sufijos ? '<div class="cx-despacho-dato">Sufijos de valor <span class="cx-despacho-nota">(no se guardan)</span><ul class="cx-despacho-sufijos">' + sufijos + '</ul></div>' : '') +
+            (avisos ? '<ul class="cx-despacho-renglon-avisos">' + avisos + '</ul>' : '') +
+            '<ul class="cx-despacho-errores" hidden></ul>' +
+        '</li>';
+    }
+
+    async function onDespachoGuardar() {
+        if (!despachoCliente) return;
+        const cid = despachoCliente;
+        const seq = despachoSeq;
+        const items = Array.from(despachoRenglones.querySelectorAll('.cx-despacho-renglon'));
+        const renglones = items.map(li => {
+            const valor = campo => {
+                const el = li.querySelector('[data-campo="' + campo + '"]');
+                return el ? el.value.trim() : '';
+            };
+            return {
+                posicion_sim: valor('posicion_sim'),
+                descripcion: valor('descripcion'),
+                origen: valor('origen').toUpperCase(),
+                cantidad: numeroDesdeTexto(valor('cantidad')),
+                valor_unitario: numeroDesdeTexto(valor('valor_unitario')),
+                kilo_neto: numeroDesdeTexto(valor('kilo_neto')),
+            };
+        });
+        items.forEach(li => {
+            const ul = li.querySelector('.cx-despacho-errores');
+            li.classList.remove('is-error');
+            ul.innerHTML = '';
+            ul.hidden = true;
+        });
+        despachoGuardar.disabled = true;
+        try {
+            const res = await CDI.api('/api/clientes/' + encodeURIComponent(cid) + '/catalogo/despacho/guardar', {
+                method: 'POST', body: JSON.stringify({ renglones, divisa: despachoDivisa }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (seq !== despachoSeq) return;
+            if (!res.ok) {
+                (Array.isArray(data.errores) ? data.errores : []).forEach(e => {
+                    const li = items[(e.renglon || 0) - 1];
+                    if (!li) return;
+                    const ul = li.querySelector('.cx-despacho-errores');
+                    li.classList.add('is-error');
+                    ul.innerHTML = (e.problemas || []).map(p => '<li>' + CDI.escapeHtml(p) + '</li>').join('');
+                    ul.hidden = false;
+                });
+                throw new Error(mensajeDeRespuesta(data, res.status));
+            }
+            cerrarDespacho();
+            CDI.toast && CDI.toast.success('Guardé ' + data.guardados + (data.guardados === 1 ? ' producto' : ' productos') + ' en el catálogo.');
+            // D47: el valor unitario sólo se guarda si el despacho está en dólares.
+            const sinValor = Array.isArray(data.avisos) ? data.avisos.length : 0;
+            if (sinValor && CDI.toast && CDI.toast.info) {
+                CDI.toast.info('Sin valor unitario', 'El despacho no está en dólares: no guardé el valor unitario de ' + sinValor + (sinValor === 1 ? ' producto.' : ' productos.'));
+            }
+            CDI.track && CDI.track('catalogo_despacho_guardado', { id: cid, renglones: data.guardados });
+            if (cid === detailClienteId) loadCatalogo(cid);
+        } catch (err) {
+            if (seq !== despachoSeq) return;
+            despachoEstado.textContent = String(err.message || err);
+            CDI.toast && CDI.toast.error(String(err.message || err));
+        } finally {
+            despachoGuardar.disabled = false;
+        }
+    }
+
+    async function downloadCatalogoExcel() {
+        if (!detailClienteId) return;
+        try {
+            const res = await CDI.api('/api/clientes/' + encodeURIComponent(detailClienteId) + '/catalogo/productos.xlsx');
+            if (!res || !res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || ('Error ' + (res && res.status)));
+            }
+            const blob = await res.blob();
+            const c = clientes.find(x => x.id === detailClienteId);
+            const baseName = (c && c.nombre ? c.nombre : 'cliente').toLowerCase()
+                .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'cliente';
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'catalogo_' + baseName + '.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+            CDI.toast && CDI.toast.success('Descarga iniciada.');
+            CDI.track && CDI.track('cliente_catalogo_download', { id: detailClienteId });
+        } catch (err) {
+            CDI.toast && CDI.toast.error(String(err.message || err));
+        }
+    }
+
     /* ==========================================================
        Acciones puntuales
        ========================================================== */
@@ -1540,7 +1818,7 @@
         const ok = await CDI.confirm({
             title: 'Eliminar cliente',
             lead: '¿Eliminar "' + (c.nombre || 'este cliente') + '"?',
-            text: 'Se borrará su historial de operaciones, productos aprendidos y notas NCM. Esta acción no se puede deshacer.',
+            text: 'Sus operaciones quedan en el historial como «Sin cliente», sin el detalle de sus ítems, y dejan de andar los links de presupuestos que compartiste. Se borran sus productos aprendidos y notas NCM. Esta acción no se puede deshacer.',
             acceptText: 'Eliminar cliente',
             kind: 'danger',
         });
@@ -1662,6 +1940,8 @@
         if (fMoneda) fMoneda.value = '';
         if (fNotas) fNotas.value = '';
         if (fFechaInicActiv) fFechaInicActiv.value = '';
+        fechaInicOculta = '';
+        fechaInicOcultaSirve = false;
         if (fAdvanced) fAdvanced.open = false;
     }
 
@@ -1676,6 +1956,12 @@
         if (fMoneda) fMoneda.value = c.preferred_currency || '';
         if (fNotas) fNotas.value = c.notas || '';
         if (fFechaInicActiv) fFechaInicActiv.value = c.fecha_inic_activ || '';
+        // D3: una fecha guardada que no es AAAA-MM-DD válida (vino por la API o
+        // es vieja) deja el campo vacío; se recuerda para no borrarla al guardar.
+        fechaInicOculta = (c.fecha_inic_activ && fFechaInicActiv && !fFechaInicActiv.value) ? c.fecha_inic_activ : '';
+        // Si le sirve al TXT lo decide el servidor con el criterio del generador:
+        // una regla propia acá leía distinto «２０１５-03-15» (CLIENTE-1c).
+        fechaInicOcultaSirve = !!c.fecha_inic_activ_sirve;
         const hasAdvanced = !!(
             c.email || c.telefono || c.default_origin ||
             c.preferred_currency || c.notas
@@ -1722,6 +2008,13 @@
             fEmail && fEmail.focus();
             return;
         }
+        // Una fecha tipeada a medias el navegador la da como vacía: guardarla
+        // así borraría (o conservaría, D3) la fecha sin que nadie lo pidiera.
+        if (fFechaInicActiv && fFechaInicActiv.validity && fFechaInicActiv.validity.badInput) {
+            showFormError('La fecha de inicio de actividad está incompleta: completala o borrala.');
+            fFechaInicActiv.focus();
+            return;
+        }
 
         const body = {
             nombre: nombre,
@@ -1732,8 +2025,14 @@
             default_origin: origen,
             preferred_currency: moneda,
             notas: notas,
-            fecha_inic_activ: fechaInicActiv,
         };
+        // D3: si el campo quedó vacío porque no podía mostrar la fecha guardada,
+        // no se manda y la API la conserva; una fecha cargada la reemplaza.
+        const conservaFecha = !fechaInicActiv && !!fechaInicOculta;
+        if (!conservaFecha) body.fecha_inic_activ = fechaInicActiv;
+        // Una fecha conservada que el TXT no acepta también falta (CLIENTE-1b).
+        // Se mira acá: closeForm() olvida la fecha oculta.
+        const fechaMala = conservaFecha && !fechaInicOcultaSirve;
 
         const isEdit = !!editingId;
         const idEdit = editingId;
@@ -1771,7 +2070,9 @@
             // CLIENTE-1: se guarda sin lo que pide el MARIA, pero se avisa qué
             // falta (lo que no puede faltar lo frena la generación del TXT).
             const faltan = [
-                [cuitNorm, 'CUIT'], [direccion, 'domicilio'], [fechaInicActiv, 'inicio de actividad'],
+                [cuitNorm, 'CUIT'], [direccion, 'domicilio'],
+                [fechaInicActiv || (conservaFecha && !fechaMala), fechaMala
+                    ? 'inicio de actividad (la guardada no es una fecha válida)' : 'inicio de actividad'],
             ].filter(([v]) => !v).map(([, n]) => n);
             const titulo = isEdit ? 'Cliente actualizado' : 'Cliente creado';
             if (faltan.length && CDI.toast) {

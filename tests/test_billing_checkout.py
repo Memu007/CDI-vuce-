@@ -54,7 +54,7 @@ def test_checkout_sandbox_incluye_back_urls(client, monkeypatch):
     _FakeSDK.captured = {}
     monkeypatch.setenv("MP_ACCESS_TOKEN", "TEST-token-sandbox")
     monkeypatch.setattr(main.billing_service.mercadopago, "SDK", _FakeSDK)
-    monkeypatch.delenv("FRONTEND_URL", raising=False)  # dev default: http://127.0.0.1:8000
+    monkeypatch.delenv("FRONTEND_URL", raising=False)  # dev default: http://127.0.0.1:8010
 
     resp = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert resp.status_code == 200
@@ -86,5 +86,5 @@ def test_checkout_prod_https_agrega_auto_return(client, monkeypatch):
 
     pref = _FakeSDK.captured["preference_data"]
     assert pref["auto_return"] == "approved"
-    assert pref["notification_url"] == "https://cdi.example.com/api/payments/webhook"
+    assert pref["notification_url"] == "https://cdi.example.com/api/payments/webhook?source_news=webhooks"
     assert pref["back_urls"]["success"] == "https://cdi.example.com/dashboard?billing=success"

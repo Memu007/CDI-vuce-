@@ -257,6 +257,7 @@ def test_undo_deletes_created_clients_and_restores_filled_fields(auth_override, 
 
 def test_batch_is_private_to_its_owner(auth_override, client):
     from proyecto_maria.main import app, get_current_user
+    from tests.conftest import cuenta_de_prueba
 
     cuit = _valid_cuit(91007)
     payload = _analyze(
@@ -268,8 +269,9 @@ def test_batch_is_private_to_its_owner(auth_override, client):
     other_user.update(username="otro_owner", effective_owner="otro_owner")
     app.dependency_overrides[get_current_user] = lambda: other_user
     try:
-        forbidden_confirm = client.post(f"/api/migrations/{payload['batch_id']}/confirm")
-        forbidden_undo = client.post(f"/api/migrations/{payload['batch_id']}/undo")
+        with cuenta_de_prueba("otro_owner"):
+            forbidden_confirm = client.post(f"/api/migrations/{payload['batch_id']}/confirm")
+            forbidden_undo = client.post(f"/api/migrations/{payload['batch_id']}/undo")
     finally:
         app.dependency_overrides[get_current_user] = lambda: auth_override
 

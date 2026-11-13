@@ -123,7 +123,7 @@ def test_validar_un_xlsx_no_lo_abre_con_openpyxl(monkeypatch):
     def _no(*a, **k):
         raise AssertionError("validar abrió el libro con openpyxl")
     monkeypatch.setattr(openpyxl, "load_workbook", _no)
-    assert file_security._abrir_excel(_libro_normal({"A": FILAS, "B": [["x"]]}), ".xlsx") == 2
+    assert file_security._abrir_excel(_libro_normal({"A": FILAS, "B": [["x"]]}), ".xlsx")[0] == 2
 
 
 def test_textos_compartidos_enormes_se_rechazan_antes_de_abrir(monkeypatch):
@@ -387,7 +387,7 @@ def test_un_libro_senuelo_no_engana_a_la_validacion_ni_a_la_lectura():
     libro = _con_libro_senuelo(_libro_normal({"Factura": FILAS, "B": [["x"]], "C": [["y"]]}))
     # openpyxl abre el libro real (3 hojas); la validación cuenta las mismas.
     assert len(openpyxl.load_workbook(io.BytesIO(libro), read_only=True).sheetnames) == 3
-    assert file_security._abrir_excel(libro, ".xlsx") == 3
+    assert file_security._abrir_excel(libro, ".xlsx")[0] == 3
     # La copia para leer deja una sola hoja en el libro que openpyxl abre.
     copia, _ = main._xlsx_solo_primera_hoja(libro)
     assert openpyxl.load_workbook(io.BytesIO(copia), read_only=True).sheetnames == ["Factura"]
@@ -497,7 +497,7 @@ def test_una_hoja_que_falta_en_el_archivo_da_400():
     assert "dev_detail" not in r.json()
 
 
-def test_leer_la_factura_abre_un_libro_con_una_sola_hoja(monkeypatch):
+def test_leer_la_factura_abre_un_libro_con_una_sola_hoja(monkeypatch, tmp_path):
     """Lo que recibe pandas es la copia con sólo la primera hoja: openpyxl no
     recorre las demás (las sin <dimension> costaban segundos cada una)."""
     import openpyxl
@@ -509,7 +509,7 @@ def test_leer_la_factura_abre_un_libro_con_una_sola_hoja(monkeypatch):
             vistos.append(openpyxl.load_workbook(io.BytesIO(origen.getvalue()), read_only=True).sheetnames)
         return original(origen, *a, **k)
     monkeypatch.setattr(main.pd, "read_excel", _espia)
-    ruta = "/tmp/_excel2_tres_hojas.xlsx"
+    ruta = str(tmp_path / "tres_hojas.xlsx")
     with open(ruta, "wb") as f:
         f.write(_libro_normal({"Factura": FILAS, "B": [["x"]], "C": [["y"]]}))
     main._leer_excel_ruta(ruta, "openpyxl")
@@ -678,7 +678,7 @@ def test_estilos_con_millones_de_elementos_se_rechazan_antes_de_abrir(elemento, 
 def test_estilos_de_un_libro_normal_grande_siguen_pasando():
     """Un libro con estilos de sobra (50.000 formatos) sigue entrando."""
     from proyecto_maria.security.file_security import _contar_hojas_xlsx
-    assert _contar_hojas_xlsx(_con_estilos(_libro([ENCABEZADO]), "xf", 50_000)) == 1
+    assert _contar_hojas_xlsx(_con_estilos(_libro([ENCABEZADO]), "xf", 50_000))[0] == 1
 
 
 def _con_hoja_escondida(filas: int) -> bytes:
@@ -718,7 +718,7 @@ def test_una_primera_hoja_de_27_mb_se_rechaza():
     from proyecto_maria.security.file_security import ExcelDemasiadoGrande, _contar_hojas_xlsx
     with pytest.raises(ExcelDemasiadoGrande):
         _contar_hojas_xlsx(_libro_con(filas_primera=int(27 * 2**20 / 1500)))
-    assert _contar_hojas_xlsx(_libro_con(filas_primera=int(9.5 * 2**20 / 1500))) == 1
+    assert _contar_hojas_xlsx(_libro_con(filas_primera=int(9.5 * 2**20 / 1500)))[0] == 1
 
 
 def test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_a_una_subida_normal(monkeypatch):
@@ -741,15 +741,18 @@ def test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_
     async def _todo():
         entradas = 0
         listas = asyncio.Event()
-        validar = file_security.validate_file_upload
+        validar = file_security.validar_con_carril
         async def observar(file, *args, **kwargs):
             nonlocal entradas
-            if file.filename == "pesada.xlsx":
+            nombre = file.filename
+            if nombre == "pesada.xlsx":
                 entradas += 1
                 if entradas == 8:
                     listas.set()
-            return await validar(file, *args, **kwargs)
-        monkeypatch.setattr(file_security, "validate_file_upload", observar)
+            contents, liviano = await validar(file, *args, **kwargs)
+            carriles.add((nombre, liviano))
+            return contents, liviano
+        monkeypatch.setattr(file_security, "validar_con_carril", observar)
         transporte = httpx.ASGITransport(app=main.app)
         async with httpx.AsyncClient(transport=transporte, base_url="http://test", timeout=600) as c:
             def subir(contenido, nombre):
@@ -763,9 +766,16 @@ def test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_
             assert entradas == 8
             return r, dt
 
+    carriles = set()
     r, dt = asyncio.run(_todo())
     print(f"XML: {tamano} bytes; zip: {len(armado)} bytes; entradas: 8; normal: {r.status_code} en {dt:.1f} s")
+    # El tiempo va primero: si la normal espera detrás de las pesadas, su
+    # validación puede no terminar y su carril no llega a anotarse.
+    assert dt < 5, f"la subida normal tardó {dt:.1f} s: esperó detrás de las pesadas"
     assert r.status_code == 200, f"la subida normal dio {r.status_code} a los {dt:.1f} s: {r.text[:200]}"
+    # Las pesadas van al carril pesado y la normal al liviano (EXCEL-2b): si
+    # no, el tiempo de la normal no prueba nada.
+    assert carriles == {("pesada.xlsx", False), ("normal.xlsx", True)}, carriles
 
 
 def test_la_pantalla_muestra_el_aviso_del_csv():
@@ -805,7 +815,7 @@ def test_una_celda_en_la_ultima_columna_se_rechaza_antes_de_abrir(monkeypatch):
 
 def test_una_factura_ancha_sigue_entrando():
     from proyecto_maria.security.file_security import _contar_hojas_xlsx
-    assert _contar_hojas_xlsx(_libro([[f"col{c}" for c in range(200)]])) == 1
+    assert _contar_hojas_xlsx(_libro([[f"col{c}" for c in range(200)]]))[0] == 1
 
 
 # ------------------------------------------- revisión Opus de la devolución
@@ -841,12 +851,12 @@ def test_un_libro_con_entidades_xml_se_rechaza_antes_de_abrir(parte, monkeypatch
 
 
 def test_estilos_con_un_prefijo_no_ascii_tambien_se_cuentan():
-    """Revisión Opus: <ñ:xf/> no lo contaba el patrón y 10 MB llegaban a
+    """Revisión Opus: <ñ:font/> no lo contaba el patrón y 10 MB llegaban a
     948 MB."""
     from proyecto_maria.security.file_security import ExcelDemasiadoGrande, _contar_hojas_xlsx
     ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
-    xml = (f'<?xml version="1.0" encoding="UTF-8"?><ñ:styleSheet xmlns:ñ="{ns}"><ñ:cellXfs>'
-           + "<ñ:xf/>" * 600_000 + "</ñ:cellXfs></ñ:styleSheet>").encode()
+    xml = (f'<?xml version="1.0" encoding="UTF-8"?><ñ:styleSheet xmlns:ñ="{ns}"><ñ:fonts>'
+           + "<ñ:font/>" * 600_000 + "</ñ:fonts></ñ:styleSheet>").encode()
     contenido = _cambiar_parte(_libro([ENCABEZADO]), "xl/styles.xml", lambda _: xml)
     with pytest.raises(ExcelDemasiadoGrande):
         _contar_hojas_xlsx(contenido)
@@ -856,7 +866,9 @@ def test_estilos_de_un_libro_real_con_muchos_formatos_siguen_pasando():
     """Revisión Opus: 40.000 formatos con su alineación y 10.000 fuentes
     (220.000 etiquetas, dentro de lo que deja Excel) se rechazaban."""
     from proyecto_maria.security.file_security import _contar_hojas_xlsx
-    assert _contar_hojas_xlsx(_con_estilos(_libro([ENCABEZADO]), "xf", 230_000)) == 1
+    # Las mismas 230 000 etiquetas, con no más formatos de celda de los que guarda Excel.
+    libro = _con_estilos(_con_estilos(_libro([ENCABEZADO]), "xf", 40_000), "font", 190_000)
+    assert _contar_hojas_xlsx(libro)[0] == 1
 
 
 def _con_hoja_de_grafico(contenido: bytes, tam: int) -> bytes:
@@ -963,29 +975,29 @@ def test_tope_columnas_lee_atributos_xml_validos(comilla, espacio, referencia, a
             z.writestr(info, datos)
     monkeypatch.setattr(openpyxl, "load_workbook", lambda *a, **k: pytest.fail("abrió el libro"))
     if admitida:
-        assert _contar_hojas_xlsx(salida.getvalue()) == 1
+        assert _contar_hojas_xlsx(salida.getvalue())[0] == 1
     else:
         with pytest.raises(ExcelDemasiadoGrande, match="columna"):
             _contar_hojas_xlsx(salida.getvalue())
 
 
-def test_ultima_columna_acepta_namespace_y_atributos_con_mayor_que():
-    from proyecto_maria.security.file_security import _ultima_columna
+def test_la_medida_de_la_hoja_acepta_namespace_y_atributos_con_mayor_que():
+    from proyecto_maria.security.file_security import _medida_hoja
     xml = b"<s:worksheet xmlns:s='urn:test'><s:sheetData><s:row><s:c otro='a>b' r = 'IW1'/></s:row></s:sheetData></s:worksheet>"
-    assert _ultima_columna(xml) == 257
+    assert _medida_hoja(xml)[0] == 257
 
 
 
 def test_tope_columnas_corta_y_cierra_la_fuente(monkeypatch):
     from xml.etree import ElementTree as ET
-    from proyecto_maria.security.file_security import _ultima_columna
+    from proyecto_maria.security.file_security import _medida_hoja
     fuentes = []
     def eventos(fuente, **kwargs):
         fuentes.append(fuente)
         yield "start", ET.Element("c", {"r": "XFD1"})
         pytest.fail("siguió leyendo después del tope")
     monkeypatch.setattr(ET, "iterparse", eventos)
-    assert _ultima_columna(b"sintetico") == 16384
+    assert _medida_hoja(b"sintetico")[0] == 16384
     assert fuentes[0].closed
 
 

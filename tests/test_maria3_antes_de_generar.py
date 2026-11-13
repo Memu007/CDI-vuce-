@@ -24,7 +24,7 @@ from proyecto_maria.core.maria_generator import (
     supuestos_declarados,
     validate_for_kit_maria,
 )
-from tests.test_generar_maria_txt import GOLDEN_INPUTS, _GOLDEN_PATH
+from tests.test_generar_maria_txt import GOLDEN_INPUTS, _GOLDEN_PATH, golden_con_destino
 from tests.test_maria4_despachante import _valor
 from tests.test_maria_subitems import COMUN, ITEM_BASE, REFERENCIA, SUF_A, SUF_B
 
@@ -36,6 +36,7 @@ def _cuerpo(**kw):
         incoterm="EXW", flete=365.0, seguro=75.47, fecha_emision="22/06/2026",
         aduana_codigo="073", sbt_sufijo_valor=SUF_A,
         banco_bcra="191", empresa_digitalizacion="PSAD01", iva_adicional="NO_VALIDA",
+        cuit_agr="20111111112",  # sin CUIT del despachante no se genera (MARIA-7)
     )
     base.update(kw)
     return base
@@ -112,7 +113,7 @@ def test_gastos_fob_explicito_sigue_mandando(client, auth_override):
 
 def test_procedencia_por_operacion_llega_a_cada_producto(client, auth_override):
     data = _generar(client, procedencia="UY",
-                    items=[dict(ITEM_BASE, estado=2), dict(ITEM_BASE, estado=2, pieza="2")],
+                    items=[dict(ITEM_BASE, estado=2), dict(ITEM_BASE, estado=4, pieza="2")],
                     sbt_sufijo_valor=SUF_A)
     lineas = [ln for ln in data["content"].split("\r\n") if ln.startswith("CARTPAYPRC=")]
     assert lineas == ["CARTPAYPRC=225", "CARTPAYPRC=225"]
@@ -125,7 +126,7 @@ def test_la_procedencia_del_producto_gana_sobre_la_de_la_operacion(client, auth_
     assert "CARTPAYPRC=222" in data["content"]
 
 
-@pytest.mark.parametrize("procedencia", ["Narnia", "99999", "12", "²", "٢٢٢", "2²2"])
+@pytest.mark.parametrize("procedencia", ["Narnia", "99999", "12", "100", "²", "٢٢٢", "2²2"])
 @pytest.mark.parametrize("ruta", ["/generate_maria", "/generate_maria/avisos"])
 def test_procedencia_no_reconocida_se_rechaza(client, auth_override, procedencia, ruta):
     r = client.post(ruta, json=_cuerpo(procedencia=procedencia))
@@ -159,7 +160,8 @@ def test_procedencias_que_antes_se_rechazaban(client, auth_override, codigo):
 
 
 def test_procedencia_de_item_en_blanco_no_pisa_la_de_la_operacion(client, auth_override):
-    items = [dict(ITEM_BASE, estado=2, pais_procedencia="  "), dict(ITEM_BASE, estado=2, procedencia=" ")]
+    # Estados distintos: desde MARIA-8 la misma posición iría en un solo ítem.
+    items = [dict(ITEM_BASE, estado=2, pais_procedencia="  "), dict(ITEM_BASE, estado=4, procedencia=" ")]
     data = _generar(client, procedencia="UY", items=items)
     assert [ln for ln in data["content"].split("\r\n") if ln.startswith("CARTPAYPRC=")] == \
         ["CARTPAYPRC=225", "CARTPAYPRC=225"]
@@ -185,7 +187,8 @@ def test_el_archivo_real_de_2025_sale_identico_con_la_procedencia_de_la_pantalla
     r = client.post("/generate_maria", json=cuerpo)
     assert r.status_code == 200, r.text
     with open(_GOLDEN_PATH, "r", newline="") as f:
-        esperado = f.read().replace("NDDTIMMIOE=30999999990", "NDDTIMMIOE=30999999995")
+        # DESTINO-1 (D28 a): todo igual salvo el GANANCIASOP3, que dice USOPAR.
+        esperado = golden_con_destino(f.read()).replace("NDDTIMMIOE=30999999990", "NDDTIMMIOE=30999999995")
     assert r.json()["content"] == esperado
 
 

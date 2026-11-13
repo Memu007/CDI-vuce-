@@ -4,9 +4,12 @@ Este módulo maneja la conexión a PostgreSQL usando SQLAlchemy con async.
 """
 
 import os
+from proyecto_maria.config import es_desarrollo
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
+from datetime import datetime, timezone
 import logging
 from typing import AsyncGenerator
 
@@ -18,12 +21,12 @@ logger = logging.getLogger(__name__)
 # Configuración de la base de datos
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    # En producción, NUNCA caer a SQLite: el disco del contenedor (Railway) es
+    # Fuera de desarrollo, NUNCA caer a SQLite: el disco del contenedor (Railway) es
     # efímero y se perdería la base de todos los estudios en cada deploy, con un
     # warning que nadie mira. Se corta ruidosamente y temprano.
-    if os.getenv("ENVIRONMENT", "development") == "production":
+    if not es_desarrollo():
         raise RuntimeError(
-            "DATABASE_URL no está definida y ENVIRONMENT=production. La app no "
+            "DATABASE_URL no está definida y ENVIRONMENT no es de desarrollo. La app no "
             "arranca sin base persistente: en Railway el disco es efímero y caer "
             "a SQLite perdería los datos en cada deploy. Definí DATABASE_URL "
             "(postgresql://...)."
@@ -38,9 +41,6 @@ if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 elif DATABASE_URL.startswith("postgresql://") and "+asyncpg" not in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
-
-# Determinar si estamos en producción
-IS_PRODUCTION = os.getenv("ENVIRONMENT", "development") == "production"
 
 # Detectar si es SQLite (no soporta connection pooling)
 IS_SQLITE = DATABASE_URL.startswith("sqlite")
@@ -113,6 +113,28 @@ async def init_db() -> None:
     """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all, checkfirst=True)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(sembrar_inicio_registro_mp)
+    except IntegrityError:
+        pass  # otro proceso que arrancaba a la vez ya la sembró
+
+
+def sembrar_inicio_registro_mp(conn) -> None:
+    """Anota desde cuándo se registra cada pago de Mercado Pago, una sola vez.
+
+    Es el primer pago registrado, si ya había (COBRO-MP-1 estuvo desplegado
+    sin esta tabla), o ahora. Los pagos aprobados antes los aplicó el código
+    que sólo recordaba el último: el webhook no los vuelve a aplicar.
+    """
+    from sqlalchemy import func, select
+    from proyecto_maria.database.models import InicioRegistroPagosMP, PagoMercadoPagoAplicado
+    inicio = InicioRegistroPagosMP.__table__
+    if conn.execute(select(inicio.c.id).where(inicio.c.id == 1)).first() is not None:
+        return
+    pagos = PagoMercadoPagoAplicado.__table__
+    desde = conn.execute(select(func.min(pagos.c.aplicado_en))).scalar()
+    conn.execute(inicio.insert().values(id=1, desde=desde or datetime.now(timezone.utc)))
 
 
 async def test_connection() -> bool:

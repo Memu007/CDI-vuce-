@@ -4,12 +4,16 @@ from fastapi import Request, Response
 from proyecto_maria.auth.dependencies import get_current_user
 from proyecto_maria.database.connection import AsyncSessionLocal
 from proyecto_maria.database.models import User
-from proyecto_maria.auth.jwt_utils import create_access_token
+from datetime import datetime, timedelta, timezone
 
-class MockRequest:
-    def __init__(self, token):
-        self.cookies = {}
-        self.headers = {"Authorization": f"Bearer {token}"}
+from proyecto_maria.auth.dependencies import firmar_token
+
+
+def create_access_token(datos):
+    return firmar_token({**datos, "exp": datetime.now(timezone.utc) + timedelta(minutes=5)})
+
+def MockRequest(token):
+    return Request({"type": "http", "headers": [(b"authorization", f"Bearer {token}".encode())]})
 
 class MockResponse:
     pass

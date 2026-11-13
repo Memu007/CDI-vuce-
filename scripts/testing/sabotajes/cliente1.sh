@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Negativos de CLIENTE-1: cada sabotaje deshace una línea de la pieza y
+# Negativos de CLIENTE-1 y su D3: cada sabotaje deshace una línea de la pieza y
 # scripts/testing/pantalla_cliente1.js tiene que fallar por ese motivo.
 #
-# uso: PY=/ruta/al/venv/bin/python [CHROMIUM=/opt/pw-browsers/chromium] [PUERTO=8841] \
+# uso: PY=/ruta/al/venv/bin/python [PUERTO=8841] \
 #        scripts/testing/sabotajes/cliente1.sh [SHA]
 # Trabaja en un worktree descartable con su propia API, SQLite nueva y sin
 # terceros: no toca tu copia ni datos compartidos. La pantalla y el JS se
@@ -27,6 +27,7 @@ API=$!
 for _ in $(seq 1 60); do curl -fsS "http://127.0.0.1:$PUERTO/health" >/dev/null 2>&1 && break; sleep 1; done
 curl -fsS "http://127.0.0.1:$PUERTO/health" >/dev/null || { echo "BASE  | la API no levantó"; tail -20 "$TMPD/api.log"; exit 1; }
 export BASE_URL="http://127.0.0.1:$PUERTO"
+export CDI_DB="$WT/local.db"   # CLIENTE-1b: la prueba siembra ahí las fechas viejas
 FALLAS=0
 
 correr() { node scripts/testing/pantalla_cliente1.js 2>&1; }
@@ -106,6 +107,80 @@ sabotaje $J "la pestaña Datos no muestra el detalle" \
 sabotaje proyecto_maria/static/v2/app_v2.js "el aviso de advertencia lleva el ícono de información" \
   "(kind === 'error' || kind === 'warning') ? '!'" "kind === 'error' ? '!'" \
   "FALLA: el aviso de advertencia tiene el ícono «i», no «!»"
+
+# D3: al editar, la fecha guardada que el campo no puede mostrar se conserva.
+sabotaje $J "la fecha que el campo no muestra se vuelve a mandar vacía" \
+  "if (!conservaFecha) body.fecha_inic_activ = fechaInicActiv;" "body.fecha_inic_activ = fechaInicActiv;" \
+  'FALLA: Barras: después de editar, la fecha es null y tenía que ser "01/03/2015"'
+sabotaje $J "sólo se conserva la que no tiene forma AAAA-MM-DD" \
+  "(c.fecha_inic_activ && fFechaInicActiv && !fFechaInicActiv.value)" \
+  '(c.fecha_inic_activ && !/^\d{4}-\d{2}-\d{2}$/.test(c.fecha_inic_activ))' \
+  'FALLA: Año cero: después de editar, la fecha es null y tenía que ser "0000-01-01"'
+sabotaje $J "se recuerda también la que el campo muestra" \
+  "(c.fecha_inic_activ && fFechaInicActiv && !fFechaInicActiv.value)" "c.fecha_inic_activ" \
+  'FALLA: Borrada: después de editar, la fecha es "2015-03-01" y tenía que ser null'
+sabotaje $J "una fecha cargada no reemplaza a la conservada" \
+  "const conservaFecha = !fechaInicActiv && !!fechaInicOculta;" "const conservaFecha = !!fechaInicOculta;" \
+  'FALLA: Reemplazada: después de editar, la fecha es "01/03/2015" y tenía que ser "2016-04-02"'
+sabotaje $J "el aviso pide la fecha que se conservó" \
+  "[fechaInicActiv || (conservaFecha && !fechaMala), fechaMala" "[fechaInicActiv, fechaMala" \
+  "FALLA: Barras: el aviso dice que falta el inicio de actividad"
+sabotaje $J "lo recordado de una edición pasa al alta" \
+  "        fechaInicOculta = '';"$'\n' '' \
+  "FALLA: un alta después de editar habla de la fecha guardada de la edición"
+
+sabotaje $J "una fecha a medias se guarda callada" \
+  "fFechaInicActiv.validity && fFechaInicActiv.validity.badInput)" "false)" \
+  "FALLA: A medias oculta: una fecha a medias se guardó sin decir nada"
+sabotaje $J "sólo frena la fecha a medias si había una oculta" \
+  "fFechaInicActiv.validity && fFechaInicActiv.validity.badInput)" "fFechaInicActiv.validity.badInput && fechaInicOculta)" \
+  "FALLA: A medias ISO: una fecha a medias se guardó sin decir nada"
+sabotaje $J "el error de la fecha a medias no dice cuál" \
+  "'La fecha de inicio de actividad está incompleta: completala o borrala.'" "'Hay un dato incompleto.'" \
+  "FALLA: A medias oculta: el error no habla del inicio de actividad"
+
+# CLIENTE-1b: la conservada que el TXT no acepta se pide en el aviso; el error
+# de la API se ve en el formulario.
+sabotaje $J "el aviso no pide la conservada que no sirve" \
+  "const fechaMala = conservaFecha && !fechaInicOcultaSirve;" "const fechaMala = false;" \
+  "FALLA: Texto: el aviso no dice que falta el inicio de actividad"
+# CLIENTE-1c: si la conservada sirve lo dice el servidor, con el criterio del
+# generador; la pantalla ya no tiene su propia regla.
+sabotaje $J "sirve cualquier conservada" \
+  "fechaInicOcultaSirve = !!c.fecha_inic_activ_sirve;" "fechaInicOcultaSirve = true;" \
+  "FALLA: Texto: el aviso no dice que falta el inicio de actividad"
+sabotaje $J "no sirve ninguna conservada" \
+  "fechaInicOcultaSirve = !!c.fecha_inic_activ_sirve;" "fechaInicOcultaSirve = false;" \
+  "FALLA: Barras: el aviso dice que falta el inicio de actividad"
+sabotaje $J "la pantalla vuelve a decidir con su propia forma" \
+  "fechaInicOcultaSirve = !!c.fecha_inic_activ_sirve;" \
+  'fechaInicOcultaSirve = /^\d{4}-\d{2}-\d{2}$|^\d{2}\/\d{2}\/\d{4}$/.test(fechaInicOculta);' \
+  "FALLA: Ancho completo: el aviso dice que falta el inicio de actividad"
+sabotaje $J "el aviso no dice que la guardada no es válida" \
+  "'inicio de actividad (la guardada no es una fecha válida)'" "'inicio de actividad'" \
+  "FALLA: Texto: el aviso no dice que la fecha guardada no es válida"
+sabotaje $J "el error de la API no se ve en el formulario" \
+  "showFormError(String(err.message || err));" "void err;" \
+  "FALLA: la fecha que la API rechaza no muestra error en el formulario"
+
+# CLIENTE-1c: la vista previa de la importación dice qué fila trae una fecha
+# que no se importa.
+sabotaje $J "la vista previa no avisa las fechas que no sirven" \
+  "importPreviewFechas.hidden = fechas.length === 0;" "importPreviewFechas.hidden = true;" \
+  "FALLA: la vista previa no avisa la fecha que no sirve"
+sabotaje $J "el aviso de la fecha no dice la fila" \
+  "(variasHojas && item.sheet ? 'Hoja ' + item.sheet + ', fila ' : 'Fila ') + item.row" "'Una fila'" \
+  "FALLA: la vista previa no avisa la fecha que no sirve"
+sabotaje $J "el aviso de la fecha no dice el valor" \
+  "«' + item.value + '»" "«»" \
+  "FALLA: la vista previa no avisa la fecha que no sirve"
+sabotaje $J "el aviso de las fechas aparece siempre" \
+  "importPreviewFechas.hidden = fechas.length === 0;" "importPreviewFechas.hidden = false;" \
+  "FALLA: sin fechas malas igual aparece el aviso de fechas"
+sabotaje $H "la vista previa no tiene dónde avisar las fechas" \
+  '<ul class="migration-omitted" id="importPreviewFechas" hidden></ul>' '' \
+  "FALLA: la vista previa no avisa la fecha que no sirve"
+
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]

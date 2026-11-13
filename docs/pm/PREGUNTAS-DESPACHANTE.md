@@ -134,13 +134,117 @@ Sin nombres: la fuente es «el despachante de Emi».
 ## Lo que falta pedirle (para que Emi lo mande)
 
 Las dos preguntas cortas ya están respondidas (2026-10-06, 22:12 y 22:15).
-Quedan los dos favores:
+El favor 1 llegó el 2026-10-28 (sin tapar; ver «Respuestas del
+2026-10-28»). Queda el 2:
 
 > 1. ¿Me pasás dos o tres despachos que hayas cargado, con nombres, CUIT y
 >    montos tapados? Mejor si son distintos: uno EXW, uno CIF y uno con
 >    varios productos.
 > 2. ¿Podés probar en tu Kit María un archivo nuestro? Sólo cargarlo para ver
 >    si lo acepta, sin oficializar nada. (Se manda al cerrar la Fase 1.)
+
+## Preguntas nuevas (2026-10-25), para que Emi las mande
+
+Salen de la carga del 2026-10-24 y de VALOR-1. Mientras no conteste, CDI
+sigue como está.
+
+> 1. El identificador de la operación (`IDSO`): ¿cuántos caracteres puede
+>    tener como máximo? ¿El MARIA rechaza uno que ya se usó?
+> 2. En los sufijos de valor (lo que va entre paréntesis, como `AI(...)`):
+>    ¿cómo se escribe un número con decimales? ¿Acepta un sufijo vacío?
+> 3. El seguro del 1 %: ¿se calcula sobre el FOB de la factura o sobre el
+>    FOB con los ajustes (descuentos y gastos que se suman o se restan)?
+> 4. ¿En qué condiciones de venta el seguro ya viene en el precio y no hay
+>    que sumarlo (CIF, CIP, alguna otra)?
+
+| Pregunta | Qué decide | Mientras tanto |
+|---|---|---|
+| 1 | Largo y repetición de `IDSO` (D1 de MARIA-7) | no cambian `NDDTIMMTRN` ni `IEXT` |
+| 2 | Decimales y vacío en los sufijos (D7 de MARIA-7) | como hoy |
+| 3 | Base del seguro sugerido (D13 de VALOR-1) | FOB de la factura |
+| 4 | Si el botón del seguro se esconde en algunas condiciones (D14) | se ofrece siempre |
+
+Una más (2026-10-27), para PRORRATEO-1. Por ítem, el TXT sólo trae FOB,
+flete y seguro (`MARTFOB`, `MARTFLE`, `MARTASS`); no hay campo de ajustes:
+
+> 5. Los ajustes que se suman o se restan al valor (descuentos, gastos,
+>    comisiones): ¿van en el archivo, y en qué campo, o los cargás vos a mano
+>    en el MARIA? Si van repartidos por ítem, ¿cómo los repartís?
+
+| Pregunta | Qué decide | Mientras tanto |
+|---|---|---|
+| 5 | Si PRORRATEO-1 escribe algo en el TXT o sólo muestra el reparto | no arranca; los ajustes no cambian el TXT (D12) |
+
+Una más (2026-10-28), para DESPACHO-1 (armar el catálogo del cliente con
+despachos ya oficializados):
+
+> 6. ¿Me pasás uno o dos despachos ya oficializados (el OM-1993-A que
+>    imprimís después de oficializar), con nombres, CUIT y montos tapados?
+>    ¿Los guardás en PDF del sistema o escaneados en papel firmado?
+>    Y para el catálogo de productos de un cliente: ¿los despachantes usan
+>    algún formato o programa para guardarlo o pasárselo, o con un Excel
+>    alcanza?
+
+| Pregunta | Qué decide | Mientras tanto |
+|---|---|---|
+| 6 | Qué archivo lee DESPACHO-1 y en qué formato se baja el catálogo | DESPACHO-1 no arranca; el catálogo se bajaría en Excel |
+
+## Respuestas del 2026-10-28 (por mensaje a Emi, con tres despachos)
+
+**Destino de la mercadería.** El MARIA hace dos preguntas por ítem; las
+respuestas van de a pares:
+
+| Destino | `GANANCIASOP3` | `IVAADICIONAL1` |
+|---|---|---|
+| Comercialización o reventa | `COMERC` | `NO_VALIDA` |
+| Bien de uso de la empresa | `BDEUSO` | `IVAAD2` |
+| Bien de uso de una persona | `USOPAR` | `IVAAD1` |
+
+Hoy CDI escribe `GANANCIASOP3` siempre `COMERC`, y «uso particular» sale
+`COMERC` + `IVAAD1`, un par que no está en la lista. Lo corrige DESTINO-1.
+El archivo real de 2025 (`maria_golden_anon.TXT`, que el MARIA aceptó) trae
+justo `COMERC` + `IVAAD1`: el golden queda como lo que se aceptó y la regla
+nueva sigue la respuesta (pregunta 7, abajo).
+
+**Las lonas no tienen packing list.** PESO-NETO-1 se queda sin el dato con
+que se iba a probar; mientras, el aviso de hoy.
+
+**Favor 1, cumplido a medias.** Mandó tres despachos oficializados (uno EXW,
+uno CIF y uno con varios productos), en PDF del sistema, **sin tapar**:
+quedan sólo fuera del repo. Lo que muestran, sin ningún dato real, está en
+`DESPACHOS-FORMA.md`.
+
+| Pregunta | Respuesta | Qué cambia |
+|---|---|---|
+| 1, `IDSO` | No está definido el largo; si se repite, el MARIA no lo rechaza | Nada. El 24/10 el MARIA sí rechazó uno de 19 caracteres (capturas de Emi): queda corto, D1 de MARIA-7 sigue |
+| 2, sufijos | Si es un código libre, un número puede llevar coma. Si el sufijo pide número sí o sí, no acepta decimales. Ninguno puede quedar vacío | Hoy `AF(2.5)` sale `AF(2 5)` (cambia el número) y `AA()` pasa sin aviso. Lo corrige SUFIJOS-2 (D7) |
+| 3, base del seguro | El 1 % va sobre FOB total + flete | Confirma la fórmula de hoy. No dice si «FOB total» lleva los ajustes, y los tres despachos tienen ajustes en cero: la base sigue en el FOB de la factura (D13) y se vuelve a preguntar (pregunta 8) |
+| 4, seguro en el precio | CIF, CIP, DPU, DAP y DDP | El botón «calcular seguro» (la sugerencia del 1 %) no se ofrece en esas cinco. El seguro se sigue declarando: el despacho CIF trae su seguro. CFR y CPT siguen con el botón. Es SEGURO-1 (D14) |
+| 5, ajustes en el TXT | Sin respuesta | Dato nuevo: el despacho tiene por ítem «Ajuste a incluir» y «Ajuste a deducir»; si el TXT tiene esos campos, sigue sin saberse. PRORRATEO-1 sigue sin arrancar |
+| 6, despachos y catálogo | Los despachos, en PDF del sistema (no escaneados). El formato del catálogo, sin respuesta | DESPACHO-1 ya tiene su ejemplo; el catálogo se baja en Excel |
+
+### Preguntas que quedan (para que Emi las mande)
+
+> 5. (la de antes) Los ajustes que se suman o se restan al valor: ¿van en
+>    el archivo, y en qué campo, o los cargás a mano en el MARIA?
+> 6. (la de antes, la parte que faltó) Para el catálogo de productos de un
+>    cliente, ¿usan algún formato o programa, o con un Excel alcanza?
+> 7. En un archivo tuyo de 2025 que el MARIA aceptó va `COMERC` con
+>    `IVAAD1`. ¿Ese par está bien, o tendría que haber sido `USOPAR`?
+> 8. Cuando hay un ajuste (un descuento, por ejemplo), el 1 % del seguro
+>    ¿va sobre el FOB de la factura o sobre el FOB ya ajustado?
+> 9. La próxima vez, ¿nos tapás nombres, CUIT y montos? Los de esta vez no
+>    los subimos a ningún lado.
+> 10. Los sufijos que piden número: ¿son todos los que empiezan con `Z`
+>    (peso, ancho, cilindrada…), y los que empiezan con `A` son texto libre?
+>    Y en un `Z` de porcentaje, ppm o quilates promedio, ¿tampoco van
+>    decimales? Hoy el sistema frena cualquier `Z` con decimales hasta que
+>    se escriba entero.
+>
+> 11. Una fecha dentro de un sufijo (un vencimiento, por ejemplo), ¿cómo la
+>    escribís? El MARIA no acepta la barra ni el punto: hoy `31/12/2026`,
+>    `31.12.2026` y `31-12-2026` salen `31 12 2026`. ¿Así la acepta, o va
+>    de otra forma (`31122026`, `2026-12-31`)?
 
 ## El mensaje que se mandó (2026-10-06)
 

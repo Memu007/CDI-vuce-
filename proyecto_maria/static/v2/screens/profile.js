@@ -10,6 +10,8 @@
 
     let modal, overlay, closeBtn, cancelBtn, saveBtn;
     let nameInput, cuitInput, emailEl, cuitErrorEl;
+    // Cambiar el email pide la contraseña actual (SESION-1)
+    let emailPwdField, emailPwdInput, originalEmail = '';
     let pfDefaultAduana, pfDefaultPuerto, pfDefaultTipoDest;
     let replayTourBtn;
     // Seguridad (cambio password)
@@ -37,6 +39,9 @@
         cuitInput = $('pfCuit');
         emailEl = $('pfEmail');
         cuitErrorEl = $('pfCuitError');
+        emailPwdField = $('pfEmailPasswordField');
+        emailPwdInput = $('pfEmailPassword');
+        if (emailEl) emailEl.addEventListener('input', syncEmailPassword);
         pfDefaultAduana = $('pfDefaultAduana');
         pfDefaultPuerto = $('pfDefaultPuerto');
         pfDefaultTipoDest = $('pfDefaultTipoDest');
@@ -94,7 +99,7 @@
         billingUsageWrap = $('pfBillingUsageWrap');
         billingUsageEl = $('pfBillingUsage');
         billingTopupBtn = $('pfBillingTopup');
-        if (billingActivateBtn) billingActivateBtn.addEventListener('click', () => openCheckout('activate'));
+        if (billingActivateBtn) billingActivateBtn.addEventListener('click', () => CDI.irAlCheckout(planElegido(), billingActivateBtn));
         if (billingReactivateBtn) billingReactivateBtn.addEventListener('click', reactivateBilling);
         if (billingCancelBtn) billingCancelBtn.addEventListener('click', cancelBilling);
         if (billingTopupBtn) billingTopupBtn.addEventListener('click', openTopup);
@@ -154,6 +159,8 @@
             nameInput.value = p.name || '';
             cuitInput.value = p.cuit ? CDI.formatCuit(p.cuit) : '';
             emailEl.value = p.email || '';
+            originalEmail = normalizeEmail(p.email);
+            syncEmailPassword();
             if (pfDefaultAduana) pfDefaultAduana.value = p.default_aduana_codigo || '';
             if (pfDefaultPuerto) pfDefaultPuerto.value = p.default_puerto_destino || '';
             if (pfDefaultTipoDest) pfDefaultTipoDest.value = p.default_tipo_destinacion || '';
@@ -174,6 +181,15 @@
         }
     }
 
+    function normalizeEmail(v) { return String(v || '').trim().toLowerCase(); }
+    function emailChanged() { return normalizeEmail(emailEl.value) !== originalEmail; }
+    function syncEmailPassword() {
+        if (!emailPwdField) return;
+        const changed = emailChanged();
+        emailPwdField.hidden = !changed;
+        if (!changed && emailPwdInput) emailPwdInput.value = '';
+    }
+
     function showError(msg) {
         if (!cuitErrorEl) return;
         cuitErrorEl.textContent = msg;
@@ -192,13 +208,19 @@
         const name = String(nameInput.value || '').trim();
         const cuitRaw = String(cuitInput.value || '').trim();
         const cuitNorm = CDI.normalizeCuit(cuitRaw);
-        const emailVal = String(emailEl.value || '').trim().toLowerCase();
+        const emailVal = normalizeEmail(emailEl.value);
+        const emailPwd = String((emailPwdInput && emailPwdInput.value) || '');
         if (cuitRaw && cuitNorm.length !== 11) {
             showError('El CUIT debe tener 11 digitos.');
             return;
         }
         if (emailVal && !emailVal.match(/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/)) {
             if (CDI.toast) CDI.toast('Email no válido', 'Revisá el formato.', 'error');
+            return;
+        }
+        if (emailChanged() && !emailPwd) {
+            showError('Para cambiar el email ingresá tu contraseña actual.');
+            if (emailPwdInput) emailPwdInput.focus();
             return;
         }
 
@@ -209,16 +231,18 @@
         saveBtn.disabled = true;
         saveBtn.textContent = 'Guardando…';
         try {
+            const payload = {
+                name,
+                cuit: cuitNorm,
+                email: emailVal,
+                default_aduana_codigo: aduanaVal,
+                default_puerto_destino: puertoVal,
+                default_tipo_destinacion: tipoVal
+            };
+            if (emailChanged()) payload.current_password = emailPwd;
             const res = await CDI.api('/api/user/profile', {
                 method: 'PUT',
-                body: JSON.stringify({
-                    name,
-                    cuit: cuitNorm,
-                    email: emailVal,
-                    default_aduana_codigo: aduanaVal,
-                    default_puerto_destino: puertoVal,
-                    default_tipo_destinacion: tipoVal
-                })
+                body: JSON.stringify(payload)
             });
             const data = await res.json();
             if (!res.ok || !data.success) throw new Error((data && data.detail) || 'No se pudo guardar');
@@ -232,6 +256,8 @@
                 puerto_destino: data.profile.default_puerto_destino || '',
                 tipo_destinacion: data.profile.default_tipo_destinacion || ''
             };
+            originalEmail = normalizeEmail(data.profile.email);
+            syncEmailPassword();
             const hasDefaults = !!(aduanaVal || puertoVal || tipoVal);
             const subtitle = hasDefaults
                 ? 'Tus defaults se aplicarán en las próximas operaciones.'
@@ -279,7 +305,7 @@
             if (!res.ok || !data.success) {
                 throw new Error((data && data.detail) || 'No se pudo cambiar la contraseña');
             }
-            CDI.toast('Contraseña actualizada', 'Usá la nueva la próxima vez que ingreses.', 'success');
+            CDI.toast('Contraseña actualizada', 'Cerramos tus otras sesiones abiertas. Usá la nueva la próxima vez que ingreses.', 'success');
             CDI.track('password_changed');
             currentPwdInput.value = '';
             newPwdInput.value = '';
@@ -337,6 +363,8 @@
             canceled: 'Cancelado'
         };
         billingStatusEl.textContent = labels[status] || status;
+        billingStatusEl.dataset.status = status;
+        billingStatusEl.dataset.corta = (b && b.cancelar_corta_acceso) ? '1' : '';
         billingSummary.textContent = labels[status] || status;
 
         // Mostrar uso del mes siempre.
@@ -360,9 +388,11 @@
             billingNextWrap.hidden = false;
             billingNextEl.textContent = formatDateAr(trialEnd);
             if (nextLabel) {
+                // «Próximo cobro» sólo si hay una suscripción que se renueva.
+                const vencida = new Date(trialEnd) <= new Date();
                 if (status === 'trial') nextLabel.textContent = 'Trial vence';
-                else if (status === 'active') nextLabel.textContent = 'Próximo cobro';
-                else if (status === 'canceled') nextLabel.textContent = 'Servicio activo hasta';
+                else if (status === 'active') nextLabel.textContent = (b && b.renueva) ? 'Próximo cobro' : 'Activo hasta';
+                else if (status === 'canceled') nextLabel.textContent = vencida ? 'Venció el' : 'Servicio activo hasta';
                 else nextLabel.textContent = 'Fecha';
             }
         }
@@ -375,7 +405,10 @@
         }
 
         // Botones por estado.
-        if (status === 'trial' || status === 'active') {
+        // past_due también cancela: si no, la suscripción cobra cuando la tarjeta vuelve.
+        // Con una suscripción abierta se cancela en cualquier estado.
+        if (status === 'trial' || status === 'active' || status === 'past_due'
+            || (b && b.suscripcion_abierta)) {
             if (billingCancelBtn) billingCancelBtn.hidden = false;
         }
         if (status === 'past_due' || status === 'none') {
@@ -389,22 +422,8 @@
         }
     }
 
-    async function openCheckout() {
-        try {
-            const plan = billingPlanSelect && !billingPlanSelect.hidden ? billingPlanSelect.value : 'premium';
-            const res = await CDI.api('/api/billing/checkout', {
-                method: 'POST',
-                body: JSON.stringify({ plan: plan })
-            });
-            const data = await res.json().catch(() => ({}));
-            if (data && data.init_point) {
-                window.location.href = data.init_point;
-                return;
-            }
-            CDI.toast('Error', 'No se pudo iniciar el cobro.', 'error');
-        } catch (err) {
-            CDI.toast('Error', String(err.message || err), 'error');
-        }
+    function planElegido() {
+        return billingPlanSelect && !billingPlanSelect.hidden ? billingPlanSelect.value : 'premium';
     }
 
     async function openTopup() {
@@ -415,18 +434,24 @@
                 window.location.href = data.init_point;
                 return;
             }
-            CDI.toast('Error', 'No se pudo iniciar el top-up.', 'error');
+            // Con el tope de operaciones extra lleno, el 409 dice por qué no hay link.
+            CDI.toast('Error', (data && typeof data.detail === 'string' && data.detail) || 'No se pudo iniciar el top-up.', 'error');
         } catch (err) {
             CDI.toast('Error', String(err.message || err), 'error');
         }
     }
 
     async function cancelBilling() {
+        const corta = billingStatusEl && billingStatusEl.dataset.corta === '1';
+        const pendiente = corta && billingStatusEl.dataset.status === 'past_due';
         const ok = await CDI.confirm({
             title: 'Cancelar plan',
             lead: '¿Seguro que querés cancelar?',
-            text: 'Vas a poder seguir usando CDI hasta el fin del período ya pagado. Después no se renueva automáticamente. Podés reactivar cuando quieras.',
-            confirmText: 'Sí, cancelar',
+            text: corta
+                ? (pendiente ? 'Tu plan tiene un pago pendiente. ' : '')
+                    + 'Al cancelar no se cobra más y dejás de usar CDI hasta que actives un plan.'
+                : 'Vas a poder seguir usando CDI hasta el fin del período ya pagado. Después no se renueva automáticamente. Podés reactivar cuando quieras.',
+            acceptText: 'Sí, cancelar',
             cancelText: 'Volver'
         });
         if (!ok) return;
@@ -455,19 +480,25 @@
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) throw new Error((data && data.detail) || 'No se pudo reactivar');
             if (data.needs_checkout) {
-                CDI.toast('Reactivar plan', 'Tu período pagado terminó. Te llevamos al checkout.', 'info');
-                await openCheckout();
-                return;
+                // Antes de pagar, se dice cuándo cobra y qué suma.
+                const seguir = await CDI.confirm({
+                    title: 'Reactivar plan',
+                    lead: 'Se crea una suscripción nueva en Mercado Pago.',
+                    text: data.message || 'Tu período pagado terminó. Te llevamos al checkout.',
+                    acceptText: 'Ir a pagar',
+                    cancelText: 'Volver'
+                });
+                if (seguir && await CDI.irAlCheckout(planElegido(), billingReactivateBtn)) return;
+            } else {
+                CDI.toast('Prueba reactivada', 'Sigue hasta el fin de la prueba.', 'success');
+                CDI.track('billing_reactivated');
+                await loadBilling();
             }
-            CDI.toast('Plan reactivado', 'Sigue activo hasta el próximo cobro.', 'success');
-            CDI.track('billing_reactivated');
-            await loadBilling();
         } catch (err) {
             CDI.toast('Error', String(err.message || err), 'error');
-        } finally {
-            billingReactivateBtn.disabled = false;
-            billingReactivateBtn.textContent = 'Reactivar plan';
         }
+        billingReactivateBtn.disabled = false;
+        billingReactivateBtn.textContent = 'Reactivar plan';
     }
 
     CDI.openProfileModal = open;

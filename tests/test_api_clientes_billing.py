@@ -24,7 +24,7 @@ def _set_user(username: str, **kwargs):
                 setattr(u, k, v)
             await db.commit()
     import asyncio
-    asyncio.new_event_loop().run_until_complete(_run())
+    asyncio.run(_run())
 
 
 @pytest.fixture()
