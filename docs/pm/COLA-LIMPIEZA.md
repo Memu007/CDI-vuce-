@@ -204,6 +204,19 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   login, mientras `revisarSesion` ante el mismo 401 se queda y avisa. Medido
   en el `api.log`; si se pierde lo cargado, no corrido (Técnica, D213).
 
+- `proyecto_maria/main.py` `_migrate_catalogo_claves`: el sabotaje 39 de
+  `catalogo_largo2.sh` ve que el candado se pide con clave compartida, no que
+  se pida antes de leer. Mover `pg_advisory_xact_lock(7302551)` después del
+  `SELECT` (hasta `movidas = choques = 0`) sale verde: falta un caso que lo
+  distinga. `lock_timeout` sigue sin sabotaje (MARIA, D223).
+- `scripts/testing/catalogo3_postgres.py:218`: `esperando_candado` espera
+  hasta 120 s fijos; y `tests/conftest.py:17` deja un `cdi_pytest_*.db` por
+  corrida en `/tmp` (contados 3869, 1,4 G): borrarlo al terminar.
+- `scripts/testing/pantalla_borrador1.js:41` abre el navegador por ruta fija
+  sin mirar `PLAYWRIGHT_BROWSERS_PATH`; `cliente1` y `destino1` por
+  `CHROMIUM` o ruta fija: que las 30 pidan el navegador igual. Esperas fijas
+  en `pantalla_maria1b.js:58` y `:65` y `pantalla_excel1.js:36`.
+
 ## Riesgos que esperan a Emi (no son tareas: no se toman de esta cola)
 
 - `client_memory._norm_desc` pierde las ligaduras («Arandela ﬁna» queda
