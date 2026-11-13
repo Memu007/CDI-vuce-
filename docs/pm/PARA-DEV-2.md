@@ -38,14 +38,29 @@ a la nota del «dale». No va a `PREGUNTAS-DESPACHANTE`: la herencia no está
 escrita en ningún lado.
 
 **D237: (a), decidido por la PM**, como pieza aparte, después de esta
-devolución y antes de CUIT-GENERAR. Es tu archivo y espera una condición
+devolución y de PAIS-NL, y antes de CUIT-GENERAR. Es tu archivo y espera una condición
 observable.
 
 **CUIT-GENERAR:** si ya lo empezaste, apartalo (`git stash` o una rama
 local). No lo mezcles con los commits de la devolución.
 
-**Cómo sigue:** 1) esta devolución; 2) D237 (a); 3) CUIT-GENERAR (D235 a),
-producto con datos, con revisión fuerte (§3); 4) los vencidos de
+**PAIS-NL (Emi, 13/11: «El código de país de países bajos es 423»).** Hoy la
+sigla «NL» y «NLD» dan 434 (HOLANDA) en el TXT, el catálogo y la pantalla:
+`PAISES_INDEC` repite la clave «NL» y gana la segunda, y `paises_maria.js`
+la manda a 434. Comportamiento pedido: toda sigla de Países Bajos da 423 en
+TXT, catálogo y pantalla, y la tabla queda sin claves repetidas. «PAISES
+BAJOS» ya da 423; «HOLANDA» escrito así queda en 434 (es otra entrada de la
+tabla oficial y Emi no la nombró). Ninguna otra entrada cambia de valor.
+`tests/test_catalogo3.py:291` y `:298` hoy fijan lo contrario: cambiarlas es
+tu rojo; las formas de escribirlo van como datos de un caso. En el informe,
+medido y no arreglado: qué queda guardado (operación, catálogo, memoria,
+`operation_items.origen`) cuando se carga «NL», y si algo ya guardado queda
+en 434 sin forma de distinguirlo de un «HOLANDA» puesto a propósito. Sin
+migración dentro de la pieza: eso va como riesgo.
+
+**Cómo sigue:** 1) esta devolución; 2) PAIS-NL (chica; es un código mal en
+el despacho y frena publicar); 3) D237 (a); 4) CUIT-GENERAR (D235 a),
+producto con datos, con revisión fuerte (§3); 5) los vencidos de
 `sabotajes-conocidos.txt`, uno por pieza.
 
 **Próxima D: D238.**
