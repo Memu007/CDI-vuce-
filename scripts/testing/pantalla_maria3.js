@@ -8,6 +8,7 @@
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_maria3.js [captura.png]
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
 const registrarCuenta = require('./_registrar');
+const cargarCuitDelPerfil = require('./_cuit_perfil');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 (async () => {
   const b = await chromium.launch();
@@ -15,9 +16,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
   await registrarCuenta(page.request, base, { data: { username: 'm3_' + id, password: 'Clave-Inventada-123', email: 'm3' + id + '@ejemplo.test' } });
-  // El CDDTAGR sale del CUIT del perfil: sin él no se genera el TXT.
-  const perfil = await page.request.put(base + '/api/user/profile', { data: { cuit: '20999999998' } });
-  if (!perfil.ok()) falla('no se pudo cargar el CUIT del perfil: ' + perfil.status());
+  await cargarCuitDelPerfil(page.request, base);
 
   const avisosPedidos = [];
   page.on('request', r => { if (r.url().endsWith('/generate_maria/avisos')) avisosPedidos.push(JSON.parse(r.postData())); });
