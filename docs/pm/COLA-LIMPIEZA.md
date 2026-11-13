@@ -221,6 +221,9 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   escribe a mano (contarlo de los `caso` que corrieron), y no corre antes una
   vez sin sabotear: si el árbol sano ya da rojo en la prueba de un `caso`,
   ese `caso` da `ROJO` igual (MARIA, valor1).
+- `docs/pm/herramientas/medir.py:34`: `PIEZA` exige número al final, así que
+  no cuenta piezas como EXCEL2D-RELOJ o DOS-RELOJES (aceptadas, vueltas ni
+  escapes).
 
 ## Riesgos que esperan a Emi (no son tareas: no se toman de esta cola)
 

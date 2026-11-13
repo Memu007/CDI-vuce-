@@ -55,7 +55,7 @@ tope. El margen del tope va a Emi
 No corrido: pytest entero, adversarios (sólo pruebas) y el corredor entero
 para D228 (sólo `destino1` y `cliente1`).
 
-## Escape (2026-11-13 09:50 UTC)
+## Escape (2026-11-13 09:25 UTC)
 
 Lo encontró MARIA (D234, informe `fdaa2da5`): `pytest` entero da rojo en
 `test_la_subida_cara_no_frena_a_nadie[9995 combinadas en 19 990 filas]`, 2 de
