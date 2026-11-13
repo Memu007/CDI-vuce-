@@ -2,25 +2,40 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## PANTALLAS-MARIA: entregada en `7ac0b4e` (sólo arnés). Dos decisiones nuevas: D225 y D226
+## PANTALLAS-MARIA: entregada en `e0d2770` (sólo arnés). Dos decisiones: D225 y D226
 
-**El informe de D218 y D219 sigue esperando tu veredicto** y ya no está acá:
-`git show 166c46c:docs/pm/PARA-PM-2.md`. Ahí están enteras **D223** y **D224**,
-que siguen abiertas (resumen abajo).
+**Este informe reemplaza al de `c918f7e`, que subí mal**: lo commiteé en el
+mismo comando que traía tu rama, sin leer tu `598919f`. Decía que tu rama no
+tenía commits nuevos y que D223 y D224 seguían abiertas; las dos cosas ya eran
+falsas. Acá está corregido. Lo técnico no cambió; se suma el corredor y D226
+quedó reescrita.
+
+Leído tu veredicto: D218 y D219 aceptadas; D223 (a) y D224 (a), una pieza
+después de ésta; `maria7` y `maria1c` son de la Técnica.
 
 | qué | SHA |
 |---|---|
 | base (mi informe anterior) | `166c46c` |
 | los cuatro guiones vuelven a salir 0 | `0ec6343` |
 | el CUIT del perfil, en un ayudante (`_cuit_perfil.js`) | `3e195de` |
-| de la autorrevisión: token CSRF en el ayudante y los cuatro pesos en `maria5`: **el que se entrega** | `7ac0b4e` |
+| de la autorrevisión: token CSRF en el ayudante y los cuatro pesos en `maria5` (último cambio de los guiones) | `7ac0b4e` |
+| tu rama integrada hasta `90b66c5`; trae el corredor de la Técnica: **el que se entrega** | `e0d2770` |
 | informe | el commit siguiente |
 
-Tu rama: sin commits nuevos desde `67c8ff0` (ya integrada en `636b889`).
+Entre `7ac0b4e` y `e0d2770` mis cinco archivos no cambian
+(`git diff 7ac0b4e e0d2770 -- scripts/testing/pantalla_{maria3,maria4,maria5,subitems1}.js scripts/testing/_cuit_perfil.js`
+da vacío).
 
 **Resultado.** Los cuatro, cada uno con servidor y base nuevos, sobre
 `7ac0b4e`: `maria3` 8 `OK`, `maria4` 7, `maria5` 9, `subitems1` 10; ninguna
 `FALLA`; los cuatro salen 0. Producto **+0/−0**; arnés +23/−8.
+
+**En el corredor** (`scripts/testing/correr_pantallas.sh e0d2770`): las cuatro
+salen `verde`, con los mismos `OK` (8, 7, 9, 10). Ninguna necesitó cabecera
+`// corredor:`. El resumen, en mi contenedor:
+`resumen: 25 verdes, 5 rojas: catalogo_ncm1 excel1 maria1b maria1c maria7`
+(sale 1). Ninguna de las cinco es de esta pieza: cuatro son D226 y `maria7` es
+de la Técnica.
 
 **Ninguna causa es de producto**: no frené. Eran cuatro causas, no dos:
 
@@ -66,24 +81,27 @@ el producto ya tiene la regla escrita para los otros dos CUIT. En mis
 guiones puse `20111111112`, que pasa `cuit_valido`: no dependen de lo que
 decidas.
 
-**D226. Otros cuatro guiones tienen la misma ruta fija del navegador:**
-`pantalla_catalogo_ncm1.js:12`, `pantalla_excel1.js:12`,
-`pantalla_maria1b.js:17`, `pantalla_maria1c.js:13`. **Leído, no corrido**: en
-mi contenedor cortarían al abrir. No sé si en el tuyo abren ni qué hay
-detrás. Tampoco a estos los corre ningún guion (`grep` de sus nombres en
-`.sh`, `.py` y la CI: sólo comentarios).
+**D226. Cuatro guiones más tienen la ruta fija del navegador, y en mi
+contenedor salen rojos en el corredor:** `pantalla_catalogo_ncm1.js:12`,
+`pantalla_excel1.js:13`, `pantalla_maria1b.js:18`, `pantalla_maria1c.js:14`.
+Los cuatro cortan al abrir: `FALLA: browserType.launch: Failed to launch
+chromium because executable doesn't exist at
+/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. En el contenedor de la
+Técnica abren (su corrida sobre `907e1ed` los dio verdes), así que detrás de
+la ruta no hay otra causa conocida: es una línea por guion. El corredor ya le
+pasa `CHROMIUM` a cada pantalla.
 
-- (a) Una pieza: los cuatro con `chromium.launch()`, cada uno corrido una
-  vez, y lo que aparezca detrás se informa.
-- (b) A la cola.
+- (a) Una pieza chica mía: `catalogo_ncm1`, `excel1` y `maria1b` sin la ruta
+  fija, y esas tres verdes en el corredor de mi contenedor. `maria1c` es de la
+  Técnica: la línea la cambia ella dentro de INTERMITENTES.
+- (b) Las cuatro a la Técnica, con el corredor.
+- (c) A la cola.
 
-Recomiendo **(a)**: acá, detrás del mismo rojo había tres causas más.
+Recomiendo **(a)**: mientras tanto, en mi contenedor el corredor no puede dar
+«0 rojas» y hay que comparar por nombre. Retiro lo que dije antes («detrás
+había tres causas más»): acá no vale, porque en otro contenedor ya corren.
 
-**D223 y D224 (abiertas desde `166c46c`).** D223: el candado de
-`_migrate_catalogo_claves` no tiene sabotaje en el repo; (a) uno para el
-advisory lock, (b) riesgo anotado, (c) también el `lock_timeout`; recomiendo
-(a). D224: el borde del corte de `_vendor_key` no lo fija ninguna prueba; (a)
-dos datos más, (b) riesgo anotado; recomiendo (a).
+**D223 y D224: decididas, (a) y (a).** Son mi próxima pieza.
 
 ## Supuestos (reversibles)
 
@@ -107,7 +125,12 @@ dos datos más, (b) riesgo anotado; recomiendo (a).
 ## Para reproducir
 
 ```bash
-# raíz del repo en 7ac0b4e; PY = python de un venv con requirements.txt. Unos 5 minutos.
+# raíz del repo en e0d2770; PY = python de un venv con requirements.txt.
+# 1) En el corredor, unos 15 minutos:
+PY=$PY scripts/testing/correr_pantallas.sh e0d2770
+#   → «verde» en maria3, maria4, maria5 y subitems1. Las rojas del resumen no son de esta pieza (tabla de puertas):
+#     se comparan por nombre.
+# 2) Las cuatro solas, sin el corredor, unos 5 minutos:
 for g in maria3 maria4 maria5 subitems1; do
   D=$(mktemp -d); P=$("$PY" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
   ENVIRONMENT=development DATABASE_URL="sqlite+aiosqlite:///$D/p.db" CDI_DATA_DIR="$D/data" \
@@ -150,7 +173,7 @@ de las causas 1 y 2 (en mi contenedor, antes, la 4). Los dos de `7ac0b4e`:
 python docs/pm/herramientas/chequeo-6.py 166c46c 7ac0b4e   # producto +0/−0, arnés +23/−8, avisos: 1
 ```
 
-## Puertas, sobre `7ac0b4e`
+## Puertas (las solas, sobre `7ac0b4e`; el corredor, sobre `e0d2770`)
 
 | puerta | salida |
 |---|---|
@@ -160,6 +183,16 @@ python docs/pm/herramientas/chequeo-6.py 166c46c 7ac0b4e   # producto +0/−0, a
 | `pantalla_subitems1.js`, ídem | 10 `OK`, 0 `FALLA`, sale 0 |
 | `maria3` con `CSRF_ENFORCE=true` | 8 `OK`, sale 0 |
 | `anclas_perdidas.py 7ac0b4e` | sale 0; ninguna fila de un archivo de esta pieza (no toca guiones de sabotaje) |
+| `correr_pantallas.sh e0d2770` (02:44→02:58 UTC) | `verde maria3 rc=0 … OK: pantalla MARIA-3`, `verde maria4 rc=0 … OK: pantalla MARIA-4`, `verde maria5 rc=0 … OK: pantalla MARIA-5`, `verde subitems1 rc=0 … OK: pantalla SUBITEMS-1`; `resumen: 25 verdes, 5 rojas: catalogo_ncm1 excel1 maria1b maria1c maria7`, sale 1 |
+| el mismo corredor (copia de `4e98c86`, idéntica por `cmp`) sobre `636da47`, antes de integrar sus cabeceras | las cuatro `verde`; `resumen: 24 verdes, 6 rojas: catalogo_ncm1 csrf1 excel1 maria1b maria1c maria7` |
+
+Las rojas del corredor, por nombre:
+
+| pantalla | última línea | de quién |
+|---|---|---|
+| `catalogo_ncm1`, `excel1`, `maria1b`, `maria1c` | `FALLA: browserType.launch: Failed to launch chromium because executable doesn't exist at /opt/pw-browsers/chromium-1194/chrome-linux/chrome` | D226; de entorno: en mi contenedor esa ruta no existe |
+| `maria7` | `FALLA: la pregunta por la fecha no aparece al subir` | de la Técnica (INTERMITENTES). Dato para ella: en mi contenedor dio roja en las dos corridas, 2 de 2 |
+| `csrf1` (sólo sobre `636da47`) | `FALLA: «Salir» rechazado no avisó y la página fue a /` | le faltaba la cabecera `// corredor: servidor CSRF_ENFORCE=true`, que llegó con tu rama. Comprobado: sola, con `CSRF_ENFORCE=true`, da `OK: CSRF-1 en el navegador`; sobre `e0d2770` sale `verde` |
 
 `chequeo-6`, entero:
 
@@ -213,12 +246,16 @@ Adversario: `adversario-sonnet-medio` (Sonnet, esfuerzo medio); corrió
 - Con `CSRF_ENFORCE=true` corrí sólo `maria3`. `maria4` hace cuatro `POST`
   directos sin token (de antes): leído, ahí daría 403.
 - Los cuatro contra un mismo servidor, uno atrás de otro: no corrido.
-- Los cuatro guiones de D226: no corridos.
-- **Sigue sin haber un guion que los corra.** Vuelven a estar verdes y
-  pueden volver a romperse sin que nadie lo vea. No lo agregué: no lo pediste.
+- Los cuatro guiones de D226: corridos sólo dentro del corredor, donde cortan
+  al abrir el navegador. Qué hacen después de abrir, en mi contenedor, no lo vi.
+- **Al corredor no lo llama nada** (`grep` de `correr_pantallas` en `.sh`,
+  `.py`, `.yml` y la CI: sólo `docs/pm/`). Mis cuatro vuelven a estar verdes y
+  se ven rojas sólo si alguien lo corre.
+- `chequeo-6` y `anclas_perdidas.py` corrieron sobre `7ac0b4e`, no sobre
+  `e0d2770`: entre los dos sólo está tu rama integrada.
 - El rojo de la causa 4 lo volví a sacar con el guion de `166c46c` sin
   servidor: corta al abrir el navegador, antes de necesitarlo.
 
 Archivos de producto tocados: ninguno.
 
-/compact conservar: Dev 2 (MARIA), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (rama claude/practical-shannon-szpwkn, cabeza 67c8ff0, ya integrada en 636b889), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. Entregadas y esperando veredicto: D218 y D219 en 1f8ffa6 (informe en 166c46c) y PANTALLAS-MARIA en 7ac0b4e (informe en el commit siguiente; sólo arnés, producto +0/−0: pantalla_maria3, maria4, maria5 y subitems1 salen 0 con servidor y base nuevos). Abiertas, las decide la PM: D223 (candado de _migrate_catalogo_claves sin sabotaje: recomiendo (a)), D224 (borde del corte de _vendor_key sin prueba: recomiendo (a)), D225 (el perfil guarda un CUIT de despachante con el verificador mal y el TXT sale con él: recomiendo (a), pieza chica de producto) y D226 (otros cuatro guiones de pantalla con la ruta fija del navegador: recomiendo (a), una pieza). Ya decididas: D221 (b) y D222 (a). Orden de la PM, una pieza a la vez: la que arranco ahora es retirar el 13 y el 24 de sabotaje_valor1.sh y reanclar en código el 10 (hoy en un comentario, línea 108) y el 28 (comentario al final de la línea 187); puerta: valor1 entero da 29 ROJO y sale 0, y su línea sale de sabotajes-conocidos.txt. Después: AJUSTE-BORRADOR (producto en static/v2: primero un caso de pantalla en rojo; corre e2e_maria.sh) y los vencidos, uno por pieza: maria8, maria1d, maria5, valor1b, doc1.py, maria7, guardar2. Próxima D libre: D227. Una devolución de la PM o la tarea de comparación van primero. Los detalles están en PARA-PM-2.md: el resumen los cita, no los copia. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; las Devs no usan el consejero.
+/compact conservar: Dev 2 (MARIA), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (rama claude/practical-shannon-szpwkn, cabeza 90b66c5, ya integrada en e0d2770), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. Aceptadas: D218 y D219. Entregada y esperando veredicto: PANTALLAS-MARIA en e0d2770 (guiones de 7ac0b4e; sólo arnés, producto +0/−0; pantalla_maria3, maria4, maria5 y subitems1 salen 0 solas y verdes en scripts/testing/correr_pantallas.sh). Abiertas, las decide la PM: D225 (el perfil guarda un CUIT de despachante con el verificador mal y el TXT sale con él: recomiendo (a), pieza chica de producto) y D226 (catalogo_ncm1, excel1, maria1b y maria1c con la ruta fija del navegador, rojas en el corredor de mi contenedor: recomiendo (a), las tres primeras mías). Ya decididas: D221 (b), D222 (a), D223 (a), D224 (a). No son mías: maria7 y maria1c (de la Técnica, tarea INTERMITENTES), ni correr_pantallas.sh. Orden de la PM, una pieza a la vez: la que arranco ahora es D223 + D224 (un sabotaje del advisory lock de _migrate_catalogo_claves en sabotajes/catalogo_largo2.sh, con el lock_timeout como riesgo anotado; y dos datos más en la prueba de _vendor_key: clave de 60 entera, de 61 cortada). Después: retirar el 13 y el 24 de sabotaje_valor1.sh y reanclar en código el 10 (comentario, línea 108) y el 28 (comentario al final de la línea 187), puerta: valor1 entero da 29 ROJO y sale 0, y su línea sale de sabotajes-conocidos.txt; AJUSTE-BORRADOR (producto en static/v2: primero un caso de pantalla en rojo; corre e2e_maria.sh); y los vencidos de sabotajes-conocidos.txt, uno por pieza. Próxima D libre: D227. Una devolución de la PM o la tarea de comparación van primero. Los detalles están en PARA-PM-2.md: el resumen los cita, no los copia. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; las Devs no usan el consejero.
