@@ -282,20 +282,35 @@ def test_la_migracion_separa_los_proveedores_y_los_productos_mezclados(client):
     assert [k for _, k, _ in primera if k == "2mm"] == ["2mm"], primera
 
 
-def test_la_tabla_de_paises_no_tiene_claves_repetidas_salvo_nl():
+def test_la_tabla_de_paises_no_tiene_claves_repetidas():
     fuente = inspect.getsource(maria_generator)
     arbol = ast.parse(fuente)
     literal = next(n.value for n in ast.walk(arbol) if isinstance(n, ast.Assign)
                    and any(getattr(t, "id", None) == "PAISES_INDEC" for t in n.targets))
     claves = [k.value for k in literal.keys]
-    assert {k for k in claves if claves.count(k) > 1} == {"NL"}
+    assert {k for k in claves if claves.count(k) > 1} == set()
+
+
+# «HOLANDA» es otra entrada de la tabla oficial: no es una forma de escribir Países Bajos.
+PAISES_BAJOS = ("NL", "nl", "NLD", "nld", "PAISES BAJOS", "Países Bajos", "423", "423 · PAISES BAJOS")
+
+
+def test_paises_bajos_es_423_en_el_catalogo_y_en_el_txt():
+    formas = [*PAISES_BAJOS, "HOLANDA"]
+    esperado = [423] * len(PAISES_BAJOS) + [434]
+    assert [get_pais_codigo(origen_para_catalogo(p)[0]) for p in formas] == esperado
+    items = [{"pieza": "84713000", "descripcion": f"Producto {i}", "cantidad": 1, "valor_unitario": 10,
+              "peso_unitario": 1, "origen": o, "procedencia": "NL", "unidad": "07", "grupo_id": i}
+             for i, o in enumerate(formas, start=1)]
+    txt = _gen("OP123456", items)
+    assert [int(c) for c in re.findall(r"CARTPAYORI=(\d+)", txt)] == esperado
+    assert set(re.findall(r"CARTPAYPRC=(\d+)", txt)) == {"423"}
 
 
 def test_nombre_y_codigo_de_cada_pais_dan_el_mismo_codigo():
     for nombre, codigo in PAISES_INDEC.items():
         guardado, problema = origen_para_catalogo(nombre)
         assert problema is None and get_pais_codigo(guardado) == codigo, (nombre, guardado, problema)
-    assert [get_pais_codigo(origen_para_catalogo(p)[0]) for p in ("PAISES BAJOS", "HOLANDA", "NL")] == [423, 434, 434]
     # «123» es LIBIA en la tabla oficial: un código de la tabla vale como «310».
     assert [origen_para_catalogo(c)[0] for c in ("123", "310")] == ["123", "310"]
     for malo in ("XYZ", "ZZ", "99999", "ＢＲ", "ÉS"):
@@ -433,7 +448,7 @@ def test_la_pantalla_y_el_servidor_reconocen_los_mismos_paises():
     codigos = sorted(maria_generator.codigos_tabla_oficial())
     valores = [*FAMILIA_ORIGEN, *PAISES_INDEC, *ISO3_A_ISO2, *(f"0{c}" for c in codigos),
                *(f"{c} · X" for c in codigos), "0313", "123", "ÉS", "ＢＲ", "XYZ", "99999", "Türkiye", "",
-               *ESPACIOS_RAROS,
+               *ESPACIOS_RAROS, *PAISES_BAJOS,
                *LECTURA_PAIS, *NO_SON_PAISES]
     servidor = [str(maria_generator.codigo_de_pais(v) or "") for v in valores]
     distintos = [(v, p, s) for v, p, s in zip(valores, _resolve_de_la_pantalla(valores), servidor) if p != s]
