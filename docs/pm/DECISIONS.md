@@ -809,3 +809,11 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - D191 (a), por la PM: `sabotaje_maria9.sh` no corre entero desde `fe95a49b` (SUFIJOS-1 cambió la firma de `usa_el_sufijo_de_la_operacion`); lo reancla MARIA, sólo arnés, 30 de 30 en rojo.
 - Escape de la PM: VALOR-1c (`3df999c8`, anclas 24, 27 y 28) y después SUFIJOS-1 (la firma) se aceptaron sin correr `sabotaje_maria9.sh`, que anclaba lo que cambiaron (acta de D191). `sabotaje_maria9.sh` entero entra en «Antes de publicar».
 - D194 aceptada sobre `f507763`; D195 (a), decidido por la PM: los 10 guiones vencidos van a `herramientas/sabotajes-conocidos.txt` con dueña MARIA y salida «reescribirlo»; uno por pieza de arnés, empezando por `sabotaje_maria3.sh`; un sabotaje sin protección que atacar vuelve como D para retirarlo. Antes de publicar, `anclas_perdidas.py` sobre el SHA candidato.
+
+## 2026-11-13 16:30 UTC — Países Bajos y TokenEconomizer (Emi)
+
+- Emi: «No lo usemos lo que te pase»: TokenEconomizer no se instala.
+- Emi: «El código de país de países bajos es 423». La PM lo lee como
+  respuesta a lo que quedó abierto el 2026-11-09 21:00: «NL» y «NLD» → 423;
+  «HOLANDA» queda en 434 (otra entrada de la tabla oficial). Pieza PAIS-NL a
+  MARIA, después de la devolución de SUFIJO-BORRADOR; es puerta de publicar.

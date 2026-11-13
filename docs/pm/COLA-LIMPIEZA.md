@@ -229,14 +229,21 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `profile.js:213` cuenta 11 dígitos; el verificador lo mira sólo el
   servidor.
 - `sabotajes/cuit_perfil.sh` sobre `_entorno_comun.sh`.
-- Salir de `async for … in get_async_session()` sin agotarlo, en producto:
-  `main.py:11688` (webhook de Mercado Pago), `:1986` (`api_logs`) y `:1695`
-  (arranque). Se toma sólo la medición, local: si la sesión vuelve tarde al
-  pool de Postgres. El arreglo es dinero y queda como riesgo hasta medir
-  (Técnica, FUGA-HILOS).
+- `tests/conftest.py`, la guarda de conexiones: una fixture de módulo o de
+  sesión que deje viva una conexión de aiosqlite haría rojo al primer test
+  que la usa, culpándolo a él. Hoy no hay ninguna (FUGA-HILOS-GUARDA).
 
 ## Riesgos que esperan a Emi (no son tareas: no se toman de esta cola)
 
+- Salir de `async for … in get_async_session()` sin cerrarlo, en producto:
+  los `get_db` de `main.py:173` y `auth/dependencies.py:21` (cada pedido),
+  `main.py:11688` (webhook de Mercado Pago), `:1986` (`api_logs`) y `:1695`
+  (arranque). La sesión se cierra tarde y el `rollback` de error de
+  `connection.py:101-104` no corre; en la suite da los «Event loop is
+  closed». Leído, no medido: el pool deshace lo abierto al devolverla.
+  Arreglarlo es pieza de producto con revisión fuerte: rompe
+  `test_cobro_corte1[al_confirmar_y_deshacer]` y esa pieza decide qué espera
+  (D230 a, recomendada; Técnica, FUGA-HILOS-GUARDA).
 - `client_memory._norm_desc` pierde las ligaduras («Arandela ﬁna» queda
   `arandela na`). Arreglarlo cambia `descripcion_normalizada` ya guardada:
   es producto con migración de datos, y nadie lo midió en facturas reales (D220).

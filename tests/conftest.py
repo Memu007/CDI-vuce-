@@ -69,6 +69,7 @@ def _set_sqlite_pragma(dbapi_connection, _):
     cursor.close()
 import asyncio  # noqa: E402
 import threading  # noqa: E402
+import time  # noqa: E402
 
 
 def pytest_sessionstart(session):
@@ -123,6 +124,42 @@ def pytest_sessionfinish(session, exitstatus):
             conexion._thread.join(timeout=2)
     except Exception:
         pass
+
+
+# Cada conexión abierta de aiosqlite tiene un hilo vivo con este nombre; mirar
+# los hilos ve la fuga por su efecto, venga del ayudante que venga.
+_HILO_AIOSQLITE = "(_connection_worker_thread)"
+_TOPE_CIERRE = 5  # segundos; un hilo de una conexión cerrada sale enseguida
+_hilos_antes = pytest.StashKey[set]()
+
+
+def _hilos_de_aiosqlite():
+    return {h for h in threading.enumerate() if h.name.endswith(_HILO_AIOSQLITE)}
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_setup(item):
+    item.stash[_hilos_antes] = _hilos_de_aiosqlite()
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(item, call):
+    reporte = yield
+    if call.when != "teardown" or _hilos_antes not in item.stash or reporte.failed:
+        return reporte
+    nuevos = _hilos_de_aiosqlite() - item.stash[_hilos_antes]
+    fin = time.monotonic() + _TOPE_CIERRE
+    for hilo in nuevos:
+        hilo.join(max(0, fin - time.monotonic()))
+    vivos = sorted(h.name for h in nuevos if h.is_alive())
+    if vivos:
+        reporte.outcome = "failed"
+        reporte.longrepr = (
+            f"{item.nodeid} dejó {len(vivos)} conexión(es) de aiosqlite abiertas "
+            f"después de {_TOPE_CIERRE} s: {vivos}. Cerrá el generador de la "
+            "sesión (aclose) y el bucle que la abrió."
+        )
+    return reporte
 
 
 @pytest.fixture(scope="session")

@@ -3,40 +3,67 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## CUIT-PERFIL: aceptada sobre `af396041` (informe `9ed8b9a9`) e integrada (2026-11-13)
+## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 
-Acta `REPRODUCCION-CUIT-PERFIL-2026-11-13.md`. **Traé mi rama con `merge`.**
-Reproduje el rojo (tus 5 casos con el `main.py` de `fdaa2da`), los 11
-sabotajes, `e2e_maria.sh` y las pantallas sobre `af396041`. El pytest entero
-sobre la unión con la rama de la Técnica: `6126 passed`, sin rojos. Tus cuatro supuestos, aceptados.
-z8 de `orden1`: leído y aceptado; tu forzado no lo reproduje (no quedó
-guion), y así consta en el acta.
+Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge.
 
-**D235: (a), decidido por la PM.** ESTUDIO-1 ya rechaza el verificador malo
-al guardar el CUIT del estudio; `/generate_maria` saltea esa regla para el
-CUIT del perfil y para `cuit_agr`. Va como pieza aparte, **CUIT-GENERAR**,
-después de SUFIJO-BORRADOR: primero los dos rojos (un TXT con un CUIT malo
-ya guardado en el perfil, y otro con `cuit_agr` malo), y el mensaje dice
-dónde corregirlo. El conteo de producción lo llevo yo a la nota del «dale».
+## SUFIJO-BORRADOR: devolución sobre `ee2ee3c` (informe `765db40`), sin integrar (2026-11-13)
 
-**`00000000000`** pasa `cuit_valido` (lo encontró mi adversario): es de la
-función, no de tu pieza. Queda como riesgo; no lo toques sin tarea.
+Acta `REPRODUCCION-SUFIJO-BORRADOR-2026-11-13.md`. Reproduje tu rojo y tu
+verde, chequeo-6 (igual al tuyo; el AVISO explicado alcanza), `e2e_maria.sh`
+sobre la entrega y sobre la unión, la suite y los sabotajes. El recargar y
+recuperar quedó bien. Gracias por declarar D236 y no ampliar.
 
-Tus cuatro propuestas pasaron a `COLA-LIMPIEZA.md`.
+**La causa.** `pintarSufijo` pinta sólo si la operación tiene sufijo; si no,
+el campo conserva el de la operación anterior y «Generar» lo copia. Tu
+informe dice que la herencia «venía de antes y no la cambié»: sin recargar
+es cierto, pero la entrega le suma un camino. Recargar, recuperar A con
+`AA(000123)`, «Nueva operación», B sin sufijo, «Generar»: sobre `9ed8b9a`
+frena con «Es obligatorio»; sobre `ee2ee3c` sale `/generate_maria` 200 y el
+TXT de B con `CSBTSVL=AA(000123)`, mientras los avisos se pidieron con `""`.
 
-**Cómo sigue, en este orden:**
-1. **SUFIJO-BORRADOR (D227)**, producto en `static/v2`. Primero un caso de
-   pantalla: sufijo de la operación, generar, volver, recargar, recuperar;
-   el campo tiene que mostrar el sufijo guardado. Mostralo en rojo sobre el
-   código de hoy; si no reproduce, se informa con la salida. Corre
-   `e2e_maria.sh`. En la misma pieza: mi otro negativo encontró que
-   `test_lo_que_se_esta_escribiendo_no_se_pisa` mira sólo Ajustes a
-   deducir; sacar `document.activeElement !== incluir` (`finalize.js:451`)
-   la deja en verde. Los dos campos como datos de ese caso.
-2. **CUIT-GENERAR (D235 a)**, producto con datos: revisión fuerte (§3).
-3. Los vencidos que quedan en `sabotajes-conocidos.txt`, uno por pieza.
+**D236: (b), decidido por la PM, dentro de esta pieza.** Es la misma causa.
+Lo que pido es comportamiento:
+- al entrar a «Validación», el campo muestra el sufijo de la operación en
+  curso, vacío si no tiene;
+- una B sin sufijo no genera: «Generar» frena con el aviso y no sale ningún
+  `POST /generate_maria`. Mirar sólo el campo no alcanza;
+- avisos, tarjeta del despachante y TXT usan el mismo valor.
 
-**Próxima D: D236.**
+La familia va como datos de un caso: B después de recuperar A, B sin
+recargar, y una operación con el sufijo borrado abierta después de otra con
+sufijo. Rojo sobre `ee2ee3c` antes del arreglo. Quien carga varias
+operaciones seguidas va a tener que escribir el sufijo en cada una: lo llevo
+a la nota del «dale». No va a `PREGUNTAS-DESPACHANTE`: la herencia no está
+escrita en ningún lado.
+
+**D237: (a), decidido por la PM**, como pieza aparte, después de esta
+devolución y de PAIS-NL, y antes de CUIT-GENERAR. Es tu archivo y espera una condición
+observable.
+
+**CUIT-GENERAR:** si ya lo empezaste, apartalo (`git stash` o una rama
+local). No lo mezcles con los commits de la devolución.
+
+**PAIS-NL (Emi, 13/11: «El código de país de países bajos es 423»).** Hoy la
+sigla «NL» y «NLD» dan 434 (HOLANDA) en el TXT, el catálogo y la pantalla:
+`PAISES_INDEC` repite la clave «NL» y gana la segunda, y `paises_maria.js`
+la manda a 434. Comportamiento pedido: toda sigla de Países Bajos da 423 en
+TXT, catálogo y pantalla, y la tabla queda sin claves repetidas. «PAISES
+BAJOS» ya da 423; «HOLANDA» escrito así queda en 434 (es otra entrada de la
+tabla oficial y Emi no la nombró). Ninguna otra entrada cambia de valor.
+`tests/test_catalogo3.py:291` y `:298` hoy fijan lo contrario: cambiarlas es
+tu rojo; las formas de escribirlo van como datos de un caso. En el informe,
+medido y no arreglado: qué queda guardado (operación, catálogo, memoria,
+`operation_items.origen`) cuando se carga «NL», y si algo ya guardado queda
+en 434 sin forma de distinguirlo de un «HOLANDA» puesto a propósito. Sin
+migración dentro de la pieza: eso va como riesgo.
+
+**Cómo sigue:** 1) esta devolución; 2) PAIS-NL (chica; es un código mal en
+el despacho y frena publicar); 3) D237 (a); 4) CUIT-GENERAR (D235 a),
+producto con datos, con revisión fuerte (§3); 5) los vencidos de
+`sabotajes-conocidos.txt`, uno por pieza.
+
+**Próxima D: D238.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
