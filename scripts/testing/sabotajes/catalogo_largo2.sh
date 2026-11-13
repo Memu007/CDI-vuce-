@@ -25,6 +25,7 @@ FALLAS=0
 T=tests/test_catalogo_largo2.py
 PRUEBA=("$PY" -m pytest -q --no-cov -p no:cacheprovider "$T")
 PRUEBA_PG=("$PY" -I scripts/testing/catalogo_largo2_postgres.py "$PG_URL")
+PRUEBA_PG_ITEMS=("$PY" -I scripts/testing/catalogo3_postgres.py "$PG_URL")
 
 # sabotaje <archivo> <nombre> <texto original> <texto saboteado> <lo que el rojo tiene que decir>...
 # Corre la prueba de "${CORRE[@]}".
@@ -53,6 +54,16 @@ PYEOF
     echo "ROJO? | $nombre: rojo (salida $codigo), pero sin «$falta»"
     grep -E "^E |^FALLA" <<<"$salida" | head -5; FALLAS=$((FALLAS+1))
   fi
+}
+
+# base_en_verde <nombre>: corre "${CORRE[@]}" sin sabotaje. Si ya está roja,
+# suma una falla y muestra el final de su salida.
+base_en_verde() {
+  local salida
+  git checkout -q -- proyecto_maria/
+  salida="$("${CORRE[@]}" 2>&1)" && return
+  echo "BASE  | $1 ya está en rojo sin sabotaje"; tail -n 3 <<<"$salida"; FALLAS=$((FALLAS+1))
+  return 1
 }
 
 M=proyecto_maria/main.py
@@ -197,10 +208,7 @@ sabotaje $CS "cambiar cualquier campo mueve la clave de una fila vieja" \
 
 if [ -n "$PG_URL" ]; then
   CORRE=("${PRUEBA_PG[@]}")
-  git checkout -q -- proyecto_maria/
-  if ! "${CORRE[@]}" >/dev/null 2>&1; then
-    echo "BASE  | la prueba en Postgres ya está en rojo sin sabotaje"; FALLAS=$((FALLAS+1))
-  else
+  if base_en_verde "la prueba en Postgres"; then
     sabotaje $M "el arranque no pasa el origen a text" \
       '("product_key", "descripcion", "origen", "vendor_nombre")' \
       '("product_key", "descripcion", "vendor_nombre")' \
@@ -250,11 +258,8 @@ if [ -n "$PG_URL" ]; then
       "FALLA | 2000 caracteres CJK por cambiar la descripción"
   fi
   # operation_items sólo lo mira catalogo3_postgres.py
-  CORRE=("$PY" -I scripts/testing/catalogo3_postgres.py "$PG_URL")
-  git checkout -q -- proyecto_maria/
-  if ! "${CORRE[@]}" >/dev/null 2>&1; then
-    echo "BASE  | catalogo3_postgres.py ya está en rojo sin sabotaje"; FALLAS=$((FALLAS+1))
-  else
+  CORRE=("${PRUEBA_PG_ITEMS[@]}")
+  if base_en_verde "catalogo3_postgres.py"; then
     sabotaje $M "el arranque no pasa el origen de los ítems a text" \
       '                            ("operation_items", ("origen",))):' \
       '                            ):' \
