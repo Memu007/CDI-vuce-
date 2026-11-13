@@ -1480,12 +1480,13 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const t = await abrir(ctx);
     await t.waitForLoadState('networkidle');  // como en (m)
     await listaParaGenerar(t, 'GEN-Z22');
-    const soltar = await retenerUsuario(t, 3000);
+    // Retenida hasta volver a entrar: soltada antes, sale sin sesión y la pestaña va al login.
+    const soltar = await retenerUsuario(t);
     const salida = await salir(ctx);
     if (!salida.ok()) falla('no se pudo salir: ' + salida.status());
     await entrar(ctx, a);
-    const fin = await apretarGenerar(t);
     soltar();
+    const fin = await apretarGenerar(t);
     if (fin !== 'generado') falla(que + ' y no generó: ' + fin);
     const s = await enElServidor(a);
     if (s.operaciones !== 1) falla(que + ' y A tiene ' + s.operaciones + ' operaciones en el servidor');
