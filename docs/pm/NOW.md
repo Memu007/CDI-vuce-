@@ -251,7 +251,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-13 19:08 UTC: Emi dio «dale 7436c6e5» (19:0x UTC); NO fusionado: falta su sí a la copia de la base (migra al arrancar); preguntadas también las variables. CI verde en 7436c6e5 y 6c8a29ef (a276c261 cortada a 20 min). Técnica sin pieza, rutina apagada; MARIA en SUFIJO-BORRADOR.
+2026-11-13 19:05 UTC: Emi dio «dale 7436c6e5» (19:0x UTC); NO fusionado: falta su sí a la copia de la base (migra al arrancar); preguntadas también las variables. CI verde en 7436c6e5 y 6c8a29ef (a276c261 cortada a 20 min). Técnica sin pieza, rutina apagada; MARIA en SUFIJO-BORRADOR.
 
 ## /compact conservar de la PM principal
 
