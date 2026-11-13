@@ -2,146 +2,119 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## INTERMITENTES: maria1c y maria7 dan lo mismo siempre
+## ORDEN1-INTERMITENTE: z22 da lo mismo en cada corrida
 
 | | SHA |
 |---|---|
-| base | `90b66c5e33cc36b8d563636554b7ca13983696c3` |
-| arnés: las pantallas esperan la primera pantalla del tablero | `aa002538847b99f82819ad5819e63868d695f4d9` |
-| arnés: `forzar_arranque.js` carga el mismo playwright | `2d76e41963ade79fc96b547811e581959082c17b` |
+| base | `74e3cc74ec97a72a80d12b5311489f6532e9d0ae` |
+| arnés: z22, `forzar_orden1.js`, TOPE 900, maria1c con `chromium.launch()` | `8e775b2ba325774ebae831af7aa60e7815a3dc14` |
 | informe | el commit `docs:` que trae este archivo |
 
-**Resultado.** La causa de los dos intermitentes es una sola: la subida le gana al arranque del tablero. Con la carrera forzada por la prueba, la pantalla de hoy da las dos FALLAS de siempre y, con el arreglo, las dos dan verde. Producto +0/−0. El arreglo es una espera a una condición que la pantalla muestra (`[data-screen="upload"].is-active`), sin espera fija.
+**Resultado.**
+- La FALLA de z22 sale de una espera fija del propio caso.
+  - z22 retenía `/auth/current_user` durante 3 s fijos.
+  - Si `salir` + `entrar` tarda más de 3 s, la consulta retenida se suelta todavía sin sesión y vuelve con 401. Con carga, bcrypt se pone lento y eso pasa.
+  - Ante ese 401 la pestaña hace lo que tiene escrito: va al login (`/?next=%2Fdashboard`). `#validatingGenerate` queda en null y aparece la FALLA de tu corrida.
+- El arreglo saca la espera fija. La consulta queda retenida hasta volver a entrar, y recién ahí se suelta y se aprieta Generar. La condición que se espera es observable: que `entrar` haya vuelto.
+- La carrera se puede forzar, y las dos salidas están abajo:
+  - la pantalla de hoy da la FALLA de siempre;
+  - la arreglada da verde.
+- Producto +0/−0. También van los otros dos pedidos: `TOPE` por defecto 900 (D212 a) y `pantalla_maria1c.js` con `chromium.launch()` (D226).
 
 ## Decisiones
 
-**D211. Defecto de producto: una subida anterior a la primera pantalla del tablero se pierde o no prende el semáforo.**
-`app_v2.js` (alrededor de la línea 958) espera `/auth/current_user` o 4 s y recién ahí hace `goTo('upload')` si no hay pantalla activa. Si la usuaria sube antes:
-- si la subida ya terminó (maria1c): fue a revisión sin `currentScreen`, `goTo` no dispara `cdi:screen-leave`, el semáforo no se muestra (`#semaforoFAB hidden data-kind=empty`);
-- si la subida sigue en vuelo (maria7): `goTo('upload')` llama a `onEnter`, que hace `++uploadTicket` (`upload.js:706`) y la respuesta se descarta.
-Le pasa a una usuaria real con la red lenta. No lo toqué: la tarea es sólo arnés.
-- (a) Pieza de producto: que el `goTo` inicial no pise una pantalla ya activa ni una subida en curso. Es `app_v2.js` y `upload.js`, que hoy toca Dev MARIA.
-- (b) Dejarlo: el arnés ya no depende de eso.
-Recomiendo (a), para quien tenga abierto `upload.js`; `forzar_arranque.js` ya es su reproducción; que el arreglo de producto haga verde las pantallas de la base bajo la carrera forzada no lo probé.
+**D213. Un 401 que llega tarde, de una consulta hecha antes de volver a entrar, manda al login a una sesión que ya es válida.**
+- Es lo que forzó la FALLA. En el arnés la causa era la espera fija, y ya no queda.
+- A una usuaria real le puede pasar algo parecido: sale y vuelve a entrar en otra pestaña mientras una consulta de esta pestaña sigue en vuelo con la red lenta. No lo reproduje fuera del arnés.
+- Opciones:
+  - (a) Pieza de producto para quien tenga `app_v2.js`: antes de navegar al login por un 401, releer `current_user`. Si ahora hay sesión, no navegar.
+  - (b) Dejarlo. El arnés ya no depende de eso.
+- Recomiendo (b) por ahora. Hace falta salir y entrar en el hueco de una sola consulta, y lo peor que pasa es volver al login con la sesión válida (un clic más), sin pérdida de datos. Si Emi lo ve en uso real, (a), y `forzar_orden1.js` ya es su reproducción.
 
-**D212. `orden1` tarda 581 s contra un tope de 600 por pantalla.**
-En la corrida completa la corté yo con `TOPE=300` (rc=124 después de su último OK). Sola, con el tope por defecto, dio verde en 581 s: 20 s de margen. En una máquina más cargada se va a cortar.
-- (a) Subir el `TOPE` por defecto de `correr_pantallas.sh` a 900.
-- (b) Dejarlo.
-Recomiendo (a): una línea del arnés, y un tope sigue existiendo.
-
-## Respuestas a lo que pediste
-
-- **¿Tus corridas sueltas usaron un servidor ya tibio?** Sí. Las corridas sueltas de antes iban contra un uvicorn ya levantado y tibio, donde `/auth/current_user` contesta enseguida y la carrera casi no se da. El corredor levanta un servidor nuevo por pantalla; ahí la primera consulta tarda y la subida le gana.
-- **maria1c, confirmada.** Con la consulta de sesión retenida hasta que la subida terminó, da la misma FALLA que la intermitente (abajo).
-- **Tu hipótesis del escuchador de `upload.js`:** no es. El input es HTML fijo (`dashboard_v2.html:116`), los scripts van con `defer` (`app_v2.js` en la línea 1741, `upload.js` en la 1751) y `upload.js` hace `init()` en `DOMContentLoaded` y otra vez en `onEnter` si hace falta (`upload.js:710`). El escuchador está; lo que falla es lo de D211.
-
-## Forma repetible
-
-`scripts/testing/forzar_arranque.js` se carga antes de la pantalla con `NODE_OPTIONS`. Retiene `/auth/current_user` y lo suelta:
-- `maria1c` (modo `terminada`): cuando la página ya pasó a revisión;
-- `maria7` (modo `en_vuelo`): cuando sale la subida, y la subida contesta recién cuando el tablero eligió su primera pantalla.
-No toca la pantalla ni el producto. Cada log dice `forzar_arranque: <modo>`.
-
-Sobre la pantalla de hoy (90b66c5e):
-```
-ROJA  maria1c        rc=1   <S>/forz-hoy3/maria1c.log |        - waiting 500ms
-ROJA  maria7         rc=1   <S>/forz-hoy3/maria7.log | FALLA: la pregunta por la fecha no aparece al subir
-resumen: 0 verdes, 2 rojas: maria1c maria7
-```
-En `maria1c.log`:
-```
-FALLA: locator.click: Timeout 30000ms exceeded.
-  - locator resolved to <div hidden="" tabindex="0" role="button" id="semaforoFAB" data-kind="empty" class="semaforo-fab" aria-label="Estado de validacion">…</div>
-```
-Con el arreglo (2d76e419), bajo la misma condición:
-```
-verde maria1c        rc=0   <S>/forz-arreglo3/maria1c.log | OK: pantalla MARIA-1c
-verde maria7         rc=0   <S>/forz-arreglo3/maria7.log | PANTALLA MARIA-7 OK
-resumen: 2 verdes, 0 rojas
-```
-Corrí cada lado tres veces (`forz-hoy`, `forz-hoy2`, `forz-hoy3`; `forz-arreglo`, `forz-arreglo2`, `forz-arreglo3`): las tres rojas y las tres verdes, iguales. Muestro la tercera.
-
-## sesion1
-
-`pantalla_sesion1.js` lleva `// corredor: servidor ENVIRONMENT=testing`. Corrida sin forzar sobre aa002538 (maria1c, maria7 y sesion1: `3 verdes, 0 rojas`), con una vigía que lee el entorno de cada uvicorn:
-```
-uvicorn pid=1537 ENVIRONMENT=development CDI_DATA_DIR=maria1c.Ok7o
-uvicorn pid=1786 ENVIRONMENT=development CDI_DATA_DIR=maria7.r90f
-uvicorn pid=2011 ENVIRONMENT=testing CDI_DATA_DIR=sesion1.MOAJ
-```
-sesion1: «OK: el perfil pide la contraseña sólo al cambiar el email y no saca a nadie al login».
-
-## Huérfano
-
-**Corrijo el informe anterior.** Decía que el corredor «lo retira al salir (también si se corta con Ctrl-C, por el `trap`)». Era falso para un TERM: bash no atiende el trap mientras espera a un hijo en primer plano, y quedaban el uvicorn y el worktree. Ahora el hijo va en segundo plano con `wait` (y `exec`, para que `$!` sea el proceso real), y el trap mata la pantalla y el uvicorn.
-
-TERM a mitad de `borrador1`, corredor de la base:
-```
-antes:   2346 2325 python … -m uvicorn proyecto_maria.main:app --host 127.0.0.1 --port 60493
-         2422 2421 node node scripts/testing/pantalla_borrador1.js
-rc del corredor: 143
-2 s después: 2346 1 python … uvicorn …        (huérfano, ppid 1; también quedó el worktree)
-```
-Mismo TERM, corredor nuevo:
-```
-antes:   2602 2581 python … uvicorn …
-         2675 2674 node … pantalla_borrador1.js
-rc del corredor: 143
-2 s después: (nada vivo)
-worktrees del corredor: 0
-```
-
-## Corrida completa (30 pantallas, aa002538, `TOPE=300`)
-
-```
-ROJA  maria3         rc=1   … | Node.js v22.22.0
-ROJA  maria4         rc=1   … |        - waiting 500ms
-ROJA  maria5         rc=1   … | FALLA: no se generó el TXT: {"detail":"Falta el CUIT del despachante (CDDTAGR)…
-ROJA  orden1         rc=124 … | FALLA: page.waitForFunction: Target page, context or browser has been closed
-ROJA  subitems1      rc=1   … | FALLA: no se generó el TXT: {"detail":"Falta el CUIT del despachante (CDDTAGR)…
-resumen: 25 verdes, 5 rojas: maria3 maria4 maria5 orden1 subitems1
-```
-- maria3, maria4, maria5 y subitems1: las conocidas de MARIA, que la tarea dice no tocar.
-- orden1: la corté yo con el tope (D212). Sola sobre 2d76e419, con el tope por defecto: `verde orden1 rc=0 | OK: ORDEN-1 en el navegador`, `rc=0 segundos=581`.
-- aa002538 y 2d76e419 se diferencian sólo en `forzar_arranque.js`, que sin `NODE_OPTIONS` no se carga.
-
-## chequeo-6
-
-```
-chequeo-6 90b66c5e33cc36b8d563636554b7ca13983696c3..2d76e41963ade79fc96b547811e581959082c17b: avisos para mirar, no un veredicto
-producto +0/−0
-arnés +75/−9
-historia (grep de §6, sin líneas movidas): vacío
-archivos de producto:
-avisos: 0
-```
+Las decisiones que siguen abiertas de antes son D205, D206 y D208 (las tiene Emi). D211 y D212 ya las contestaste.
 
 ## Comandos
 
 ```bash
-# 1. La carrera forzada sobre la base: tiene que dar 0 verdes, 2 rojas: maria1c maria7
-NODE_OPTIONS="--require $PWD/scripts/testing/forzar_arranque.js" SOLO="maria1c maria7" \
-  scripts/testing/correr_pantallas.sh 90b66c5e33cc36b8d563636554b7ca13983696c3 /tmp/forz-base
-# 2. La misma sobre la entrega: tiene que dar 2 verdes, 0 rojas, y cada log, «forzar_arranque: terminada» o «en_vuelo»
-NODE_OPTIONS="--require $PWD/scripts/testing/forzar_arranque.js" SOLO="maria1c maria7" \
-  scripts/testing/correr_pantallas.sh 2d76e41963ade79fc96b547811e581959082c17b /tmp/forz-entrega
-# 3. Huérfano: cortá con TERM a mitad de una pantalla; después, ps no muestra uvicorn ni node de la pantalla
-SOLO=borrador1 scripts/testing/correr_pantallas.sh HEAD /tmp/huerfano & sleep 60; kill -TERM $!; sleep 2; ps -eo pid,ppid,args | grep -E 'uvicorn|pantalla_' | grep -v grep
+PY=<python del venv>; F=$PWD/scripts/testing/forzar_orden1.js
+# 1. Arreglo con la carrera forzada: «la consulta del hueco seguía retenida a los 10 s», «OK A salió, volvió a entrar y generó enseguida…», resumen 1 verdes, rc=0
+NODE_OPTIONS="--require $F" CASOS=z22 SOLO=orden1 PY=$PY scripts/testing/correr_pantallas.sh 8e775b2b /tmp/f_arreglo; echo rc=$?; grep -E 'forzar_orden1|FALLA|OK A salió' /tmp/f_arreglo/orden1.log
+# 2. Base con la misma carrera: «volvió antes de entrar: 401», «FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')», rc=1
+NODE_OPTIONS="--require $F" CASOS=z22 SOLO=orden1 PY=$PY scripts/testing/correr_pantallas.sh 74e3cc74 /tmp/f_base; echo rc=$?; grep -E 'forzar_orden1|FALLA' /tmp/f_base/orden1.log
+# 3. Sabotajes de orden1: 29 ROJO, «sabotajes sin rojo: 0», rc=0
+PY=$PY scripts/testing/sabotajes/orden1b.sh 8e775b2b
+# 4. Corredor completo: «resumen: 30 verdes, 0 rojas», rc=0
+PY=$PY scripts/testing/correr_pantallas.sh 8e775b2b /tmp/pant
+# 5. chequeo-6: producto +0/−0, avisos: 1 (ver abajo)
+$PY docs/pm/herramientas/chequeo-6.py 74e3cc74 8e775b2b
 ```
-Ojo: el corredor toma desde el SHA las pantallas y `forzar_arranque.js` se carga desde tu árbol; en el 1 tiene que ser un árbol con 2d76e419.
 
-## No corrido
+En el comando 2 el preload sale de mi árbol por ruta absoluta, porque la base no lo tiene. El preload se activa sólo en `pantalla_orden1` e imprime `forzar_orden1: activo`; en cualquier otra pantalla no hace nada.
 
-- **Ctrl-C (SIGINT):** no lo pude probar. Un bash no interactivo en segundo plano ignora SIGINT, así que mandarle INT no reproduce un Ctrl-C de una terminal. El trap `INT` está, sin prueba.
-- **pytest:** no aplica; la pieza es sólo arnés (producto +0/−0).
-- **Subagentes adversariales y `/code-review`:** la tarea dice «sin adversarios»; no los corrí.
+## Puertas, sobre 8e775b2b
 
-## Supuestos y riesgos
+**Forma repetible, con el corredor oficial (comandos 1 y 2):**
 
-- `SOLO` (elegir pantallas en el corredor) es nuevo: lo necesité para correr sólo maria1c y maria7. Se puede sacar.
-- La vigía del entorno y el script del TERM son míos, en el scratchpad, no en el repo.
-- `forzar_arranque.js` envuelve `chromium.launch`, `newContext` y `newPage`: si una pantalla abre el navegador de otra forma, no fuerza nada; el log lo muestra porque falta la línea del modo.
-- Archivos de producto tocados: ninguno.
+Arreglo, 8e775b2b:
+```
+verde orden1         rc=0   <S>/o1/f_8e775b2b/orden1.log | OK: ORDEN-1 en el navegador
+resumen: 1 verdes, 0 rojas
+rc=0
+forzar_orden1: activo
+forzar_orden1: la consulta del hueco seguía retenida a los 10 s
+OK A salió, volvió a entrar y generó enseguida: genera sin falsos bloqueos
+OK: ORDEN-1 en el navegador
+```
 
-/compact conservar: Dev 1 técnica, rama claude/dev-tecnica; entregué INTERMITENTES (aa002538, 2d76e419 + informe); D211 (defecto de producto del arranque, recomiendo pieza para quien tenga upload.js) y D212 (TOPE 900, recomiendo); tests/test_conexiones1.py sin seguimiento (su copia está en el parche); espero veredicto.
+Base, 74e3cc74:
+```
+ROJA  orden1         rc=1   <S>/o1/f_74e3cc74/orden1.log |     at UtilityScript.<anonymous> (<anonymous>:1:44)
+resumen: 0 verdes, 1 rojas: orden1
+rc=1
+forzar_orden1: activo
+forzar_orden1: la consulta del hueco volvió antes de entrar: 401
+FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')
+```
+
+Cómo fuerza la carrera `forzar_orden1.js`:
+- Cuando la pantalla sale, el login siguiente espera a que la pestaña pida `current_user` y a que esa consulta vuelva, con un techo de 10 s.
+- En la base la consulta se suelta sola a los 3 s, sin sesión: vuelve 401 y la pestaña va al login.
+- En el arreglo la consulta sigue retenida a los 10 s, porque sólo se suelta después de entrar. Ahí el preload deja pasar el login.
+- Las dos ramas imprimen por cuál pasaron.
+
+**Sabotajes (`orden1b.sh 8e775b2b`):**
+- 29 ROJO, `sabotajes sin rojo: 0`, `rc=0`.
+- El de z22: `ROJO  | con la sesión cambiada no escribe aunque sea del mismo usuario: dice «FALLA: A salió, volvió a entrar y generó enseguida y no generó»`.
+
+**Corredor completo:**
+- Salida: `resumen: 30 verdes, 0 rojas`, `rc=0`, con el `TOPE` nuevo de 900.
+- orden1 dio `OK: ORDEN-1 en el navegador`, con 71 líneas OK.
+- maria1c dio `OK: pantalla MARIA-1c`, ya con `chromium.launch()`.
+
+**chequeo-6, 74e3cc74..8e775b2b:**
+```
+chequeo-6 HEAD~1..HEAD: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +55/−5
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  AVISO creció una función de más de 150: scripts/testing/pantalla_orden1.js:284 <anónima> 1584 → 1585, 1 en su propio cuerpo (§6: lo nuevo va aparte)
+avisos: 1
+```
+
+Sobre el AVISO:
+- La línea neta que suma es el comentario del porqué («Retenida hasta volver a entrar: soltada antes, sale sin sesión y la pestaña va al login.»). Está para que nadie vuelva a poner un temporizador.
+- El resto del cambio en z22 reordena líneas que ya estaban.
+- Partir el cuerpo anónimo de 1585 líneas va a `COLA-LIMPIEZA.md`. Lo anoto para que lo encole la PM, porque yo no edito ese archivo.
+
+## Riesgos y lo no corrido
+
+- No corrí la suite de pytest: no toqué producto ni tests de Python.
+- Tampoco corrí `/code-review`, adversarios, smoke ni el ataque de aislamiento: la tarea dice sin adversarios y es sólo arnés.
+- Que el 401 tardío le pase a una usuaria real (D213) no lo probé fuera del arnés.
+- Mientras z22 está retenida, si `entrar` falla, `falla()` corta el caso antes de `soltar()`. Pierde la consulta retenida, pero el proceso termina igual. No es un rojo silencioso.
+- `forzar_orden1.js` envuelve `chromium.launch` → `newContext`. Si orden1 abre el navegador de otra forma, el preload no fuerza nada. Se nota porque falta la línea `forzar_orden1: activo`.
+- `tests/test_conexiones1.py` sigue sin seguimiento, por regla; su copia está en el parche.
+- Archivos de producto tocados: ninguno. Del arnés toqué `pantalla_orden1.js`, `pantalla_maria1c.js`, `correr_pantallas.sh` y `forzar_orden1.js` (nuevo). `pantalla_orden1.js` queda libre para Dev MARIA (D225).
+
+/compact conservar: Dev 1 técnica, rama claude/dev-tecnica; entregué ORDEN1-INTERMITENTE (arnés 8e775b2b + informe); D213 (401 tardío tras volver a entrar manda al login, recomiendo b); AVISO de chequeo-6 por la función anónima de pantalla_orden1.js para la cola; tests/test_conexiones1.py sin seguimiento (su copia está en el parche); espero veredicto.
