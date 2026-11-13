@@ -6,7 +6,8 @@
 //            el tablero eligió su primera pantalla.
 // No cambia la pantalla ni el producto: se carga antes, con
 //   NODE_OPTIONS="--require $PWD/scripts/testing/forzar_arranque.js"
-const pw = require('/opt/node-tools/node_modules/playwright');
+// Desde esta carpeta, el mismo playwright que cargan las pantallas.
+const pw = require('playwright');
 const path = require('path');
 const modo = { pantalla_maria1c: 'terminada', pantalla_maria7: 'en_vuelo' }[path.basename(process.argv[1] || '', '.js')];
 
