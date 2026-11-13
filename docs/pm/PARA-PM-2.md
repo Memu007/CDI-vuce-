@@ -2,286 +2,297 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## D199 y `sabotaje_valor1.sh`: entregados en `fe0f1b4` (sólo arnés). D199 cerrada; en `valor1` queda verde el 24 y va como D222
+## D218 y D219: entregadas en `1f8ffa6` (sólo arnés). Dos decisiones: D223 y D224
 
 | qué | SHA |
 |---|---|
-| base (mi entrega anterior) | `0609e14` |
-| `valor1`: los cinco sabotajes perdidos, sobre el código de hoy | `38ee8e1` |
-| `valor1`: su línea de `sabotajes-conocidos.txt`, con el motivo de hoy | `a625d11` |
-| tu cabeza `2de2396`, integrada con `merge` | `6c87747` |
-| D199: el sabotaje pasa de `catalogo_largo2.sh` a `catalogo3.sh` | `5eb1540` |
-| D199: sale la línea de `catalogo_largo2` de `sabotajes-conocidos.txt` | `a2ec4bc` |
-| tu cabeza `08ae965`, integrada con `merge`: **el que se entrega** | `fe0f1b4` |
+| base (mi informe anterior) | `4b5ef68` |
+| D219: un proveedor de nombre largo con su id escrito | `9120475` |
+| D218: sabotaje que saca `operation_items` de la migración a `text` | `8f98a31` |
+| tu cabeza `6dc251e`, integrada con `merge` | `d5a96aa` |
+| `catalogo3_postgres.py` corre solo en una consola limpia (hallazgo del adversario) | `2211e6b` |
+| el encabezado del guion nombra sus dos arneses | `ea3256e` |
+| tu cabeza `67c8ff0`, integrada con `merge` | `636b889` |
+| el chequeo de base de los dos arneses, una vez y con su causa (hallazgo de `/code-review`): **el que se entrega** | `1f8ffa6` |
 | informe | el commit siguiente |
 
-**Resultado.** Producto: **+0/−0** en las dos.
+**Resultado.** Producto: **+0/−0**. Arnés: +14/−0, +3/−2 y +14/−9 en los tres
+tramos míos (abajo, `chequeo-6` entero).
 
-- **D199.** La mutación `NFD`→`NFKD` de `_normalize` está ahora en
-  `catalogo3.sh`, que corre `tests/test_catalogo3.py`, y espera el id del
-  proveedor «Industrias García Nº1». `catalogo3.sh` entero: 51
-  `ROJO`, `fallas: 0`, sale 0. `catalogo_largo2.sh` entero con Postgres 16:
-  37 `ROJO`, `fallas: 0`, sale 0. Su línea salió de `sabotajes-conocidos.txt`.
-- **`sabotaje_valor1.sh`.** Las cinco anclas perdidas (13, 15, 16, 29, 30)
-  están otra vez sobre código que existe una sola vez. El guion entero da 30
-  `ROJO` y una `FALLA`: el sabotaje 24, que no estaba entre los cinco, queda
-  verde con su ancla presente (D222). Con el 24 salteado sólo en una copia
-  local: 30 `ROJO`, sale 0. Su línea **sigue** en `sabotajes-conocidos.txt`,
-  con el motivo de hoy, hasta que decidas D222.
+- **D218.** `catalogo_largo2.sh`, con `PG_URL`, corre ahora también
+  `catalogo3_postgres.py`: primero sin sabotaje y después con la tupla
+  `("operation_items", ("origen",))` sacada de `_migrate_catalogo_sin_tope`.
+  Guion entero con Postgres 16, **en una consola sin `DATABASE_URL` ni
+  `ENVIRONMENT`**, sobre `1f8ffa6`: **38 `ROJO`, `fallas: 0`, sale 0**. La línea
+  nueva:
+  `ROJO  | el arranque no pasa el origen de los ítems a text: dice «FALLA | operation_items.origen pasa a text y la fila vieja queda igual»`.
+- **D219.** `test_un_proveedor_latino_conserva_su_id` tiene un dato más: un
+  nombre de 71 caracteres con su id de 60 escrito a mano. Con el corte
+  cambiado de 39 a 38 y el resumen de 20 a 21 (el id sigue midiendo 60) es
+  **la única** prueba del catálogo que se pone roja: `1 failed, 185 passed`.
+  Antes de este dato esa mutación pasaba entera en verde.
 
-`anclas_perdidas.py fe0f1b4` no da ninguna fila de los tres guiones.
+**Mi primera versión estaba mal y no lo vi yo.** El bloque nuevo daba
+`BASE  | catalogo3_postgres.py ya está en rojo sin sabotaje` y salida 1 en una
+consola sin `DATABASE_URL` ni `ENVIRONMENT`: mi corrida de 38 `ROJO` sobre
+`8f98a31` los tenía exportados por mi propio envoltorio. Lo encontró el
+adversario. Tu comando de reproducción lo habría pisado. Arreglado en
+`2211e6b`; todo lo de este informe corrió con `env -u DATABASE_URL -u
+ENVIRONMENT`.
+
+`anclas_perdidas.py 1f8ffa6`: sale 0, 22 filas, ninguna de `catalogo_largo2.sh` ni de `catalogo3.sh`. Las 22 son de `sabotaje_maria1d.sh`, `maria5`, `maria7`, `maria8`, `valor1b`, `e2e_rerun.sh`, `foco_cliente1.sh`, `guardar2.sh` y `limpieza1.sh`: las mismas que sobre `8f98a31`.
 
 ## Decisiones
 
-**D221. El sabotaje 13 de `valor1` cambió de sentido.** Antes decía «un
-ajuste mal escrito viaja como texto (daría 422 al generar)» y cambiaba
-`isFinite(n) ? n : null` por `: v`. Esa regla se invirtió a propósito: hoy
-`ajusteDelPedido` manda tal cual lo que no se lee, para que el servidor lo
-diga, y `test_el_pedido_manda_los_ajustes_y_nunca_algo_que_frene_el_txt`
-espera `"mal escrito"` en el pedido. El sabotaje viejo no tiene qué atacar.
-Lo reescribí con la regla de hoy: manda vacío lo que no se lee
-(`r.error ? null : r.valor`). Rojo: `At index 4 diff: None != 'mal escrito'`.
-Lo que encontró `/code-review` y comprobé leyendo: es **la misma mutación**
-que la de `sabotaje_separadores1b.sh:102` (`return r.valor;`). En
-`montos_ar.js` todo camino con error devuelve `valor: null`, así que las dos
-dejan el producto igual; sólo cambia el caso que se espera en rojo.
-- (a) Queda reescrito, como está. El caso de `test_valor1.py` conserva un
-  sabotaje en su guion para la mitad «viaja tal cual».
-- (b) Se retira (tres líneas menos). **Recomiendo (b)**: no distingue nada
-  que el otro guion no distinga, y la misma línea del producto queda anclada
-  en tres guiones (`valor1`, `separadores1`, `separadores1b`), que se vencen
-  juntos. Ese caso de `test_valor1.py` sigue nombrado por el sabotaje 14.
-No lo retiré yo: sacar un sabotaje lo decidís vos. Si elegís (b) y D222 (a),
-van en la misma vuelta.
+**D223. El candado de la migración de claves del catálogo no tiene sabotaje
+commiteado.** `_migrate_catalogo_claves` (`main.py:1339`) toma
+`pg_advisory_xact_lock(7302551)` con `lock_timeout` de 5 s para que dos
+workers no la corran a la vez. Los dos chequeos que lo miran viven sólo en
+`catalogo3_postgres.py`, y hasta esta pieza ningún guion de sabotaje corría
+ese arnés. El encabezado de `catalogo3.sh` ya lo decía («el candado de la
+migración sólo se ve en Postgres»): no es un olvido, es un hueco anotado sin
+negativo. Es una migración (§3).
 
-**D222. El sabotaje 24 de `valor1` (`mal_escrito_se_borra`) queda verde:
-retirarlo.** Cambia `!ajusteMalEscrito(op.ajustes_incluir)) {` por `true) {`
-en `pintarValor`. Con esa mutación: `75 passed`. Sacando también la guarda de
-«a deducir»: `75 passed`.
-Por qué: desde que el campo es de texto, `op.ajustes_incluir` guarda lo
-escrito tal cual. Lo escriben sólo el propio campo y el botón del descuento
-(que también escribe el campo), así que repintar pone lo mismo que ya está.
-La guarda del producto no cambia nada que se vea.
-- (a) Retirar el sabotaje 24 (tres líneas; el mensaje final pasa a 30).
-  **Recomiendo (a)**. Y propongo una línea para la cola de limpieza: sacar
-  las dos guardas `!ajusteMalEscrito(...)` de `pintarValor`
-  (`finalize.js:451` y `:454`), que hoy no hacen nada.
-- (b) Dejarlo y escribir un caso que lo distinga. No lo recomiendo: el único
-  estado donde la guarda cambia algo es uno que la pantalla no produce (el
-  ajuste mal escrito en la operación y otra cosa en el campo), y ahí la
-  guarda deja el campo sin mostrar lo que el aviso dice que está mal.
+Lo que medí a mano, en un worktree fuera del repo:
 
-**Para la cola de limpieza (la escribís vos; son propuestas):**
-- `finalize.js`, `pintarValor`: sacar la guarda `!ajusteMalEscrito(...)` de
-  las dos líneas que repintan los ajustes; no cambia nada que se vea (D222).
-- `sabotaje_valor1.sh`: el sabotaje 10 está anclado en un comentario del
-  producto (`// Ya usado como ajuste, no se vuelve a ofrecer.`, línea 108) y
-  el ancla del 28 lleva un comentario al final de la línea (187). Ya estaban
-  así; no los toqué.
+| se saca | sobre | resultado |
+|---|---|---|
+| `pg_advisory_xact_lock(7302551)` (`main.py:1354`) | `8f98a31` | `FALLA \| dos workers esperan juntos la migración y arrancan los dos: juntos False, [True, True]`, los otros 9 `OK`, `1 fallas`, `rc=1`, 133 s |
+| `SET LOCAL lock_timeout = '5s'` (`main.py:1352`) | `ea3256e` | 6 `OK` y un `Traceback` donde va «un worker arranca mientras otro tiene tomada la migración de claves», `rc=1`, 610 s |
+
+Del segundo, mi filtro guardó sólo la palabra `Traceback`: por los 610 s leo
+que es el `communicate(timeout=600)` del arnés, **no vi el texto de la
+excepción**. Como sabotaje del guion daría `ROJO?` (rojo sin el texto
+esperado), que cuenta como falla.
+
+- (a) Pieza chica: un sabotaje del candado en el bloque nuevo de
+  `catalogo_largo2.sh`. Suma unos 2 minutos al guion. El `lock_timeout` queda
+  como riesgo anotado.
+- (b) Nada: los dos quedan como riesgo anotado.
+- (c) Los dos. Para el `lock_timeout` hay que cambiar el arnés: que espere
+  bastante menos que 600 s y lo diga con una `FALLA` propia.
+
+Recomiendo **(a)**. El candado es lo que evita que dos workers rearmen claves
+a la vez, y su negativo es barato y con nombre. El del `lock_timeout` hoy
+cuesta 10 minutos por corrida y no dice qué falló; (c) lo arregla, pero es
+tocar un arnés que anda para cubrir una línea que sólo cambia cuánto espera el
+arranque.
+
+**D224. El borde del corte de `_vendor_key` no lo fija ninguna prueba.** Lo
+encontró el adversario con una sola prueba; lo medí con los cuatro archivos
+`tests/test_catalogo*.py` (186 pruebas), sobre `ea3256e`:
+
+| mutación en `catalog_service.py` | resultado |
+|---|---|
+| `if len(clave) <= _MAX_VENDOR_ID:` → `<` | `186 passed` |
+| `_MAX_VENDOR_ID = 60` → `70` | `186 passed` |
+
+Qué rompería cada una (**leído, no corrido**): con `<`, un proveedor cuya
+clave mide justo 60 pasa a tener id cortado con resumen; el arranque rearma
+las filas de 60 o más, así que no se pierden. Con el tope en 70, una clave de
+61 a 70 quedaría entera y el guardado la rechazaría con `vendor_id inválido`
+(`_VENDOR_ID_RE` admite hasta 60, `catalog_service.py:97`; es el rechazo que
+dio el id de 61 en la tabla de D219): ese proveedor no podría guardar
+catálogo.
+
+- (a) Dos datos más en la misma prueba: un nombre cuya clave mide 60 (queda
+  entera) y uno de 61 (se corta). Dos líneas, como D219.
+- (b) Riesgo anotado.
+
+Recomiendo **(a)**: con D219 el formato del corte quedó fijado y el borde no;
+son dos líneas. No lo hice acá porque D219 pedía un dato.
 
 ## Supuestos (reversibles)
 
-1. **D199: qué rojo espera.** De tus dos sugerencias tomé el id de
-   proveedor: `FAILED …::test_un_proveedor_latino_conserva_su_id[Industrias Garc`.
-   Es el daño que se ve: el `vendor_id` guardado deja de coincidir
-   (`industrias_garcia_no1` en vez de `industrias_garcia_n_1`). El nombre del
-   sabotaje pasó a `«Nº» en el nombre se lee «No» y el proveedor latino
-   cambia de id`; el viejo («la clave junta ﬁ con fi») describía algo que el
-   producto hace a propósito.
-2. **D199: `test_acelerar_no_cambia_ninguna_clave`** también se pone roja con
-   esa mutación (abajo), pero ningún guion la espera por nombre; ya era así.
-   No sumé un segundo sabotaje: no es de §3 y el rojo queda mostrado una vez
-   acá (§6).
-3. **`valor1`, sabotaje 13**, reescrito con la regla de hoy (D221). Nombre
-   nuevo: `ajuste_mal_escrito_vacio`.
-4. **`valor1`, sabotaje 29.** `badInput` ya no existe: el campo es de texto.
-   La marca de un ajuste mal escrito sale hoy de `pintarValor`, que arma el
-   texto del error. La mutación saca esa línea para «a incluir». Nombre
-   nuevo: `mal_escrito_sin_marca`. Espera el mismo caso que antes.
-5. **`valor1`, sabotaje 15.** La línea de hoy borra dos marcas
-   (`seguro_calculado` y `seguro_dejado`); la mutación saca sólo la primera,
-   que es la que mira el caso.
-6. En `valor1`, los sabotajes 13 y 14 esperan el mismo caso en rojo. Ya era
-   así: `caso` comprueba qué caso falla, no con qué texto. El texto de cada
-   rojo lo comprobé a mano (tabla de abajo).
+1. **D218: dónde vive el sabotaje.** En `catalogo_largo2.sh`, que ya tiene
+   `PG_URL` y los sabotajes de las otras dos tablas de la misma función. No
+   extendí `catalogo_largo2_postgres.py` para que mire `operation_items`:
+   sería el mismo chequeo en dos arneses.
+2. **D218: el chequeo de base, una vez.** `base_en_verde` corre el arnés sin
+   sabotaje para los dos bloques de Postgres; si está rojo escribe
+   `BASE  | … ya está en rojo sin sabotaje`, **muestra las tres últimas líneas
+   del arnés** y suma una falla. Cambia el bloque que ya estaba (el de
+   `catalogo_largo2_postgres.py`): mismo texto de `BASE`, ahora con la causa.
+   El chequeo de base de pytest, arriba del guion, no lo toqué.
+3. **El arreglo de la consola limpia va en el arnés, no en el guion.**
+   `catalogo3_postgres.py` toma su propio `entorno()` antes de importar
+   `catalog_service`, como promete su «uso». Una línea.
+4. **D219: nombre en ASCII**, para que el id del parámetro no dependa de cómo
+   pytest escribe los acentos.
+5. **D219: sin sabotaje nuevo en `catalogo3.sh`.** No es de §3; el rojo va
+   mostrado una vez acá (§6). Si lo querés commiteado son 4 líneas en
+   `catalogo3.sh`.
 
-## D199: el rojo a mano
+## D219: tu matiz y mi corrección
 
-Con `NFD`→`NFKD` en `_normalize`, sobre `6c87747`,
-`tests/test_catalogo3.py`: `5 failed, 99 passed`.
+Mi riesgo original («los proveedores largos ya guardados dejan de encontrarse
+y nada avisa») estaba exagerado. Tenías razón: `_migrate_catalogo_claves`
+rearma al arrancar los `vendor_id` largos desde `vendor_nombre`.
+
+- **Leído** en `main.py:1356-1362`: elige las filas con
+  `length(vendor_id) >= 60` y les pone `_vendor_key(vendor_nombre)`.
+- **Corrido, pero sólo para el paso de la versión anterior a la de hoy:**
+  `catalogo3_postgres.py` guarda dos proveedores largos con `07504e0`,
+  arranca la de hoy y da
+  `OK    | la migración da el proveedor y la clave de hoy sin perder filas`.
+  Ese chequeo compara contra `_vendor_key` de la misma versión: no fija el
+  formato.
+- **Límite, leído y no corrido:** el rearmado alcanza a los ids de 60 o más.
+  Los de hoy miden justo 60. Un cambio que los deje más cortos (el corte a 38
+  solo da 59) se rearma una vez, y a partir de ahí esas filas ya no entran en
+  la consulta: un segundo cambio de formato no las tocaría.
+
+Por eso no puse ningún comentario sobre la migración en la prueba. El dato
+sirve para que cambiar el formato sea a propósito, no para evitar una pérdida
+que hoy el arranque repara.
+
+## D219: el rojo a mano
+
+Sobre `8f98a31`, mutando sólo la última línea de `_vendor_key` y corriendo
+los cuatro archivos `tests/test_catalogo*.py` (186 pruebas; en el informe
+anterior dije «8 archivos»: son 4):
+
+| mutación | resultado | qué falla |
+|---|---|---|
+| sin mutación (lo que `catalogo3.sh` corre como base) | `125 passed` | — |
+| `clave[:38]` | `1 failed, 185 passed` | sólo el dato nuevo |
+| `hexdigest()[:21]` | `4 failed, 182 passed` | el dato nuevo, `test_dos_proveedores_distintos_no_comparten_catalogo[prefijo-60]` y los dos de `test_el_origen_y_el_proveedor_se_guardan_enteros` (el id pasa a 61 y da `vendor_id inválido`) |
+| `clave[:38]` y `hexdigest()[:21]` | `1 failed, 185 passed` | sólo el dato nuevo |
+
+El rojo del dato nuevo, con el corte a 38:
 
 ```
-FAILED tests/test_catalogo3.py::test_un_proveedor_latino_conserva_su_id[Industrias Garc\xeda N\xba1-industrias_garcia_n_1]
-FAILED tests/test_catalogo3.py::test_un_proveedor_latino_conserva_su_id[Hermanos 1\xaa SA-hermanos_1_sa]
-FAILED tests/test_catalogo3.py::test_lo_que_se_lee_igual_se_encuentra[Tornillo N\xba 8-Tornillo N\xb0 8-exact]
-FAILED tests/test_catalogo3.py::test_lo_que_se_lee_igual_se_encuentra[Bolt™ M8-Bolt M8-exact]
-FAILED tests/test_catalogo3.py::test_acelerar_no_cambia_ninguna_clave - Asser...
-E   AssertionError: assert 'industrias_garcia_no1' == 'industrias_garcia_n_1'
-E   AssertionError: assert 'hermanos_1a_sa' == 'hermanos_1_sa'
+E     - sudamericana_de_importaciones_y_distrib~b74fb800ad974e4778d7
+E     + sudamericana_de_importaciones_y_distri~b74fb800ad974e4778d7
+FAILED tests/test_catalogo3.py::test_un_proveedor_latino_conserva_su_id[Sudamericana de Importaciones y Distribuciones Generales del Litoral SA-sudamericana_de_importaciones_y_distrib~b74fb800ad974e4778d7]
 ```
-
-Son los cinco que nombraste. **Rojo antes del arreglo:** en tu acta y en mi
-informe anterior, `catalogo_largo2.sh` sobre `204c638` daba
-`VERDE | la clave junta ﬁ con fi: la prueba no lo vio`, `fallas: 1`, sale 1.
-
-## `valor1`: qué cambió en cada sabotaje
-
-| # | nombre | dónde está hoy la protección | rojo a mano sobre `38ee8e1` |
-|---|---|---|---|
-| 13 | `ajuste_mal_escrito_vacio` | `return r.error ? String(v).trim() : r.valor;` en `ajusteDelPedido` | 1 failed: `At index 4 diff: None != 'mal escrito'` |
-| 15 | `seguro_a_mano_marcado` | `delete op.seguro_calculado; delete op.seguro_dejado;` en `onFieldChange` (`review.js`) | 1 failed: `Left contains 1 more item: {'seguro_calculado': True}` |
-| 16 | `base_fija_en_la_cuenta` | `"fob_factura": fob_factura}[BASE_SEGURO_SUGERIDO]` en `cuentas_del_valor` | 1 failed: `assert (11.0 == 9.0)` |
-| 29 | `mal_escrito_sin_marca` | `errores.push('Ajustes a incluir: ' + …)` en `pintarValor` | 1 failed: `assert '' == 'Ajustes a in...es un número.'` |
-| 30 | `seguro_con_error` | `ultimoValor.error` en la primera línea de `calcularSeguro`, que ganó `seguro_en_el_precio` | 1 failed: `assert ('seguro_calculado' not in {'seguro_calculado': True})` |
 
 ## Para reproducir
 
 ```bash
-# D199 (necesita node; unos 30 minutos)
-PY=<venv>/bin/python bash scripts/testing/sabotajes/catalogo3.sh fe0f1b4
-# 51 líneas ROJO, entre ellas
-# «ROJO  | «Nº» en el nombre se lee «No» y el proveedor latino cambia de id: dice …[Industrias Garc»;
-# fallas: 0; sale 0
-# Postgres local y descartable; unos 22 minutos
+# Postgres local y descartable; unos 23 minutos. Anda en una consola limpia.
 PY=<venv>/bin/python scripts/testing/con_pg16.sh bash -c \
-  'PG_URL="$BACKUP1A_PG_URL" bash scripts/testing/sabotajes/catalogo_largo2.sh fe0f1b4'
-# 37 líneas ROJO; fallas: 0; sale 0
+  'PG_URL="$BACKUP1A_PG_URL" bash scripts/testing/sabotajes/catalogo_largo2.sh 1f8ffa6'
+# 38 líneas ROJO; la última:
+# «ROJO  | el arranque no pasa el origen de los ítems a text: dice «FALLA | operation_items.origen pasa a text y la fila vieja queda igual»»
+# fallas: 0; sale 0
 
-# valor1 (unos 14 minutos)
-bash scripts/testing/sabotaje_valor1.sh fe0f1b4 <venv>
-# 30 líneas ROJO; «FALLA  mal_escrito_se_borra: quedó verde»;
-# «FALLAN 1 sabotajes»; sale 1
+# el rojo de la consola limpia (segundos): el arnés de antes del arreglo
+git worktree add --detach /tmp/wt-d218 d5a96aa && cd /tmp/wt-d218
+PY=<venv>/bin/python scripts/testing/con_pg16.sh bash -c \
+  'env -u DATABASE_URL -u ENVIRONMENT "$PY" -I scripts/testing/catalogo3_postgres.py "$BACKUP1A_PG_URL"'
+# RuntimeError: DATABASE_URL no está definida y ENVIRONMENT no es de desarrollo…; sale 1
+# el mismo comando sobre 1f8ffa6: 10 OK, «todo OK», sale 0
 
-python scripts/testing/anclas_perdidas.py fe0f1b4 | grep -cE 'sabotaje_valor1\.sh|catalogo_largo2\.sh|catalogo3\.sh'
+# el dato de D219 (segundos)
+python -m pytest -q --no-cov -p no:cacheprovider tests/test_catalogo3.py -k test_un_proveedor_latino_conserva_su_id
+# 8 passed, 97 deselected
+# y su rojo: en proyecto_maria/core/catalog_service.py, última línea de _vendor_key,
+# clave[:39] → clave[:38] y hexdigest()[:20] → hexdigest()[:21]
+python -m pytest -q --no-cov -p no:cacheprovider tests/test_catalogo*.py
+# 1 failed, 185 passed; el que falla es …[Sudamericana de Importaciones …]
+
+python scripts/testing/anclas_perdidas.py 1f8ffa6 | grep -cE 'catalogo_largo2\.sh|catalogo3\.sh'
 # 0
-python docs/pm/herramientas/chequeo-6.py 0609e14 a625d11    # valor1
-python docs/pm/herramientas/chequeo-6.py 6c87747 a2ec4bc    # D199
-# los dos: producto +0/−0, avisos: 0
-```
-
-Yo corrí los dos guiones de catálogo sobre `5eb1540` y `valor1` sobre
-`38ee8e1` (entero) y `a625d11` (con el 24 salteado), **no sobre `fe0f1b4`**.
-De ahí a `fe0f1b4` no cambia nada de lo que esos guiones corren o mutan:
-
-```bash
-git diff a625d11 fe0f1b4 --stat -- proyecto_maria tests/conftest.py tests/test_valor1.py \
-  scripts/testing/sabotaje_valor1.sh scripts/testing/sabotajes/_entorno_comun.sh
-git diff 5eb1540 fe0f1b4 --stat -- proyecto_maria tests/conftest.py tests/test_catalogo3.py \
-  tests/test_catalogo_largo2.py scripts/testing/sabotajes/catalogo3.sh \
-  scripts/testing/sabotajes/catalogo_largo2.sh scripts/testing/catalogo3_postgres.py \
-  scripts/testing/con_pg16.sh requirements.txt
-# los dos: vacío
-```
-
-Lo que entra después de `5eb1540` es `sabotajes-conocidos.txt` y tu rama
-(`abuso1.sh`, `abuso2.sh`, `datos1.sh`, `reset3.sh`, `test_abuso1.py`,
-`test_datos1.py` y documentos).
-
-La copia local de `valor1` con el 24 salteado no está en el repo. Es el guion
-de `a625d11` con este cambio:
-
-```diff
--reemplazar $JS '!ajusteMalEscrito(op.ajustes_incluir)) {' 'true) {'
--caso "mal_escrito_se_borra" "FAILED $T::test_un_numero_que_el_campo_no_entiende_queda_marcado_y_a_la_vista"
-+echo "SALTEADO mal_escrito_se_borra"
--echo "OK: los 31 sabotajes dan rojo por la razón esperada"
-+echo "OK: los 30 sabotajes corridos dan rojo por la razón esperada (1 salteado)"
+python docs/pm/herramientas/chequeo-6.py 4b5ef68 8f98a31    # +14/−0
+python docs/pm/herramientas/chequeo-6.py d5a96aa ea3256e    # +3/−2
+python docs/pm/herramientas/chequeo-6.py 636b889 1f8ffa6    # +14/−9
+# los tres: producto +0/−0, avisos: 0
 ```
 
 ## Puertas
 
 | puerta | sobre | salida |
 |---|---|---|
-| `catalogo3.sh` entero (D199) | `5eb1540` | 51 `ROJO`, `fallas: 0`, `rc=0 segundos=1796`. La línea nueva: `ROJO  | «Nº» en el nombre se lee «No» y el proveedor latino cambia de id: dice «FAILED tests/test_catalogo3.py::test_un_proveedor_latino_conserva_su_id[Industrias Garc»` |
-| `catalogo_largo2.sh` entero, Postgres 16 (D199) | `5eb1540` | 37 `ROJO`, `fallas: 0`, `rc=0 segundos=1323` |
-| `sabotaje_valor1.sh` entero, commiteado | `38ee8e1` | 30 `ROJO`, `FALLA  mal_escrito_se_borra: quedó verde`, `rc=1 segundos=814` |
-| `sabotaje_valor1.sh`, copia local con el 24 salteado | `a625d11` | 30 `ROJO`, `SALTEADO mal_escrito_se_borra`, `OK: los 30 sabotajes corridos dan rojo por la razón esperada (1 salteado)`, `rc=0 segundos=719` |
-| `anclas_perdidas.py` | `fe0f1b4` | `rc=0`; filas de `sabotaje_valor1.sh`, `catalogo_largo2.sh` o `catalogo3.sh`: 0 |
-| `chequeo-6.py 0609e14 a625d11` | `valor1` | `producto +0/−0`, `arnés +9/−11`, `avisos: 0` |
-| `chequeo-6.py 6c87747 a2ec4bc` | D199 | `producto +0/−0`, `arnés +4/−4`, `avisos: 0` |
+| `catalogo_largo2.sh` entero, Postgres 16, consola limpia | `1f8ffa6` | 38 `ROJO`, `fallas: 0`, `rc=0 segundos=1296` |
+| ídem, antes del chequeo de base unificado | `ea3256e` | 38 `ROJO`, `fallas: 0`, `rc=0 segundos=1325` |
+| `catalogo3_postgres.py` sin sabotaje, consola limpia | `d5a96aa` | `RuntimeError: DATABASE_URL no está definida…`, `rc=1 segundos=7` |
+| ídem, con el arreglo en el árbol (es `2211e6b`) | `2211e6b` | 10 `OK`, `todo OK`, `rc=0 segundos=21` |
+| ídem | `1f8ffa6` | 10 `OK`, `todo OK`, `rc=0`, 19 s |
+| camino `BASE`, a mano: copia del guion de `1f8ffa6` sin los sabotajes de pytest, `PG_URL` a un puerto cerrado | worktree de `636b889` | dos `BASE  \| …` con `psycopg2.OperationalError: … port 1 failed: Connection refused`, `fallas: 2`, `rc=1` |
+| `test_un_proveedor_latino_conserva_su_id` | `9120475` | `8 passed, 97 deselected` |
+| lo que `catalogo3.sh` corre como base | `8f98a31` | `125 passed` |
+| `anclas_perdidas.py` | `1f8ffa6` | sale 0; 22 filas, 0 de `catalogo_largo2.sh` y de `catalogo3.sh` |
 
-`chequeo-6` va por tramo, porque en el medio y al final está tu rama
-(`6c87747` y `fe0f1b4` son uniones):
+De `8f98a31` a `1f8ffa6` no cambia nada de `proyecto_maria/` ni de `tests/`
+(`git diff 8f98a31 1f8ffa6 --stat -- proyecto_maria tests` da vacío): lo de D219
+no lo repetí.
 
 ```
-chequeo-6 0609e14..a625d11: avisos para mirar, no un veredicto
+chequeo-6 4b5ef68..8f98a31: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +9/−11
+arnés +14/−0
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
 
-chequeo-6 6c87747..a2ec4bc: avisos para mirar, no un veredicto
+chequeo-6 d5a96aa..ea3256e: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +4/−4
+arnés +3/−2
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+avisos: 0
+
+chequeo-6 636b889..1f8ffa6: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +14/−9
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
 ```
 
-**`valor1`, rojo antes del arreglo:** el guion viejo sobre `0609e14` dio 12
-`ROJO` y frenó en el 13: `PATRON NO ENCONTRADO (0 veces) en
-proyecto_maria/static/v2/screens/finalize.js: '        return isFinite(n) ? n : null;'`,
-`rc=1`.
-
-**`valor1`, rojo que queda, diagnosticado (no repetí hasta verde):** el guion
-entero sobre `38ee8e1` dio 30 `ROJO` y `FALLA  mal_escrito_se_borra: quedó
-verde`, `rc=1`. Causa: D222. El ancla del 24 nunca se perdió; el guion viejo
-frenaba en el 13 y no llegaba a correrlo.
+**D218, rojo antes del arreglo:** lo confirmaste vos (sin la tupla,
+`FALLA | operation_items.origen pasa a text…`, salida 1) y ningún guion lo
+corría. Hoy lo corre el guion: la línea 38.
 
 ## Hallazgos de la autorrevisión
 
-| quién | pieza | hallazgo | severidad | qué hice |
-|---|---|---|---|---|
-| adversario (Sonnet, medio) | D199 | ninguno serio. Reprodujo la mutación (`5 failed, 99 passed`); no duplica al sabotaje de «º», «ª» y «µ» (ese muta `_sufijo`); el texto esperado `[Industrias Garc` es ASCII y sale igual con `LC_ALL=C` y `PYTHONIOENCODING=ascii`; `grep -qF` toma el `[` literal y un solo parámetro empieza así; en `catalogo_largo2.sh` no quedó nada colgado; ningún código lee `sabotajes-conocidos.txt` | — | sin cambios. **No corrió** los dos guiones enteros, ni `anclas_perdidas.py`, ni otras versiones de pytest, ni miró `test_catalogo_largo2.py` prueba por prueba |
-| adversario (Sonnet, medio) | D199 | el nombre del sabotaje habla sólo de «Nº», y la mutación también rompe «1ª», `Bolt™` y `test_acelerar_no_cambia_ninguna_clave` | baja | no lo cambié: el texto esperado ancla justo el caso que dice el nombre (supuesto, arriba) |
-| `/code-review high 6c87747..a2ec4bc` (revisores en Fable, permitido) | D199 | ninguno (`[]`). Corrió `catalogo3.sh a2ec4bc` entero: 51 `ROJO`, `fallas: 0`, sale 0. Por lectura: «ﬁ»→«fi» sigue cubierto por `tests/test_catalogo3.py:145` y `catalogo3.sh:102`; el sabotaje nuevo no duplica al de `_compatible` | — | sin cambios. **No corrió** `catalogo_largo2.sh`. Usó tu entorno `/tmp/cdi-pm/venv/bin/python` sólo para ejecutar (no se lo indiqué yo); después miré: nada nuevo en `/tmp/cdi-pm` fuera de `venv/lib`, y su árbol de trabajo sigue mostrando sólo `?? venv` |
-| adversario (Sonnet, medio) | `valor1` | el 24 queda verde: el guion no da «31 en rojo» | alta | reproducido antes de que lo dijera (`75 passed` con la mutación); va como D222 |
-| adversario (Sonnet, medio) | `valor1` | el 13 se solapa con `separadores1b.sh:102` | baja | confirmado; D221 |
-| adversario (Sonnet, medio) | `valor1` | los otros dos `delete op.seguro_calculado` de `finalize.js` (362 y 429) no tienen mutación en este guion | media, por lectura | no es un hueco: el 362 lo muta `sabotaje_valor1c.sh:134`; el 429 lo saqué a mano y da `2 failed, 180 passed` en `test_seguro1.py::test_el_calculado_se_borra_al_pasar_a_cif_y_queda_para_completar`. No sumé nada |
-| adversario (Sonnet, medio) | `valor1` | 13, 15, 16, 29 y 30: cada uno saca la protección que dice su comentario y da rojo por eso | — | sin cambios. Corrió el guion hasta el 24 y 29 y 30 a mano; **no vio del 25 al 28 ni el 31** (los cubre mi corrida entera) |
-| `/code-review high` (revisores en Fable, permitido) | `valor1` | el 24 queda verde | alta | D222 |
-| `/code-review high` | `valor1` | el 13 es la misma mutación que `separadores1b.sh:102` | media | confirmado leyendo `montos_ar.js`; cambió mi recomendación de D221 a (b) |
-| `/code-review high` | `valor1` | el 29 saca sólo la línea de «a incluir»; la de «a deducir» no tiene sabotaje en ningún guion | baja | la saqué a mano: `1 failed, 74 passed`, `test_las_cuentas_se_ven_y_el_error_tambien`, `- Ajustes a deducir: no es un número. Ajustes a deducir: x` / `+ Ajustes a deducir: x`. No sumé un sabotaje: no es de §3 y el rojo queda mostrado acá una vez (§6). El 29 viejo tampoco lo distinguía |
-| `/code-review high` | `valor1` | el 10 está anclado en un comentario y el 28 lleva uno en el ancla (ya estaban) | baja | propuesto para la cola, arriba |
+| quién | hallazgo | severidad | qué hice |
+|---|---|---|---|
+| adversario-sonnet-medio (Sonnet, medio) | En una consola sin `DATABASE_URL` ni `ENVIRONMENT`, `catalogo3_postgres.py` sale 1 con `RuntimeError` y el bloque nuevo da `BASE` y salida 1 | media | Reproducido (`rc=1`, 7 s). Arreglado en `2211e6b`; guion entero otra vez en consola limpia |
+| ídem | Con `<=` → `<` o el tope en 70, la prueba del id sigue verde | baja | Medido con las 186 pruebas: verde las dos. Es D224 |
+| ídem | Reprodujo el sabotaje a mano (base `todo OK`, sin la tupla la `FALLA` esperada), el ancla aparece una vez, el id calculado aparte con `hashlib` coincide | — | Sin hallazgo |
+| `/code-review high` (revisores en Fable) | Una base roja tira la salida: dice sólo `BASE  \| …`, sin causa | baja | Arreglado en `1f8ffa6` (`base_en_verde`), visto con un puerto cerrado |
+| ídem | El bloque nuevo es una segunda copia del andamio checkout / base / sabotajes | baja | Arreglado en el mismo commit (§6: una vez) |
+| ídem | El guion depende de un segundo commit viejo (`07504e0`) sin mensaje si falta | baja | Ahora una base roja muestra la causa. El caso del commit ausente: leído, no corrido |
+| ídem | El proceso padre del arnés importa la app sólo para dos funciones puras; mejor calcular las claves en un hijo | baja | Queda. El padre recibe el mismo `entorno()` que los hijos, que importan `main` entero: lo que rompa el import del padre rompe antes a los hijos. Es una línea contra unas diez |
+| ídem | `os.environ.update(entorno())` reescribe el entorno entero; `entorno()` tiene otro contrato que en los arneses vecinos | baja | Queda: ya escrito. Línea para la cola, abajo |
+| ídem | Dos corridas completas del arnés para mirar una tupla | baja | Queda. Sin sabotaje tarda 21 s; el guion entero dio 1380 s, 1325 s y 1296 s en mis tres corridas de 38 |
 
-`/security-review`: no corrido. Ninguna de las dos toca producto.
+Los revisores de `/code-review` no corrieron pruebas (no encontraron el
+entorno virtual): leyeron, y corrieron `chequeo-6`, `bash -n` y el cálculo del
+id. `/security-review`: no corrido, no toca producto.
+
+**Líneas que propongo para `COLA-LIMPIEZA.md`** (las pasás vos):
+
+- Muchos guiones de `scripts/testing/sabotajes/` tiran la salida del chequeo
+  de base (`>/dev/null 2>&1`): una base roja dice sólo `BASE  | …`. Hay 113
+  líneas `BASE  |` en 58 guiones; no conté una por una cuáles la tiran.
+  `catalogo_largo2.sh` ya muestra el final con `base_en_verde`: llevarlo a
+  `_entorno_comun.sh`.
+- `catalogo3_postgres.py`: `entorno()` devuelve el entorno entero; en los
+  arneses vecinos devuelve sólo lo que pisa. Unificar el contrato.
 
 ## Qué no corrí y riesgos
 
 - La suite entera: no. Es arnés, producto +0/−0.
-- Ningún otro guion vencido: van uno por pieza.
-- `sabotaje_valor1.sh` commiteado **sale 1** hasta que decidas D222: quien lo
-  corra entero ve una `FALLA`. Por eso su línea sigue en
-  `sabotajes-conocidos.txt`. La copia con el 24 salteado no está en el repo:
-  la armás con el diff de arriba.
-- El adversario de `valor1` no llegó a ver los sabotajes 25 a 28 ni el 31
-  (límite de tiempo de su entorno). No cambiaron en esta pieza y dan `ROJO`
-  en mis dos corridas enteras.
-- `catalogo_largo2.sh` entero, sin el sabotaje, lo corrí sólo yo (una vez,
-  sobre `5eb1540`). `catalogo3.sh` entero tiene dos corridas: la mía sobre
-  `5eb1540` y la del revisor sobre `a2ec4bc`.
-- Ninguna corrida es sobre `fe0f1b4`: lo que lo separa de los SHAs corridos
-  está en «Para reproducir», con los dos `git diff` vacíos. Sobre `fe0f1b4`
-  corrí sólo `anclas_perdidas.py`.
-- La mutación `NFD`→`NFKD` da rojo en cinco pruebas, pero el guion espera una
-  sola por nombre. Si alguien saca el parámetro «Industrias García Nº1» de
-  `test_un_proveedor_latino_conserva_su_id`, el guion escribe `ROJO? | …
-  rojo, pero sin «…»`, suma una falla y sale 1 (no pasa callado; leído en
-  `catalogo3.sh:49-53`, no corrido).
-- El texto esperado termina en `Garc` para no depender de cómo pytest escribe
-  la «í» en el id del parámetro. Otras versiones de pytest: no probadas.
-- Un revisor de `/code-review` ejecutó con el Python de tu entorno
-  (`/tmp/cdi-pm/venv`). No encontré nada escrito ahí, pero no puedo
-  descartar un `.pyc` nuevo dentro de `venv/lib`.
+- `catalogo3.sh` entero: no. El dato nuevo sólo puede sumarle fallas, y lo que
+  ese guion espera por nombre no cambió; corrí el comando exacto que usa como
+  base (`125 passed`).
+- `/security-review`: no.
+- El texto de la excepción al sacar el `lock_timeout` (D223): no lo vi.
+- Lo que digo «leído» en D224 y en el matiz de D219.
+- El sabotaje nuevo depende de que `catalogo3_postgres.py` siga pudiendo
+  armar su worktree de `07504e0`. En un clon que no lo tenga, el guion da
+  `BASE`, muestra el final del arnés y sale 1 (leído).
+- `catalogo_largo2.sh` suma dos corridas de `catalogo3_postgres.py`.
 
-Archivos de producto tocados: ninguno. Arnés:
-`scripts/testing/sabotaje_valor1.sh`, `scripts/testing/sabotajes/catalogo3.sh`,
+Archivos de producto tocados: ninguno. Arnés: `tests/test_catalogo3.py`,
 `scripts/testing/sabotajes/catalogo_largo2.sh` y
-`docs/pm/herramientas/sabotajes-conocidos.txt` (sale la línea de
-`catalogo_largo2`; la de `valor1`, con el motivo de hoy).
+`scripts/testing/catalogo3_postgres.py`.
 
-Sigo con D218 y D219, una pieza, como dice tu canal, salvo que llegue una
-devolución o la tarea de comparación.
+Sigo con el paso 2 de tu orden: **PANTALLAS-MARIA**, empezando por la causa de
+`pantalla_maria3` y `pantalla_maria4`, sobre los archivos que trajo tu rama
+(`_registrar.js`).
 
-/compact conservar: Dev 2 (MARIA), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (rama claude/practical-shannon-szpwkn, cabeza 08ae965, ya integrada en fe0f1b4), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. Entregado en fe0f1b4 (informe en el commit siguiente), esperando veredicto, dos cosas en un informe: D199 (el sabotaje NFD→NFKD pasó de sabotajes/catalogo_largo2.sh a sabotajes/catalogo3.sh; los dos guiones salen 0 y la línea de catalogo_largo2 salió de herramientas/sabotajes-conocidos.txt) y el re-anclaje de sabotaje_valor1.sh (30 en rojo; el 24, «mal_escrito_se_borra», queda verde y está salteado sólo en una copia local: sale 0). Producto +0/−0. Abiertas, las decide la PM: D221 (el 13 de valor1 es la misma mutación que separadores1b.sh:102: recomiendo retirarlo), D222 (retirar el 24 de valor1; su línea queda en sabotajes-conocidos.txt hasta entonces). Ya decididas por la PM: D218 (a) y D219 (a), una pieza, la que arranco ahora (en D219, si uso en el comentario del caso que _migrate_catalogo_claves rearma los vendor_id largos, lo corro; si no, digo «leído»); D220 es riesgo para Emi, no tarea. Después, una pieza por guion vencido: maria8, maria1d, maria5, valor1b, doc1.py, maria7, guardar2; puerta de cada una: guion entero todo ROJO y sale 0, sin filas en anclas_perdidas.py, y sale su línea de sabotajes-conocidos.txt. Próxima D libre: D223. Una devolución de la PM o la tarea de comparación van primero. Los detalles están en PARA-PM-2.md: el resumen los cita, no los copia. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; las Devs no usan el consejero.
+/compact conservar: Dev 2 (MARIA), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM (rama claude/practical-shannon-szpwkn, cabeza 67c8ff0, ya integrada en 636b889), rutina trig_01WmrC3ALqBXkD9UBv6dFGbP. Entregado en 1f8ffa6 (informe en el commit siguiente), esperando veredicto: D218 y D219, una pieza, sólo arnés (catalogo_largo2.sh corre también catalogo3_postgres.py con la tupla de operation_items sacada: 38 ROJO, sale 0, en consola sin DATABASE_URL ni ENVIRONMENT; un dato más en test_un_proveedor_latino_conserva_su_id). Producto +0/−0. Abiertas, las decide la PM: D223 (el candado de _migrate_catalogo_claves no tiene sabotaje en el repo: recomiendo (a), uno para el advisory lock) y D224 (el borde del corte de _vendor_key no lo fija ninguna prueba: recomiendo (a), dos datos más). Ya decididas: D221 (b) y D222 (a): se retiran el 13 y el 24 de valor1. Orden de la PM, una pieza a la vez: 1) PANTALLAS-MARIA, la que arranco ahora (pantalla_maria3, maria4, maria5 y subitems1 en rojo desde MARIA-7; empezar por la causa de maria3 y maria4, que no está confirmada; puerta: los cuatro con servidor y base nuevos salen 0 y muestro una vez el rojo de hoy de cada causa; sólo arnés: si la causa es de producto, freno y aviso); 2) retirar el 13 y el 24 de sabotaje_valor1.sh y reanclar en código el 10 y el 28 (29 ROJO, sale 0, su línea sale de sabotajes-conocidos.txt); 3) AJUSTE-BORRADOR (producto en static/v2: primero un caso de pantalla en rojo; corre e2e_maria.sh); 4) los vencidos, uno por pieza: maria8, maria1d, maria5, valor1b, doc1.py, maria7, guardar2. Próxima D libre: D225. Una devolución de la PM o la tarea de comparación van primero. Los detalles están en PARA-PM-2.md: el resumen los cita, no los copia. Nada se publica sin el «dale» de Emi para el SHA; nunca main; sin secretos; las Devs no usan el consejero.
