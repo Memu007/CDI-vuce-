@@ -9,6 +9,7 @@
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_cobro_mp1_v2.js
 const { chromium } = require('playwright');
 const registrarCuenta = require('./_registrar');
+const cargarCuitDelPerfil = require('./_cuit_perfil');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const OP = { moneda: 'DOL', incoterm: 'CFR', comprador_cuit: '30712345671', fecha_emision: '10/10/2026', numero_factura: 'FAC_V2' };
 const LONA = { pieza: '39211390900F', descripcion: 'Lona de PVC gris', origen: 'CN', cantidad: 750,
@@ -21,8 +22,7 @@ const LONA = { pieza: '39211390900F', descripcion: 'Lona de PVC gris', origen: '
   const id = Date.now();
   await registrarCuenta(page.request, base, { data: { username: 'cmp1v_' + id, password: 'Clave-Inventada-123', email: 'cmp1v' + id + '@ejemplo.test' } });
   // Sin el CUIT del despachante no se genera el TXT (ESTUDIO-1); inventado.
-  const perfil = await page.request.put(base + '/api/user/profile', { data: { cuit: '20999999998' } });
-  if (!perfil.ok()) falla('no se pudo cargar el CUIT del perfil: ' + perfil.status());
+  await cargarCuitDelPerfil(page.request, base);
   const cli = await page.request.post(base + '/api/clientes', { data: { nombre: 'Importadora Inventada', cuit: '30999999995' } });
   if (!cli.ok()) falla('no se pudo crear el cliente: ' + cli.status());
   const cliente = (await cli.json()).cliente;

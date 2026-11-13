@@ -9,6 +9,7 @@
 const { chromium } = require('playwright');
 const ipNueva = require('./_ip_nueva');
 const registrarCuenta = require('./_registrar');
+const cargarCuitDelPerfil = require('./_cuit_perfil');
 const OP = { moneda: 'DOL', incoterm: 'CFR', comprador_cuit: '30712345671', fecha_emision: '10/10/2026' };
 const A = { pieza: '39211390900F', descripcion: 'Lona de PVC gris', origen: 'CN', cantidad: 750,
             valor_unitario: 1.85, peso_unitario: 0.62 };
@@ -123,8 +124,7 @@ async function simular(page, modo) {
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
   await registrarCuenta(ctx.request, base, { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: 'val1_' + id, password: 'Clave-Inventada-123', email: 'val1' + id + '@ejemplo.test' } });
-  const perfil = await ctx.request.put(base + '/api/user/profile', { data: { cuit: '20999999998' } });
-  if (!perfil.ok()) throw new Error('no se pudo cargar el CUIT del perfil: ' + perfil.status());
+  await cargarCuitDelPerfil(ctx.request, base);
   const cli = await ctx.request.post(base + '/api/clientes', { data: { nombre: 'Cliente de prueba', cuit: '30999999995' } });
   const cliente = (await cli.json()).cliente;
   if (!cliente) throw new Error('no se creó el cliente: ' + cli.status());

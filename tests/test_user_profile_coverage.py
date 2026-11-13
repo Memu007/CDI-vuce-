@@ -25,9 +25,9 @@ def test_update_user_profile_name(auth_override, client):
 
 def test_update_user_profile_cuit_valido(auth_override, client):
     """PUT /api/user/profile guarda CUIT normalizado (solo dígitos)."""
-    r = client.put("/api/user/profile", json={"cuit": "20-111-22233-3"})
+    r = client.put("/api/user/profile", json={"cuit": "20-111-11111-2"})
     assert r.status_code == 200
-    assert r.json()["profile"]["cuit"] == "20111222333"
+    assert r.json()["profile"]["cuit"] == "20111111112"
 
 
 def test_update_user_profile_cuit_invalido_400(auth_override, client):
