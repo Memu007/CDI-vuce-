@@ -116,9 +116,10 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   la destinación por `destinacion_del_txt` (sólo lo hace el endpoint), y el
   de importación chequea en el endpoint y en el generador. El chequeo, una
   vez, en los dos generadores.
-- `tests/test_excel2d.py:199`: el tope de 0,5 s entre pasos del hilo testigo
-  falló en la CI de `d9a6962` (sólo docs) con 0,506 s, y pasó en `2d08e94`
-  con el mismo producto. Medir el freno sin depender de la carga del runner.
+- `tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie`: con `--cov`
+  (lo suma `pytest.ini` en local; la CI corre `--no-cov`) «2499» gasta
+  1,16–1,22 s de CPU contra el tope 1,5. Un pytest local más lento puede dar
+  falso rojo (D215, acta de EXCEL2D-TIEMPO).
 - `proyecto_maria/main.py` `_guardable_en_pg(endpoint)` en el registro de pedidos
   (D150): el molde no trae NUL ni caracteres sueltos; sacar la llamada, con su rojo.
 - `proyecto_maria/main.py` `register` (219 líneas): partirla en validar la
@@ -144,9 +145,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `app_v2.js` aviso «pendiente»: no se borra, puede pisar el de «lleno» y, si la
   pestaña de antes murió sin `pagehide`, otra pestaña no lo encuentra por 3 min
   (D170 b; acta de BORRADOR-1, hallazgo 4).
-- `tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie`: compara tiempo
-  contra 0,5 s y dio 0,66 s en la CI sin cambio de producto; medir algo que no
-  dependa del runner.
 - Tres lectores de la posición SIM que no aceptan lo mismo: `_NCM` en
   `client_memory.py`, `_POSICION` en `despacho_lector.py` y `_partes` en
   `sufijos_arca.py`. Uno solo, con su tabla de formas (D165 a, MEMORIA-E2E).

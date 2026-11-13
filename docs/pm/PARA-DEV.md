@@ -3,41 +3,48 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## ORDEN1-INTERMITENTE: aceptada sobre `6d1f1365` (informe `693a9bfa`) e integrada (2026-11-13 05:35 UTC)
+## EXCEL2D-TIEMPO: aceptada sobre `181e0dfc` (informe `5e2c7b5c`) e integrada (2026-11-13 06:40 UTC)
 
-Integro tu rama. Acta `REPRODUCCION-ORDEN1-INTERMITENTE-2026-11-13.md`,
-«Vuelta 2». **Traé mi rama con `merge`.**
+Integro tu rama. Acta `REPRODUCCION-EXCEL2D-TIEMPO-2026-11-13.md`. **Traé mi
+rama con `merge`.** ORDEN1-INTERMITENTE quedó en Git y en su acta.
 
-**Lo reproducido.** `chequeo-6` igual que el tuyo. Carrera forzada: base con
-la `FALLA` del null, tu SHA verde cuatro veces. Familia forzada: 0 consultas
-en el hueco, en base y en tu SHA. `orden1b.sh`: 30 `ROJO`, 0 sin rojo. Con
-`ESPERA_SESION_MS` en 2000 sobre tu SHA (vos lo corriste sobre el
-provisorio): z20, z21, z23 y z24 rojos. Mi negativo, distinto del ejemplo:
-Generar sin comprobar la sesión da `FALLA: … y Generar no comprobó la
-sesión` dos veces. Corredor entero sobre tu SHA: `30 verdes, 0 rojas`.
+**Lo reproducido.** `chequeo-6` igual que el tuyo; `excel2d.sh` 20 `ROJO` en
+tu SHA. Mi negativo de GIL (un `re.match` catastrófico después de
+`validar_con_carril`): rojo en los dos SHA. Con 4 núcleos y 8 ocupados, base
+y tu SHA verdes: el rojo de la CI no se reproduce así. **Lo que distingue tu
+cambio:** un solo núcleo (`taskset -c 0`) con 8 ocupados: base `4 failed` dos
+veces, tu SHA `7 passed` dos veces. En ese caso de hambre, el reloj de tu SHA
+llega a 7,20 s («9995»).
 
-**Una diferencia, sin devolución.** Tu comando 1 promete
-`seguía retenida a los 10 s`, y una de mis cuatro corridas dio `se cortó sin
-respuesta antes de entrar`: `TOPE_MS` y `ESPERA_SESION_MS` casi empatan. El
-resultado es el mismo. Va a `COLA-LIMPIEZA.md`; no es esta pieza.
+**D214: (a), decidido por la PM, y es tu pieza siguiente.** Mi `sleep(4)` en
+el mismo lugar: base rojo, tu SHA verde; lo confirma. Hoy ningún camino trae
+una espera sin CPU en la subida, así que no es devolución.
 
-**Siguiente: EXCEL2D-TIEMPO** (sólo pruebas, producto +0/−0).
-`tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie` mide con reloj:
-el paso del hilo testigo contra 0,5 s (`:199`) dio 0,506 y 0,66 s en la CI
-sin cambio de producto. Son las dos entradas de `test_excel2d.py` en la cola.
-- Que la prueba distinga el defecto que cuida (openpyxl reteniendo el GIL:
-  el hilo testigo se quedaba 9 s) sin depender de la carga del runner.
-- **Puertas:** rojo con el defecto devuelto (sabotaje anclado en código; vos
-  encontrás qué lo devuelve); verde con la máquina cargada (por ejemplo,
-  tantos procesos ocupados como núcleos), varias corridas, con la salida;
-  `chequeo-6` entero.
-- Si medís que el tope no se puede separar del ruido, decilo con números
-  antes de cambiar nada.
+**D215: (a), decidido por la PM.** Comprobé `ci.yml:49` (`--no-cov`) y
+`pytest.ini` (`--cov` en local). El margen con cobertura va a la cola.
 
-Igual que antes: sin adversarios; no toques los guiones de MARIA ni
-`pantalla_orden1.js` (pasa a MARIA). Lo de D182 / D206 sigue igual: si Emi
-dice que sí, dejás esto donde esté. D205, D206 y D208 siguen con Emi.
-**Próxima D: D214** (rango D210–D215).
+**Siguiente: EXCEL2D-RELOJ** (sólo pruebas, producto +0/−0), en el mismo caso.
+- Que vuelva a ver una espera sin CPU en la subida, sin perder lo que mide hoy.
+- **Puertas:** rojo con una espera sin CPU anclada en código dentro de la
+  subida (vos elegís el ancla; la mía estaba después de `validar_con_carril`
+  en `upload_excel_v2`); verde con 4 núcleos y 8 ocupados, varias corridas;
+  el tope justificado contra el caso de hambre de un núcleo (corrélo vos y
+  poné los números); `chequeo-6` entero.
+- Si un tope que no da falso rojo en el caso de hambre ya no ve una espera
+  real, decilo con números antes de cambiar nada.
+
+**Apenas entregues: X-FORWARDED-STATUS** (sólo arnés), la entrada de
+`pantalla_destino1.js` en la cola: los guiones que mandan `X-Forwarded-For`
+para registrarse no miran el status del registro, y si falla siguen sin decir
+por qué. Hoy son estos (contá vos, la cola dice 15): `cliente1`, `despacho1a`,
+`destino1`, `estudio1`, `estudio1b`, `maria9`, `org1b`, `separadores1`,
+`validacion1`. **`pantalla_orden1.js` no: es de MARIA.** Un solo lugar que
+lo chequee, si se puede. Puerta: rojo con el registro fallando (sabotaje
+anclado en código), con el mensaje que diga el status; corredor entero verde.
+
+Igual que antes: sin adversarios; no toques los guiones de MARIA. D182 / D206
+siguen igual: si Emi dice que sí, dejás esto donde esté. D205, D206 y D208
+siguen con Emi. **Próxima D: D228** (rango D228–D233).
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 
