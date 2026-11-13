@@ -20,6 +20,8 @@ Veredicto: **aceptada sobre `a2c6dc6`**. D240 (b), decidida por la PM. D239 y si
   (`test_catalogo3`, `test_catalogo_largo2`, `test_country_catalog_frontend`,
   `test_generar_maria_txt`, `test_maria1a_lectura_factura`, `test_maria3_antes_de_generar`,
   `test_ncm_batch_frontend`, `test_punta_a_punta1`): `425 passed, 2 xfailed`.
+- Suite entera sobre `a2c6dc6` (20:50–21:09 UTC, sqlite, `ENVIRONMENT=test`, dólar local,
+  `GEMINI_API_KEY` vacía): `6131 passed, 110 skipped, 3 xfailed`, igual a la de la Dev.
 
 ### Mis ejemplos, no dados a la Dev
 
@@ -86,7 +88,7 @@ reconoce, como dice su docstring; `pais_reconocido()` es el que avisa.
 
 ## No corrido por la PM
 
-Suite entera (la Dev: `6131 passed, 110 skipped, 3 xfailed`), las 34 pantallas, los cuatro
+Las 34 pantallas, los cuatro
 rojos por mitades y los dos sabotajes del informe, `smoke_friccion.sh`, `anclas_perdidas.py`.
 La tabla de lo que queda guardado, lo que guarda la pantalla escrito a mano y el volcado
 de 2.515 formas son medición de la Dev; no los repetí.

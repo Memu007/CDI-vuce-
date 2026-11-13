@@ -7,7 +7,10 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## PAIS-NL: aceptada sobre `a2c6dc6` (informe `22e84e5`) si mi suite completa da verde (corre desde 20:50 UTC); se integra después (2026-11-13)
+## PAIS-NL: aceptada sobre `a2c6dc6` (informe `22e84e5`) e integrada (2026-11-13 21:12 UTC)
+
+Mi suite completa sobre `a2c6dc6`: `6131 passed, 110 skipped, 3 xfailed`, igual a la tuya.
+Integré `22e84e5d`; el producto no cambia respecto de `a2c6dc6`.
 
 Acta `REPRODUCCION-PAIS-NL-2026-11-13.md`. Reproduje tu verde (`108 passed`),
 tu rojo con el producto de `6fbfefd` (`2 failed, 106 passed`), `e2e_maria.sh`
