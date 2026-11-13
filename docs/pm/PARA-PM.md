@@ -2,124 +2,158 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ORDEN1-INTERMITENTE, vuelta 2: z22 vuelve a probar la sesión lenta bajo el tope
+## EXCEL2D-TIEMPO: la subida cara mide CPU del proceso, no reloj
 
 | | SHA |
 |---|---|
-| base | `74e3cc74ec97a72a80d12b5311489f6532e9d0ae` |
-| arnés: z22, `forzar_orden1.js`, sabotaje ESPERA 2000 | `6d1f1365d73bef636d8db7a158b68b3725f54fbd` |
+| base | `205b7457` |
+| el hilo testigo y el total miden CPU del proceso; tope del frenado 1 s | `6759d65d` |
+| 2499 combinadas tolera 1,5 s de CPU, no 3 | `ba2d2693` |
+| el hilo testigo deja siempre una muestra al terminar | `181e0dfc` |
+| merge de tu rama (`72c297c1`, sólo `NOW.md` y la reproducción) | `c614c5e8` |
 | informe | el commit `docs:` que trae este archivo |
 
-**Resultado.**
-- z22 vuelve a probar Generar con la consulta de sesión lenta pero bajo el tope, y da lo mismo en cada corrida.
-  - Cada `/auth/current_user` de la pestaña vuelve a los 3 s, y ninguna vuelve antes de que llegue la de Generar. Así, la que decide siempre es la de Generar, lenta y bajo los 10 s.
-  - Sigue tu sugerencia, adaptada: se mantienen los 3 s y la retención se suelta con una condición observable (llegó la consulta de Generar), no con una espera fija.
-  - El caso falla también si Generar no comprobó la sesión. Así no puede quedar verde sin probar lo que dice probar.
-- Con `ESPERA_SESION_MS` en 2000, `CASOS=z22` da rojo. Ese sabotaje está en `orden1b.sh`, anclado en el código.
-- Carrera forzada: la base da la FALLA de siempre y 6d1f1365 da verde.
-- La familia (z20a, z21, z23, z24) no comparte la carrera. Su tabla está abajo.
-- Producto +0/−0. `chequeo-6`: 0 avisos. El AVISO de la función anónima de la vuelta anterior ya no sale, porque z22 quedó con menos líneas.
-- TOPE 900 y maria1c con `chromium.launch()` quedan como estaban.
+**Resultado.** Producto +0/−0. `test_la_subida_cara_no_frena_a_nadie` ya no
+mira el reloj: mide `time.process_time()` (CPU de todo el proceso). Otros
+procesos de la máquina no la inflan. El defecto que cuida (openpyxl
+reteniendo el GIL) sigue rojo: con el sabotaje de formatos el testigo ve
+4,99 s de CPU sin poder correr (tope 1 s). Con 8 procesos ocupados en 4
+núcleos el caso normal más caro gasta 0,50 s de CPU y frena 0,11 s.
 
-## La familia: z20a, z21, z23, z24
-
-En estos cuatro casos, la consulta de sesión que decide siempre sale después de que B se registra. `revisarSesion` sólo se dispara cuando `usuarioActual` ve una cookie que no es la del dueño, y eso pasa recién cuando B ya entró. No hay una consulta en el hueco que pueda volver antes de tiempo, como pasaba en z22.
-
-Para comprobarlo, `forzar_orden1.js` ahora también demora 4 s el registro de B con la pestaña abierta (más que los 3 s de `retenerUsuario`) y cuenta cuántas consultas hizo la pestaña mientras tanto.
-
-| caso | forzado, base 74e3cc74 | forzado, arnés | `ESPERA_SESION_MS` 2000, sin forzar |
-|---|---|---|---|
-| z20a | OK | OK | «FALLA: entró otro usuario y la pestaña de A generó enseguida y la pestaña no se tapa: error: No se pudo comprobar la sesión. Recargá la página.» |
-| z21 | OK | OK | «FALLA: entró otro usuario y la pestaña de A guardó un cliente (error: No se pudo comprobar la sesión. Recargá la página.) y la pestaña no se tapa» |
-| z23 | OK | OK | «FALLA: con un servidor que no exige CSRF, entró otro usuario y la pestaña de A generó enseguida y la pestaña no se tapa: error: No se pudo comprobar la sesión. Recargá la página.» |
-| z24 | OK | OK | «FALLA: entró otro usuario y A apretó «Salir» en su pestaña y la pestaña no se tapa» |
-
-- **Forzado:** las dos corridas dan `resumen: 1 verdes, 0 rojas` y rc=0. Cada caso imprime «forzar_orden1: el registro de B tardó 4 s más; consultas de la pestaña mientras tanto: 0».
-  - La base y el arnés coinciden porque no hay carrera que forzar: la pestaña no consulta nada mientras B se registra.
-  - El preload de la vuelta anterior no alcanzaba a estos casos: ninguno sale con `ctx.request`, y z24 sale desde la pestaña. El preload nuevo sí los alcanza, y muestra que no hay hueco.
-- **ESPERA 2000:** los cuatro dan rojo. Ya probaban la comprobación lenta bajo el tope, y no hacía falta cambiarlos.
-- La columna «forzado, arnés» es sobre 6d1f1365 (comando 5). Da `resumen: 1 verdes, 0 rojas`, rc=0, y seis líneas «consultas de la pestaña mientras tanto: 0» (z20a, z20b, z20c, z21, z23 y z24).
-- La columna de ESPERA 2000 corrió sobre un commit provisorio, `ab9a2ff2`: el arnés de entonces más `app_v2.js` con 2000. Desde ese commit, el arnés sólo cambió en el orden de los dos chequeos finales de z22, que no toca a la familia. No la repetí sobre 6d1f1365.
+De paso, el tope de 3 s de «2499 combinadas» no veía su propio sabotaje
+(copiar `df.attrs` en cada fila): en la base `205b7457` sale VERDE. Lo bajé a
+1,5 s y ahora sale ROJO. Ese cambio va solo en `ba2d2693` para poder
+revertirlo (D215).
 
 ## Decisiones
 
-Nada nuevo para decidir. D213 (b) queda para la cola, como dijiste. Siguen abiertas de antes D205, D206 y D208, que tiene Emi.
+**D214. Una espera sin CPU (cola, lock, timeout) ya no la ve nadie.**
+El reloj la veía; la CPU no, porque esperar no gasta CPU. No hay sabotaje
+hoy que la devuelva, pero es cobertura perdida.
+- (a) Sumar un tope de reloj generoso al mismo caso, por ejemplo 10 s
+  (5 veces lo más lento medido con 8 ocupados, 2,09 s). Separa una espera
+  larga del ruido de la carga.
+- (b) Dejarlo así y anotarlo como riesgo.
+
+Recomiendo **(a)**: son dos líneas y un tope que la carga no alcanza. No lo
+hice porque no lo pediste.
+
+**D215. Con cobertura, «2499 combinadas» queda cerca del tope 1,5.**
+La CI (`ci.yml:49`) y las puertas corren `--no-cov`: ahí gasta ≤0,50 s, un
+tercio del tope. Pero `pytest.ini` prende cobertura por defecto, y así gasta
+1,16–1,22 s.
+- (a) Quedarse con 1,5. El sabotaje de `attrs` (2,25–2,39 s) sale rojo,
+  pero quien corra `pytest` sin `--no-cov` en una máquina lenta puede ver
+  un rojo falso.
+- (b) Volver a 3 (revertir `ba2d2693`). Nunca da falso rojo, pero el
+  sabotaje de `attrs` vuelve a pasar verde, como en la base.
+
+Recomiendo **(a)**: un falso rojo local se ve y se explica; un sabotaje
+verde no se ve.
+
+D205, D206 y D208 siguen con Emi.
 
 ## Comandos
 
 ```bash
-PY=<python del venv>; F=$PWD/scripts/testing/forzar_orden1.js
-# 1. Carrera forzada sobre el arnés: «seguía retenida a los 10 s», «OK A salió, volvió a entrar y generó enseguida…», 1 verdes, rc=0
-NODE_OPTIONS="--require $F" CASOS=z22 SOLO=orden1 PY=$PY scripts/testing/correr_pantallas.sh 6d1f1365 /tmp/f_sha; echo rc=$?; grep -E 'forzar_orden1|FALLA|OK A salió' /tmp/f_sha/orden1.log
-# 2. La misma carrera sobre la base: «volvió antes de entrar: 401», «FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')», rc=1
-NODE_OPTIONS="--require $F" CASOS=z22 SOLO=orden1 PY=$PY scripts/testing/correr_pantallas.sh 74e3cc74 /tmp/f_base; echo rc=$?; grep -E 'forzar_orden1|FALLA' /tmp/f_base/orden1.log
-# 3. Sabotajes de orden1, con el de ESPERA 2000: 30 ROJO, «sabotajes sin rojo: 0», rc=0
-PY=$PY scripts/testing/sabotajes/orden1b.sh 6d1f1365
-# 4. Corredor completo: «resumen: 30 verdes, 0 rojas», rc=0
-PY=$PY scripts/testing/correr_pantallas.sh 6d1f1365 /tmp/pant
-# 5. Familia forzada, en la base y en el arnés: cuatro «consultas de la pestaña mientras tanto: 0», 1 verdes, rc=0
-for s in 74e3cc74 6d1f1365; do NODE_OPTIONS="--require $F" CASOS=z20,z21,z23,z24 SOLO=orden1 PY=$PY scripts/testing/correr_pantallas.sh $s /tmp/fam_$s; echo rc=$?; grep -E 'forzar_orden1: el registro|FALLA' /tmp/fam_$s/orden1.log; done
-# 6. chequeo-6: producto +0/−0, avisos: 0
-$PY docs/pm/herramientas/chequeo-6.py 74e3cc74 6d1f1365
+git fetch origin claude/dev-tecnica && git checkout origin/claude/dev-tecnica
+export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
+python -m pytest -q --no-cov tests/test_excel2d.py                       # 26 passed
+PY=python scripts/testing/sabotajes/excel2d.sh 181e0dfc                  # 20 ROJO, «sabotajes con falla: 0»
+PY=python scripts/testing/sabotajes/excel2d.sh 205b7457                  # en la base: «VERDE | las celdas rellenadas vuelven a copiarse en cada fila», falla: 1
+# máquina cargada: un proceso ocupado por núcleo, y después matarlos
+for i in $(seq $(nproc)); do python -c "while True: pass" & done
+python -m pytest -q --no-cov tests/test_excel2d.py                       # 26 passed
+kill $(jobs -p)
+python docs/pm/herramientas/chequeo-6.py 205b7457 181e0dfc              # producto +0/−0, avisos: 0
 ```
 
-Para ESPERA 2000 sobre la familia, `orden1b.sh` cubre el rojo de z22. Para ver los otros cuatro, cambiá `const ESPERA_SESION_MS = 10000;` por `2000` en `proyecto_maria/static/v2/app_v2.js` de un worktree de 6d1f1365, commitealo ahí y corré `CASOS=z20,z21,z23,z24 SOLO=orden1` sobre ese commit.
+## Puertas sobre `181e0dfc`
 
-## Puertas, sobre 6d1f1365
+| Puerta | Salida exacta |
+|---|---|
+| sabotajes `excel2d.sh` | 20 ROJO, «sabotajes con falla: 0», «salida 0» |
+| sabotaje que cuida el GIL (formatos xlsx) | «ROJO  \| los formatos vuelven a no mirarse antes de abrir: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[120 000 corchetes en un formato]» (9 s)»; aparte, con el mismo sabotaje a mano sobre `181e0dfc`: «E   AssertionError: el otro hilo no avanzó mientras el proceso gastó 5.13 s de CPU» |
+| sabotaje de `attrs` en la base `205b7457` | «VERDE \| las celdas rellenadas vuelven a copiarse en cada fila: la prueba no lo vio», «sabotajes con falla: 1» |
+| `test_excel2d.py`, 4 ocupados (= núcleos), 5 vueltas | 26 passed, 3 warnings in 4.90s / 5.48s / 5.28s / 5.87s / 5.46s |
+| `test_excel2d.py`, 8 ocupados, 5 vueltas | 26 passed, 3 warnings in 9.24s / 9.53s / 9.94s / 9.95s / 10.03s |
+| los 8 `tests/test_excel*.py` juntos en orden, quieta, 3 vueltas | 1327 passed, 3 warnings in 80.73s / 81.06s / 81.82s |
+| los mismos con 4 ocupados, 2 vueltas | 1327 passed, 3 warnings in 123.92s / 123.50s |
+| `chequeo-6.py 205b7457 181e0dfc` | ver abajo |
 
-**Carrera forzada (comandos 1 y 2):**
-
-Arnés, 6d1f1365:
 ```
-verde orden1         rc=0   <S>/g6d/f_sha/orden1.log | OK: ORDEN-1 en el navegador
-resumen: 1 verdes, 0 rojas
-rc=0
-forzar_orden1: activo
-forzar_orden1: la consulta del hueco seguía retenida a los 10 s
-OK A salió, volvió a entrar y generó enseguida: genera sin falsos bloqueos
-```
-
-Base, 74e3cc74:
-```
-ROJA  orden1         rc=1   <S>/g6d/f_base/orden1.log |     at UtilityScript.<anonymous> (<anonymous>:1:44)
-resumen: 0 verdes, 1 rojas: orden1
-rc=1
-forzar_orden1: activo
-forzar_orden1: la consulta del hueco volvió antes de entrar: 401
-FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')
-```
-
-**Sabotajes (`orden1b.sh 6d1f1365`):** 30 ROJO, `sabotajes sin rojo: 0`, `rc=0`. Los dos de z22:
-```
-ROJO  | con la sesión cambiada no escribe aunque sea del mismo usuario: dice «FALLA: A salió, volvió a entrar y generó enseguida y no generó»
-ROJO  | la comprobación de la sesión corta antes de lo que tarda: dice «FALLA: A salió, volvió a entrar y generó enseguida y no generó: error: No se pudo comprobar la sesión»
-```
-
-**Corredor completo (`correr_pantallas.sh 6d1f1365`):** `resumen: 30 verdes, 0 rojas`, `rc=0`. TOPE 900 sin cambios. orden1 deja 71 líneas `OK`.
-```
-verde maria1c        rc=0   <S>/g6d/pant/maria1c.log | OK: pantalla MARIA-1c
-verde orden1         rc=0   <S>/g6d/pant/orden1.log | OK: ORDEN-1 en el navegador
-resumen: 30 verdes, 0 rojas
-rc=0
-```
-
-**chequeo-6, 74e3cc74..6d1f1365:**
-```
-chequeo-6 74e3cc74..6d1f1365: avisos para mirar, no un veredicto
+chequeo-6 205b7457..181e0dfc0b757c02231fe12bd49a0d28b226ca98: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +94/−5
+arnés +11/−8
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
 ```
 
-## Riesgos y lo no corrido
+## Mediciones (máximo de 3 vueltas, en segundos)
 
-- No corrí pytest, `/code-review`, adversarios, smoke ni el ataque de aislamiento. La tarea es sólo de arnés y dice que sin adversarios.
-- La familia con ESPERA 2000 corrió sobre un commit provisorio y no la repetí sobre 6d1f1365 (ver arriba). La familia forzada sí corrió sobre 6d1f1365.
-- Para marcar la consulta de Generar, z22 mira que `generateMaria` esté en la pila del `fetch`. Si alguien renombra esa función, `comprobo()` da falso y el caso da rojo con «Generar no comprobó la sesión». Es un rojo que avisa, no un verde mudo.
-- Si el producto dejara de consultar la sesión al apretar Generar, la retención nunca se suelta: Generar no termina y el caso cae por el tope de la pantalla. Es un rojo, pero con un texto menos claro.
-- `tests/test_conexiones1.py` sigue sin seguimiento, por regla; su copia está en el parche.
-- Archivos de producto tocados: ninguno. Del arnés toqué `pantalla_orden1.js`, `forzar_orden1.js` y `sabotajes/orden1b.sh`.
+Sin cobertura, como la CI. «Frenado» es el salto más grande de CPU entre
+dos muestras del hilo testigo.
 
-/compact conservar: Dev 1 técnica, rama claude/dev-tecnica; entregué ORDEN1-INTERMITENTE vuelta 2 (arnés 6d1f1365 + informe): z22 retiene current_user 3 s hasta la consulta de Generar, sabotaje ESPERA 2000 en orden1b.sh, la familia z20a/z21/z23/z24 sin carrera (0 consultas en el hueco); D213 (b) a la cola; D205, D206, D208 con Emi; próxima D214; tests/test_conexiones1.py sin seguimiento; espero veredicto.
+| Caso | Quieta: reloj / CPU / frenado | 4 ocupados | 8 ocupados |
+|---|---|---|---|
+| 2499 combinadas (tope 1,5) | 0,535 / 0,493 / 0,075 | 0,66 / 0,471 / 0,09 | 1,174 / 0,502 / 0,079 |
+| 9995 combinadas (tope 3) | 0,946 / 0,963 / 0,31 | 1,187 / 1,004 / 0,33 | 2,091 / 0,883 / 0,112 |
+| los otros 5 casos | 0,214 / 0,206 / 0,097 | 0,356 / 0,198 / 0,095 | 0,493 / 0,201 / 0,1 |
+
+Con 8 ocupados el reloj se duplica y la CPU no se mueve: eso es lo que
+pediste separar.
+
+Con cobertura (como `pytest` sin `--no-cov`):
+
+| Caso | Quieta | 4 ocupados | sólo `-k 2499`, proceso nuevo |
+|---|---|---|---|
+| 2499 combinadas | CPU 1,193, frenado 0,131 | CPU 1,128 | CPU 1,224 |
+| 9995 combinadas | CPU 1,929, frenado 0,438 | CPU 1,735 | — |
+
+Sabotajes, una medición cada uno (`attrs`, 3):
+
+| Sabotaje | Caso | CPU | Frenado | Por qué sale rojo |
+|---|---|---|---|---|
+| formatos xlsx sin mirar antes de abrir | 120 000 corchetes | 5,016 | 4,99 | frenado (tope 1) |
+| muchos rangos | 640 000 rangos | 3,908 | 0,268 | total |
+| formatos .xls | tres de 60 000 corchetes | 14,7 | 1,279 | frenado y total |
+| `attrs` en cada fila | 2499 combinadas | 2,25–2,387 | 0,091 | total (tope 1,5) |
+| `attrs` en cada fila | 9995 combinadas | 0,89 | 0,273 | no le cambia: rechaza con 400 antes del bucle |
+
+El frenado normal más alto es 0,438 (9995, con cobertura). El sabotaje con
+frenado más bajo es el de .xls, 1,279. El tope 1 queda entre los dos.
+
+## Revisión (`/code-review high`) y qué hice con cada hallazgo
+
+| # | Hallazgo | Qué hice |
+|---|---|---|
+| 1 | La CPU no ve una espera sin CPU (cola, lock, timeout) que el reloj veía | D214 |
+| 2 | El tope del frenado pasó de 0,5 s de reloj a 1 s de CPU: un freno de 0,6–0,99 s pasa | Riesgo, queda en 1: el normal llega a 0,438 y el sabotaje más bajo a 1,279 |
+| 3 | `process_time` suma hilos que dejaron tests anteriores | Corrí los 8 `test_excel*.py` juntos en orden, quieta y cargada: todo verde. La suite completa no la corrí |
+| 4 | Con cobertura, 2499 queda a 1,22 de 1,5 | D215 |
+| 5 | Igual que 4, con `-k 2499` solo | Medido: 1,164–1,224. Va en D215 |
+| 6 | 9995 con tope 3 no vería una regresión lineal más suave | Queda: el sabotaje de `attrs` no lo toca (400 antes del bucle) y el suyo sale rojo en 16 s. Con cobertura gasta 1,93 de 3 |
+| 7 | Si la subida termina antes de la primera vuelta del testigo, `max()` de una lista vacía tapa el status | Arreglado en `181e0dfc`. Con `listo` puesto antes de arrancar el hilo: el bucle viejo da «ValueError: max() iterable argument is empty» y el nuevo, 2 muestras |
+| 8 | Hay otros topes de reloj: `tests/test_excel2.py:141,434,555` y `tests/test_excel1_lectura.py:285` | Fuera de alcance. Te propongo una pieza igual para ellos |
+
+## Lo que no corrí
+
+- La suite completa: sólo los 8 archivos `test_excel*.py`.
+- Subagentes adversarios: no corrí ninguno en esta pieza.
+- El runner real de la CI: todo es de esta máquina (4 núcleos).
+- La línea E de cada sabotaje en `excel2d.sh`: mira sólo el id del `FAILED`.
+  La del sabotaje de formatos la saqué aparte (tabla de puertas).
+
+## Riesgos
+
+- D214: una espera sin CPU pasa verde.
+- D215 (a): un rojo falso local con cobertura en una máquina lenta.
+- Hallazgo 2: un freno de 0,6–0,99 s de CPU pasa verde.
+- El runner de la CI puede tener otra CPU; la medición de CPU depende de la
+  velocidad del núcleo, no de la carga. El margen sin cobertura es 3 veces.
+
+Archivos de producto tocados: ninguno. `tests/test_excel2d.py` es el único
+archivo cambiado.
+
+/compact conservar: Dev 1 técnica, rama claude/dev-tecnica; entregué EXCEL2D-TIEMPO (6759d65d, ba2d2693, 181e0dfc + informe): test_la_subida_cara_no_frena_a_nadie mide CPU del proceso, frenado < 1 s, 2499 combinadas tope 1,5; D214 (tope de reloj para esperas sin CPU) y D215 (1,5 vs 3 con cobertura) abiertas; D205, D206, D208 con Emi; próxima D216; tests/test_conexiones1.py sin seguimiento; nunca main, nada se publica sin el «dale» de Emi para el SHA, sin secretos.
