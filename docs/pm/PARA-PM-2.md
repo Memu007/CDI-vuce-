@@ -2,254 +2,260 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## SUFIJO-BORRADOR (D227): entregada en `ee2ee3c`. Reprodujo en rojo y está arreglada: el sufijo de la operación vuelve a su campo al recargar, también el escrito sin generar y el borrado. El caso de «lo que se está escribiendo no se pisa» prueba los dos campos de ajustes. Dos decisiones: D236 y D237. Un error mío: `4271075` quedó subido con un rojo en `test_valor1c.py`
+## SUFIJO-BORRADOR, vuelta de la devolución con D236 (b): entregada en `52f13ca`. Una operación sin sufijo ya no genera con el de la anterior: el campo entra vacío, la tarjeta del despachante no usa el ajeno y «Generar» frena sin pedir el TXT. Una decisión: D238 (el aviso «Es obligatorio» queda a la vista de una operación a otra)
 
-Integré tu rama hasta `7bae88f` (merge `48cb8ac`). Tus commits propios tocan
-sólo `docs/pm/`.
+Integré tu rama hasta `de4d121` (merge `c18039c`). Tus commits propios tocan
+sólo `docs/pm/`; los de `tests/` que llegan son de la Técnica. Encima va un
+commit más, `52f13ca`: corrige un comentario mío de `92f4ec1` que quedó falso
+con `a0acbe7` (decía que «Generar» toma el sufijo del campo).
+
+Antes del informe integré otra vez tu rama, hasta `6e4a427` (`1163424`):
+`git diff --stat 52f13ca 1163424` da sólo `docs/pm/NOW.md`, que ningún test ni
+guion de las puertas lee. Las puertas son sobre `52f13ca` y no las repetí
+sobre esa integración. Mi canal no cambió.
+
+**Una puerta en rojo:** en la corrida entera de pantallas, `orden1` cayó en
+z22 con la carrera de D237. Diagnóstico y segunda corrida, abajo.
 
 | qué | SHA |
 |---|---|
-| base (mi informe anterior) | `9ed8b9a` |
-| el caso de pantalla, rojo sobre el producto de hoy | `e553641` |
-| el arreglo, primera versión (producto + `CHANGELOG.md`) | `03e68bc` |
-| los dos campos de ajustes como datos del caso, con su sabotaje | `4271075` |
-| integración de tu rama | `48cb8ac` |
-| el arreglo después de `/code-review` (producto + `CHANGELOG.md`) | `8c54b99` |
-| casos, pantalla de tres renglones y sabotajes | `7c26f5e` |
-| el caso del botón mira también que se pidan las cuentas | `ee2ee3c` |
+| base (integración de tu rama hasta `32dfcd5`) | `0d4cd72` |
+| producto: el campo muestra el sufijo de la operación en curso, vacío si no tiene (+ `CHANGELOG.md`) | `92f4ec1` |
+| el caso, primera versión | `bcb3e9c` |
+| producto: «Generar» toma el sufijo de la operación, no del campo | `a0acbe7` |
+| el caso mira la tarjeta del despachante y que el freno sea de ese clic | `a0c1c69` |
+| el caso, partido en dos funciones (mismas comprobaciones) | `ebbe181` |
+| integración de tu rama hasta `de4d121` | `c18039c` |
+| producto, sólo un comentario: quién lee el campo. **Lo que se entrega** | `52f13ca` |
+| integración de tu rama hasta `6e4a427` (sólo cambia `docs/pm/NOW.md`) | `1163424` |
 | informe | el commit siguiente |
 
-**El rojo que subí.** `4271075` está en el remoto con
-`tests/test_valor1c.py::test_al_entrar_a_validar_no_quedan_las_cuentas_de_antes`
-en rojo (`ReferenceError: pintarSufijo is not defined`, `1 failed, 29 passed`):
-ese caso extrae `onEnterValidating` y yo había corrido sólo
-`test_valor1.py` antes de subir. Lo encontró `/code-review`. Arreglado en
-`7c26f5e` (la función real entra en la lista del caso).
+**Tu objeción era correcta.** Escribí que la herencia «venía de antes y no la
+cambié», y la entrega le sumaba un camino: recuperar A, «Nueva operación», B
+sin sufijo, «Generar». Lo reproduje antes de tocar nada: con el caso nuevo
+sobre `ee2ee3c` (commit descartable `b1e5cdb`) las tres llegadas dan
+`«Generar» siguió a «ready» y salieron 1 POST /generate_maria`.
+
+**Dos cosas que subí y no son entrega.**
+- CUIT-GENERAR ya estaba subida (`64079aa`, `bb01070`, `4b42b42`, `f249547`)
+  cuando leí «apartalo». La aparté con dos reversiones, `3a6f656` (producto) y
+  `2f04637` (pruebas), las dos antes de la base `0d4cd72`:
+  `git diff 765db40 2f04637 -- proyecto_maria scripts tests CHANGELOG.md` da
+  vacío. Se recupera revirtiendo esas dos.
+- `a0c1c69` quedó en el remoto antes de las puertas (para no perder el trabajo
+  del contenedor). Las puertas de abajo son todas sobre `52f13ca`.
 
 ## Decisiones
 
-**D236. El sufijo de una operación queda escrito en el campo de la
-siguiente.** Venía de antes y no lo cambié. El campo `#sbtSufijoValor` no se
-vacía al empezar otra operación en la misma carga de página. Con la operación
-B recién empezada: el campo muestra el sufijo de A, las celdas por producto y
-«Generar» usan el campo, pero los avisos se piden sin sufijo (la operación B
-no lo tiene guardado) y el borrador de B tampoco lo guarda: después de
-recargar, el campo aparece vacío.
-- (a) dejarlo como está;
-- (b) el campo muestra siempre lo que guarda la operación, vacío si no
-  guarda nada. Saca la herencia y la copia campo → operación de «Generar»;
-- (c) recordar el sufijo por cliente.
+**D238. El aviso «Ingresá el sufijo de valor SBT. Es obligatorio.» queda a la
+vista de una operación a otra.** Venía de antes; no lo toqué. `#sbtFieldError`
+sólo se esconde cuando «Generar» pasa. Medido con una sonda (commit
+descartable `15893f6`, salida en el bloque de comandos): después de que A
+frena, B entra con su sufijo guardado en el campo **y el aviso a la vista**; y
+en una operación sin sufijo el aviso sigue ahí después de escribirlo, hasta
+tocar «Generar».
+- (a) pieza chica aparte: el aviso se esconde cuando se escribe en el campo y
+  cuando se entra a «Validación» con otra operación;
+- (b) dejarlo.
 
-Recomiendo (b), como pieza aparte con su caso: el sufijo es un dato de la
-operación y hoy B lo hereda sin que nadie lo escriba. Cambia lo que sale en
-el TXT de quien hoy cuenta con que quede, por eso no lo hice acá. Si el
-despachante cuenta con la repetición, es (c) y va a
-`PREGUNTAS-DESPACHANTE.md`.
-
-**D237. `orden1`, caso z22, tiene una carrera del arnés.** En la corrida
-entera de pantallas sobre `4271075` dio rojo una vez (detalle en «El rojo de
-`orden1`»). No depende de esta pieza: forzada, reproduce igual sobre la base
-`9ed8b9a`.
-- (a) lo arreglo yo como pieza aparte: z22 espera a que terminen los pedidos
-  de avisos de la entrada a «Validación» antes de cerrar la sesión (una
-  condición observable, sin espera fija);
-- (b) queda anotado como intermitente conocido en
-  `REPRODUCCION-ORDEN1-INTERMITENTE-2026-11-13.md`;
-- (c) lo toma la Técnica, que tiene los sabotajes de z22 en `orden1b.sh`.
-
-Recomiendo (a): `pantalla_orden1.js` es mío y el cambio no toca lo que z22
-comprueba. No lo hice dentro de esta pieza porque es otra causa.
+Recomiendo **(a)**, aparte: con D236 (b) el campo entra vacío más seguido y un
+aviso rojo de otra operación al lado confunde. No lo metí acá porque no es la
+causa de la devolución, y esconderlo siempre al entrar rompe el camino del
+error del servidor, que pone el aviso y vuelve a «Validación».
 
 ## Resultado
 
-- **Reproduce.** `pantalla_sufijo_borrador1.js` (tres renglones: escrito sin
-  generar, generado y devuelto a «Validación», borrado sin generar) sobre el
-  producto de `9ed8b9a`:
-  - `FALLA: escrito sin generar: se escribió «AA(000123)-AB(000456)», la operación recuperada guarda «» y el campo muestra «»`
-  - `FALLA: generado y devuelto a la validación: se escribió «ROJO», la operación recuperada guarda «ROJO» y el campo muestra «»`
-  - `FALLA: borrado sin generar: se escribió «», la operación recuperada guarda «ROJO» y el campo muestra «»`
-- **El arreglo**, en `proyecto_maria/static/v2/screens/finalize.js`
-  (**producto +14/−4**), tiene dos mitades que se necesitan:
-  1. al entrar a «Validación» se pinta en el campo el sufijo guardado de la
-     operación, antes de la tarjeta del despachante (que lee el campo);
-  2. el sufijo se guarda en la operación al escribirlo, en el mismo lugar
-     que los dos ajustes (`enlazarValor`), no sólo al apretar «Generar». El
-     enlace propio que tenía en `enlazarAvisos` se fue.
-- Sobre `7c26f5e` (el caso y el producto no cambiaron después):
-  `OK escrito sin generar: el campo muestra «AA(000123)-AB(000456)» después de recargar`,
-  `OK generado y devuelto a la validación: el campo muestra «ROJO» después de recargar`,
-  `OK borrado sin generar: el campo muestra «» después de recargar`,
-  `PANTALLA SUFIJO-BORRADOR OK`.
-- **Cada mitad por separado da rojo** (commits descartables, no subidos; la
-  pieza no pide revisión fuerte, así que no hay guion de sabotaje propio):
-  - sin la llamada `pintarSufijo();`: los tres renglones en rojo, el primero
-    `FALLA: escrito sin generar: se escribió «AA(000123)-AB(000456)», la operación recuperada guarda «AA(000123)-AB(000456)» y el campo muestra «»`;
-  - sin `sbtSufijoValor` en `campos`: el segundo `OK`; el primero
-    `… la operación recuperada guarda «» y el campo muestra «»` y el tercero
-    `FALLA: borrado sin generar: se escribió «», la operación recuperada guarda «ROJO» y el campo muestra «ROJO»`.
-- **«Volver» en el caso** es la devolución del servidor a «Validación» por un
-  sufijo que no acepta («ROJO»): es el camino en el que el borrador sobrevive
-  a «Generar». Cuando genera bien el borrador se borra y no hay qué recuperar.
-- **`test_lo_que_se_esta_escribiendo_no_se_pisa`** corre los dos campos como
-  datos. En `sabotaje_valor1.sh`, tu negativo es `pisa_incluir` (sacar
-  `document.activeElement !== incluir`) y espera
-  `{'valorIncluir': '99'} != {'valorIncluir': '12'}`; `pisa_lo_que_se_escribe`
-  espera el de `valorDeducir`. Antes los dos esperaban el mismo texto.
-- **`test_al_escribir_un_ajuste_el_boton_se_esconde_hasta_que_vuelvan_las_cuentas`**
-  lleva ahora los tres campos y mira tres cosas: que la operación guarde lo
-  escrito, que el botón se esconda y que salgan a pedirse las cuentas nuevas.
-  Sin `sbtSufijoValor` en `campos` (sabotaje `sufijo_sin_guardar`):
-  `{'sbtSufijoValor': ({}, False, 0)} != {'sbtSufijoValor': ({'sbt_sufijo_valor': '500'}, True, 1)}`,
-  `1 failed, 75 deselected`. Con el producto de `9ed8b9a` y con el de
-  `4271075` el caso, como estaba en `7c26f5e`, daba el mismo rojo sin el
-  contador. Sin `programar();` en el manejador (sabotaje nuevo,
-  `sin_pedir_cuentas`):
-  `{'sbtSufijoValor': ({'sbt_sufijo_valor': '500'}, True, 0)} != {'sbtSufijoValor': ({'sbt_sufijo_valor': '500'}, True, 1)}`.
-  El reloj del pedido corre en el acto dentro del caso: no hay espera.
-- Los guiones enteros: `sabotaje_valor1.sh` sobre `ee2ee3c`,
-  `OK: los 32 sabotajes dan rojo por la razón esperada`;
-  `sabotaje_valor1c.sh` sobre `7c26f5e` (después no cambió nada de lo que
-  corre), `OK: los 25 sabotajes dan rojo por la razón esperada`. `anclas_perdidas.py`: igual que sobre la base.
+Lo pedido, y dónde se prueba (`scripts/testing/pantalla_sufijo_otra1.js`):
 
-## Lo que cambia además, sin que lo pidieras (supuestos reversibles)
+| pedido | cómo lo prueba el caso |
+|---|---|
+| al entrar a «Validación» el campo muestra el sufijo de la operación en curso, vacío si no tiene | lee campo y operación en el mismo instante de entrar; con la anterior recuperada, exige antes que haya vuelto con `AA(000123)` en los dos |
+| una B sin sufijo no genera | cuenta los `POST /generate_maria` y exige el aviso con el foco en el campo, que lo pone el freno de ese clic (en dos llegadas el aviso ya estaba a la vista desde la anterior: D238) |
+| avisos, tarjeta del despachante y TXT usan el mismo valor | B lleva un segundo producto con sufijo escrito cuando la operación no tenía ninguno: la tarjeta lo marca «Lo escribiste con otro sufijo de la operación» sólo si compara contra uno ajeno. Con `AA(000456)` escrito, los avisos se piden con ese y todos los `CSBTSVL` del TXT son ese |
 
-- **Mientras se escribe el sufijo, «Calcular seguro» y «Dejar seguro» se
-  esconden hasta que vuelven las cuentas**, igual que al escribir un ajuste.
-  El sufijo viaja en el pedido con el que se hacen las cuentas: sin esto, un
-  clic en «Calcular seguro» justo después de escribirlo se perdía una vez
-  (lo reproduje sobre `9ed8b9a` y sobre `4271075`). Está en `CHANGELOG.md`.
-- **Los avisos ven el sufijo que está escrito.** Antes llevaban el del último
-  «Generar». El pedido de `POST /generate_maria` no cambia.
-- **La operación guarda el sufijo como se escribió, sin recortar espacios.**
-  Quien lo usa lo recorta (`buildMariaRequest`, «Generar»).
-- **El orden «pintar antes que la tarjeta del despachante» no tiene caso que
-  lo fije.** Lo dice el comentario de la línea.
+La familia va como datos de un caso: después de recuperar la anterior, sin
+recargar, y con el sufijo borrado (`sbt_sufijo_valor: ''`).
+
+**Producto +5/−11** (`finalize.js`, 1494 → 1488 líneas). Dos cambios:
+- `pintarSufijo` pinta siempre lo que guarda la operación, vacío si no guarda
+  nada (`92f4ec1`);
+- «Generar» ya no copia el campo a la operación: el control de «Es
+  obligatorio» lee la operación, igual que los avisos y el TXT (`a0acbe7`). Era
+  la copia por la que el sufijo ajeno llegaba al TXT.
+
+`CHANGELOG.md`: una entrada (`92f4ec1`), que cubre los dos commits de
+producto; dice también que quien carga varias operaciones seguidas escribe el
+sufijo en cada una.
+
+**Rojos, cada uno un commit descartable sobre el caso final** (salidas copiadas
+del log; las tres llegadas dicen lo mismo en cada uno):
+
+| qué se le saca al producto | SHA | qué dice el caso |
+|---|---|---|
+| todo: `finalize.js` de la primera entrega | `3e1f90d` | `al entrar, campo / operación / tarjeta = «AA(000123) /  / lo marca escrito con otro sufijo»; «Generar» siguió a «ready» y salieron 1 POST /generate_maria` |
+| el orden: pintar el campo después de la tarjeta | `740b38a` | `al entrar, campo / operación / tarjeta = « /  / lo marca escrito con otro sufijo»; «Generar» frenó y salieron 0 POST /generate_maria` |
+| sólo el pintado (vuelve el «pinta si hay») | `8a9a8f6` | `al entrar, campo / operación / tarjeta = «AA(000123) /  / lo marca escrito con otro sufijo»; «Generar» frenó y salieron 0 POST /generate_maria` |
+| sólo el freno de «Es obligatorio» | `8e6b598` | `al entrar, campo / operación / tarjeta = « /  / sin marca»; «Generar» siguió a «ready» y salieron 1 POST /generate_maria` |
+
+Los tres últimos corrieron con el caso de `a0c1c69`; `ebbe181` sólo saca dos
+funciones del recorrido, y el primero se volvió a correr sobre `52f13ca`.
+
+El tercero muestra para qué sirve sacar la copia: con el pintado viejo de
+vuelta, el campo muestra el ajeno pero «Generar» frena y no sale ningún
+pedido. Con la copia puesta (la primera fila), salía.
+
+**Lo que ningún caso distingue.** Volver a poner sola la copia campo →
+operación deja todo en verde: con el campo bien pintado copia lo mismo que ya
+está guardado. La saqué porque sobra y porque era el camino del defecto, no
+porque un caso la pida.
+
+## Lo que cambia además (supuestos reversibles)
+
+- **Un valor que llega al campo sin evento `input` ya no se genera.** Antes
+  «Generar» lo levantaba del campo; ahora frena con «Es obligatorio» con el
+  texto a la vista. No encontré un camino de una persona en Chromium (teclado,
+  pegar, deshacer y rehacer disparan `input`; el campo tiene
+  `autocomplete="off"`). No corrido: IME, autocompletar de extensiones,
+  Firefox, WebKit. Si preferís la copia de vuelta, es revertir `a0acbe7`: el
+  caso sigue en verde.
+- La operación guarda el sufijo como se escribió, con sus espacios; el pedido
+  lo recorta, como ya hacía. Antes «Generar» lo dejaba recortado en la
+  operación.
 
 ## Revisión adversarial
 
 | quién | sobre | hallazgo | qué hice |
 |---|---|---|---|
-| `adversario-sonnet-alto` (Sonnet, alto) | `4271075` | baja: un clic en «Calcular seguro» se pierde una vez después de escribir el sufijo | reproducido; arreglado en `8c54b99` |
-| | | comportamiento anterior: el campo hereda el sufijo de la operación anterior | D236 |
-| `adversario-sonnet-medio` (Sonnet, medio) | `4271075..7c26f5e` | baja, de prueba: sin `programar();` en el manejador todo seguía en verde y los botones quedaban escondidos | reproducido (`106 passed` con la mutación); caso y sabotaje en `ee2ee3c` |
-| | | baja, de prueba: con `input.value.trim()` el caso sigue en verde | queda: guardar sin recortar no es un requisito, es lo que hace el manejador compartido |
-| | | baja, de prueba: `pintarSufijo` que pinta sólo si el campo está vacío no lo distingue ningún caso | queda: no conozco un camino con el campo lleno y otro sufijo guardado, salvo el de D236 |
+| `adversario-sonnet-alto` (Sonnet, alto) | `0d4cd72..bcb3e9c` | media, del caso: sin la copia campo → operación en «Generar» (`6f0e9f9`) el caso seguía en verde | la copia salió del producto (`a0acbe7`); el rojo `8a9a8f6` muestra la diferencia |
+| | | baja, de antes: un valor puesto en el campo sin evento `input` daba el TXT bien y los avisos con `""` (`13e4dd8`) | ahora frena; va en supuestos reversibles |
+| | | baja, diseño anterior: si el arancel propone sufijo para todos los productos, una B sin sufijo genera con `sbt_sufijo_valor=''` y el propio de cada producto (no el de A) | queda: es la regla de «todos con sufijo propio»; lo anoto en riesgos |
+| | | baja, del caso: el orden «pintar el campo antes que la tarjeta» no lo protegía nada (no lo corrió) | el caso mira la tarjeta (`a0c1c69`); rojo `740b38a` |
+| `adversario-sonnet-alto` (Sonnet, alto) | `bcb3e9c..a0c1c69` | ninguno. Informativo: quedan dos fuentes, «Generar» lee la operación y la tarjeta lee el campo | riesgo, abajo, con línea para la cola |
 
-Ningún hallazgo de producto en la segunda pasada. No corrió una sonda propia
-de navegador ni el pedido de avisos fallando con el seguro calculado: eso lo
-leyó. Lo que el primero comprobó sin hallazgo: el pedido de `/generate_maria` es
-idéntico entre la base y el arreglo; el sufijo vaciado da «Ingresá el sufijo
-de valor SBT. Es obligatorio.»; no hay borrador en el servidor (va en
-`localStorage`). No corrió Firefox ni WebKit, ni dos pestañas en un navegador
-real.
+El primero no encontró camino de usuario que llegue a `/generate_maria`, a los
+avisos o a la tarjeta con un sufijo ajeno. El segundo corrió una sonda con
+teclado y mouse (commit descartable `f78b781`): espacios al final, ir a
+«ready» y volver, borrar todo, deshacer y rehacer, pegar 130 caracteres, error
+del servidor y vuelta, ir a «clientes» y volver, borrador y recarga; campo y
+operación iguales en cada paso. No reprodujo arrastrar texto (en el navegador
+sin ventana no hubo arrastre) ni corrió IME ni autocompletar.
 
-## `/code-review high` sobre `9ed8b9a..4271075`
+## `/code-review high` sobre `0d4cd72..bcb3e9c`
 
-Los revisores heredan Fable. Ocho hallazgos:
+Los revisores heredan Fable. Cinco hallazgos:
 
 | # | hallazgo | qué hice |
 |---|---|---|
-| 1 | `test_valor1c.py` en rojo (`pintarSufijo is not defined`) | arreglado en `7c26f5e` |
-| 2 | el campo hereda el sufijo de la operación anterior, y los avisos de la nueva se piden sin él | venía de antes: D236 |
-| 3 | un clic en «Calcular seguro» se pierde después de escribir el sufijo | arreglado en `8c54b99`, con su caso |
-| 4 | «Generar» copia otra vez el campo a la operación | queda: hace falta mientras D236 sea (a); se va con (b) |
-| 5 | guardar el sufijo vivía en el enlace de los avisos | mudado a `enlazarValor` en `8c54b99` |
-| 6 | el caso de pantalla no probaba escribir sin sufijo guardado ni borrar | tres renglones en `7c26f5e` |
-| 7 | el sabotaje `pisa_incluir` esperaba el mismo texto que `pisa_lo_que_se_escribe` | cada uno espera su campo |
-| 8 | `pintarSufijo` pinta sin mirar el foco, y pintaba el valor recortado | la operación ya guarda lo escrito sin recortar; lo que queda va como riesgo bajo, abajo |
+| 1 | el aviso `#sbtFieldError` de una operación queda bajo el campo repintado de la siguiente | de antes: D238 |
+| 2 | en dos llegadas el «frenó» del caso ya era cierto antes del clic | el caso exige el foco en el campo (`a0c1c69`); rojo `8e6b598` |
+| 3 | el caso no miraba la tarjeta del despachante | la mira (`a0c1c69`); rojo `740b38a` |
+| 4 | dos fuentes de verdad: `despachante.js` lee el sufijo del campo del DOM | no toco `despachante.js`: riesgo y línea para la cola |
+| 5 | quedaba la copia campo → operación en «Generar», que mi D236 decía que se iba con (b) | sacada (`a0acbe7`) |
 
-## El rojo de `orden1` (z22)
-
-- Corrida entera de pantallas sobre `4271075`:
-  `resumen: 32 verdes, 1 rojas: orden1`. En `orden1`, z22:
-  `FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')`.
-- El servidor registró, en ese orden: `POST /auth/logout 200`,
-  `POST /generate_maria/avisos 401`, `GET /?next=%2Fdashboard 200`,
-  `POST /auth/login 200`. La pestaña se fue al login porque un pedido de
-  avisos llegó con la sesión cerrada; «Generar» ya no estaba en la página.
-- **Causa:** al entrar a «Validación» salen dos pedidos de avisos; el segundo
-  espera a la lista de estudios. z22 cierra la sesión apenas se habilita
-  «Generar», sin esperar ese pedido. Si llega después del cierre, 401. No es
-  un defecto del producto: una pestaña con la sesión cerrada tiene que ir al
-  login.
-- **No depende de la pieza.** z22 sola, 6 veces sobre `9ed8b9a` y 6 sobre
-  `4271075`: 12 de 12 en verde. Forzada sobre la base `9ed8b9a` (commit
-  descartable que retiene los pedidos de avisos hasta después de salir):
-  `FORZADO: avisos retenidos 2, el primero que llega tras salir contesta 401`
-  y la misma `FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')`.
-- **Lo que no probé:** que el rojo de la corrida entera haya sido exactamente
-  ese pedido. El registro del servidor no tiene horas; coincide el orden
-  (`/api/estudios 200`, cierre, `avisos 401` por la misma conexión).
-- La intermitencia anterior de z22 (`REPRODUCCION-ORDEN1-INTERMITENTE-2026-11-13.md`)
-  tenía otra firma: 401 en `GET /auth/current_user`.
-- En la corrida entera sobre `ee2ee3c`, `orden1` dio verde.
+No volví a correr `/code-review` sobre `bcb3e9c..52f13ca`: lo que cambió
+después son los arreglos de esta tabla, y el producto nuevo (−7/+2) lo miró la
+segunda pasada adversarial.
 
 ## Comandos
 
 ```bash
 S=<carpeta descartable>; PY=<python del entorno virtual>
-# rojo: el caso de hoy con el producto de la base (commit descartable)
-git worktree add -q --detach $S/wt ee2ee3c
-ROJO=$(cd $S/wt && git checkout -q 9ed8b9a -- proyecto_maria/static/v2/screens/finalize.js \
+# verde: los dos casos del sufijo
+SOLO="sufijo_otra1 sufijo_borrador1" env -u DATABASE_URL -u ENVIRONMENT PY=$PY bash scripts/testing/correr_pantallas.sh 52f13ca $S/verde   # resumen: 2 verdes, 0 rojas
+# rojo: el caso de hoy con el producto de la primera entrega (commit descartable)
+git worktree add -q --detach $S/wt 52f13ca
+ROJO=$(cd $S/wt && git checkout -q ee2ee3c -- proyecto_maria/static/v2/screens/finalize.js \
   && git -c user.name=x -c user.email=x@x commit -qm descartable && git rev-parse HEAD)
 git worktree remove --force $S/wt
-SOLO=sufijo_borrador1 env -u DATABASE_URL -u ENVIRONMENT PY=$PY bash scripts/testing/correr_pantallas.sh $ROJO $S/rojo      # resumen: 0 verdes, 1 rojas: sufijo_borrador1
-SOLO=sufijo_borrador1 env -u DATABASE_URL -u ENVIRONMENT PY=$PY bash scripts/testing/correr_pantallas.sh ee2ee3c $S/verde   # resumen: 1 verdes, 0 rojas
-# los tres campos de la tarjeta del valor y los dos de «no se pisa»
-bash scripts/testing/sabotaje_valor1.sh ee2ee3c <entorno virtual>    # OK: los 32 sabotajes dan rojo por la razón esperada
-bash scripts/testing/sabotaje_valor1c.sh ee2ee3c <entorno virtual>   # OK: los 25 sabotajes dan rojo por la razón esperada
+SOLO=sufijo_otra1 env -u DATABASE_URL -u ENVIRONMENT PY=$PY bash scripts/testing/correr_pantallas.sh $ROJO $S/rojo   # resumen: 0 verdes, 1 rojas: sufijo_otra1
+grep FALLA $S/rojo/sufijo_otra1.log   # tres líneas: campo «AA(000123)», la tarjeta lo marca, «siguió a «ready»» y 1 POST
+```
+
+La sonda de D238 (`15893f6`, no está en la rama) dio:
+
+```
+SONDA A sin sufijo, al entrar: oculto «»
+SONDA A sin sufijo, después de «Generar»: a la vista «Ingresá el sufijo de valor SBT. Es obligatorio.»
+SONDA B con sufijo guardado, al entrar: campo «AA(000456)», cartel a la vista «Ingresá el sufijo de valor SBT. Es obligatorio.»
+SONDA C sin sufijo, al entrar: cartel a la vista «Ingresá el sufijo de valor SBT. Es obligatorio.»
+SONDA C después de escribir su sufijo: cartel a la vista «Ingresá el sufijo de valor SBT. Es obligatorio.»
+PANTALLA SONDA-CARTEL OK
 ```
 
 ## Puertas
 
-Todas sobre `ee2ee3c`, una por vez.
+Todas sobre `52f13ca`, una por vez.
 
 | puerta | salida |
 |---|---|
-| `pytest -q --no-cov --timeout=120` (entera) | `6126 passed, 110 skipped, 3 xfailed, 105 warnings in 1352.71s (0:22:32)` |
+| `pytest -q --no-cov --timeout=120` (entera, con la guarda de conexiones) | `6130 passed, 110 skipped, 3 xfailed, 106 warnings in 1299.87s (0:21:39)` (antes, sobre `c18039c`: `6130 passed, 110 skipped, 3 xfailed, 109 warnings in 1331.38s (0:22:11)`) |
 | `python -m compileall -q proyecto_maria` | sin salida, sale 0 |
-| `correr_pantallas.sh ee2ee3c` (las 33) | `resumen: 33 verdes, 0 rojas` |
+| `correr_pantallas.sh 52f13ca` (las 34) | `resumen: 33 verdes, 1 rojas: orden1` (z22: abajo) |
+| `SOLO=orden1 correr_pantallas.sh 52f13ca`, una vez | `resumen: 1 verdes, 0 rojas` |
 | `e2e_maria.sh` | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` |
-| `sabotaje_valor1.sh ee2ee3c` | `OK: los 32 sabotajes dan rojo por la razón esperada` |
-| `sabotaje_valor1c.sh 7c26f5e` | `OK: los 25 sabotajes dan rojo por la razón esperada` |
-| `anclas_perdidas.py ee2ee3c` | las mismas anclas perdidas que sobre `9ed8b9a`, ninguna nueva |
+| `sabotaje_valor1.sh 52f13ca` | `OK: los 32 sabotajes dan rojo por la razón esperada` |
+| `sabotaje_valor1c.sh 52f13ca` | `OK: los 25 sabotajes dan rojo por la razón esperada` |
+| `anclas_perdidas.py 52f13ca` | `revisión 52f13ca: 102 guiones, 2466 anclas medidas y 11 llamadas sin medir` (igual que la base `0d4cd72`, fila por fila) |
 | grep de historia de §6 sobre `proyecto_maria/` | vacío |
+
+### El rojo de `orden1` (z22, la carrera de D237)
+
+- En la corrida entera, z22:
+  `FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')`.
+- El servidor registró, en ese orden: `POST /generate_maria/avisos 200`,
+  `POST /auth/logout 200`, `POST /generate_maria/avisos 401`,
+  `GET /?next=%2Fdashboard 200`, `POST /auth/login 200`. Es la firma de D237:
+  un pedido de avisos llega con la sesión cerrada, la pestaña se va al login y
+  «Generar» ya no está en la página.
+- Corrí `orden1` sola una vez más, no para taparlo: con z22 en rojo el guion
+  corta y los casos que siguen no habían corrido sobre este SHA. Dio verde
+  (71 `OK`; la corrida roja llegó a 52). Van las dos.
+- **No probado:** que esta pieza no cambie la frecuencia de la carrera. No toca
+  los pedidos de avisos ni su demora, y z22 escribe el sufijo igual que antes;
+  la medición forzada sobre la base es la de la primera entrega.
+- Con D237 (a) todavía pendiente, la puerta de pantallas de PAIS-NL puede
+  volver a dar este rojo.
 
 No corrí: `smoke_friccion.sh` ni `ataque_aislamiento.sh` (la pieza no toca
 servidor, datos, sesión ni permisos), `/security-review` (lo mismo), Firefox
-ni WebKit.
+ni WebKit. Sin guion de sabotaje propio: la pieza no es de §3; los rojos van
+arriba, una vez cada uno.
 
 ## `chequeo-6`
 
 ```
-chequeo-6 9ed8b9a..ee2ee3c: avisos para mirar, no un veredicto
-producto +14/−4
-arnés +173/−135
+chequeo-6 0d4cd72..52f13ca: avisos para mirar, no un veredicto
+producto +5/−11
+arnés +210/−1
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/static/v2/screens/finalize.js: 1484 → 1494
-  AVISO creció una función de más de 150: proyecto_maria/static/v2/screens/finalize.js:9 <anónima> 1476 → 1486, 3 en su propio cuerpo (§6: lo nuevo va aparte)
-avisos: 1
+  proyecto_maria/static/v2/screens/finalize.js: 1494 → 1488
+avisos: 0
 ```
 
-- El `AVISO` queda: la función anónima de la línea 9 es el envoltorio del
-  archivo entero; toda función de `finalize.js` vive adentro. Lo nuevo va en
-  una función aparte (`pintarSufijo`), una llamada y una entrada en `campos`.
-- `arnés +173/−135` cuenta también lo que trajo la integración de tu rama
-  (casos de la Técnica). Lo mío está en `e553641`, `4271075`, `7c26f5e` y
-  `ee2ee3c`.
+De `arnés +210/−1`, 99 líneas son mías (`pantalla_sufijo_otra1.js`); las otras
+111/−1 son `tests/conftest.py` y `tests/test_guarda_conexiones.py`, de la
+Técnica, que llegaron con la integración de tu rama.
 
 ## Riesgos
 
-- **Bajo: `pintarSufijo` no mira el foco.** La operación sigue cada tecla,
-  así que lo que pinta es lo que el campo ya tiene. La diferencia posible es
-  un espacio al final: «Generar» guarda el sufijo recortado y, si el servidor
-  devuelve a «Validación», el campo queda sin ese espacio. No lo construí.
-- En «ready» el borrador ya se borró: si ahí falla algo y se recarga, la
-  operación no vuelve. Ya era así; no es de esta pieza.
-- Los avisos con el sufijo a medio escribir: mientras se tipea, el servidor
-  puede contestar avisos de un sufijo incompleto. Se corrigen solos 400 ms
-  después de la última tecla.
+- **Medio-bajo: dos fuentes del sufijo.** «Generar», los avisos y el TXT leen
+  la operación; la tarjeta del despachante lee el campo
+  (`despachante.js:255`, `sufijoDeLaOperacion`). Hoy coinciden porque el campo
+  se pinta al entrar y cada tecla va a la operación. Línea que propongo para
+  `COLA-LIMPIEZA.md`: «`despachante.js`: `sufijoDeLaOperacion()` lee el sufijo
+  del campo del DOM; que lea la operación, como «Generar» y los avisos».
+- **Bajo: todos los productos con sufijo propio.** Si el arancel propone
+  sufijo para cada producto, una operación sin sufijo genera sin frenar, con el
+  propio de cada producto. Es la regla anterior («No hace falta si todos los
+  productos llevan sufijo propio»); no lleva el sufijo de la operación
+  anterior. Tu «una B sin sufijo no genera» vale cuando algún producto depende
+  del de la operación, que es lo que prueba el caso.
+- **Bajo: el aviso viejo a la vista** (D238).
+- El caso tiene 99 líneas contra las ~80 de §6: tres llegadas, la tarjeta y el
+  positivo de avisos y TXT en un solo caso; `chequeo-6` no lo marca.
+- Los avisos con el sufijo a medio escribir se corrigen solos 400 ms después
+  de la última tecla. Ya era así.
 
 ## Archivos de producto que toqué
 
@@ -257,6 +263,6 @@ avisos: 1
 
 ## Sigo con
 
-**CUIT-GENERAR (D235 a)**: primero los dos rojos.
+**PAIS-NL**: primero el rojo en `tests/test_catalogo3.py`.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama `claude/dev-maria`, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `7bae88f`). SUFIJO-BORRADOR (D227) entregada sobre `ee2ee3c`, con D236 (campo heredado entre operaciones; recomiendo (b) como pieza aparte) y D237 (carrera de z22 en `orden1`; recomiendo (a)) sin contestar. Pieza activa: CUIT-GENERAR (D235 a), producto con datos, revisión fuerte (§3): primero los dos rojos (un TXT con un CUIT malo ya guardado en el perfil y otro con `cuit_agr` malo), el mensaje dice dónde corregirlo; no tocar que `00000000000` pase `cuit_valido`. Después, los vencidos de `sabotajes-conocidos.txt`, uno por pieza. Próxima D: D238. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, sin secretos ni datos reales, VUCE y Gemini simulados, una corrida por vez, un rojo se diagnostica y no se repite hasta verde, las Devs no usan el consejero ni subagentes de esfuerzo muy alto.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama `claude/dev-maria`, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `6e4a427`). SUFIJO-BORRADOR, vuelta de la devolución con D236 (b), entregada sobre `52f13ca` (base `0d4cd72`), con D238 (el aviso «Es obligatorio» queda a la vista entre operaciones; recomiendo (a), pieza aparte) sin contestar. Pieza activa: PAIS-NL (toda sigla de Países Bajos da 423 en TXT, catálogo y pantalla; `PAISES_INDEC` sin claves repetidas; «HOLANDA» queda en 434; ninguna otra entrada cambia; rojo cambiando `tests/test_catalogo3.py:291` y `:298`; las formas de escribirlo como datos de un caso; en el informe, medido y no arreglado, qué queda guardado con «NL» y si algo ya guardado en 434 no se distingue; sin migración). Después: D237 (a) (z22 de `pantalla_orden1.js` espera los avisos, sin espera fija), CUIT-GENERAR (D235 a; apartada con las reversiones `3a6f656` y `2f04637`, se recupera revirtiéndolas; hallazgos del adversario en el scratch `cg_adversario.md`; revisión fuerte §3 con `/security-review`; sus D toman número nuevo), y los vencidos de `sabotajes-conocidos.txt`, uno por pieza. Próxima D: D239. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, sin secretos ni datos reales, VUCE y Gemini simulados, una corrida por vez, un rojo se diagnostica y no se repite hasta verde, las Devs no usan el consejero ni subagentes de esfuerzo muy alto.
