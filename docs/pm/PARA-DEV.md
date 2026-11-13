@@ -3,48 +3,32 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## EXCEL2D-TIEMPO: aceptada sobre `181e0dfc` (informe `5e2c7b5c`) e integrada (2026-11-13 06:40 UTC)
+## CONFTEST-TMP: aceptada sobre `8dd99fa1` (informe `eea0eab5`) e integrada (2026-11-13 08:05 UTC)
 
-Integro tu rama. Acta `REPRODUCCION-EXCEL2D-TIEMPO-2026-11-13.md`. **Traé mi
-rama con `merge`.** ORDEN1-INTERMITENTE quedó en Git y en su acta.
+Integro `eea0eab5`. Acta `REPRODUCCION-CONFTEST-TMP-2026-11-13.md`. **Traé mi
+rama con `merge`.** EXCEL2D-RELOJ quedó en Git y en su acta.
 
-**Lo reproducido.** `chequeo-6` igual que el tuyo; `excel2d.sh` 20 `ROJO` en
-tu SHA. Mi negativo de GIL (un `re.match` catastrófico después de
-`validar_con_carril`): rojo en los dos SHA. Con 4 núcleos y 8 ocupados, base
-y tu SHA verdes: el rojo de la CI no se reproduce así. **Lo que distingue tu
-cambio:** un solo núcleo (`taskset -c 0`) con 8 ocupados: base `4 failed` dos
-veces, tu SHA `7 passed` dos veces. En ese caso de hambre, el reloj de tu SHA
-llega a 7,20 s («9995»).
+**Lo reproducido.** Tu puerta sana: base 4149 → 4150, arreglo 4150 → 4150,
+`7 passed` las dos. `chequeo-6` igual que el tuyo. Lo demás (falla, Ctrl-C,
+importación rota, suite entera) es tuyo y no lo repetí.
 
-**D214: (a), decidido por la PM, y es tu pieza siguiente.** Mi `sleep(4)` en
-el mismo lugar: base rojo, tu SHA verde; lo confirma. Hoy ningún camino trae
-una espera sin CPU en la subida, así que no es devolución.
+**Riesgos que van a la cola, no devolución:**
+- Un hijo creado con `fork` hereda el `atexit` y, si sale normal, borra la
+  base del padre. Mi negativo da `1 passed` en la base y `1 failed` en tu
+  SHA. Hoy ninguna prueba hace `fork`. Sugerencia: borrar sólo desde el
+  proceso que creó la base.
+- Con SIGTERM (lo que manda `timeout`) `atexit` no corre y el archivo queda,
+  igual que en la base. Leído, no corrido.
 
-**D215: (a), decidido por la PM.** Comprobé `ci.yml:49` (`--no-cov`) y
-`pytest.ini` (`--cov` en local). El margen con cobertura va a la cola.
-
-**Siguiente: EXCEL2D-RELOJ** (sólo pruebas, producto +0/−0), en el mismo caso.
-- Que vuelva a ver una espera sin CPU en la subida, sin perder lo que mide hoy.
-- **Puertas:** rojo con una espera sin CPU anclada en código dentro de la
-  subida (vos elegís el ancla; la mía estaba después de `validar_con_carril`
-  en `upload_excel_v2`); verde con 4 núcleos y 8 ocupados, varias corridas;
-  el tope justificado contra el caso de hambre de un núcleo (corrélo vos y
-  poné los números); `chequeo-6` entero.
-- Si un tope que no da falso rojo en el caso de hambre ya no ve una espera
-  real, decilo con números antes de cambiar nada.
-
-**Apenas entregues: X-FORWARDED-STATUS** (sólo arnés), la entrada de
-`pantalla_destino1.js` en la cola: los guiones que mandan `X-Forwarded-For`
-para registrarse no miran el status del registro, y si falla siguen sin decir
-por qué. Hoy son estos (contá vos, la cola dice 15): `cliente1`, `despacho1a`,
-`destino1`, `estudio1`, `estudio1b`, `maria9`, `org1b`, `separadores1`,
-`validacion1`. **`pantalla_orden1.js` no: es de MARIA.** Un solo lugar que
-lo chequee, si se puede. Puerta: rojo con el registro fallando (sabotaje
-anclado en código), con el mensaje que diga el status; corredor entero verde.
+**Ahora: DOS-RELOJES** (sólo arnés), la entrada de `forzar_orden1.js` en la
+cola: retiene el login `TOPE_MS` desde que llega y el producto corta
+`ESPERA_SESION_MS` desde que la pide, así que el mensaje cambia entre
+corridas. Puerta: el mensaje del comando 1 de tu informe de ORDEN1 sale igual
+cuatro veces seguidas; `orden1b.sh` sigue con 30 `ROJO`.
 
 Igual que antes: sin adversarios; no toques los guiones de MARIA. D182 / D206
 siguen igual: si Emi dice que sí, dejás esto donde esté. D205, D206 y D208
-siguen con Emi. **Próxima D: D228** (rango D228–D233).
+siguen con Emi. **Próxima D: D229** (rango D228–D233).
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 

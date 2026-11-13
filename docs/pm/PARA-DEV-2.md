@@ -3,52 +3,42 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## PANTALLAS-MARIA: aceptada sobre `7ac0b4e` (entregada en `e0d2770f`) e integrada (2026-11-13 03:58 UTC)
+## valor1: aceptada sobre `0334800` (trabajo `b1a70d1`, informe `a647bee`) e integrada (2026-11-13 07:32 UTC)
 
-Integro tu informe `8f848862`. Acta `REPRODUCCION-PANTALLAS-MARIA-2026-11-13.md`.
-**Traé mi rama con `merge`.**
+Acta `REPRODUCCION-VALOR1-2026-11-13.md`. **Traé mi rama con `merge`.**
+Integro tu rama **hasta `a647bee`**: AJUSTE-BORRADOR (`a57b584`, `c4620ca`)
+todavía no entra.
 
-**Lo reproducido.** Antes: en mi corredor sobre `907e1edb`, tus cuatro rojas.
-Ahora, el corredor entero sobre `e0d2770f`: `28 verdes, 2 rojas: maria1c
-orden1`, y `maria3`, `maria4`, `maria5` y `subitems1` verdes. `chequeo-6`
-igual que el tuyo, con el aviso de `subitems1` bien explicado. Mis negativos:
-`maria4` sin el CUIT del comprador en el armado da `FALLA: page.click:
-Timeout 30000ms exceeded` (el guion distingue la causa 1); `maria5` y
-`subitems1` con `CSRF_ENFORCE=true` dan 9 y 10 `OK` (el ayudante manda el
-token). Tu contradicción de la fecha, aceptada.
+**Lo reproducido.** Desde el árbol de `0334800`: `sabotaje_valor1.sh` da
+29 `ROJO`, 0 `FALLA` y salida 0; `descuento_solo` 2 failed y
+`respuesta_vieja` 1, como tu informe. `anclas_perdidas.py` da 0 para el guion
+y el grep de comentarios, vacío. `chequeo-6`, igual que el tuyo. Mis dos
+negativos en `finalize.js`, sobre `tests/test_valor1.py`: tolerar respuestas
+un poco viejas (`seq < avisosSeq - 5`) pone rojo
+`test_una_respuesta_vieja_no_pisa_las_cuentas_nuevas`; poner el descuento
+solo cuando el campo está vacío pone rojo
+`test_el_descuento_de_la_planilla_se_ofrece_y_no_se_pone_solo`. Los dos son
+distintos de tu 26 y tu 10.
 
-**Las dos rojas no son tuyas.** `maria1c` la arregló la Técnica. `orden1`:
-sola, dos veces en la base y dos en tu SHA, verde las cuatro; no requiere
-ninguno de tus cinco archivos. Es un intermitente sin diagnosticar y va a la
-Técnica. **Aviso (05:35 UTC): la pieza de la Técnica está integrada;
-`pantalla_orden1.js` ya es tuya para CUIT-PERFIL.**
+**Tus tres supuestos, aceptados.** A la cola, no devolución, dos cosas del
+guion: el total del mensaje final (`los 29`) se cuenta de los `caso` que
+corrieron en vez de escribirlo a mano, y una corrida sin sabotear antes de
+los casos (si el árbol sano ya está rojo en la prueba que nombra un `caso`,
+ese `caso` da `ROJO` igual).
 
-**D225: (a).** Lo confirmé en vivo: `PUT /api/user/profile` con `cuit`
-`20999999998` da 200 y queda guardado. Pieza propia, en el lugar 5 de abajo.
-**D226: (a)** para tus tres (`catalogo_ncm1`, `excel1`, `maria1b`). En mi
-contenedor la ruta fija existe y las tres salen verdes, así que el rojo es de
-tu entorno; igual se saca, como en los otros 19 guiones. `maria1c` la hace la
-Técnica.
-
-Tus tres líneas para `COLA-LIMPIEZA.md`: `subitems1` y `maria4` ya están; la
-de los cuatro guiones con CUIT inválido va dentro de D225.
+D223 + D224 y D226 siguen aceptadas e integradas (actas del 13/11).
 
 **Cómo sigue, en este orden:**
-1. **D223 + D224**, una pieza (lo que ya estaba escrito).
-2. **D226 (a)**: tus tres guiones con `chromium.launch()` sin ruta. Puerta:
-   las tres verdes en el corredor de tu contenedor.
-3. Retirar los sabotajes 13 y 24 de `valor1` y reanclar en código el 10
-   (comentario, línea 108) y el 28 (comentario al final de la línea 187).
-   Puerta: `valor1` entero da 29 `ROJO` y salida 0, y su línea sale de
-   `sabotajes-conocidos.txt`.
-4. **AJUSTE-BORRADOR** (producto). Primero un caso de pantalla: ajuste mal
-   escrito, borrador guardado, recargar, recuperar; el caso pide que el campo
-   muestre lo que el aviso nombra (`guardarBorrador`, `app_v2.js:1082`;
-   `adoptarBorrador`; la guarda en `finalize.js:451`/`:454`). Mostralo en rojo
-   sobre el código de hoy. Si da rojo, arreglalo (sugerencia: sacar las dos
-   guardas resta antes de sumar). Si no reproduce, informalo con la salida y
-   las guardas pasan a la cola. Producto en `static/v2`: corre `e2e_maria.sh`.
-5. **CUIT-PERFIL (D225)**, producto, con datos: revisión fuerte (§3:
+1. **AJUSTE-BORRADOR** (producto), en curso. Primero un caso de pantalla:
+   ajuste mal escrito, borrador guardado, recargar, recuperar; el caso pide
+   que el campo muestre lo que el aviso nombra (`guardarBorrador`,
+   `app_v2.js:1082`; `adoptarBorrador`; la guarda en `finalize.js:451`/`:454`).
+   Mostralo en rojo sobre el código de hoy. Si da rojo, arreglalo
+   (sugerencia: sacar las dos guardas resta antes de sumar). Si no
+   reproduce, informalo con la salida y las guardas pasan a la cola.
+   Producto en `static/v2`: corre `e2e_maria.sh`. Según tu informe, cubre también D222 (el
+   «a la vista» sin negativo de valor1).
+2. **CUIT-PERFIL (D225)**, producto, con datos: revisión fuerte (§3:
    adversarios y sabotaje propio).
    - Primero el camino de hoy: mostrá en rojo que «Mi perfil» (o la API que
      usa) guarda un CUIT con el dígito verificador malo.
@@ -58,8 +48,8 @@ de los cuatro guiones con CUIT inválido va dentro de D225.
      cambiar datos guardados.
    - En la misma pieza, `orden1`, `validacion1`, `cobro_corte1` y
      `cobro_mp1_v2` pasan a `_cuit_perfil.js` (hoy cargan un CUIT inválido y
-     se pondrían rojos). `orden1` también: el aviso ya está.
-6. Los vencidos que quedan en `sabotajes-conocidos.txt`, uno por pieza.
+     se pondrían rojos). `pantalla_orden1.js` ya es tuya.
+3. Los vencidos que quedan en `sabotajes-conocidos.txt`, uno por pieza.
 
 **Próxima D: D227.**
 

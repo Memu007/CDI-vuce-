@@ -142,5 +142,11 @@ sabotaje $M "las celdas rellenadas vuelven a copiarse en cada fila" \
   '    pass' \
   "FAILED $T::test_la_subida_cara_no_frena_a_nadie[2499 combinadas en 4998 filas]"
 
+# espera sin CPU
+sabotaje $M "la subida espera 4 s sin gastar CPU" \
+  "    contents, liviano = await validar_con_carril(file, 'excel', max_size=max_upload_bytes)" \
+  $'    contents, liviano = await validar_con_carril(file, \'excel\', max_size=max_upload_bytes)\n    await __import__("asyncio").sleep(4)' \
+  "FAILED $T::test_la_subida_cara_no_frena_a_nadie[2499 combinadas en 4998 filas]"
+
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]

@@ -1,4 +1,6 @@
+import atexit
 import contextlib
+import glob
 import pytest
 import tempfile
 from fastapi.testclient import TestClient
@@ -13,9 +15,17 @@ os.environ['ENVIRONMENT'] = 'testing'
 os.environ['SENTRY_DSN'] = ''  # Disable Sentry in tests
 # DB en archivo temporal (no in-memory): SQLite in-memory crea una DB nueva
 # por cada conexión async, lo que rompe tests que abren más de una sesión.
-# Archivo en /tmp se borra al final del proceso de tests (lo limpia OS).
 _test_db_fd, _test_db_path = tempfile.mkstemp(suffix='.db', prefix='cdi_pytest_')
 os.close(_test_db_fd)
+
+
+@atexit.register
+def _borrar_db_de_prueba():
+    # atexit y no pytest_sessionfinish: también corre si la corrida se corta
+    # antes de la sesión. Con la base se van su -journal, -wal y -shm.
+    for ruta in glob.glob(glob.escape(_test_db_path) + '*'):
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(ruta)
 os.environ['DATABASE_URL'] = f'sqlite+aiosqlite:///{_test_db_path}'
 
 from proyecto_maria.main import app  # noqa: E402
