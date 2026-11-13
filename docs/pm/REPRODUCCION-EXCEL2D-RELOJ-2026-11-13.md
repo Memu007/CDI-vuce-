@@ -54,3 +54,51 @@ tope. El margen del tope va a Emi
 
 No corrido: pytest entero, adversarios (sólo pruebas) y el corredor entero
 para D228 (sólo `destino1` y `cliente1`).
+
+## Escape (2026-11-13 09:25 UTC)
+
+Lo encontró MARIA (D234, informe `fdaa2da5`): `pytest` entero da rojo en
+`test_la_subida_cara_no_frena_a_nadie[9995 combinadas en 19 990 filas]`, 2 de
+2 en su contenedor (1,01 y 1,26 s contra el tope de 1 s). Acepté sin `pytest`
+entero y la CI de la PR, que sí lo corre, dio verde.
+
+Causa, reproducida por mí: `_otro_hilo_listo()` recorre `/proc/self/task` en
+cada marca. La suite llega a esta prueba con ~1080 hilos dormidos; el testigo
+casi no marca y `frenado` mide al testigo. La prueba sola con 1075 hilos
+dormidos puestos por un plugin: `1 failed` 2 de 2 (1,47 y 1,13 s); sin el
+plugin, `7 passed`. Vuelve a la Técnica (`PARA-DEV.md`).
+
+## Vuelta 2: entregada en `25e13c44` (test `c4a30b5a`), con devolución (2026-11-13 11:39 UTC)
+
+El testigo ahora mide el tiempo de reloj y de CPU en cada marca, y saca la
+espera de los saltos sin CPU. Diff fuera de `docs/pm`: sólo
+`tests/test_excel2d.py`. Corrido por la PM en un worktree en `c4a30b5a`, con
+el plugin de hilos del informe de MARIA (`HILOS=n`).
+
+| qué | salida |
+|---|---|
+| puerta 1, el caso con 0, 1000 y 3000 hilos | verde en los tres |
+| puerta 2, `sabotajes/excel2d.sh` con 1000 hilos | 6 `ROJO`, `sabotajes con falla: 0` |
+| puerta 3, `pytest` entero | `6112 passed, 110 skipped, 3 xfailed, 104 warnings in 1111.63s`, 0 FAILED (el caso de más: `test_valor1.py` +7 en `git diff --stat caad310a c4a30b5a -- tests/`) |
+| negativo mío `246d80c0` (nunca recorre `/proc`), 1000 hilos | «la subida espera 4 s sin gastar CPU» da `VERDE`: el recorrido hace falta |
+| espera real de 4 s (`asyncio.sleep(4)` después de `validar_con_carril` en `main.py`) | medida: 3,91 s con 0 hilos, 1,95 s con 1000 y 0,87 s con 3000 |
+| espera real de 0,8 s, apenas sobre el tope de 0,5 s, con `-k "no_frena and 2499"` | `HILOS=0`: `E   assert 0.7789743069993165 < 0.5`, `1 failed, 25 deselected, 3 warnings in 1.50s`; `HILOS=1000`: `1 passed, 25 deselected, 3 warnings in 1.61s`; `HILOS=3000`: `1 passed, 25 deselected, 3 warnings in 1.48s` |
+
+**Causa.** El salto en el que el testigo recorre `/proc/self/task` se marca
+como «otro hilo listo» y no suma a la espera. Con muchos hilos, ese recorrido
+dura más que el tic de 10 ms del testigo, y de cada vuelta sólo cuenta como
+espera el tic. El frenado ya no depende de los hilos;
+la espera sí.
+
+**No corrido por la PM:** que el producto no pierde hilos en un uvicorn que
+vive mucho (va a la pieza de D229), y adversarios (la pieza es del arnés).
+
+**Riesgos, no devolución.** El webhook de Mercado Pago (`main.py:11688`)
+cierra la sesión por el finalizador: la pieza de D229 lo informa como
+riesgo, y arreglarlo sería una pieza de producto aparte. Queda un residuo: un recorrido justo antes de CPU fuerte puede
+quedar contado como salto con CPU.
+
+**Integrada sin aceptar.** `c4a30b5a` entra a la rama de PM con NAVEGADOR
+(merge `5c0faf45`): la unión es idéntica a `9059c696` fuera de `docs/pm`, y
+con ese test `pytest` entero da verde, mientras que el de antes daba el rojo
+de D234.

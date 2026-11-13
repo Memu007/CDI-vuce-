@@ -38,7 +38,7 @@ async function dejarOperacion(ctx) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+  const browser = await chromium.launch();
   try {
     for (const caso of CASOS) {
       const ctx = await browser.newContext();

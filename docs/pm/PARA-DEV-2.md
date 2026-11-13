@@ -3,43 +3,30 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## valor1: aceptada sobre `0334800` (trabajo `b1a70d1`, informe `a647bee`) e integrada (2026-11-13 07:32 UTC)
+## AJUSTE-BORRADOR: aceptada sobre `d094c24` (informe `fdaa2da`) e integrada (2026-11-13 09:30 UTC)
 
-Acta `REPRODUCCION-VALOR1-2026-11-13.md`. **Traé mi rama con `merge`.**
-Integro tu rama **hasta `a647bee`**: AJUSTE-BORRADOR (`a57b584`, `c4620ca`)
-todavía no entra.
+Acta `REPRODUCCION-AJUSTE-BORRADOR-2026-11-13.md`. **Traé mi rama con
+`merge`.** valor1 quedó en Git y en su acta.
 
-**Lo reproducido.** Desde el árbol de `0334800`: `sabotaje_valor1.sh` da
-29 `ROJO`, 0 `FALLA` y salida 0; `descuento_solo` 2 failed y
-`respuesta_vieja` 1, como tu informe. `anclas_perdidas.py` da 0 para el guion
-y el grep de comentarios, vacío. `chequeo-6`, igual que el tuyo. Mis dos
-negativos en `finalize.js`, sobre `tests/test_valor1.py`: tolerar respuestas
-un poco viejas (`seq < avisosSeq - 5`) pone rojo
-`test_una_respuesta_vieja_no_pisa_las_cuentas_nuevas`; poner el descuento
-solo cuando el campo está vacío pone rojo
-`test_el_descuento_de_la_planilla_se_ofrece_y_no_se_pone_solo`. Los dos son
-distintos de tu 26 y tu 10.
+**Lo reproducido.** `pantalla_ajuste1.js`: `ROJA` sobre `a57b584` y verde
+sobre `d094c24`. `tests/test_valor1.py`: `76 passed`; con el `finalize.js` de
+`a647bee`, `1 failed` (el caso nuevo). `e2e_maria.sh` sobre `d094c24`, OK.
+`chequeo-6` igual al tuyo. Mi negativo: la guarda vuelta a poner sólo en
+Ajustes a deducir pone rojo el caso nuevo. Tus tres supuestos, aceptados.
 
-**Tus tres supuestos, aceptados.** A la cola, no devolución, dos cosas del
-guion: el total del mensaje final (`los 29`) se cuenta de los `caso` que
-corrieron en vez de escribirlo a mano, y una corrida sin sabotear antes de
-los casos (si el árbol sano ya está rojo en la prueba que nombra un `caso`,
-ese `caso` da `ROJO` igual).
+**D227: (a), decidido por la PM.** Lo leí igual que vos: ninguna línea le
+asigna valor a `sbtInput`. Va como pieza aparte, después de CUIT-PERFIL
+(abajo).
 
-D223 + D224 y D226 siguen aceptadas e integradas (actas del 13/11).
+**D234: (a), decidido por la PM.** Vuelve a la Técnica como devolución de
+EXCEL2D-RELOJ; lo reproduje con tu comando 4, 2 de 2. Es un escape mío.
+**Al día (11:39 UTC):** el test nuevo de la Técnica ya está en mi rama, y con
+él mi `pytest` entero da verde. Traé mi rama con `merge`. Si tu `pytest`
+entero trae ese rojo igual, informalo con su salida.
 
 **Cómo sigue, en este orden:**
-1. **AJUSTE-BORRADOR** (producto), en curso. Primero un caso de pantalla:
-   ajuste mal escrito, borrador guardado, recargar, recuperar; el caso pide
-   que el campo muestre lo que el aviso nombra (`guardarBorrador`,
-   `app_v2.js:1082`; `adoptarBorrador`; la guarda en `finalize.js:451`/`:454`).
-   Mostralo en rojo sobre el código de hoy. Si da rojo, arreglalo
-   (sugerencia: sacar las dos guardas resta antes de sumar). Si no
-   reproduce, informalo con la salida y las guardas pasan a la cola.
-   Producto en `static/v2`: corre `e2e_maria.sh`. Según tu informe, cubre también D222 (el
-   «a la vista» sin negativo de valor1).
-2. **CUIT-PERFIL (D225)**, producto, con datos: revisión fuerte (§3:
-   adversarios y sabotaje propio).
+1. **CUIT-PERFIL (D225)**, en curso. Producto, con datos: revisión fuerte
+   (§3: adversarios y sabotaje propio).
    - Primero el camino de hoy: mostrá en rojo que «Mi perfil» (o la API que
      usa) guarda un CUIT con el dígito verificador malo.
    - `PUT /api/user/profile` rechaza un CUIT inválido y la pantalla muestra
@@ -49,9 +36,17 @@ D223 + D224 y D226 siguen aceptadas e integradas (actas del 13/11).
    - En la misma pieza, `orden1`, `validacion1`, `cobro_corte1` y
      `cobro_mp1_v2` pasan a `_cuit_perfil.js` (hoy cargan un CUIT inválido y
      se pondrían rojos). `pantalla_orden1.js` ya es tuya.
+2. **SUFIJO-BORRADOR (D227)**, producto en `static/v2`. Primero un caso de
+   pantalla: sufijo de la operación, generar, volver, recargar, recuperar;
+   el campo tiene que mostrar el sufijo guardado. Mostralo en rojo sobre el
+   código de hoy; si no reproduce, se informa con la salida. Corre
+   `e2e_maria.sh`. En la misma pieza: mi otro negativo encontró que
+   `test_lo_que_se_esta_escribiendo_no_se_pisa` mira sólo Ajustes a
+   deducir; sacar `document.activeElement !== incluir` (`finalize.js:451`)
+   la deja en verde. Los dos campos como datos de ese caso.
 3. Los vencidos que quedan en `sabotajes-conocidos.txt`, uno por pieza.
 
-**Próxima D: D227.**
+**Próxima D: D235.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 

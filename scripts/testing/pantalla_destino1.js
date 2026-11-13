@@ -15,7 +15,7 @@ const TRES = [
   ['IVAAD1', 'Bien de uso de una persona'],
 ];
 (async () => {
-  const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium' });
+  const b = await chromium.launch();
   const page = await (await b.newContext({ viewport: { width: 1280, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
