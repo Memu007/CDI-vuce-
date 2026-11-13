@@ -3,56 +3,41 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## ORDEN1-INTERMITENTE: devolución sobre `8e775b2b` (2026-11-13 04:46 UTC)
+## ORDEN1-INTERMITENTE: aceptada sobre `6d1f1365` (informe `693a9bfa`) e integrada (2026-11-13 05:35 UTC)
 
-No integro. Acta `REPRODUCCION-ORDEN1-INTERMITENTE-2026-11-13.md`. La carrera
-forzada se reproduce como en tu informe (base: la misma `FALLA` del null;
-`8e775b2b`: verde), `chequeo-6` da lo mismo y `orden1b.sh` sigue con
-29 `ROJO`, 0 sin rojo. TOPE 900 y `maria1c` con `chromium.launch()` están
-bien: quedan.
+Integro tu rama. Acta `REPRODUCCION-ORDEN1-INTERMITENTE-2026-11-13.md`,
+«Vuelta 2». **Traé mi rama con `merge`.**
 
-**Causa de la devolución.** El z22 nuevo suelta la consulta de usuario antes
-de apretar Generar, así que ya no prueba la escritura con un chequeo de sesión
-lento por debajo del tope del producto. Lo medí: con `ESPERA_SESION_MS` en
-2000 (`app_v2.js:960`) y `CASOS=z22`, la base da dos veces
-`FALLA: A salió, volvió a entrar y generó enseguida y no generó: error: No se
-pudo comprobar la sesión. Recargá la página.`; `8e775b2b`, dos veces
-`OK=2`. Además, entre `soltar()` y el clic no queda fijado si la pestaña ya
-procesó la respuesta.
+**Lo reproducido.** `chequeo-6` igual que el tuyo. Carrera forzada: base con
+la `FALLA` del null, tu SHA verde cuatro veces. Familia forzada: 0 consultas
+en el hueco, en base y en tu SHA. `orden1b.sh`: 30 `ROJO`, 0 sin rojo. Con
+`ESPERA_SESION_MS` en 2000 sobre tu SHA (vos lo corriste sobre el
+provisorio): z20, z21, z23 y z24 rojos. Mi negativo, distinto del ejemplo:
+Generar sin comprobar la sesión da `FALLA: … y Generar no comprobó la
+sesión` dos veces. Corredor entero sobre tu SHA: `30 verdes, 0 rojas`.
 
-Un reloj que decide si la consulta vuelve antes o después del login no vale:
-es la carrera. Una respuesta demorada a propósito por debajo del tope sí vale:
-es la entrada del caso.
+**Una diferencia, sin devolución.** Tu comando 1 promete
+`seguía retenida a los 10 s`, y una de mis cuatro corridas dio `se cortó sin
+respuesta antes de entrar`: `TOPE_MS` y `ESPERA_SESION_MS` casi empatan. El
+resultado es el mismo. Va a `COLA-LIMPIEZA.md`; no es esta pieza.
 
-**Pedido:**
-1. z22 vuelve a probar Generar con el chequeo de sesión lento por debajo del
-   tope, y además da lo mismo siempre.
-2. La familia: z20a, z21, z23 y z24 también usan `retenerUsuario(t, 3000)`.
-   Mostrá qué da cada uno con la entrada forzada, y si `forzar_orden1.js` los
-   alcanza (hoy demora sólo el login que sigue a un logout).
-3. *Sugerencia, no criterio:* la demora de 3 s se puede dejar en la respuesta
-   y soltar el login recién cuando la pestaña mostró que la procesó.
+**Siguiente: EXCEL2D-TIEMPO** (sólo pruebas, producto +0/−0).
+`tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie` mide con reloj:
+el paso del hilo testigo contra 0,5 s (`:199`) dio 0,506 y 0,66 s en la CI
+sin cambio de producto. Son las dos entradas de `test_excel2d.py` en la cola.
+- Que la prueba distinga el defecto que cuida (openpyxl reteniendo el GIL:
+  el hilo testigo se quedaba 9 s) sin depender de la carga del runner.
+- **Puertas:** rojo con el defecto devuelto (sabotaje anclado en código; vos
+  encontrás qué lo devuelve); verde con la máquina cargada (por ejemplo,
+  tantos procesos ocupados como núcleos), varias corridas, con la salida;
+  `chequeo-6` entero.
+- Si medís que el tope no se puede separar del ruido, decilo con números
+  antes de cambiar nada.
 
-**Puertas:**
-- Con `ESPERA_SESION_MS` en 2000, `CASOS=z22` da rojo sobre tu SHA; ese
-  sabotaje entra a `orden1b.sh`, anclado en código.
-- La carrera forzada sigue: base con la `FALLA`, tu SHA verde.
-- Tu corredor entero sobre tu SHA, con el resumen. `chequeo-6` entero,
-  producto +0/−0.
-
-**D213: (b) por ahora, decidido por la PM, reencuadrado.** El 401 que forzamos
-llega con la sesión ya cerrada, y lo pide el autoguardado del hueco:
-`api()` → `sesionEsDelDueno()` → `irAlLogin()`, mientras `revisarSesion` ante
-el mismo 401 se queda y avisa. Es un riesgo con camino de hoy (salir en otra
-pestaña con una operación cargada); si se pierde lo cargado, no está corrido.
-Va a `COLA-LIMPIEZA.md`. No lo toques en esta pieza.
-
-Igual que antes: sin adversarios; no toques los guiones de MARIA;
-`pantalla_orden1.js` es tuya en esta pieza. La función de 1585 líneas va a la
-cola: no la partas acá. Mi corredor entero sobre `8e775b2b`: `30 verdes, 0 rojas`.
-
-Lo de D182 / D206 sigue igual: si Emi dice que sí, dejás esto donde esté.
-D205, D206 y D208 siguen con Emi. **Próxima D: D214** (rango D210–D215).
+Igual que antes: sin adversarios; no toques los guiones de MARIA ni
+`pantalla_orden1.js` (pasa a MARIA). Lo de D182 / D206 sigue igual: si Emi
+dice que sí, dejás esto donde esté. D205, D206 y D208 siguen con Emi.
+**Próxima D: D214** (rango D210–D215).
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 

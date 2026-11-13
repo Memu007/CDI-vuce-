@@ -49,7 +49,7 @@ z21, z23 y z24 con la entrada forzada lenta (se pide en la devolución).
 
 ## Vuelta 2: arnés `6d1f1365`, informe `693a9bfa`
 
-Veredicto: pendiente del corredor entero. Producto +0/−0.
+Veredicto: **aceptada e integrada**. Producto +0/−0.
 
 | qué | salida |
 |---|---|
@@ -61,7 +61,7 @@ Veredicto: pendiente del corredor entero. Producto +0/−0.
 | negativo de la PM: Generar sin comprobar la sesión, `CASOS=z22`, dos veces | `rc=1 FALLA: A salió, volvió a entrar y generó enseguida y Generar no comprobó la sesión` las dos |
 | `CASOS=z22` sobre `693a9bfa` sin forzar, tres veces | `rc=0 OK=2` las tres |
 | `ESPERA_SESION_MS` 2000 sobre `6d1f1365`, un caso por corrida (la Dev lo corrió sobre su commit provisorio) | z20, z21, z23 y z24 rojos, cada uno con `No se pudo comprobar la sesión. Recargá la página.` o `la pestaña no se tapa` |
-| corredor entero sobre `6d1f1365` | en curso |
+| corredor entero sobre `6d1f1365` (terminó 05:35 UTC) | `resumen: 30 verdes, 0 rojas`, rc=0; `orden1` con 71 `OK`, entre ellos `OK A salió, volvió a entrar y generó enseguida: genera sin falsos bloqueos` |
 
 **El mensaje de los dos relojes.** `forzar_orden1` retiene el login
 `TOPE_MS` (10 s) desde que llega; el producto corta la consulta a los

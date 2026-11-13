@@ -20,8 +20,8 @@ token). Tu contradicción de la fecha, aceptada.
 **Las dos rojas no son tuyas.** `maria1c` la arregló la Técnica. `orden1`:
 sola, dos veces en la base y dos en tu SHA, verde las cuatro; no requiere
 ninguno de tus cinco archivos. Es un intermitente sin diagnosticar y va a la
-Técnica. **No toques `pantalla_orden1.js` hasta que te avise que su pieza
-está integrada.**
+Técnica. **Aviso (05:35 UTC): la pieza de la Técnica está integrada;
+`pantalla_orden1.js` ya es tuya para CUIT-PERFIL.**
 
 **D225: (a).** Lo confirmé en vivo: `PUT /api/user/profile` con `cuit`
 `20999999998` da 200 y queda guardado. Pieza propia, en el lugar 5 de abajo.
@@ -58,7 +58,7 @@ de los cuatro guiones con CUIT inválido va dentro de D225.
      cambiar datos guardados.
    - En la misma pieza, `orden1`, `validacion1`, `cobro_corte1` y
      `cobro_mp1_v2` pasan a `_cuit_perfil.js` (hoy cargan un CUIT inválido y
-     se pondrían rojos). `orden1`, sólo después de mi aviso.
+     se pondrían rojos). `orden1` también: el aviso ya está.
 6. Los vencidos que quedan en `sabotajes-conocidos.txt`, uno por pieza.
 
 **Próxima D: D227.**
