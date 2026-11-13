@@ -197,7 +197,14 @@ def test_la_subida_cara_no_frena_a_nadie(subida):
 
     def marcar():
         while not listo.wait(0.01):
-            pasos.append((time.monotonic(), time.process_time(), _otro_hilo_listo()))
+            reloj, cpu = time.monotonic(), time.process_time()
+            if cpu - pasos[-1][1] >= (reloj - pasos[-1][0]) / 20:
+                pasos.append((reloj, cpu, True))
+                continue
+            # Recorrer /proc cuesta según cuántos hilos haya: se hace sólo tras un
+            # salto sin CPU, y el recorrido cuenta como un salto propio.
+            pasos.append((reloj, cpu, _otro_hilo_listo()))
+            pasos.append((time.monotonic(), time.process_time(), True))
         pasos.append((time.monotonic(), time.process_time(), True))
     otro = threading.Thread(target=marcar)
     otro.start()
