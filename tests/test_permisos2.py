@@ -20,14 +20,6 @@ from proyecto_maria.database.models import Organization, User
 RUTA_ADMIN = "/api/dev/stats"
 
 
-def _run(coro):
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
-
-
 async def _fila(username):
     async with AsyncSessionLocal() as s:
         return (await s.execute(select(User).where(User.username == username))).scalars().first()
@@ -65,7 +57,7 @@ def nombre():
     n = f"p2_{uuid.uuid4().hex[:8]}"
     yield n
     for variante in {n, n.upper()} | {pedido.format(n=n, N=n.upper()) for pedido, _, _ in PARECIDOS}:
-        _run(_borrar(variante))
+        asyncio.run(_borrar(variante))
 
 
 def _registrar(c, ruta, username):
@@ -88,7 +80,7 @@ def test_un_nombre_de_admin_usernames_no_se_registra(monkeypatch, nombre, ruta, 
     r = _registrar(c, ruta, nombre)
     assert r.status_code == 400, r.text[:200]
     assert r.json()["detail"] == "Usuario ya existe"
-    assert _run(_fila(nombre)) is None
+    assert asyncio.run(_fila(nombre)) is None
 
 
 @pytest.mark.parametrize("roles", [None, [], ["operador"], "administrador", {"admin": False}])
@@ -99,14 +91,14 @@ def test_la_cuenta_de_admin_usernames_sigue_siendo_admin_al_reiniciar(monkeypatc
     r = _registrar(c, "/auth/register", nombre)
     assert r.status_code == 200, r.text[:200]
     token = r.json()["access_token"]
-    _run(_poner_roles(nombre, roles))
+    asyncio.run(_poner_roles(nombre, roles))
     assert _como(c, token).status_code == 403
 
     monkeypatch.setenv("ADMIN_USERNAMES", nombre)
     for _ in range(2):
         with TestClient(main.app) as reiniciada:
             assert _como(reiniciada, token).status_code == 200
-    assert main.roles_de({"roles": _run(_fila(nombre)).roles}).count("admin") == 1
+    assert main.roles_de({"roles": asyncio.run(_fila(nombre)).roles}).count("admin") == 1
 
 
 @pytest.mark.parametrize("ruta", ["/auth/register", "/api/organizations/create"])
@@ -120,4 +112,4 @@ def test_un_nombre_que_se_ve_como_otro_no_se_registra(monkeypatch, nombre, ruta,
     assert r.status_code == 400, r.text[:200]
     assert r.json()["detail"].startswith(detalle)
     for variante in {username, nombre, nombre.upper()}:
-        assert _run(_fila(variante)) is None
+        assert asyncio.run(_fila(variante)) is None

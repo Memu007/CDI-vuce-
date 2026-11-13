@@ -47,7 +47,7 @@ def _sql(consulta, **params):
     async def _run():
         async for db in get_async_session():
             return (await db.execute(text(consulta), params)).fetchall()
-    return asyncio.new_event_loop().run_until_complete(_run())
+    return asyncio.run(_run())
 
 
 def _cliente(client) -> str:
@@ -87,7 +87,7 @@ def test_la_sugerencia_del_cliente_devuelve_el_ncm_de_la_sim(client):
     async def _buscar():
         async for db in get_async_session():
             return await lookup_client_memory(db, usuario, cid, "computadora portatil")
-    encontrado = asyncio.new_event_loop().run_until_complete(_buscar())
+    encontrado = asyncio.run(_buscar())
     assert encontrado and encontrado["ncm"] == "84714900", encontrado
 
 

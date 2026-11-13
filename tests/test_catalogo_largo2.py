@@ -286,7 +286,7 @@ def _escribir(consulta, **params):
     async def _run():
         async with engine.begin() as conn:
             await conn.execute(text(consulta), params)
-    asyncio.new_event_loop().run_until_complete(_run())
+    asyncio.run(_run())
 
 
 @pytest.mark.parametrize("descripcion", ["螺丝钉", "🔩🔩", "螺丝🔩"])

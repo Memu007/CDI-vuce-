@@ -28,7 +28,7 @@ def _leer_usuario(usuario: str, *campos) -> dict:
             u = (await db.execute(select(User).where(User.username == usuario))).scalars().first()
             leido.update({c: getattr(u, c) for c in campos})
             return
-    asyncio.new_event_loop().run_until_complete(_run())
+    asyncio.run(_run())
     return leido
 
 

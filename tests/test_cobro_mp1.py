@@ -110,7 +110,7 @@ def test_el_pago_aplicado_queda_registrado(client):
             fila = (await db.execute(select(PagoMercadoPagoAplicado).where(
                 PagoMercadoPagoAplicado.payment_id == pid))).scalar_one()
             return fila.cuenta, fila.tipo, float(fila.monto), fila.moneda
-    assert asyncio.new_event_loop().run_until_complete(_leer()) == (usuario, "premium", 45000.0, "ARS")
+    assert asyncio.run(_leer()) == (usuario, "premium", 45000.0, "ARS")
 
 
 def test_pagar_con_la_cuenta_activa_extiende_desde_el_fin(client):
@@ -150,7 +150,7 @@ def _org(usuario: str, **campos) -> str:
             db.add(Organization(id=org_id, name=f"Estudio {usuario}", owner_username=usuario, **campos))
             await db.commit()
             return
-    asyncio.new_event_loop().run_until_complete(_crear())
+    asyncio.run(_crear())
     return org_id
 
 
@@ -170,7 +170,7 @@ def _leer_org(org_id: str, **cambios) -> dict:
                          ops_used_this_period=org.ops_used_this_period,
                          extra_ops_remaining=org.extra_ops_remaining)
             return
-    asyncio.new_event_loop().run_until_complete(_run())
+    asyncio.run(_run())
     return leido
 
 
@@ -236,7 +236,7 @@ def _leer_pago(pid: str):
                 leido.update(estado=fila.estado, motivo=fila.motivo,
                              monto_esperado=fila.monto_esperado, cuenta=fila.cuenta)
             return
-    asyncio.new_event_loop().run_until_complete(_run())
+    asyncio.run(_run())
     return leido
 
 
@@ -454,7 +454,7 @@ def test_dos_avisos_del_mismo_pago_a_la_vez_se_aplican_una_sola_vez(client, monk
             url = "/api/payments/webhook"
             return await asyncio.gather(c.post(url, **aviso), c.post(url, **aviso))
 
-    respuestas = asyncio.new_event_loop().run_until_complete(_dos_a_la_vez())
+    respuestas = asyncio.run(_dos_a_la_vez())
     assert pasaron == ["aplicado", "aplicado"], pasaron  # los dos pasaron el «¿ya está?»
     assert [r.status_code for r in respuestas] == [200, 200], [r.text[:200] for r in respuestas]
     salteados = [r.json().get("skipped") for r in respuestas]

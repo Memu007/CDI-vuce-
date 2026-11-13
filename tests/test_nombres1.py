@@ -16,14 +16,6 @@ from proyecto_maria.database.connection import AsyncSessionLocal
 from proyecto_maria.database.models import Organization, User
 
 
-def _run(coro):
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
-
-
 async def _sembrar(username, clave):
     async with AsyncSessionLocal() as s:
         s.add(User(username=username, password=main.hash_password(clave), name=username,
@@ -67,8 +59,8 @@ def nombre(monkeypatch):
     n = f"n1_{uuid.uuid4().hex[:8]}"
     yield n
     for variante in set(_formas(n).values()):
-        _run(_borrar(variante))
-    _run(_borrar_intentos(_ip(n)))
+        asyncio.run(_borrar(variante))
+    asyncio.run(_borrar_intentos(_ip(n)))
 
 
 # (la que existe, la que se pide, si la que existe está en ADMIN_USERNAMES)
@@ -88,7 +80,7 @@ OTRAS_MAYUSCULAS = [
 def test_un_nombre_que_existe_con_otras_mayusculas_no_se_registra(monkeypatch, nombre, ruta, existe, pedido, en_lista):
     formas = _formas(nombre)
     existe, pedido = existe.format(**formas), pedido.format(**formas)
-    _run(_sembrar(existe, "Vieja#123"))
+    asyncio.run(_sembrar(existe, "Vieja#123"))
     if en_lista:
         monkeypatch.setenv("ADMIN_USERNAMES", existe)
     cuerpo = {"username": pedido, "password": "SecureP@ss1", "email": f"{uuid.uuid4().hex}@ejemplo.com",
@@ -97,7 +89,7 @@ def test_un_nombre_que_existe_con_otras_mayusculas_no_se_registra(monkeypatch, n
     assert r.status_code == 400, r.text[:200]
     assert r.json()["detail"] == "Usuario ya existe"
     if pedido != existe:
-        assert _run(_fila(pedido)) is None
+        assert asyncio.run(_fila(pedido)) is None
 
 
 def _entrar(c, username, clave, ip):
@@ -117,7 +109,7 @@ def test_dos_cuentas_viejas_que_difieren_en_mayusculas_siguen_entrando(monkeypat
     claves = {nombre: "Minus#123", nombre.upper(): "Mayus#456"}
     existen = {f(nombre): claves[f(nombre)] for f in sembradas}
     for username, clave in existen.items():
-        _run(_sembrar(username, clave))
+        asyncio.run(_sembrar(username, clave))
     c = TestClient(main.app)
     for username in claves:
         for clave in existen.values():
@@ -134,6 +126,6 @@ def test_dos_cuentas_viejas_que_difieren_en_mayusculas_siguen_entrando(monkeypat
     with TestClient(main.app):
         pass
     for username in claves:
-        fila = _run(_fila(username))
+        fila = asyncio.run(_fila(username))
         roles = main.roles_de({"roles": fila.roles}) if fila else []
         assert roles.count("admin") == (1 if fila and username == admin else 0), (username, roles)

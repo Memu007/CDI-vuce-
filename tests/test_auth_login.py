@@ -19,14 +19,6 @@ from sqlalchemy import select, delete, text
 
 # ── helpers ──────────────────────────────────────────────────────────
 
-def _run_async(coro):
-    """Ejecuta una coroutine en un loop nuevo (compatible con Python 3.12+)."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
-
 
 async def _ensure_login_test_user(username="logintest", email="logintest@example.com",
                                    password="Correct1!"):
@@ -70,17 +62,17 @@ async def _cleanup_login_test_user(username="logintest"):
 @pytest.fixture(autouse=True)
 def _clean_rate_limits():
     """Limpiar rate limits entre tests para que no interfieran."""
-    _run_async(_vaciar_limites())
+    asyncio.run(_vaciar_limites())
     yield
-    _run_async(_vaciar_limites())
+    asyncio.run(_vaciar_limites())
 
 
 @pytest.fixture(autouse=True)
 def _setup_user():
     """Crea el usuario de prueba antes de cada test y lo limpia después."""
-    _run_async(_ensure_login_test_user())
+    asyncio.run(_ensure_login_test_user())
     yield
-    _run_async(_cleanup_login_test_user())
+    asyncio.run(_cleanup_login_test_user())
 
 
 # ── tests ────────────────────────────────────────────────────────────

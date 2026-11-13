@@ -33,10 +33,6 @@ CLAVE = "Clave-Segura-123"
 ID_A = "FAC_CORTE1A"
 
 
-def _correr(coro):
-    return asyncio.new_event_loop().run_until_complete(coro)
-
-
 @pytest.fixture
 def cuenta(monkeypatch):
     """Da (TestClient con sesión, username) de una cuenta nueva; con org=True,
@@ -76,7 +72,7 @@ def _fijar(username, de_la_org=False, **campos):
             for k, v in campos.items():
                 setattr(destino, k, v)
             await db.commit()
-    _correr(_run())
+    asyncio.run(_run())
 
 
 def _leer(username, de_la_org=False):
@@ -89,7 +85,7 @@ def _leer(username, de_la_org=False):
                     select(Organization).where(Organization.id == u.organization_id))).scalars().first()
             return {"ops": fila.ops_used_this_period or 0, "extra": fila.extra_ops_remaining or 0,
                     "estado": fila.billing_status}
-    return _correr(_run())
+    return asyncio.run(_run())
 
 
 def _operaciones(username):
@@ -101,7 +97,7 @@ def _operaciones(username):
             return [{"id": o.id, "op_code": o.op_code, "archivo": o.generated_file, "creada": o.created_at,
                      "cliente": o.client_id, "source": o.source, "extra": dict(o.extra or {})}
                     for o in filas]
-    return _correr(_run())
+    return asyncio.run(_run())
 
 
 def _clientes(username):
@@ -111,7 +107,7 @@ def _clientes(username):
         async with AsyncSessionLocal() as db:
             return len((await db.execute(
                 select(Client).where(Client.owner_username == username))).scalars().all())
-    return _correr(_run())
+    return asyncio.run(_run())
 
 
 def _generar(c, operation_id=ID_A, flete=7925.0, operacion_id=""):
@@ -136,7 +132,7 @@ def _mismo_estudio(admin, otro):
             u = (await db.execute(select(User).where(User.username == otro))).scalars().first()
             u.organization_id = org_id
             await db.commit()
-    _correr(_run())
+    asyncio.run(_run())
 
 
 def _cliente(c, cuit="30999999995"):
@@ -608,7 +604,7 @@ def test_sin_sesion_las_rutas_que_cuentan_dan_401(cuenta):
                 return e.status_code
             return None
 
-    assert {k: _correr(_codigo(p)) for k, p in pasos.items()} == dict.fromkeys(pasos, 401)
+    assert {k: asyncio.run(_codigo(p)) for k, p in pasos.items()} == dict.fromkeys(pasos, 401)
     assert _operaciones(u) == []
 
 
@@ -712,7 +708,7 @@ def _items(operation_id):
         async with AsyncSessionLocal() as db:
             return len((await db.execute(
                 select(OperationItem).where(OperationItem.operation_id == operation_id))).scalars().all())
-    return _correr(_run())
+    return asyncio.run(_run())
 
 
 def test_guardar_dos_veces_lo_generado_reemplaza_los_items(cuenta):
@@ -742,7 +738,7 @@ def test_el_conteo_vence_la_cuenta_que_vencio_despues_del_corte(cuenta):
             await db.commit()
 
     with pytest.raises(HTTPException) as e:
-        _correr(_contar())
+        asyncio.run(_contar())
     assert e.value.status_code == 402
     assert e.value.detail["code"] == "TRIAL_EXPIRED", e.value.detail
     assert _leer(u, de_la_org=True) == {"ops": 0, "extra": 0, "estado": "past_due"}

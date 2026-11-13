@@ -88,7 +88,7 @@ def test_active_dentro_de_la_gracia_pasa(client):
     """active vencido hace 3 días → dentro de la gracia de 7 → pasa el gate."""
     u = "g73_active_gracia"
     _register(client, u)
-    asyncio.new_event_loop().run_until_complete(_set_billing(u, "active", dias_vencido=3))
+    asyncio.run(_set_billing(u, "active", dias_vencido=3))
     resp = _op(client)
     assert resp.status_code != 402, resp.text          # el gate deja pasar
     assert resp.status_code == 400, resp.text           # cae recién en el body vacío
@@ -101,7 +101,7 @@ def test_active_pasada_la_gracia_da_402(client):
     Este es el rojo previo: contra el commit anterior, pasaba."""
     u = "g73_active_corte"
     _register(client, u)
-    asyncio.new_event_loop().run_until_complete(
+    asyncio.run(
         _set_billing(u, "active", dias_vencido=10, pago_previo=True)
     )
     resp = _op(client)
@@ -117,7 +117,7 @@ def test_active_vigente_no_se_toca(client):
     """active con período futuro → pasa, sin transición."""
     u = "g73_active_vigente"
     _register(client, u)
-    asyncio.new_event_loop().run_until_complete(_set_billing(u, "active", dias_vencido=-5))  # +5d
+    asyncio.run(_set_billing(u, "active", dias_vencido=-5))  # +5d
     resp = _op(client)
     assert resp.status_code != 402, resp.text
     assert _billing_status(client) == "active"
@@ -127,7 +127,7 @@ def test_trial_vencido_sin_gracia_da_402_con_codigo_propio(client):
     """trial vencido → 402 sin gracia, con code TRIAL_EXPIRED (distinguible)."""
     u = "g73_trial_corte"
     _register(client, u)
-    asyncio.new_event_loop().run_until_complete(_set_billing(u, "trial", dias_vencido=1))
+    asyncio.run(_set_billing(u, "trial", dias_vencido=1))
     resp = _op(client)
     assert resp.status_code == 402, resp.text
     detail = resp.json()["detail"]
@@ -143,11 +143,10 @@ def test_cron_corta_active_pasada_la_gracia_y_respeta_la_gracia(client):
     gracia = "g73_cron_gracia"
     _register(client, corta)
     _register(client, gracia)
-    loop = asyncio.new_event_loop()
-    loop.run_until_complete(_set_billing(corta, "active", dias_vencido=10))
-    loop.run_until_complete(_set_billing(gracia, "active", dias_vencido=3))
+    asyncio.run(_set_billing(corta, "active", dias_vencido=10))
+    asyncio.run(_set_billing(gracia, "active", dias_vencido=3))
 
-    loop.run_until_complete(main._check_expired_trials())
+    asyncio.run(main._check_expired_trials())
 
     from sqlalchemy.future import select
     from proyecto_maria.database.connection import get_async_session
@@ -158,6 +157,6 @@ def test_cron_corta_active_pasada_la_gracia_y_respeta_la_gracia(client):
             res = await db.execute(select(User).where(User.username.in_([corta, gracia])))
             return {u.username: u.billing_status for u in res.scalars().all()}
 
-    estados = loop.run_until_complete(_read())
+    estados = asyncio.run(_read())
     assert estados[corta] == "past_due", estados
     assert estados[gracia] == "active", estados
