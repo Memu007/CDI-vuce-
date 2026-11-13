@@ -295,10 +295,16 @@ def test_la_tabla_de_paises_no_tiene_claves_repetidas():
 PAISES_BAJOS = ("NL", "nl", "NLD", "nld", "PAISES BAJOS", "Países Bajos", "423", "423 · PAISES BAJOS")
 
 
-def test_paises_bajos_es_423_en_el_catalogo_y_en_el_txt():
+def test_paises_bajos_es_423_y_holanda_434():
+    from proyecto_maria import pdf_extractor
+    from proyecto_maria.core import despacho_lector, maria_generator_export
     formas = [*PAISES_BAJOS, "HOLANDA"]
     esperado = [423] * len(PAISES_BAJOS) + [434]
     assert [get_pais_codigo(origen_para_catalogo(p)[0]) for p in formas] == esperado
+    assert [maria_generator_export.get_pais_codigo(p) for p in formas] == esperado
+    # Lo que un lector deja guardado genera el mismo código que lo que leyó.
+    for lector in (pdf_extractor._origen_desde_factura, despacho_lector.origen_iso2):
+        assert [maria_generator.codigo_de_pais(lector(p)) for p in formas] == esperado, lector.__name__
     items = [{"pieza": "84713000", "descripcion": f"Producto {i}", "cantidad": 1, "valor_unitario": 10,
               "peso_unitario": 1, "origen": o, "procedencia": "NL", "unidad": "07", "grupo_id": i}
              for i, o in enumerate(formas, start=1)]
