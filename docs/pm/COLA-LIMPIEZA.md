@@ -256,3 +256,11 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `maria_generator.py:2013` (`_avisos_del_arancel`): el filtro `if v.strip() or len(c) == 4` de los códigos con valor vacío; desde SUFIJOS-2 un valor vacío frena antes, ver si quedó muerto y sacarlo.
 - `paises_maria.js` repite a mano alias que el servidor tiene en `PAISES_INDEC` («NL» está en los dos; «NLD» sólo en la pantalla): una sola fuente para las siglas (MARIA, PAIS-NL).
 - `scripts/testing/ataque_aislamiento.sh`, `limpiar()`: como root `pg_ctl stop` falla («cannot be run as root») y el Postgres queda en 5434 hasta un minuto; una corrida pegada a otra no levanta el suyo. Pararlo con `correr` (PM, sabotajes 13/11).
+- `scripts/testing/forzar_orden1.js` y `forzar_avisos_orden1.js` (y uno más que
+  venga): un ayudante común para cargarlos; uno pide `require('playwright')` y
+  otro `/opt/node-tools/node_modules/playwright` (`pantalla_orden1.js:78`), y
+  `forzar_orden1.js:66` dice «activo» aunque no demore nada. Lo vio la Dev MARIA.
+- `scripts/testing/pantalla_orden1.js:174`, `:335`, `:1429`: el sufijo
+  `'AA(DemoPouchs)-CA00-'` escrito tres veces; una constante.
+- `scripts/testing/pantalla_orden1.js`: `listaParaGenerar` y `enValidacionQuieta`
+  dejan lista una operación de dos formas; una sola, con z20, z22 y z23.

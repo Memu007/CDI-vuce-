@@ -7,49 +7,39 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## PAIS-NL: aceptada sobre `a2c6dc6` (informe `22e84e5`) e integrada (2026-11-13 21:12 UTC)
+## D237 (a): aceptada sobre `346a1c9` (informe `73f8db7`) e integrada (2026-11-13 22:55 UTC)
 
-Mi suite completa sobre `a2c6dc6`: `6131 passed, 110 skipped, 3 xfailed`, igual a la tuya.
-Integré `22e84e5d`; el producto no cambia respecto de `a2c6dc6`.
+Acta `REPRODUCCION-D237-2026-11-13.md`. Reproduje tu rojo de la base con tu forzador
+(avisos 401 a 648 ms de la salida), tu verde de `346a1c9`, el rojo sin la espera,
+`orden1b.sh` (30 ROJO, «sabotajes sin rojo: 0») y `orden1` entero (rc=0, 71 OK).
+chequeo-6 igual al tuyo. La unión con mi rama no cambia nada fuera de `docs/pm`.
 
-Acta `REPRODUCCION-PAIS-NL-2026-11-13.md`. Reproduje tu verde (`108 passed`),
-tu rojo con el producto de `6fbfefd` (`2 failed, 106 passed`), `e2e_maria.sh`
-sobre `a2c6dc6`, chequeo-6 (igual al tuyo) y las 8 pruebas de la tabla de
-países (`425 passed, 2 xfailed`). Probé formas que no te di («Nl», «nL», sigla
-con espacios raros, «NLD » con espacio, «PAÍSES BAJOS» con tilde, «paises
-bajos» con doble espacio): 423 en el servidor, el catálogo, la exportación, los
-dos lectores y la pantalla. «434», «0434» y «434 · HOLANDA» siguen en 434 salvo
-en el lector de despachos, que con «434» solo o «434 · HOLANDA» queda sin
-origen y con aviso (tu D239).
-Reproduje también los grupos: «NL» con «HOLANDA» o «434» ahora frena, «NL» con
-«Países Bajos» ahora genera 423. Gracias por las tablas de lo guardado y de los
-lectores: son lo que hacía falta para publicar sabiendo qué cambia.
+Un negativo mío cubre tu segundo «no demostré»: tu mismo forzador sobre
+`**/api/validate/smart`. Con 1 s no distingue (la base termina antes de salir); con
+3 s, la base da rojo (`POST /api/validate/smart 401` a 125 ms de la salida) y
+`346a1c9` verde. La espera cubre las validaciones.
 
-- **Tu pregunta de §3:** sí, es pieza de datos: cambia el código que queda
-  guardado y el que se genera. Lleva suite completa (la tuya y la mía) y un
-  adversario Sonnet alto, que corrí yo. `/security-review` y
-  `ataque_aislamiento.sh` van cuando hay sesión, permisos o datos de otro
-  usuario: acá no hacían falta. CUIT-GENERAR sí los lleva.
-- **D239: va a Emi**, con mi recomendación (a). Las pruebas y los guiones
-  traen siempre código y nombre («310 CHINA»); le pregunto si un despacho real
-  trae el código solo. Hasta que conteste, no entra en la cola. El adversario sumó un caso de la misma
-  familia: con un código sin sigla y el nombre de otro país, el lector guarda
-  el nombre sin avisar («434 BELGICA» da `BE`; antes no daba origen). Si Emi
-  dice que sí, va dentro de D239 (a) como datos de un caso.
-- **D240: (b), decidido por la PM.** No hay dato mal: frena antes de generar.
-- **A Emi también le pregunto** si «Holanda» debe dar 423. Si dice que sí, es
-  una pieza chica aparte.
-- Tu línea de `paises_maria.js` (una sola fuente para las siglas) va a
-  `COLA-LIMPIEZA.md`.
+- **D241: (b), decidido por la PM.** Es espera del arnés, no control de producto.
+- **Supuestos:** acepto los seis. Del 4 comprobé que el campo lo siguen escribiendo
+  `generar()` (casos que leen el TXT) y `listaParaGenerar()` (z20, z23).
+- **«Lo que no demostré»:** las cantidades (1), lo frágil de las cantidades con una
+  quinta petición (3) y la barra de arriba (4) quedan como riesgos aceptados por la PM.
+  La mitad de las validaciones (2) ya no: la cubre mi negativo. El caso al revés (5)
+  queda sin prueba; en la base forzada, después del 401 la pestaña va al login y no
+  sale ningún `POST /generate_maria`.
+- Tus tres líneas de limpieza (un ayudante para los tres forzadores, el sufijo escrito
+  en tres lugares, dos formas de dejar lista una operación) van a `COLA-LIMPIEZA.md`.
 
-**Cómo sigue:** 1) D237 (a), ya la tenés: z22 de `orden1` espera a que terminen
-los pedidos; 2) D238 (a): el aviso del sufijo SBT no queda a la vista de una
-operación a otra; 3) CUIT-GENERAR (D235 a), producto con datos, con revisión
-fuerte (§3); 4) los vencidos de `sabotajes-conocidos.txt`, uno por pieza,
-primero `sabotaje_subitems1.sh` y `sabotaje_sufijos1.sh`. Si Emi dice que sí a
-D239 (a), entra después de D238 (a).
+**Cómo sigue:** 1) D238 (a): el aviso del sufijo SBT no queda a la vista de una
+operación a otra; 2) CUIT-GENERAR (D235 a), producto con datos, con revisión fuerte
+(§3: suite completa, `/security-review` y `ataque_aislamiento.sh`); 3) los vencidos
+de `sabotajes-conocidos.txt`, uno por pieza, primero `sabotaje_subitems1.sh` y
+`sabotaje_sufijos1.sh`. D239 sigue esperando a Emi; si dice que sí a (a), entra
+después de D238 (a) y lleva adentro, como datos de un caso, el de un código sin
+sigla con el nombre de otro país («434 BELGICA» guarda `BE` sin avisar). Si Emi dice
+que «Holanda» también es 423, es una pieza chica aparte.
 
-**Próxima D: D241.**
+**Próxima D: D242.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
