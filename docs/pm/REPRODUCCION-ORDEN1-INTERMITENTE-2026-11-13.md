@@ -49,7 +49,7 @@ z21, z23 y z24 con la entrada forzada lenta (se pide en la devolución).
 
 ## Vuelta 2: arnés `6d1f1365`, informe `693a9bfa`
 
-Veredicto: pendiente del corredor entero. Producto +0/−0.
+Veredicto: **aceptada e integrada**. Producto +0/−0.
 
 | qué | salida |
 |---|---|
@@ -57,11 +57,11 @@ Veredicto: pendiente del corredor entero. Producto +0/−0.
 | carrera forzada sobre `6d1f1365`, cuatro veces | rc=0 las cuatro, `OK A salió, volvió a entrar y generó enseguida: genera sin falsos bloqueos`; el mensaje de `forzar_orden1` dio tres veces `seguía retenida a los 10 s` y una `se cortó sin respuesta antes de entrar` |
 | carrera forzada sobre la base `74e3cc74` | rc=1, `volvió antes de entrar: 401`, `FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')` |
 | familia forzada (`CASOS=z20,z21,z23,z24`) en base y en `6d1f1365` | `1 verdes, 0 rojas` las dos; seis `consultas de la pestaña mientras tanto: 0` en cada log: la familia no tiene la carrera, como dice el informe |
-| `orden1b.sh 6d1f1365` | 30 `ROJO`, `sabotajes sin rojo: 0`; incluye `la comprobación de la sesión corta antes de lo que tarda` |
+| `orden1b.sh 6d1f1365` | 30 `ROJO`, `sabotajes sin rojo: 0`; incluye `la comprobación de la sesión corta antes de lo que tarda`: es la puerta de la devolución (`ESPERA_SESION_MS` 2000 con `CASOS=z22` solo, `orden1b.sh:118-124`), y `ROJO` exige la `FALLA` exacta de z22 (`… y no generó: error: No se pudo comprobar la sesión`) |
 | negativo de la PM: Generar sin comprobar la sesión, `CASOS=z22`, dos veces | `rc=1 FALLA: A salió, volvió a entrar y generó enseguida y Generar no comprobó la sesión` las dos |
 | `CASOS=z22` sobre `693a9bfa` sin forzar, tres veces | `rc=0 OK=2` las tres |
 | `ESPERA_SESION_MS` 2000 sobre `6d1f1365`, un caso por corrida (la Dev lo corrió sobre su commit provisorio) | z20, z21, z23 y z24 rojos, cada uno con `No se pudo comprobar la sesión. Recargá la página.` o `la pestaña no se tapa` |
-| corredor entero sobre `6d1f1365` | en curso |
+| corredor entero sobre `6d1f1365` (terminó 05:35 UTC) | `resumen: 30 verdes, 0 rojas`, rc=0; `orden1` con 71 `OK`, entre ellos `OK A salió, volvió a entrar y generó enseguida: genera sin falsos bloqueos` |
 
 **El mensaje de los dos relojes.** `forzar_orden1` retiene el login
 `TOPE_MS` (10 s) desde que llega; el producto corta la consulta a los

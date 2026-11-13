@@ -119,6 +119,9 @@ export CASOS=z22
 sabotaje $A "con la sesión cambiada no escribe aunque sea del mismo usuario" \
   "FALLA: A salió, volvió a entrar y generó enseguida y no generó" \
   '!(await sesionEsDelDueno())' 'true'
+sabotaje $A "la comprobación de la sesión corta antes de lo que tarda" \
+  "FALLA: A salió, volvió a entrar y generó enseguida y no generó: error: No se pudo comprobar la sesión" \
+  'const ESPERA_SESION_MS = 10000;' 'const ESPERA_SESION_MS = 2000;'
 
 export CASOS=z23
 sabotaje $A "sin CSRF en el servidor, la escritura sale sin preguntar quién es" \
