@@ -252,3 +252,4 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `cuit_valido` (`controles_maria.py:52`) acepta `00000000000`: no mira el
   prefijo. Lo usan clientes, estudio y perfil; cerrarlo es una regla nueva
   del CUIT, sin camino medido de daño hoy (adversario de CUIT-PERFIL).
+- `main.py` (`/generate_maria`): el control de forma de los sub-ítems está dos veces (5059, agregado con EXCEL-2 en 7e9c4e00, y 5088 sobre 7436c6e5); queda uno, y `sabotaje_subitems1.sh` ataca el que queda. Con `controles_maria.py:127` saboteado también queda verde `test_la_validacion_no_revienta_con_subitems_raros` (camino del semáforo, `/api/validate/smart`): falta ver qué lo frena antes.
