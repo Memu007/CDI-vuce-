@@ -93,7 +93,8 @@ sabotaje() {
   fi
   if [ "$corre" = casos ]; then
     local vistos esperados
-    vistos="$(grep -E "^(FAILED|ERROR) " <<<"$salida" | sed -E "s/^[A-Z]+ //; s/ - .*//" | sort)"
+    # Sólo el resumen de pytest: el log capturado también trae líneas «ERROR    …».
+    vistos="$(grep -E "^(FAILED|ERROR) [^ ]" <<<"$salida" | sed -E "s/^[A-Z]+ //; s/ - .*//" | sort)"
     esperados="$(printf "$T::%s\n" "$@" | sort)"
     if [ "$vistos" != "$esperados" ]; then
       echo "ANCHO | $nombre: no fallan los casos esperados"
