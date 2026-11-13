@@ -163,6 +163,18 @@ function seguirPedidos(p) {
     mirar();
   });
 }
+// Deja la operación en «Validación», con su sufijo, y espera a que la pestaña termine lo que pide sola al
+// entrar: un pedido suyo que el servidor atiende con la sesión ya cerrada da 401 y la manda al login.
+// Entra en un solo paso: desde otra pantalla el semáforo valida una vez más o una menos.
+async function enValidacionQuieta(p, factura) {
+  const terminaron = seguirPedidos(p);
+  await p.evaluate(([op, items]) => {
+    CDI.state = { operacion: op, items };
+    CDI.goTo('validating');
+  }, [Object.assign({ numero_factura: factura, sbt_sufijo_valor: 'AA(DemoPouchs)-CA00-' }, OPERACION), [prod('Producto de ' + factura, '84714900100D', 2, 10)]]);
+  await p.waitForFunction(() => !document.getElementById('validatingGenerate').disabled, null, { timeout: 15000 });
+  await terminaron(AL_ENTRAR_A_VALIDACION);
+}
 
 // Con `pestana`, la página arranca con ese id de pestaña en sessionStorage,
 // como la duplica o la restaura el navegador; sólo en la primera carga.
@@ -1529,20 +1541,10 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const a = await nuevoUsuario(ctx, 'ord1z22');
     const t = await abrir(ctx);
     await t.waitForLoadState('networkidle');  // como en (m)
-    const terminaron = seguirPedidos(t);
-    // En un solo paso: si la pestaña se queda en otra pantalla, el semáforo valida una vez más o una menos.
-    await t.evaluate(([op, items]) => {
-      CDI.state = { operacion: op, items };
-      CDI.goTo('validating');
-    }, [Object.assign({ numero_factura: 'GEN-Z22' }, OPERACION), [prod('Producto de GEN-Z22', '84714900100D', 2, 10)]]);
-    await t.waitForFunction(() => !document.getElementById('validatingGenerate').disabled, null, { timeout: 15000 });
-    // Un pedido de A que el servidor atiende después de la salida da 401 y manda la pestaña al login.
-    await terminaron(AL_ENTRAR_A_VALIDACION).catch(e => falla(que + ': antes de salir, ' + e.message));
+    await enValidacionQuieta(t, 'GEN-Z22').catch(e => falla(que + ': antes de salir, ' + e.message));
     const comprobo = await demorarHastaGenerar(t);
     const salida = await salir(ctx);
     if (!salida.ok()) falla('no se pudo salir: ' + salida.status());
-    // Con la sesión ya cerrada: lo que dispara escribir sale después de la consulta de sesión, que está demorada.
-    await t.fill('#sbtSufijoValor', 'AA(DemoPouchs)-CA00-');
     await entrar(ctx, a);
     const fin = await apretarGenerar(t);
     if (fin !== 'generado') falla(que + ' y no generó: ' + fin);

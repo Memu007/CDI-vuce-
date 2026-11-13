@@ -10,6 +10,8 @@ const AVISOS_MS = 1000, LOGIN_MS = 2000;
 const demora = ms => new Promise(r => setTimeout(r, ms));
 
 async function demorar(ctx) {
+  // Acá y no al cargar: si este playwright no es el de la pantalla, no se demora nada y no tiene que decir que sí.
+  console.log('forzar_avisos_orden1: activo');
   let salio = 0;
   await ctx.route('**/generate_maria/avisos', async ruta => {
     await demora(AVISOS_MS);
@@ -33,5 +35,4 @@ if (path.basename(process.argv[1] || '', '.js') === 'pantalla_orden1') {
     b.newContext = async (...c) => { const ctx = await newContext(...c); await demorar(ctx); return ctx; };
     return b;
   };
-  console.log('forzar_avisos_orden1: activo');
 }
