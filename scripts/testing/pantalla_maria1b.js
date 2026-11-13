@@ -5,6 +5,7 @@
 // los errores de la cabecera que controla el servidor (moneda y CUIT).
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_maria1b.js <xlsx> [captura.png]
+// corredor: argumentos tests/test_facturas.xlsx
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
 const registrarCuenta = require('./_registrar');
 const FILAS = '2 fila(s) del Excel no se pudieron leer (filas 7, 9)';

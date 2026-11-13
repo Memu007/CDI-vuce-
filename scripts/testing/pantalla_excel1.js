@@ -4,6 +4,7 @@
 // Comprueba que, terminada la subida, el aviso en pantalla nombra las filas.
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_excel1.js <xlsx> [captura.png]
+// corredor: argumentos tests/test_facturas.xlsx
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
 const registrarCuenta = require('./_registrar');
 const AVISO = '2 fila(s) del Excel no se pudieron leer (filas 7, 9)';

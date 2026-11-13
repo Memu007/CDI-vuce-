@@ -4,6 +4,7 @@
 // Si otro entra en el mismo navegador antes de que la pestaña sepa quién es,
 // la pestaña lo avisa y no escribe. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_csrf3.js
+// corredor: servidor CSRF_ENFORCE=true
 const { chromium } = require('playwright');
 const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
