@@ -7,7 +7,7 @@
 #   // corredor: servidor VAR=valor ...   variables para el servidor
 #   // corredor: argumentos a b ...       argumentos, relativos a la raíz
 #   // corredor: sin servidor             no levanta servidor ni base
-# Toda pantalla recibe BASE_URL, CDI_DB (la base del servidor), PY y CHROMIUM.
+# Toda pantalla recibe BASE_URL, CDI_DB (la base del servidor) y PY.
 #
 # uso: PY=<python del proyecto> scripts/testing/correr_pantallas.sh [SHA] [salida]
 #   SHA     por defecto HEAD
@@ -21,7 +21,6 @@ mkdir -p "$SAL" || exit 2
 SAL=$(cd "$SAL" && pwd)
 PY=${PY:-python}
 case "$PY" in */*) PY=$(cd "$(dirname "$PY")" && pwd)/$(basename "$PY") ;; esac
-CHROMIUM=${CHROMIUM:-/opt/pw-browsers/chromium}
 TOPE=${TOPE:-900}
 
 WT=$(mktemp -d -t pantallas-wt.XXXX)
@@ -53,7 +52,7 @@ esperar_salud() {
 # Corre la pantalla en segundo plano: así bash atiende un TERM sin esperar a que termine.
 correr_nodo() {  # $1 = log; el resto, variables y argumentos de node
   local log=$1; shift
-  (cd "$WT" && exec env PY="$PY" CHROMIUM="$CHROMIUM" "$@") >"$log" 2>&1 &
+  (cd "$WT" && exec env PY="$PY" "$@") >"$log" 2>&1 &
   hijo=$!; wait "$hijo"; RC=$?; hijo=
 }
 

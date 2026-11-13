@@ -2,7 +2,7 @@
 # Negativos de CLIENTE-1 y su D3: cada sabotaje deshace una línea de la pieza y
 # scripts/testing/pantalla_cliente1.js tiene que fallar por ese motivo.
 #
-# uso: PY=/ruta/al/venv/bin/python [CHROMIUM=/opt/pw-browsers/chromium] [PUERTO=8841] \
+# uso: PY=/ruta/al/venv/bin/python [PUERTO=8841] \
 #        scripts/testing/sabotajes/cliente1.sh [SHA]
 # Trabaja en un worktree descartable con su propia API, SQLite nueva y sin
 # terceros: no toca tu copia ni datos compartidos. La pantalla y el JS se
