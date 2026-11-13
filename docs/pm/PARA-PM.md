@@ -2,89 +2,80 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## DOS-RELOJES: el mensaje de `forzar_orden1.js` ya no cambia entre corridas
+## CONFTEST-FORK: un hijo con `fork` ya no borra la base de prueba del padre
 
 | | SHA |
 |---|---|
-| base (mi informe de CONFTEST-TMP) | `eea0eab5` |
-| arreglo (`test:`, sólo `scripts/testing/forzar_orden1.js`) | `894bc67a` |
-| merge de tu rama (sólo `docs/pm/`, sin conflictos) | `4a8652a7` |
-| informe | el commit `docs:` que sigue |
+| base | `fa6df9bc` |
+| merge de tu rama (sólo `docs/pm/`) | `c9f760e9` |
+| arreglo (`fix(tests):`, sólo `tests/conftest.py`, +4) | `f2d5580e` |
+| test nuevo `tests/test_conftest_fork.py` | `a2d6c18a` |
+| el hijo del test corre sólo el cierre del conftest (tu «ojo» de `_run_exitfuncs`) | `caad310a` ← **lo que entrego** |
+| merge de tu rama `26391fe9` (sólo `docs/pm/` y lo aceptado de MARIA) e informe | los commits que siguen |
 
-**Resultado:** verde. El comando 1 del informe de ORDEN1 da el mismo mensaje
-cuatro veces seguidas. `orden1b.sh` sigue con 30 `ROJO`. **Nada para
+**Resultado:** verde. Las cuatro puertas pasan sobre `caad310a`. **Nada para
 decidir.**
 
-**Causa.** El producto corta la consulta de sesión a los 10 s
-(`ESPERA_SESION_MS`, `app_v2.js`) desde que la pestaña la pide. El preload la
-retenía 10 s desde el login. Los dos relojes casi empataban, y según quién
-llegaba primero salía un mensaje u otro.
+**Arreglo.** El conftest guarda el pid que creó la base; `_borrar_db_de_prueba`
+vuelve sin borrar si corre en otro proceso. Es tu sugerencia.
 
-**Arreglo.** El preload cuenta desde que la pestaña pide la consulta, igual
-que el producto. El tope sube a 15 s, por encima del corte. El tope 15 s es un
-supuesto reversible: cualquier valor entre 10 y el límite del caso alcanza;
-elegí 5 s de margen.
+**El test.** Hace `os.fork()`; el hijo llama sólo a
+`tests.conftest._borrar_db_de_prueba()` y sale con `os._exit(0)`; el padre
+comprueba que la base sigue. La primera versión (`a2d6c18a`) corría
+`atexit._run_exitfuncs()`: tenías razón, eso corre todos los cierres
+registrados y alguno podría borrar algo del padre (por ejemplo un
+`weakref.finalize` de un directorio temporal). Lo cambié y repetí las puertas
+sobre `caad310a`.
 
 ### Comandos
 
 ```bash
-# 1. Arreglo: cuatro corridas, las cuatro con rc=0, la línea OK y
-#    «forzar_orden1: la consulta del hueco se cortó sin respuesta antes de entrar».
-F=$PWD/scripts/testing/forzar_orden1.js
-for i in 1 2 3 4; do NODE_OPTIONS="--require $F" CASOS=z22 SOLO=orden1 PY=$PY \
-  scripts/testing/correr_pantallas.sh 894bc67a /tmp/dr_$i >/dev/null 2>&1; echo "rc=$?"; \
-  grep -E 'forzar_orden1: la|FALLA|OK A salió' /tmp/dr_$i/orden1.log; done
-
-# 2. Rojo: lo mismo con el preload viejo; el mensaje cambia entre corridas.
-#    El producto no cambió entre eea0eab5 y 894bc67a: sirve el mismo SHA.
-git show eea0eab5:scripts/testing/forzar_orden1.js > /tmp/forzar_viejo.js   # y F=/tmp/forzar_viejo.js
-
-# 3. Ningún sabotaje de ORDEN-1b pierde su rojo: 30 ROJO, «sabotajes sin rojo: 0», rc=0.
-PY=$PY scripts/testing/sabotajes/orden1b.sh 894bc67a
+export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
+P="python -m pytest -q --no-cov -p no:cacheprovider"
+# 1. verde con el arreglo; rojo con el conftest de la base (la última línea deja el árbol como estaba)
+$P tests/test_conftest_fork.py                     # 1 passed
+git show fa6df9bc:tests/conftest.py > tests/conftest.py; $P tests/test_conftest_fork.py; git checkout -- tests/conftest.py
+#   E   AssertionError: el hijo borró la base del padre      1 failed
+# 2. la cuenta de bases en /tmp no cambia
+a=$(ls /tmp/cdi_pytest_* | wc -l); $P tests/test_excel2d.py; echo "$a $(ls /tmp/cdi_pytest_* | wc -l)"   # los dos números iguales
+# 4. suite entera (~18 min)
+$P --timeout=120 tests/                            # 1 failed (el de D234), 6110 passed
 ```
 
-### Lo corrido (salida copiada de los logs)
+### Puertas, salida exacta
 
-**Rojo, preload viejo sobre `eea0eab5`:** el mensaje cambia entre corridas.
+Las suites corrieron en worktrees aparte, una detrás de otra, con el comando 4.
+«sab» es `caad310a` con `tests/conftest.py` de `fa6df9bc`.
 
-| corrida | rc | `forzar_orden1:` |
+| puerta | dónde | salida |
 |---|---|---|
-| 1 | 0 | la consulta del hueco se cortó sin respuesta antes de entrar |
-| 2 | 0 | la consulta del hueco seguía retenida a los 10 s |
-| 3 | 0 | la consulta del hueco seguía retenida a los 10 s |
-| 4 | 0 | la consulta del hueco seguía retenida a los 10 s |
+| 1. sólo el test, con el arreglo | `caad310a` | `1 passed, 4 warnings in 0.08s` |
+| 1. sólo el test, conftest de la base | checkout principal | `E   AssertionError: el hijo borró la base del padre`, `1 failed, 4 warnings in 0.13s` |
+| 1 y 4. suite entera, base | `fa6df9bc` | `1 failed, 6109 passed, 110 skipped, 3 xfailed, 106 warnings in 1127.12s (0:18:47)` |
+| 1 y 4. suite entera, mi SHA | `caad310a` | `1 failed, 6110 passed, 110 skipped, 3 xfailed, 104 warnings in 1083.76s (0:18:03)` |
+| 1. suite entera, sab | `caad310a` + conftest de la base | `2 failed, 6109 passed, 110 skipped, 3 xfailed, 104 warnings in 1090.76s (0:18:10)`; el rojo nuevo es `test_conftest_fork.py::test_un_hijo_que_sale_no_borra_la_base_del_padre` con `AssertionError: el hijo borró la base del padre` |
+| 2. `test_excel2d.py` | `caad310a` | `26 passed, 3 warnings in 4.39s`; `antes=11359 despues=11359` |
+| 3. pool `ProcessPoolExecutor(4)`, a mano (copiado a `tests/` y borrado) | `caad310a` | `1 passed, 7 warnings in 0.11s` |
 
-Las cuatro corridas traen además «OK A salió, volvió a entrar y generó
-enseguida: genera sin falsos bloqueos».
+El único rojo de la base y de mi SHA es el mismo:
+`FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[9995 combinadas en 19 990 filas]`
+(D234). La lista de rojos de la base y la de mi SHA dan `diff` vacío.
 
-**Arreglo, preload nuevo sobre `eea0eab5`:** las cuatro corridas dan rc=0,
-«forzar_orden1: la consulta del hueco se cortó sin respuesta antes de entrar»
-y la misma línea OK.
+La suite sobre `a2d6c18a`, la versión anterior del test, había dado lo mismo:
+`1 failed, 6110 passed, 110 skipped, 3 xfailed, 107 warnings in 1117.59s`, con
+el mismo rojo.
 
-**Comando 2 del informe de ORDEN1 (base `74e3cc74`) con el preload nuevo:**
-sigue rojo. Da rc=1 con:
+**Las puertas 2 y 3 no distinguen.** Sobre la base también dan lo mismo:
+`26 passed`, `antes=11359 despues=11359` y `1 passed`. `test_excel2d.py` no
+crea hijos que salgan normal, y los hijos de `ProcessPoolExecutor` salen con
+`os._exit`, que no corre `atexit`. Son de no regresión; la que distingue es la 1.
 
-```
-forzar_orden1: activo
-forzar_orden1: la consulta del hueco volvió antes de entrar: 401
-FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')
-```
-
-**El preload ve el corte del producto, no su propio tope.** Hice un commit
-local `5ce86061` sobre `894bc67a` que sólo cambia `ESPERA_SESION_MS` de 10000
-a 20000 en `app_v2.js`. No está subido; se rehace con ese `sed` y un commit
-en un worktree. Con el preload nuevo da rc=0 y
-«forzar_orden1: la consulta del hueco seguía retenida a los 15 s de pedida».
-El mensaje cambia cuando cambia el producto.
-
-**`orden1b.sh 894bc67a`:** 30 `ROJO`, «sabotajes sin rojo: 0», rc=0.
-
-**`chequeo-6 eea0eab5 894bc67a`**, entero:
+**`chequeo-6 fa6df9bc caad310a`**, entero:
 
 ```
-chequeo-6 eea0eab5..894bc67a: avisos para mirar, no un veredicto
+chequeo-6 fa6df9bc..caad310a: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +9/−6
+arnés +21/−0
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
@@ -92,17 +83,19 @@ avisos: 0
 
 ### No corrido
 
-- Adversarios y `/code-review`: la tarea dice «sin adversarios», y la pieza
-  son 15 líneas de arnés.
-- Suite de pytest, el resto de los arneses de pantalla, `smoke_friccion.sh` y
-  ataques: el producto no cambió, y ningún guion, prueba ni arnés nombra
-  `forzar_orden1.js` (`grep -rl forzar_orden1 scripts tests` da sólo el
-  archivo mismo); sólo lo carga el `NODE_OPTIONS` del comando.
+- Adversarios y `/code-review`: la tarea dice «sin adversarios».
+- Arneses de pantalla, `smoke_friccion.sh` y ataques: no cambió el producto.
 
 ### Riesgos
 
-- Si alguien sube `ESPERA_SESION_MS` por encima de 15 s, el preload vuelve a
-  ganarle al producto. El mensaje lo dice con el número («a los 15 s de
-  pedida»), así que se ve; no es silencioso.
+- El test hace `fork` en un proceso con hilos. Python 3.12 avisa
+  (`DeprecationWarning: This process … is multi-threaded, use of fork() may
+  lead to deadlocks in the child`). El hijo sólo borra archivos y sale; si
+  alguna vez se trabara, `pytest-timeout` (120 s) corta en el padre. En tres
+  suites enteras no se trabó.
+- SIGTERM sigue fuera, como decía la tarea. Al cortar con `TaskStop` una suite
+  a medias quedó una base más en `/tmp` (de 11358 a 11359).
+- El test usa el nombre privado `_borrar_db_de_prueba`. Si se renombra, el
+  test da error de atributo, no un verde falso.
 
-/compact conservar: Dev 1 técnica, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, PM principal session_01B7FVQspcEHF7PqNv797wNM (aviso con send_message priority next). DOS-RELOJES entregada: arreglo 894bc67a, merge 4a8652a7, informe docs: encima. Sin tarea nueva hasta el veredicto. Próxima D: D229. Nunca main, sin secretos, nada publicado sin «dale» de Emi para el SHA; tests/test_conexiones1.py nunca a git add.
+/compact conservar: Dev 1 técnica, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, PM principal session_01B7FVQspcEHF7PqNv797wNM (aviso con send_message priority next). CONFTEST-FORK entregada en caad310a (arreglo f2d5580e, test a2d6c18a + caad310a), informe docs: encima. Ahora EXCEL2D-RELOJ (D234: _otro_hilo_listo con ~1080 hilos), después NAVEGADOR. Próxima D: la que siga a la más alta de PARA-DEV.md y NOW.md después del merge (D234 ya está usada). Nunca main, sin secretos, nada publicado sin «dale» de Emi para el SHA; tests/test_conexiones1.py nunca a git add.
