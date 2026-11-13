@@ -33,4 +33,8 @@ sobre la rama integrada: un rojo de esta prueba ahí es de la pieza, no ruido.
 Mis cargas de 06:20–06:22 y 06:24–06:29 cayeron mientras corría
 `catalogo3.sh` de MARIA (acta de D223+D224).
 
+**Medida en otra máquina (agregado 13/11).** La CI de la PR sobre `927d35fe`,
+que trae esta pieza, dio verde: «Suite completa» 18:01, a 1:22 del tope de
+20 min (`ci.yml:15`).
+
 No corrido: pytest entero y adversarios (sólo pruebas).
