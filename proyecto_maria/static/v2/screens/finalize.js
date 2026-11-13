@@ -187,14 +187,6 @@
         };
         wrap.addEventListener('change', programar);
         wrap.addEventListener('input', programar);
-        // El sufijo de la operación cambia lo que viaja por producto, y se
-        // guarda con ella al escribirlo: así vuelve con el borrador.
-        const sbt = document.getElementById('sbtSufijoValor');
-        if (sbt) sbt.addEventListener('input', () => {
-            const op = CDI.state.operacion = CDI.state.operacion || {};
-            op.sbt_sufijo_valor = sbt.value.trim();
-            programar();
-        });
         const estudio = document.getElementById('estudioWrap');
         if (estudio) estudio.addEventListener('change', programar);
     }
@@ -349,7 +341,10 @@
             clearTimeout(avisosTimer);
             avisosTimer = setTimeout(refrescarAvisos, 400);
         };
-        const campos = { valorIncluir: 'ajustes_incluir', valorDeducir: 'ajustes_deducir' };
+        // El sufijo no entra en las cuentas, pero viaja en el pedido con el
+        // que se hicieron; guardado al escribirlo, vuelve con el borrador.
+        const campos = { valorIncluir: 'ajustes_incluir', valorDeducir: 'ajustes_deducir',
+                         sbtSufijoValor: 'sbt_sufijo_valor' };
         Object.keys(campos).forEach(function (id) {
             const input = document.getElementById(id);
             if (!input) return;

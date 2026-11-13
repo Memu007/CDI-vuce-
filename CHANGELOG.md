@@ -9,6 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-13 · fix: el sufijo de valor de la operación vuelve a su campo después de recargar (SUFIJO-BORRADOR)
 
 - El sufijo de valor de la operación se guarda con ella apenas se escribe, y al recuperar la operación el campo lo muestra: antes aparecía vacío aunque la operación lo tuviera guardado, y lo escrito sin generar se perdía.
+- Mientras se escribe el sufijo, «Calcular seguro» se esconde hasta que vuelven las cuentas, igual que al escribir un ajuste.
 
 ## 2026-11-13 · fix: «Mi perfil» no guarda un CUIT con el dígito verificador equivocado (CUIT-PERFIL)
 
