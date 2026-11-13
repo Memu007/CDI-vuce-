@@ -486,9 +486,13 @@ def test_un_numero_que_el_campo_no_entiende_queda_marcado_y_a_la_vista():
 
 
 def test_lo_que_se_esta_escribiendo_no_se_pisa():
-    r = _pantalla({}, "els.valorDeducir.value = '12'; document.activeElement = els.valorDeducir;"
-                      " CDI.state.operacion.ajustes_deducir = '99'; pintarValor(VALOR);", VALOR)
-    assert r["els"]["valorDeducir"]["value"] == "12"
+    # En el campo en foco está lo que la persona escribe: lo guardado no lo pisa.
+    campos = {"valorIncluir": "ajustes_incluir", "valorDeducir": "ajustes_deducir"}
+    vistos = {campo: _pantalla(
+        {}, f"els.{campo}.value = '12'; document.activeElement = els.{campo};"
+            f" CDI.state.operacion.{atributo} = '99'; pintarValor(VALOR);", VALOR
+    )["els"][campo]["value"] for campo, atributo in campos.items()}
+    assert vistos == {"valorIncluir": "12", "valorDeducir": "12"}
 
 
 def test_un_ajuste_mal_escrito_se_ve_en_el_campo_que_llega_vacio():

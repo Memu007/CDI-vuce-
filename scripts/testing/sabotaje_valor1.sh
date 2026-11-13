@@ -175,6 +175,10 @@ caso "seguro_de_otra_operacion" "FAILED $T::test_el_seguro_sugerido_de_otra_oper
 reemplazar $JS 'document.activeElement !== deducir' 'true'
 caso "pisa_lo_que_se_escribe" "FAILED $T::test_lo_que_se_esta_escribiendo_no_se_pisa"
 
+# 25b. se pisa lo que se escribe en el campo de incluir
+reemplazar $JS 'document.activeElement !== incluir' 'true'
+caso "pisa_incluir" "FAILED $T::test_lo_que_se_esta_escribiendo_no_se_pisa"
+
 # 26. una respuesta vieja de los avisos pisa la nueva
 reemplazar $JS 'if (seq !== avisosSeq) return;' 'if (false) return;'
 caso "respuesta_vieja" "FAILED $T::test_una_respuesta_vieja_no_pisa_las_cuentas_nuevas"
@@ -193,4 +197,4 @@ reemplazar $JS '        cuentasCon = firma || null;' '        cuentasCon = null;
 caso "sin_operacion_no_calcula" "FAILED $T::test_sin_operacion_todavia_el_boton_igual_pone_el_seguro"
 
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
-echo "OK: los 29 sabotajes dan rojo por la razón esperada"
+echo "OK: los 30 sabotajes dan rojo por la razón esperada"
