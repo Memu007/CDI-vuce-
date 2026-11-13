@@ -257,6 +257,7 @@ try:
              f"{sql('select origen from operation_items')}")
 
     filas = catalogo()
+    os.environ.update(entorno())  # el import de abajo no arranca sin base ni entorno
     sys.path.insert(0, NUEVA)
     from proyecto_maria.core import catalog_service as cs  # noqa: E402
     esperadas = sorted((cs._vendor_key(n), n, cs.clave_de_producto(d), d) for _, n, _, d in filas_viejas)
