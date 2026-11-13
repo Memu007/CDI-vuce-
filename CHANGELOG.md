@@ -6,11 +6,6 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
-## 2026-11-13 · fix: no se genera el TXT con un CUIT del despachante que no cierra con su verificador (CUIT-GENERAR)
-
-- Al generar, el CUIT del despachante se controla con su dígito verificador, también el que ya estaba guardado en el perfil: antes alcanzaba con que tuviera 11 dígitos y salía así en el TXT.
-- El error dice dónde corregirlo: en «Mi perfil», campo «Mi CUIT (despachante)», o en la operación si es ella la que lo manda.
-
 ## 2026-11-13 · fix: el sufijo de valor de la operación vuelve a su campo después de recargar (SUFIJO-BORRADOR)
 
 - El sufijo de valor de la operación se guarda con ella apenas se escribe, y al recuperar la operación el campo lo muestra: antes aparecía vacío aunque la operación lo tuviera guardado, y lo escrito sin generar se perdía.
