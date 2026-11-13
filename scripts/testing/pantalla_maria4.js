@@ -6,13 +6,14 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_maria4.js [captura.png]
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
   const page = await (await b.newContext({ viewport: { width: 1280, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  await page.request.post(base + '/auth/register', { data: { username: 'm4_' + id, password: 'Clave-Inventada-123', email: 'm4' + id + '@ejemplo.test' } });
+  await registrarCuenta(page.request, base, { data: { username: 'm4_' + id, password: 'Clave-Inventada-123', email: 'm4' + id + '@ejemplo.test' } });
   // Un cliente con una operación anterior que usó el banco 191.
   const rc = await page.request.post(base + '/api/clientes', { data: { nombre: 'Cliente M4', cuit: '30712345678' } });
   const cj = await rc.json(); const cliente = cj.cliente || cj;

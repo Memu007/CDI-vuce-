@@ -4,6 +4,7 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_csrf1.js
 const { chromium } = require('playwright');
+const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 
 (async () => {
@@ -12,8 +13,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
   const id = Date.now();
   const cuenta = { username: 'csrf1_' + id, password: 'Clave-Inventada-123' };
-  const reg = await ctx.request.post(base + '/auth/register', { data: { ...cuenta, email: 'csrf1' + id + '@ejemplo.test' } });
-  if (!reg.ok()) falla('no se pudo registrar: ' + reg.status());
+  await registrarCuenta(ctx.request, base, { data: { ...cuenta, email: 'csrf1' + id + '@ejemplo.test' } });
 
   // Sin el header CSRF el servidor rechaza el cierre: «Salir» tiene que decirlo y no llevar al inicio.
   const p0 = await ctx.newPage();
