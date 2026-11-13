@@ -3,61 +3,73 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## REGISTRO-GUIONES: aceptada sobre `b832fc2` e integrada (2026-11-13 01:05 UTC)
+## CORREDOR-PANTALLAS: aceptada sobre `907e1edb` e integrada (2026-11-13 02:36 UTC)
 
-Integro tu rama hasta `19f890a5`. Acta `REPRODUCCION-REGISTRO-GUIONES-2026-11-13.md`.
+Integro tu informe `4e98c865`. Acta `REPRODUCCION-CORREDOR-PANTALLAS-2026-11-13.md`.
 **Traé mi rama con `merge`.**
 
-Reproducido sobre `b832fc2`: `chequeo-6` producto +0/−0, 0 avisos; tu
-medición, 13 en la base y 0 después; doce pantallas de a una, cada una con
-servidor y base nuevos, con los mismos cuatro rojos que en `08ae9654`; y
-enteros `sabotajes/estudio1.sh`, `sabotaje_maria9.sh`,
-`sabotaje_separadores1.sh` y `sabotajes/destino1.sh`: los cuatro con
-salida 0, sin `ROTO` y sin «registro: 4xx». Ningún otro guion llama a las 13
-de la base (medido por llamada, no por mención). Mi negativo, en otro borde que tu 429: registrar dos veces la misma cuenta corta
-con `registro: 400 {"detail":"Usuario ya existe"}`. No corrí las otras 16
-pantallas, tu `csrf1` con `CSRF_ENFORCE` ni tu 429 con proxy: el acta lo dice.
+**Lo reproducido.** Tu corredor entero sobre `907e1edb`: «26 verdes, 4 rojas:
+maria3 maria4 maria5 subitems1», salida 1, las cuatro con las causas ya
+conocidas. `chequeo-6`: +0/−0, 0 avisos. Tu lista de 11 pantallas sin guion:
+la medí yo, las mismas 11. Las 8 cabeceras: el `awk` del corredor y un `grep`
+aparte encuentran las mismas 8. `maria7` y `maria1c` me salieron verdes: **no
+vi el intermitente**; esa premisa es tuya.
 
-**Escape mío.** La puerta decía que `sabotaje_maria1c`, `4`, `7` y `9` corren
-sus pantallas «medido con grep». Sólo `maria9` corre la suya; en los otros
-tres es un comentario. La puerta de `maria4` que diste por no cumplida no
-correspondía: no cuenta contra la entrega.
+**La puerta del sabotaje, cerrada por mí.** En commits locales recortados a 6
+pantallas, con tu corredor idéntico: una cabecera mal escrita
+(`csrf_enforce=true`) da «FALLA: cabecera … no es VAR=valor» y salida 2; con
+eso más un sabotaje a mano en `pantalla_cliente1.js:51`, el resumen pasa de 1
+a 2 rojas: exactamente una más.
 
-**D209: (a), MARIA.** Le queda como paso 2 de su cola (`PARA-DEV-2.md`).
+**Comparé los entornos.** Cada guion que levanta uvicorn para una pantalla,
+contra tu entorno más la cabecera: la única diferencia es la que diste,
+`sesion1` con `ENVIRONMENT=testing`.
 
-## Tarea activa (2026-11-13 01:05 UTC): un corredor de todas las pantallas, sólo arnés
+**Hallazgo mío (y escape mío de la vuelta anterior).** `kill -TERM` al PID del
+corredor mientras corre una pantalla: el corredor sale y borra su worktree,
+pero **queda el uvicorn de esa pantalla huérfano** (PPID 1), sobre el
+worktree ya borrado. Con Ctrl-C no pasa (la señal va a todo el grupo). Va en
+tu tarea nueva.
 
-La premisa, mirada: `maria3`, `maria4`, `maria5` y `subitems1` estuvieron
-rojas tres semanas y nadie lo vio, porque ningún guion las corre; cada una
-se corre a mano, levantando servidor y base. No sé cuántas más están así:
-medilo vos.
+**D210: (b), y ya.** Son del arnés, no tenías tarea y la cola de MARIA es
+larga. Ella ya sabe que no las toca.
 
-**Pedido:** un comando que corre todas las `scripts/testing/pantalla_*.js`
-sobre un SHA, cada una con su servidor y su base nuevos, y escribe una línea
-por pantalla con su salida y su última línea, y al final un resumen. Lo que
-una pantalla necesita para correr (por ejemplo, `CSRF_ENFORCE=true` en
-`csrf1`, o un archivo de entrada) lo dice la pantalla misma, no una lista
-aparte en el corredor (sugerencia: un comentario de cabecera que el corredor
-lee). Sin esperas fijas: espera `/health`.
+## Tarea activa (2026-11-13 02:36 UTC): INTERMITENTES, sólo arnés
 
-**Puertas:**
-- La lista medida de pantallas que hoy no corre ningún guion (llamada, no
-  mención).
-- Sobre tu SHA: la línea de cada pantalla coincide con correrla sola sobre
-  el mismo SHA. Mostrás al menos una roja y una verde que coinciden. No pido
-  «exactamente cuatro rojas»: MARIA está arreglando esas.
-- Una vez, con un sabotaje a mano en una pantalla verde, su línea pasa de
-  verde a roja y el resumen cuenta una roja más que sin el sabotaje (hoy ya
-  termina distinto de 0 por las de MARIA). Uno basta (no es §3).
+**Premisa, medida por vos (yo no la vi):** `maria7` sola da 5 de 5 verdes y en
+el corredor 2 de 4. `maria1c` falla a veces con el click en `#semaforoFAB`
+vencido (el elemento no está visible). Tu causa probable de `maria7`: espera
+`#uploadFileInput` con `state:'attached'` (`pantalla_maria7.js:28`), pero ese
+input es HTML fijo (`templates/dashboard_v2.html:116`), así que
+`setInputFiles` puede llegar antes de que `init()` de `upload.js` le cuelgue
+el escuchador. **Decí si tus corridas sueltas usaron un servidor ya tibio.**
+Para `maria1c` no hay causa: **empezá por confirmarla.**
+
+**Pedido:** que `maria7` y `maria1c` den lo mismo siempre, esperando una
+condición que la pantalla muestra, sin esperas fijas.
+
+**Puertas (deterministas, no por cantidad de repeticiones):**
+- Para cada una, una forma repetible de que la pantalla de hoy dé la misma
+  `FALLA` que viste intermitente, y con tu arreglo, bajo esa misma condición,
+  verde. Las dos salidas, en el informe. (Sugerencia para `maria7`: demorar
+  `upload.js` con `page.route`.) Lo que fuerza la carrera es de la prueba: no
+  queda en la pantalla ni en el producto.
+- Una corrida verde del corredor no alcanza como prueba: la mía salió verde
+  sin arreglo.
+- Si la causa de cualquiera de las dos resulta de producto, la informás con
+  la salida y no la tocás.
+- `pantalla_sesion1.js` con `// corredor: servidor ENVIRONMENT=testing`, y
+  mostrás una vez que el servidor lo recibió (hoy `sesion1` da verde igual con
+  `development`, así que el verde solo no lo distingue).
+- El uvicorn huérfano: `kill -TERM` al PID del corredor a mitad de una
+  pantalla no deja uvicorn ni node vivos. Mostrás el antes (hoy queda uno) y
+  el después.
 - `chequeo-6` entero: producto +0/−0.
 
-Sin adversarios. No toques `maria3`, `maria4`, `maria5` ni `subitems1`:
-las está arreglando MARIA. Si alguna de esas necesita algo para correr (una
-cabecera, por ejemplo), lo anotás en el informe y no lo hacés; en las demás,
-la cabecera la ponés vos.
+Sin adversarios. No toques `maria3`, `maria4`, `maria5` ni `subitems1`.
 
 Lo de D182 / D206 sigue igual: si Emi dice que sí, dejás esto donde esté.
-D205, D206 y D208 siguen con Emi. Tu rango libre: D210 a D215.
+D205, D206 y D208 siguen con Emi. **Próxima D: D211** (rango D210–D215).
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 
