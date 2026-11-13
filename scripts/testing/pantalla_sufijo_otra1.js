@@ -25,6 +25,30 @@ const LLEGADAS = [
   [false, { sbt_sufijo_valor: '' }, 'con el sufijo borrado'],
 ];
 
+// Entra a «Validación» (con la operación dada, si hay) y devuelve, de ese mismo instante, lo que muestra el
+// campo, lo que guarda la operación y lo que dice la tarjeta del despachante del segundo producto.
+const entrar = (page, op, items) => page.evaluate(([op, items, otro]) => {
+  if (op) CDI.state = { operacion: op, items };
+  CDI.goTo('validating');
+  const nota = document.querySelector('.despachante-sufijo-nota[data-row="1"]');
+  return [document.getElementById('sbtSufijoValor').value, String(CDI.state.operacion.sbt_sufijo_valor || ''),
+    !nota ? 'sin segundo producto' : nota.textContent.includes(otro) ? 'lo marca escrito con otro sufijo' : 'sin marca'].join(' / ');
+}, [op, items, OTRO]);
+
+// Toca «Generar» y dice si frenó o a qué pantalla siguió; si siguió, espera a que el pedido termine.
+async function generar(page) {
+  await page.click('#validatingGenerate');
+  const quedo = await (await page.waitForFunction(freno => {
+    const pantalla = document.querySelector('.screen.is-active').dataset.screen;
+    if (pantalla !== 'validating') return 'siguió a «' + pantalla + '»';
+    // El foco en el campo lo pone el freno de este clic: el aviso puede venir de la operación anterior.
+    const el = document.getElementById('sbtFieldError');
+    return !el.hidden && el.textContent === freno && document.activeElement.id === 'sbtSufijoValor' && 'frenó';
+  }, FRENO, { timeout: 15000 })).jsonValue();
+  if (quedo !== 'frenó') await page.waitForFunction(() => ['readyDone', 'readyError'].some(i => !document.getElementById(i).hidden), null, { timeout: 20000 });
+  return quedo;
+}
+
 (async () => {
   const b = await chromium.launch();
   const page = await (await b.newContext({ viewport: { width: 1400, height: 1000 } })).newPage();
@@ -35,43 +59,24 @@ const LLEGADAS = [
   const esGenerar = r => r.url().endsWith('/generate_maria') && r.method() === 'POST';
   let generados = 0;
   page.on('request', r => { if (esGenerar(r)) generados++; });
-  // Entra a «Validación» (con la operación dada, si hay) y devuelve, de ese mismo instante, lo que muestra el
-  // campo, lo que guarda la operación y lo que dice la tarjeta del despachante del segundo producto.
-  const entrar = (op, items) => page.evaluate(([op, items, otro]) => {
-    if (op) CDI.state = { operacion: op, items };
-    CDI.goTo('validating');
-    const nota = document.querySelector('.despachante-sufijo-nota[data-row="1"]');
-    return [document.getElementById('sbtSufijoValor').value, String(CDI.state.operacion.sbt_sufijo_valor || ''),
-      !nota ? 'sin segundo producto' : nota.textContent.includes(otro) ? 'lo marca escrito con otro sufijo' : 'sin marca'].join(' / ');
-  }, [op, items, OTRO]);
 
   await page.goto(base + '/dashboard');
   await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.currentUser);
   let mal = 0;
   for (const [recargar, guardado, paso] of LLEGADAS) {
-    await entrar(ANTERIOR, [ITEM]);
+    await entrar(page, ANTERIOR, [ITEM]);
     await page.fill('#sbtSufijoValor', AJENO);
     if (recargar) {
       await page.reload();
       await page.waitForFunction(f => window.CDI && CDI.state && CDI.state.operacion && CDI.state.operacion.numero_factura === f
         && document.querySelector('.screen.is-active')?.dataset.screen === 'review', ANTERIOR.numero_factura, { timeout: 20000 })
         .catch(e => falla(paso + ': al recargar la operación no se recuperó: ' + e.message.split('\n')[0]));
-      const volvio = await entrar();
+      const volvio = await entrar(page);
       if (!volvio.startsWith(AJENO + ' / ' + AJENO + ' / ')) falla(paso + ': la anterior no volvió con su sufijo: ' + volvio);
     }
     await page.click('.topbar-nav [data-action="go-upload"]');
-    const alEntrar = await entrar(Object.assign({}, ANTERIOR, { numero_factura: 'INV-2026/0732' }, guardado), [ITEM, ESCRITO]);
-    const antes = generados;
-    await page.click('#validatingGenerate');
-    const quedo = await (await page.waitForFunction(freno => {
-      const pantalla = document.querySelector('.screen.is-active').dataset.screen;
-      if (pantalla !== 'validating') return 'siguió a «' + pantalla + '»';
-      // El foco en el campo lo pone el freno de este clic: el aviso puede venir de la operación anterior.
-      const el = document.getElementById('sbtFieldError');
-      return !el.hidden && el.textContent === freno && document.activeElement.id === 'sbtSufijoValor' && 'frenó';
-    }, FRENO, { timeout: 15000 })).jsonValue();
-    // Si siguió, se espera a que termine de generar: la fila que sigue arranca sin un pedido en vuelo.
-    if (quedo !== 'frenó') await page.waitForFunction(() => ['readyDone', 'readyError'].some(i => !document.getElementById(i).hidden), null, { timeout: 20000 });
+    const alEntrar = await entrar(page, Object.assign({}, ANTERIOR, { numero_factura: 'INV-2026/0732' }, guardado), [ITEM, ESCRITO]);
+    const antes = generados, quedo = await generar(page);
     if (alEntrar === ' /  / sin marca' && quedo === 'frenó' && generados === antes) { console.log('OK ' + paso + ': el campo entra vacío, la tarjeta no usa el ajeno y «Generar» frena sin pedir el TXT'); continue; }
     console.error('FALLA: ' + paso + ': al entrar, campo / operación / tarjeta = «' + alEntrar + '»; «Generar» ' + quedo + ' y salieron ' +
       (generados - antes) + ' POST /generate_maria');
@@ -79,7 +84,7 @@ const LLEGADAS = [
   }
   if (mal) process.exit(1);
 
-  await entrar(Object.assign({}, ANTERIOR, { numero_factura: 'INV-2026/0733' }), [ITEM]);
+  await entrar(page, Object.assign({}, ANTERIOR, { numero_factura: 'INV-2026/0733' }), [ITEM]);
   const avisado = page.waitForRequest(r => r.url().endsWith('/generate_maria/avisos') && (r.postDataJSON() || {}).sbt_sufijo_valor === PROPIO, { timeout: 15000 });
   await page.fill('#sbtSufijoValor', PROPIO);
   await avisado.catch(() => falla('con «' + PROPIO + '» escrito, los avisos no se pidieron con ese sufijo'));
