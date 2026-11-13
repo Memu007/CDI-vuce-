@@ -2,80 +2,106 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## NAVEGADOR: las 31 pantallas abren el navegador con `chromium.launch()`
+## EXCEL2D-RELOJ vuelta 2: la espera medida no depende de cuántos hilos tenga el proceso
 
-| qué | SHA |
+| | SHA |
 |---|---|
-| base (informe de EXCEL2D-RELOJ, todavía en tu revisión) | `25e13c44` |
-| arnés | `740eac45` |
+| base | `806f838c` |
+| test | `cc8c7b7d` |
 | informe | el commit `docs:` que trae este archivo |
 
-**Resultado.** Las tres puertas en verde. No toqué producto (`producto +0/−0`)
-ni nada de MARIA.
+**Resultado: cumple las cinco puertas.** Nada para decidir.
 
-**Forma elegida: `chromium.launch()`, sin argumentos.** Es la que ya usaban
-28 de las 31 pantallas, y toma el Chromium que trae el Playwright instalado.
-`borrador1`, `cliente1` y `destino1` pasan a usarla. Como ya ninguna pantalla
-lee `CHROMIUM`, lo saqué de `correr_pantallas.sh`: del comentario de `:10`,
-de `:24` y de `:56`. También lo saqué del uso documentado en
-`sabotajes/cliente1.sh:5`, que nombraba la variable pero no la leía.
+- Con la espera de 0,8 s, el test da rojo con 0, 1000 y 3000 hilos y mide 0,79 s en los tres casos.
+- Con 4 s mide 4,00, 3,99 y 3,99 s.
+- La suite entera da `6112 passed, 110 skipped, 3 xfailed`, igual que tu referencia.
+- No toca el producto: `producto +0/−0`, arnés `+9/−11`.
 
-**Nada para decidir.** Un supuesto reversible: quien tenga otro Playwright
-que no encuentre su navegador ya no puede apuntarlo con `CHROMIUM`. Es lo
-mismo que ya pasaba con las otras 28 pantallas.
+### Causa
+El testigo marcaba `True` el salto en el que recorría `/proc/self/task`, y ese salto no sumaba espera. Con muchos hilos, el recorrido tarda más que el tic de 10 ms, así que buena parte de la espera caía en saltos que no contaban.
 
-D229 (fuga de hilos del arnés, informe de EXCEL2D-RELOJ en `25e13c44`) sigue
-abierta.
+### Arreglo (sólo en `tests/test_excel2d.py`)
+- **CPU sin el testigo.** La CPU del salto es `process_time - thread_time`, así no entra lo que gasta el propio testigo al recorrer `/proc`.
+- **Un veredicto por salto entero.** El veredicto del recorrido vale para todo el salto, recorrido incluido: la marca de tiempo se toma después de recorrer.
+- **Gasto con el mismo reloj.** El gasto sale de esas marcas: `pasos[-1][1] - pasos[0][1]`.
 
-### Comandos para reproducir
+### Puertas sobre `cc8c7b7d`
 
-1. **Una sola forma.** Tiene que dar `31 chromium.launch()`, en una sola
-   línea:
-   ```bash
-   grep -ho 'chromium.launch([^;]*' scripts/testing/*.js | sort | uniq -c
-   ```
-2. **Nadie lee `CHROMIUM`.** Tiene que dar vacío:
-   ```bash
-   grep -rn CHROMIUM scripts/
-   ```
-3. **Las tres pantallas.** Tiene que dar `resumen: 3 verdes, 0 rojas`:
-   ```bash
-   SOLO="borrador1 cliente1 destino1" PY=<python del venv> scripts/testing/correr_pantallas.sh 740eac45
-   ```
-4. **Los sabotajes de `cliente1`.** Tiene que dar `sabotajes sin rojo: 0`:
-   ```bash
-   PY=<python del venv> scripts/testing/sabotajes/cliente1.sh 740eac45 | tail -1
-   ```
+**Puertas 1 a 3 (filtro `no_frena and 2499`):**
 
-### Puertas (corridas sobre `740eac45`)
+| espera inyectada | 0 hilos | 1000 hilos | 3000 hilos |
+|---|---|---|---|
+| ninguna | `1 passed … in 0.61s` | `in 0.66s` | `in 0.69s` |
+| 0,8 s | `la subida esperó 0.79 s sin gastar CPU`, `1 failed` | `0.79 s`, `1 failed` | `0.79 s`, `1 failed` |
+| 4 s | `4.00 s`, `1 failed` | `3.99 s`, `1 failed` | `3.99 s`, `1 failed` |
 
-| puerta | salida |
+**Puerta 4:** `sabotajes/excel2d.sh cc8c7b7d`.
+- Sin hilos: 21 `ROJO`, «sabotajes con falla: 0».
+- Con `HILOS=1000` (tu plugin): 21 `ROJO`, «sabotajes con falla: 0».
+- En las dos corridas, el último dice: «ROJO  | la subida espera 4 s sin gastar CPU: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[2499 combinadas en 4998 filas]» (13 s)».
+- El guion tiene 21 sabotajes, no los 6 que nombraste: los corrí todos.
+
+**Puerta 5:** `pytest` entero con `--no-cov --timeout=120 -p no:cacheprovider`.
+- Resultado: `6112 passed, 110 skipped, 3 xfailed, 106 warnings in 1092.69s (0:18:12)`, código 0.
+
+### Mediciones fuera de las puertas
+
+**Sabotaje propio: el test viejo (`806f838c`) con 0,8 s.**
+
+| hilos | resultado |
 |---|---|
-| `grep` en la base `25e13c44` | `28 chromium.launch()` · `1 chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })` · `2 chromium.launch({ executablePath: process.env.CHROMIUM \|\| '/opt/pw-browsers/chromium' })` |
-| `grep` en `740eac45` | `31 chromium.launch()` |
-| `git grep -n CHROMIUM 740eac45 -- scripts/` | 0 líneas |
-| `correr_pantallas.sh` con las tres | `verde borrador1 rc=0 … ok: el arranque no saca de Clientes y recupera si no fue a ninguna pantalla` · `verde cliente1 rc=0 … PANTALLA CLIENTE-1 OK (con CLIENTE-1b y 1c)` · `verde destino1 rc=0 … OK: pantalla DESTINO-1` · `resumen: 3 verdes, 0 rojas` · rc=0 |
-| `sabotajes/cliente1.sh 740eac45` | 34 `ROJO` · `sabotajes sin rojo: 0` · rc=0 (11:02:53 → 11:06:58) |
+| 0 | `la subida esperó 0.82 s`, `1 failed` |
+| 1000 | `1 passed` |
+| 3000 | `1 passed` |
 
-`chequeo-6 25e13c44 740eac45` (rc=0, entero):
+Ése es el defecto que la vuelta arregla.
+
+**Hambre: `taskset -c 0` con 8 `yes`, los 7 casos de la subida cara.**
+
+| espera | 0 hilos | 1000 hilos | 3000 hilos |
+|---|---|---|---|
+| ninguna | `7 passed … 22.62s` | `7 passed … 23.29s` | `7 passed … 25.20s` |
+| 4 s | `3.99 s`, `1 failed` | `3.99 s`, `1 failed` | `4.21 s`, `1 failed` |
+
+Con 3000 hilos y la CPU fijada mide de más, cerca de un 5 %. Probablemente sea el tiempo en que el testigo queda desalojado. Mide de más, no de menos: no esconde una espera.
+
+**Carga sin fijar a una CPU (`yes` sueltos).**
+
+| procesos `yes` | hilos | sin espera | con 4 s |
+|---|---|---|---|
+| 4 | 0 | `7 passed` | `4.00 s` |
+| 4 | 3000 | `7 passed` | `3.92 s` |
+| 8 | 0 | `7 passed` | `4.00 s` |
+| 8 | 3000 | `7 passed` | `3.97 s` |
+
+### chequeo-6 (entero)
 ```
-chequeo-6 25e13c44..740eac45: avisos para mirar, no un veredicto
+chequeo-6 806f838c..cc8c7b7d441235c56e43b5ff0361a6abe1726262: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +6/−7
+arnés +9/−11
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
 ```
 
-### No corrido
+### Comandos para reproducir
+```bash
+git checkout cc8c7b7d
+python -m pytest -q --no-cov tests/test_excel2d.py -k 'no_frena and 2499'   # 1 passed
+bash scripts/testing/sabotajes/excel2d.sh cc8c7b7d                           # 21 ROJO, «sabotajes con falla: 0»
+HILOS=1000 PYTHONPATH=<carpeta de tu hilos_plugin.py> PYTEST_ADDOPTS="-p hilos_plugin" \
+  bash scripts/testing/sabotajes/excel2d.sh cc8c7b7d                         # lo mismo
+```
 
-- Adversarios y `/code-review`, porque sigue vigente «sin adversarios».
-- Las otras 28 pantallas: no las toqué.
-- `pytest`: el cambio es sólo en JS y bash de pantallas, que pytest no
-  ejecuta.
+### No corrido
+- Adversarios y `/code-review`: no los corrí porque esta vuelta es «sin adversarios».
+- No toqué los topes de 1 s y 0,5 s: estaban fuera de la pieza.
 
 ### Archivos de producto tocados
-
 Ninguno.
 
-/compact conservar: Dev 1 técnica, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main); PM session_01B7FVQspcEHF7PqNv797wNM. Entregué EXCEL2D-RELOJ (25e13c44, D229 abierta) y NAVEGADOR (arnés 740eac45). No hay pieza siguiente marcada. Próxima D: D230. Sin adversarios. Nada se publica sin el «dale» de Emi para el SHA. Sin secretos.
+### Para FUGA-HILOS (la sigo ahora)
+- Hay 18 archivos de `tests/` con `new_event_loop`, no 77: los otros 59 eran `.pyc`.
+- La base para la puerta 3 sale de esta misma corrida entera: 1113 «Task was destroyed but it is pending» con `async_generator_athrow`.
+
+/compact conservar: Dev 1 técnica, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica; entregué EXCEL2D-RELOJ (test cc8c7b7d); sigo con FUGA-HILOS (D229 a), base 1113 «Task was destroyed» con async_generator_athrow; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM; nada se publica sin el «dale» de Emi para el SHA, nunca main, sin secretos; próxima D: D230.
