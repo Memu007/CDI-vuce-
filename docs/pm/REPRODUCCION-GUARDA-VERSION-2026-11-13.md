@@ -35,3 +35,45 @@ ejemplo que no le di.
 
 No corrido: pytest entero sobre `3f39ff36`, aiosqlite 0.19 y 0.20,
 Postgres, adversarios (pieza sin adversarios).
+
+## Vuelta 2
+
+Entrega: `f0ec76d1` (saca la línea fija del resumen, −6) y `1be2477b`
+(`tests/test_guarda_conexiones.py`, +85: un caso con cuatro datos que corre
+pytest aparte con el `conftest.py` real), informe `bb83ecc6`, merge
+`9661f5d3`, que ya trae mi rama (`32dfcd5b`): la unión es `9661f5d3`.
+Revisado en un worktree en `9661f5d3`.
+
+| qué | salida |
+|---|---|
+| `chequeo-6.py 703066b1 1be2477b` | producto +0/−0, arnés +85/−6, historia vacía, 0 avisos: igual que el informe |
+| `chequeo-6.py 64106289 1be2477b` | producto +0/−0, arnés +111/−1, historia vacía, 0 avisos |
+| `tests/test_guarda_conexiones.py` | `4 passed, 5 warnings in 23.84s`, rc=0 |
+| mi ejemplo guardado: `pytest_runtest_setup` sin la foto (`pass`) | `3 failed, 1 passed`: rojos «veredicto del cierre», «foto antes de los fixtures», «la culpa es de quien la deja» |
+| negativo mío: `or reporte.failed` → `or True` (el cierre nunca juzga) | `3 failed, 1 passed`: los mismos tres |
+| negativo mío: la foto vacía (`= set()`) | `1 failed, 3 passed`: rojo «la culpa es de quien la deja» |
+| negativo mío: sin `tryfirst` | `4 passed`: verde, y es correcto (el hook de un conftest ya corre antes que el de pytest) |
+| negativo mío: `trylast=True` (la foto después de los fixtures) | `1 failed, 3 passed`: rojo sólo «foto antes de los fixtures» |
+| negativo mío: sin el chequeo de arranque (`if False:`) | `1 failed, 3 passed`: rojo sólo «chequeo de arranque» |
+| `git diff --name-only 32dfcd5b 9661f5d3` | `docs/pm/PARA-PM.md`, `tests/conftest.py`, `tests/test_guarda_conexiones.py` |
+| pytest entero sobre `9661f5d3` | `6130 passed, 110 skipped, 3 xfailed, 108 warnings in 1134.62s (0:18:54)`, rc=0, 0 «dejó» |
+| aiosqlite que instala la CI | `requirements.txt:94` `>=0.19.0` sin tope: hoy 0.22.1, la misma del venv donde la suite da verde |
+
+**Aceptada e integrada** (merge `0bd0d3d6`). Cada parte rota da rojo: el
+reconocimiento, la foto, su orden y el veredicto del cierre. El rojo nombra
+el dato que cae, no la parte rota. Sin foto o sin veredicto caen los mismos
+tres datos, porque el cierre juzga con la foto. Para separarlos alcanza el
+nombre del dato más el diff que rompió: **decidido por la PM** que eso cumple
+«dice cuál». El pytest de adentro usa su propia base (`mkstemp` por proceso).
+
+- Supuesto aceptado: sacar la línea del resumen. No mostrar nada cumple «sale
+  de lo que se vio».
+- Riesgo aceptado: `_TOPE_CIERRE = 0` da verde, y si el tope baja, lo que
+  aparece son falsas alarmas: ninguna fuga queda escondida.
+- Riesgo anotado: el caso escribe `asyncio_mode = auto` adentro. Si el
+  `pytest.ini` cambia, hay que cambiarlo también ahí.
+- Tiempo: el archivo suma 23.84 s acá (22.34 s en el informe), en una CI que
+  ya se corta a los 20 min (punto 14, ya preguntado a Emi).
+
+No corrido: los sabotajes 1–6 del informe (corrí los seis míos de arriba),
+aiosqlite 0.19 y 0.20, Postgres y adversarios (pieza sin adversarios).

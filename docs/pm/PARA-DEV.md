@@ -3,98 +3,26 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## GUARDA-VERSION: devolución sobre `95e7a835` (informe `3f39ff36`), sin integrar (2026-11-13)
+## GUARDA-VERSION: aceptada sobre `9661f5d3` (informe `bb83ecc6`) e integrada (2026-11-13 17:31 UTC)
 
-Acta `REPRODUCCION-GUARDA-VERSION-2026-11-13.md`. Igual a tu informe: el
-`chequeo-6`, que fuera de `docs/pm/` sólo cambia `tests/conftest.py`, la
-puerta 1 (0.21.0 da rc=4 con tu mensaje y 0.22.1 da `76 passed`) y la
-puerta 2 (rc=4 con `'(_worker_thread)'`). El chequeo de arranque se queda.
+Acta `REPRODUCCION-GUARDA-VERSION-2026-11-13.md`, sección «Vuelta 2».
+**Traé mi rama con `merge`.**
 
-**Puerta 3: no la acepto como supuesto.** El pedido dice «por la versión
-instalada **o porque alguien la rompe**», y la razón de la pieza era que en
-el repo nada prueba que la guarda funciona.
+- Igual a tu informe: `chequeo-6` (arnés +85/−6, 0 avisos), `4 passed` el
+  archivo solo y el pytest entero sobre `9661f5d3`: `6130 passed, 110 skipped, 3 xfailed`, 1134.62 s, rc=0, 0 «dejó».
+- Mis negativos, todos distintos de los tuyos:
+  - sin la foto, o `or reporte.failed` → `or True`: caen tus tres datos de fuga;
+  - la foto vacía: cae «la culpa es de quien la deja»;
+  - `trylast=True`: cae sólo «foto antes de los fixtures»;
+  - sin el chequeo de arranque: cae sólo «chequeo de arranque»;
+  - sin `tryfirst`: verde, y es correcto (el conftest ya va antes).
+- **Decidido por la PM:** el rojo nombra el dato que cae, y con eso alcanza
+  para decir cuál se rompió. Acepto tu supuesto: la línea del resumen sale.
+  Acepto también el riesgo del tope: bajarlo sólo trae falsas alarmas.
+- D230 sigue con Emi (ahora no; va a la cola con los otros `async for`).
 
-**Causa:** lo que queda en el repo prueba que la guarda *reconoce* una
-conexión, no que una fuga termine en rojo.
-
-**Dos defectos:**
-
-1. **El cierre anulado no da rojo.** Mi ejemplo: un test async que guarda
-   `aiosqlite.connect(":memory:")` en una lista del módulo. Con la guarda
-   entera, «dejó 1 conexión(es)…» y `1 error`. Con `if vivos:` cambiado por
-   `if vivos and False:`, `1 passed` y la línea «vio la conexión de prueba»:
-   todo verde.
-2. **La línea «vio la conexión de prueba» no sale de lo que se vio.**
-   `pytest_terminal_summary` imprime un texto fijo. Saqué el bloque
-   `if not _guarda_ve_una_conexion()` y corrí con 0.21.0: dijo «vio la
-   conexión de prueba de aiosqlite 0.21.0» y `76 passed`. Tiene que salir
-   del resultado del chequeo, o no salir.
-
-**Comportamiento pedido.** Si alguien rompe la guarda en cualquiera de sus
-partes, la suite normal da rojo y dice cuál se rompió. Hay que cubrir el
-reconocimiento, que la foto de antes del test se tome y el veredicto del
-cierre. Va como datos de un mismo caso, con el rojo de cada dato. En el
-informe, cuánto tiempo le suma a la suite. Lo que mostrás como evidencia
-tiene que cambiar cuando cambia lo que prueba.
-
-*Sugerencia, no criterio:* `pytester`, en un archivo propio. Así los ~5 s se
-pagan sólo cuando ese archivo entra en la corrida, no en cada una.
-
-Fuera, igual que antes: el producto, `requirements.txt`, `ci.yml` y lo de
-MARIA. Sin esperas fijas nuevas y sin adversarios. **Próxima D: D231.**
-
-## FUGA-HILOS-GUARDA: aceptada sobre `a58d45d5` (informe `7e36ba88`) e integrada (2026-11-13 16:06 UTC)
-
-Acta `REPRODUCCION-FUGA-HILOS-GUARDA-2026-11-13.md`. **Traé mi rama con
-`merge`.**
-
-- Igual a tu informe: `chequeo-6`, sólo `tests/conftest.py` fuera de
-  `docs/pm/`, y el pytest entero sobre `7e36ba88`: `6126 passed, 110 skipped, 3 xfailed, 107 warnings in 1149.00s`, rc=0; 0 «dejó»; 8 «Event loop is closed», los mismos que sin la guarda
-- Mis negativos: `_sql` de `guardar1` devuelto a lo viejo da 12 errors, cada
-  uno con su «dejó»; un `async for … break` en un bucle propio que se cierra
-  sin `shutdown_asyncgens`, y una conexión guardada en una lista del módulo,
-  dan rojo. Doce archivos corridos de a uno, verdes.
-- **Distinto de tu informe, sin defecto:** `aiosqlite.connect` sin cerrar en
-  un test async da **verde** si nadie guarda la conexión (descartada o en una
-  variable local). aiosqlite 0.22 la cierra al soltarla (`Connection.__del__`
-  para el hilo) y el hilo ya no está: por el efecto, verde es lo correcto. Tu
-  caso «directo» seguramente la retenía; en la próxima, el caso va en el
-  repo y se ve.
-- **D230: ahora no, decidido por la PM; (a) va a Emi con mi recomendación.**
-  Es producto, toca cobro y está fuera del roadmap. Leído, no reproducido:
-  el `close` tardío devuelve la conexión al pool, que deshace lo abierto, así
-  que hoy el efecto sería el retraso, no datos a medias; falta medirlo. Va a
-  la cola junto con los otros tres `async for` (misma causa). Qué espera el
-  caso de `test_cobro_corte1` que se rompe lo decide esa pieza.
-
-## GUARDA-VERSION, decidido por la PM: pieza siguiente, ahora (2026-11-13)
-
-La guarda reconoce las conexiones por el nombre que Python le pone al hilo de
-aiosqlite 0.22 (`Thread-N (_connection_worker_thread)`). En 0.19, 0.20 y
-0.21 (miré los paquetes) la conexión es ella misma el hilo y se llama
-`Thread-N`: la guarda no ve nada y no avisa. `requirements.txt:94` pide
-`>=0.19.0` sin tope: puede quedar ciega para atrás (un venv viejo) o para
-adelante (una versión nueva), sin ningún commit. Y en el repo nada prueba
-que la guarda funciona: tus casos de la puerta 2 quedaron afuera.
-
-**Comportamiento pedido.** Si la guarda deja de ver una conexión de
-aiosqlite que queda viva (por la versión instalada o porque alguien la
-rompe), la corrida de pytest termina en rojo y dice por qué. Sólo `tests/`.
-
-**Puertas.**
-1. Rojo con aiosqlite 0.21 en un venv aparte, verde con 0.22.1: las dos
-   salidas.
-2. Rojo con la guarda rota a mano (por ejemplo, otro sufijo de nombre), una
-   vez, con la salida.
-3. Una fuga escrita de otra forma que `new_event_loop().run_until_complete`
-   queda en el repo y la suite normal muestra que la guarda la ve, sin quedar
-   roja.
-4. `pytest` entero: tus `passed` de antes más los nuevos, y el tiempo.
-
-Fuera: el producto, `requirements.txt`, `ci.yml` y lo de MARIA. Sin esperas
-fijas nuevas. Sin adversarios. Lo que sigue después espera a Emi (punto 14,
-D182, D206): si al entregar no contestó, no arranques otra cosa; te aviso
-yo. **Próxima D: D231** (rango D228–D233).
+**Lo que sigue espera a Emi** (punto 14, D182, D206): no arranques otra cosa;
+te aviso yo. **Próxima D: D231** (rango D228–D233).
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 

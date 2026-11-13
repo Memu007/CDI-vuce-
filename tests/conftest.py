@@ -68,12 +68,20 @@ def _set_sqlite_pragma(dbapi_connection, _):
     cursor.execute("PRAGMA busy_timeout=30000")  # 30s: esperar el lock, no fallar
     cursor.close()
 import asyncio  # noqa: E402
+import aiosqlite  # noqa: E402
 import threading  # noqa: E402
 import time  # noqa: E402
 
 
 def pytest_sessionstart(session):
-    """Crear tablas antes de la sesión de tests (idempotente con checkfirst)."""
+    """Comprobar que la guarda ve las conexiones y crear las tablas (checkfirst)."""
+    if not _guarda_ve_una_conexion():
+        pytest.exit(
+            f"La guarda de conexiones no ve una conexión abierta de aiosqlite "
+            f"{aiosqlite.__version__}: busca hilos que terminen en "
+            f"{_HILO_AIOSQLITE!r}. Ajustá _hilos_de_aiosqlite a esta versión.",
+            returncode=pytest.ExitCode.USAGE_ERROR,
+        )
     asyncio.run(init_db())
 
 
@@ -135,6 +143,23 @@ _hilos_antes = pytest.StashKey[set]()
 
 def _hilos_de_aiosqlite():
     return {h for h in threading.enumerate() if h.name.endswith(_HILO_AIOSQLITE)}
+
+
+def _guarda_ve_una_conexion():
+    # El nombre del hilo depende de la versión de aiosqlite: si deja de
+    # coincidir, la guarda no vería ninguna fuga y tampoco avisaría.
+    async def probar():
+        antes = _hilos_de_aiosqlite()
+        conexion = await aiosqlite.connect(":memory:")
+        try:
+            return _hilos_de_aiosqlite() - antes
+        finally:
+            await conexion.close()
+
+    vistos = asyncio.run(probar())
+    for hilo in vistos:
+        hilo.join(_TOPE_CIERRE)
+    return bool(vistos)
 
 
 @pytest.hookimpl(tryfirst=True)
