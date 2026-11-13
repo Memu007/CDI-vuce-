@@ -212,8 +212,8 @@ Sesiones viejas, apagadas (historia): Dev 1 session_01VV5RVDA64AuzLaPBDnwH39
 `claude/dev2-maria`; las ramas `codex/*`.
 
 Archivos abiertos por Dev:
-- Dev técnica (sólo arnés): los `scripts/testing/*.js` que registran una cuenta y un ayudante al lado de `_ip_nueva.js`. Sin producto hasta el sí de Emi (D182 o D206).
-- Dev MARIA (D199 y `sabotaje_valor1`, después D218/D219): `scripts/testing/sabotajes/catalogo3.sh` o el guion que elija para D199, `scripts/testing/sabotaje_valor1.sh`, `scripts/testing/sabotajes/catalogo_largo2.sh` y sus líneas de `herramientas/sabotajes-conocidos.txt`.
+- Dev técnica (sólo pruebas, EXCEL2D-TIEMPO): `tests/test_excel2d.py`. Sin producto hasta el sí de Emi (D182 o D206).
+- Dev MARIA: lo de su lista en `PARA-DEV-2.md`, y `pantalla_orden1.js` desde 2026-11-13 05:35 UTC.
 
 ## En curso
 
