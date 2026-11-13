@@ -73,6 +73,7 @@
 //      llega cuando ya entró B.
 // Datos inventados. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_orden1.js
+// corredor: servidor CSRF_ENFORCE=true
 // El servidor corre con CSRF_ENFORCE=true, como en producción.
 const { chromium, request } = require('/opt/node-tools/node_modules/playwright');
 const ipNueva = require('./_ip_nueva');
