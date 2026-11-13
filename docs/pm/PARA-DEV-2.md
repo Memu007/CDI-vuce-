@@ -3,43 +3,40 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D218 y D219: aceptadas sobre `1f8ffa6` e integradas (2026-11-13 02:22 UTC)
+## PANTALLAS-MARIA: aceptada sobre `7ac0b4e` (entregada en `e0d2770f`) e integrada (2026-11-13 03:58 UTC)
 
-Integro tu informe `166c46c5`, no la punta de tu rama (`0ec63435`, que ya
-trae PANTALLAS-MARIA sin revisar). Acta: `REPRODUCCION-D218-D219-2026-11-13.md`.
+Integro tu informe `8f848862`. Acta `REPRODUCCION-PANTALLAS-MARIA-2026-11-13.md`.
 **Traé mi rama con `merge`.**
 
-**Lo reproducido, con los guiones de `1f8ffa6`.** `catalogo_largo2.sh` entero
-con Postgres 16 y consola limpia (`env -u DATABASE_URL -u ENVIRONMENT`):
-38 `ROJO`, ningún `ROJO?`, `VERDE`, `ROTO` ni `BASE`, `fallas: 0`, salida 0.
-`catalogo3_postgres.py` solo, consola limpia: en `d5a96aa` corta en el
-`RuntimeError` que encontró tu adversario; en `1f8ffa6` da 10 `OK`, salida 0.
-`chequeo-6` en tus tres tramos: +0/−0, 0 avisos. Mutaciones mías en
-`catalog_service.py` con los cuatro `test_catalogo*`: resumen sacado de
-`nombre` → 1 failed (tu dato nuevo); separador `-` → 4 failed. No corrí el
-camino de base roja de `base_en_verde` (lo leí): queda en el acta.
+**Lo reproducido.** Antes: en mi corredor sobre `907e1edb`, tus cuatro rojas.
+Ahora, el corredor entero sobre `e0d2770f`: `28 verdes, 2 rojas: maria1c
+orden1`, y `maria3`, `maria4`, `maria5` y `subitems1` verdes. `chequeo-6`
+igual que el tuyo, con el aviso de `subitems1` bien explicado. Mis negativos:
+`maria4` sin el CUIT del comprador en el armado da `FALLA: page.click:
+Timeout 30000ms exceeded` (el guion distingue la causa 1); `maria5` y
+`subitems1` con `CSRF_ENFORCE=true` dan 9 y 10 `OK` (el ayudante manda el
+token). Tu contradicción de la fecha, aceptada.
 
-**D223: (a).** Un sabotaje del candado en `catalogo_largo2.sh`; el
-`lock_timeout` queda como riesgo anotado.
-**D224: (a).** Dos datos más en la misma prueba: clave de 60 entera, de 61
-cortada. Lo confirmé: `<=`→`<` hoy da 186 passed.
-Las dos, como una pieza chica, después de PANTALLAS-MARIA.
+**Las dos rojas no son tuyas.** `maria1c` la arregló la Técnica. `orden1`:
+sola, dos veces en la base y dos en tu SHA, verde las cuatro; no requiere
+ninguno de tus cinco archivos. Es un intermitente sin diagnosticar y va a la
+Técnica. **No toques `pantalla_orden1.js` hasta que te avise que su pieza
+está integrada.**
 
-Tus dos líneas para `COLA-LIMPIEZA.md` (la línea `BASE` muda y el contrato
-de `entorno()`) ya están en la cola.
+**D225: (a).** Lo confirmé en vivo: `PUT /api/user/profile` con `cuit`
+`20999999998` da 200 y queda guardado. Pieza propia, en el lugar 5 de abajo.
+**D226: (a)** para tus tres (`catalogo_ncm1`, `excel1`, `maria1b`). En mi
+contenedor la ruta fija existe y las tres salen verdes, así que el rojo es de
+tu entorno; igual se saca, como en los otros 19 guiones. `maria1c` la hace la
+Técnica.
 
-**`maria7` y `maria1c` no son tuyas.** En el corredor nuevo de la Técnica
-salen rojas a veces; se las doy a ella (D210 (b)). No las toques.
+Tus tres líneas para `COLA-LIMPIEZA.md`: `subitems1` y `maria4` ya están; la
+de los cuatro guiones con CUIT inválido va dentro de D225.
 
 **Cómo sigue, en este orden:**
-1. **PANTALLAS-MARIA**, como venías (`0ec63435`). La puerta no cambia: los
-   cuatro, cada uno con servidor y base nuevos, salen 0, y mostrás una vez el
-   rojo de hoy de cada causa. Ahora también se puede con
-   `scripts/testing/correr_pantallas.sh <SHA>` de la Técnica: las cuatro
-   tienen que salir verdes ahí. Si alguna necesita algo para correr, la
-   cabecera `// corredor: …` la ponés vos. Sólo arnés; si la causa resulta de
-   producto, frená y avisá.
-2. **D223 + D224**, una pieza.
+1. **D223 + D224**, una pieza (lo que ya estaba escrito).
+2. **D226 (a)**: tus tres guiones con `chromium.launch()` sin ruta. Puerta:
+   las tres verdes en el corredor de tu contenedor.
 3. Retirar los sabotajes 13 y 24 de `valor1` y reanclar en código el 10
    (comentario, línea 108) y el 28 (comentario al final de la línea 187).
    Puerta: `valor1` entero da 29 `ROJO` y salida 0, y su línea sale de
@@ -51,9 +48,20 @@ salen rojas a veces; se las doy a ella (D210 (b)). No las toques.
    sobre el código de hoy. Si da rojo, arreglalo (sugerencia: sacar las dos
    guardas resta antes de sumar). Si no reproduce, informalo con la salida y
    las guardas pasan a la cola. Producto en `static/v2`: corre `e2e_maria.sh`.
-5. Los vencidos que quedan en `sabotajes-conocidos.txt`, uno por pieza.
+5. **CUIT-PERFIL (D225)**, producto, con datos: revisión fuerte (§3:
+   adversarios y sabotaje propio).
+   - Primero el camino de hoy: mostrá en rojo que «Mi perfil» (o la API que
+     usa) guarda un CUIT con el dígito verificador malo.
+   - `PUT /api/user/profile` rechaza un CUIT inválido y la pantalla muestra
+     el error (sugerencia: `cuit_valido`, `controles_maria.py:52`).
+   - Decí qué pasa con los perfiles que ya tengan uno inválido guardado, sin
+     cambiar datos guardados.
+   - En la misma pieza, `orden1`, `validacion1`, `cobro_corte1` y
+     `cobro_mp1_v2` pasan a `_cuit_perfil.js` (hoy cargan un CUIT inválido y
+     se pondrían rojos). `orden1`, sólo después de mi aviso.
+6. Los vencidos que quedan en `sabotajes-conocidos.txt`, uno por pieza.
 
-**Próxima D: D225.**
+**Próxima D: D227.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 

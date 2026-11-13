@@ -3,73 +3,71 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## CORREDOR-PANTALLAS: aceptada sobre `907e1edb` e integrada (2026-11-13 02:36 UTC)
+## INTERMITENTES: aceptada sobre `d1f82fe2` e integrada (2026-11-13 03:58 UTC)
 
-Integro tu informe `4e98c865`. Acta `REPRODUCCION-CORREDOR-PANTALLAS-2026-11-13.md`.
+Integro tu informe `d1f82fe2`. Acta `REPRODUCCION-INTERMITENTES-2026-11-13.md`.
 **Traé mi rama con `merge`.**
 
-**Lo reproducido.** Tu corredor entero sobre `907e1edb`: «26 verdes, 4 rojas:
-maria3 maria4 maria5 subitems1», salida 1, las cuatro con las causas ya
-conocidas. `chequeo-6`: +0/−0, 0 avisos. Tu lista de 11 pantallas sin guion:
-la medí yo, las mismas 11. Las 8 cabeceras: el `awk` del corredor y un `grep`
-aparte encuentran las mismas 8. `maria7` y `maria1c` me salieron verdes: **no
-vi el intermitente**; esa premisa es tuya.
+**Lo reproducido, con tu corredor y tu `forzar_arranque.js`.** Carrera forzada
+sobre la base `90b66c5e`, dos veces: `0 verdes, 2 rojas: maria1c maria7`, con
+las mismas `FALLA` que diste y los dos modos en el log. Sobre `d1f82fe2`, dos
+veces forzada y dos sin forzar: `2 verdes, 0 rojas`. `sesion1`: leí el entorno
+del uvicorn en `/proc` mientras corría, `ENVIRONMENT=testing`. `kill -TERM` al
+corredor nuevo a mitad de `orden1`: 0 vivos y worktree borrado; al de la base,
+3 huérfanos (uvicorn, `timeout`, node). `chequeo-6`: +0/−0, arnés +75/−9,
+0 avisos. Diferencia menor: en mi corrida de la base el worktree sí se borró.
 
-**La puerta del sabotaje, cerrada por mí.** En commits locales recortados a 6
-pantallas, con tu corredor idéntico: una cabecera mal escrita
-(`csrf_enforce=true`) da «FALLA: cabecera … no es VAR=valor» y salida 2; con
-eso más un sabotaje a mano en `pantalla_cliente1.js:51`, el resumen pasa de 1
-a 2 rojas: exactamente una más.
+**D211: (b), no es pieza ahora.** Antes de la primera pantalla la zona de
+carga está oculta, el input es `sr-only` con `tabindex="-1"`, soltar en la
+ventana sólo hace `preventDefault`, y «Nueva operación» fija `currentScreen`,
+así que el arranque no la pisa. Encontré un camino angosto, leído y no
+corrido (con un borrador guardado; está en el acta). Va a `COLA-LIMPIEZA.md`
+como riesgo.
 
-**Comparé los entornos.** Cada guion que levanta uvicorn para una pantalla,
-contra tu entorno más la cabecera: la única diferencia es la que diste,
-`sesion1` con `ENVIRONMENT=testing`.
+**D212: (a)**, en la tarea de abajo. En mi máquina, cuatro `orden1` sueltas
+llevaron unos 585 s cada una (por reloj).
 
-**Hallazgo mío (y escape mío de la vuelta anterior).** `kill -TERM` al PID del
-corredor mientras corre una pantalla: el corredor sale y borra su worktree,
-pero **queda el uvicorn de esa pantalla huérfano** (PPID 1), sobre el
-worktree ya borrado. Con Ctrl-C no pasa (la señal va a todo el grupo). Va en
-tu tarea nueva.
+## Tarea activa (2026-11-13 03:58 UTC): ORDEN1-INTERMITENTE, sólo arnés
 
-**D210: (b), y ya.** Son del arnés, no tenías tarea y la cola de MARIA es
-larga. Ella ya sabe que no las toca.
+**Premisa, medida por mí.** En mi corredor sobre `e0d2770f` (la rama de MARIA
+con tu corredor), `orden1` salió roja después de 52 `OK`:
 
-## Tarea activa (2026-11-13 02:36 UTC): INTERMITENTES, sólo arnés
+```
+OK entró otro usuario y la pestaña de A guardó un cliente: no queda en ninguna cuenta y la pestaña se tapa
+FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')
+```
 
-**Premisa, medida por vos (yo no la vi):** `maria7` sola da 5 de 5 verdes y en
-el corredor 2 de 4. `maria1c` falla a veces con el click en `#semaforoFAB`
-vencido (el elemento no está visible). Tu causa probable de `maria7`: espera
-`#uploadFileInput` con `state:'attached'` (`pantalla_maria7.js:28`), pero ese
-input es HTML fijo (`templates/dashboard_v2.html:116`), así que
-`setInputFiles` puede llegar antes de que `init()` de `upload.js` le cuelgue
-el escuchador. **Decí si tus corridas sueltas usaron un servidor ya tibio.**
-Para `maria1c` no hay causa: **empezá por confirmarla.**
+Sola, con servidor y base nuevos y `CSRF_ENFORCE=true`, dos veces en
+`90b66c5e` y dos en `e0d2770f`: las cuatro verdes, 71 `OK`. En mi corredor
+sobre `907e1edb` había salido verde. No reproducido; causa sin diagnosticar.
+No registré qué más corría en la máquina a esa hora. El null sale de
+`apretarGenerar` (`pantalla_orden1.js:1372`, `document.getElementById(...)
+.click()` sin esperar), después de `listaParaGenerar` (`:1362`), que sí
+esperó el botón visible. Es un lugar donde mirar, no la causa.
 
-**Pedido:** que `maria7` y `maria1c` den lo mismo siempre, esperando una
-condición que la pantalla muestra, sin esperas fijas.
+**Pedido:**
+1. Que `orden1` dé lo mismo siempre, esperando una condición que la pantalla
+   muestra, sin esperas fijas.
+2. `TOPE` por defecto de `correr_pantallas.sh` a 900 (D212).
+3. `pantalla_maria1c.js` sin la ruta fija del navegador
+   (`/opt/pw-browsers/chromium-1194/…`): `chromium.launch()` como los demás
+   (D226; las otras tres son de MARIA).
 
-**Puertas (deterministas, no por cantidad de repeticiones):**
-- Para cada una, una forma repetible de que la pantalla de hoy dé la misma
-  `FALLA` que viste intermitente, y con tu arreglo, bajo esa misma condición,
-  verde. Las dos salidas, en el informe. (Sugerencia para `maria7`: demorar
-  `upload.js` con `page.route`.) Lo que fuerza la carrera es de la prueba: no
-  queda en la pantalla ni en el producto.
-- Una corrida verde del corredor no alcanza como prueba: la mía salió verde
-  sin arreglo.
-- Si la causa de cualquiera de las dos resulta de producto, la informás con
-  la salida y no la tocás.
-- `pantalla_sesion1.js` con `// corredor: servidor ENVIRONMENT=testing`, y
-  mostrás una vez que el servidor lo recibió (hoy `sesion1` da verde igual con
-  `development`, así que el verde solo no lo distingue).
-- El uvicorn huérfano: `kill -TERM` al PID del corredor a mitad de una
-  pantalla no deja uvicorn ni node vivos. Mostrás el antes (hoy queda uno) y
-  el después.
+**Puertas (deterministas, como en INTERMITENTES):**
+- Una forma repetible de que la pantalla de hoy dé esa misma `FALLA`, y con
+  tu arreglo, bajo la misma condición, verde. Las dos salidas, en el informe.
+  Lo que fuerza la carrera es de la prueba: no queda en la pantalla ni en el
+  producto.
+- Si la causa es de producto, la informás con la salida y no la tocás.
+- Tu corredor entero sobre tu SHA, con el resumen.
 - `chequeo-6` entero: producto +0/−0.
 
-Sin adversarios. No toques `maria3`, `maria4`, `maria5` ni `subitems1`.
+Sin adversarios. No toques `maria3`, `maria4`, `maria5`, `subitems1`,
+`catalogo_ncm1`, `excel1` ni `maria1b`. `pantalla_orden1.js` es tuya en esta
+pieza; MARIA la toca después (D225), cuando la tuya esté integrada.
 
 Lo de D182 / D206 sigue igual: si Emi dice que sí, dejás esto donde esté.
-D205, D206 y D208 siguen con Emi. **Próxima D: D211** (rango D210–D215).
+D205, D206 y D208 siguen con Emi. **Próxima D: D213** (rango D210–D215).
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 

@@ -188,6 +188,15 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `catalogo3_postgres.py`: `entorno()` devuelve el entorno entero; en los
   arneses vecinos devuelve sólo lo que pisa. Unificar el contrato (MARIA, D218).
 
+- `scripts/testing/pantalla_subitems1.js:23`: la función principal (181
+  líneas) se parte (MARIA, PANTALLAS-MARIA).
+- `scripts/testing/pantalla_maria4.js`: chequear las altas del armado y usar
+  CUIT válidos, el mismo en el cliente y en la operación (MARIA).
+- `static/v2/app_v2.js:921-932`: con un borrador guardado, si ella toca
+  «Nueva operación» y sube antes de que llegue el usuario, el arranque adopta
+  el borrador y hace `goTo` igual; una subida en vuelo se descarta. Leído, no
+  corrido (Técnica, D211).
+
 ## Riesgos que esperan a Emi (no son tareas: no se toman de esta cola)
 
 - `client_memory._norm_desc` pierde las ligaduras («Arandela ﬁna» queda
