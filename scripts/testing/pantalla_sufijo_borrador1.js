@@ -1,7 +1,8 @@
 // El sufijo de valor de la operación, después de recargar la página: la
 // operación se recupera con su sufijo y el campo tiene que mostrarlo, lo haya
-// guardado «Generar» (el servidor lo rechaza y devuelve a la validación) o se
-// haya escrito sin generar. Navegador local, servidor local. Datos inventados.
+// guardado «Generar» (el servidor lo rechaza y devuelve a la validación), se
+// haya escrito sin generar o se haya borrado. Navegador local, servidor
+// local. Datos inventados.
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_sufijo_borrador1.js
 const { chromium } = require('playwright');
@@ -15,8 +16,9 @@ const ITEM = { pieza: '39211390900F', descripcion: 'Lona de PVC gris', origen: '
                valor_unitario: 1.85, peso_unitario: 0.62 };
 // lo que se escribe, si se genera con eso, cómo se nombra el paso
 const SUFIJOS = [
-  ['ROJO', true, 'generado y devuelto a la validación'],
   ['AA(000123)-AB(000456)', false, 'escrito sin generar'],
+  ['ROJO', true, 'generado y devuelto a la validación'],
+  ['', false, 'borrado sin generar'],
 ];
 
 (async () => {

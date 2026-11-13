@@ -167,17 +167,22 @@ reemplazar $JS '                cuentasViejas();
 ' ''
 caso "boton_con_cuentas_viejas" "FAILED $T::test_al_escribir_un_ajuste_el_boton_se_esconde_hasta_que_vuelvan_las_cuentas"
 
+# 23b. el sufijo de la operación se escribe sin guardarse ni dejar viejas las cuentas
+reemplazar $JS "valorDeducir: 'ajustes_deducir',
+                         sbtSufijoValor: 'sbt_sufijo_valor' };" "valorDeducir: 'ajustes_deducir' };"
+caso "sufijo_sin_guardar" "{'sbtSufijoValor': ({}, False)} != {'sbtSufijoValor': ({'sbt_sufijo_valor': '500'}, True)}"
+
 # 24. el seguro sugerido de otra operación se usa
 reemplazar $JS '        if (!cuentasCon || cuentasCon !== ahora) {' '        if (false) {'
 caso "seguro_de_otra_operacion" "FAILED $T::test_el_seguro_sugerido_de_otra_operacion_no_se_usa"
 
 # 25. se pisa lo que la persona está escribiendo
 reemplazar $JS 'document.activeElement !== deducir' 'true'
-caso "pisa_lo_que_se_escribe" "FAILED $T::test_lo_que_se_esta_escribiendo_no_se_pisa"
+caso "pisa_lo_que_se_escribe" "{'valorDeducir': '99'} != {'valorDeducir': '12'}"
 
 # 25b. se pisa lo que se escribe en el campo de incluir
 reemplazar $JS 'document.activeElement !== incluir' 'true'
-caso "pisa_incluir" "FAILED $T::test_lo_que_se_esta_escribiendo_no_se_pisa"
+caso "pisa_incluir" "{'valorIncluir': '99'} != {'valorIncluir': '12'}"
 
 # 26. una respuesta vieja de los avisos pisa la nueva
 reemplazar $JS 'if (seq !== avisosSeq) return;' 'if (false) return;'
@@ -197,4 +202,4 @@ reemplazar $JS '        cuentasCon = firma || null;' '        cuentasCon = null;
 caso "sin_operacion_no_calcula" "FAILED $T::test_sin_operacion_todavia_el_boton_igual_pone_el_seguro"
 
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
-echo "OK: los 30 sabotajes dan rojo por la razón esperada"
+echo "OK: los 31 sabotajes dan rojo por la razón esperada"
