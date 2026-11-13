@@ -16,7 +16,7 @@ Veredicto: **aceptada e integrada**.
 | los que mandan un CUIT al perfil en `tests/`: `test_estudio1`, `test_estudio1b`, `test_generar_maria_txt`, `test_maria7_rechazos_24_10`, `test_punta_a_punta1` | `201 passed, 2 xfailed` |
 | `e2e_maria.sh` sobre `af396041` (carga `20111111112` por la API; `af396041` ya contiene mi rama `1de18f9d`) | `E2E MARIA OK`, rc=0 |
 | pantallas sobre `af396041`: `cuit_perfil1`, `validacion1`, `cobro_corte1`, `cobro_mp1_v2`, `sesion1`, `orden1` | todas OK. `orden1` dio primero rc=124: saltó mi tope de 300 s (el del repo es 900) con 31 OK de 71; el texto «FALLA» de z4 salió al cortarse. Con 300 s nunca terminaba (un caso solo tarda 200 s). Sola con 900 s y la suite al lado: rc=0, 71 OK, z4 incluido, ~10 min |
-| pytest entero sobre la unión `f1403811` (mi rama `1de18f9d` + `9ed8b9a9` + la Técnica `d9dd73bc`) | `6126 passed, 110 skipped, 3 xfailed`, rc=0, 19 min |
+| pytest entero sobre la unión `f1403811` (mi rama `1de18f9d` + `9ed8b9a9` + la Técnica `d9dd73bc`) | `6126 passed, 110 skipped, 3 xfailed`, rc=0, 19 min (con 1075 hilos extra quietos: ver el acta de FUGA-HILOS) |
 
 **Negativos de la PM** (archivo propio, fuera del repositorio, borrado):
 `PUT` con dígitos arábigos orientales, `{"a":1}`, `true` y `20999999998`:

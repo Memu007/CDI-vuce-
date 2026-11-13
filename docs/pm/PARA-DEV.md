@@ -3,6 +3,44 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## FUGA-HILOS: aceptada sobre `07e0b2b9` (informe `d9dd73bc`) e integrada (2026-11-13)
+
+Acta `REPRODUCCION-FUGA-HILOS-2026-11-13.md`. **Traé mi rama con `merge`.**
+Sin D. Igual a tu informe: `chequeo-6`, nada fuera de `tests/` y `docs/pm/`,
+un solo `new_event_loop` (la fixture), 0 athrow con el arreglo y 393 con
+`_sql` de `guardar1` devuelto. El pytest entero de la unión con MARIA:
+`6126 passed` (tus 6112 más sus 14), 0 athrow. Conté athrow, no hilos: así
+consta. Los tres caminos de `main.py` que señalaste van a la cola: se toma
+sólo la medición; el arreglo es dinero y queda como riesgo.
+
+## FUGA-HILOS-GUARDA, decidido por la PM: pieza siguiente, ahora (2026-11-13)
+
+Hoy nada se pone rojo si un ayudante de `tests/` vuelve a dejar el bucle o el
+generador de la sesión colgados: lo arreglado puede volver sin aviso.
+
+**Comportamiento pedido.** Si un test deja una conexión de aiosqlite viva o
+un generador de la sesión sin cerrar, la corrida termina en rojo y nombra al
+test (o al archivo) que la dejó. Por el efecto, no por el texto: un bucle
+armado de otra forma también tiene que verse.
+
+**Puertas.**
+1. Primero, quién deja los «Event loop is closed» que cambian de test en cada
+   corrida (`_connection_worker_thread`, la misma familia): la causa, con la
+   salida. Hasta tenerla, la guarda no los cuenta y el informe lo dice; si
+   los contara sin causa, saldría intermitente.
+2. Rojo con un ayudante que no sea `_sql` de `guardar1`, y con la fuga escrita
+   de otra forma que `new_event_loop().run_until_complete` (por ejemplo,
+   salir del `async for` sin cerrar el generador). Verde con el arreglo.
+3. No la disparan los hilos que viven todo el proceso: los 8 de los pools de
+   `main.py` y `file_security.py`, `MainThread` y el `_DummyThread`.
+4. `pytest` entero: mismos `passed` que tu base, y el tiempo antes y después.
+
+Fuera: el producto, `ci.yml` (hasta que te lo escriba acá) y los guiones de
+MARIA. Sin esperas fijas nuevas. Sin adversarios. Si Emi dice que sí a subir
+el tope de la CI de 20 a 30 min, te lo paso como pieza chica y va antes. D182
+/ D206: si Emi dice que sí, dejás esto donde esté. D205, D206 y D208 siguen
+con Emi. **Próxima D: D230** (rango D228–D233).
+
 ## EXCEL2D-RELOJ, vuelta 3: aceptada sobre `cc8c7b7d` (informe `c4b16b53`) e integrada (2026-11-13 12:21 UTC)
 
 Integro exactamente `d1ee0b71`. Acta `REPRODUCCION-EXCEL2D-RELOJ-2026-11-13.md`,
@@ -19,10 +57,6 @@ Integro exactamente `d1ee0b71`. Acta `REPRODUCCION-EXCEL2D-RELOJ-2026-11-13.md`,
 - Riesgo a la cola, no devolución: el veredicto de la foto de `/proc` cubre el
   salto entero; un hilo listo en esa foto esconde ese salto.
 
-**Sigue:** FUGA-HILOS (abajo), ahora. Si Emi dice que sí a subir el tope de
-la CI de 20 a 30 min, te lo paso como pieza chica y va antes; hasta que te lo
-escriba acá, no toques `ci.yml`.
-
 ## NAVEGADOR: aceptada sobre `740eac45` (informe `9059c696`) e integrada (2026-11-13 11:39 UTC)
 
 Integro `5c0faf45`. Acta `REPRODUCCION-NAVEGADOR-2026-11-13.md`. **Traé mi
@@ -31,31 +65,6 @@ rama con `merge`.** Sin D. Lo reproducido: `31 chromium.launch()`, ningún
 `sabotajes/cliente1.sh`, y `chequeo-6` igual al tuyo. Negativo mío: ninguna
 ruta `pw-browsers` ni `executablePath` fuera de `docs`. Saqué de la cola de
 limpieza la parte del navegador; las esperas fijas siguen ahí.
-
-## D229 (a), decidido por la PM: FUGA-HILOS, pieza siguiente (2026-11-13 11:39 UTC)
-
-Tu recomendación. Va después de EXCEL2D-RELOJ.
-
-**Comportamiento pedido.** Que los ayudantes de `tests/` que abren un bucle
-con `asyncio.new_event_loop().run_until_complete` no dejen hilos ni
-generadores colgados. Puertas:
-
-1. Al final de `pytest` entero, el censo de hilos (`threading.active_count()`
-   en `pytest_sessionfinish`, o el que uses) baja de ~1129. El informe trae el
-   número antes y después, y quién deja cada hilo que quede.
-2. `pytest` entero con los mismos `passed` que la base.
-3. Desaparecen de la salida los «Task was destroyed but it is pending» con
-   `async_generator_athrow`: la cuenta antes y después.
-4. Con un ayudante devuelto a como estaba, la cuenta de la puerta 1 sube.
-
-Fuera: el producto. Si encontrás el mismo patrón en `proyecto_maria/` (por
-ejemplo, el webhook de Mercado Pago en `main.py:11688`, que hace `return`
-dentro de `async for session in get_async_session()`), va al informe como
-riesgo, sin arreglarlo.
-
-Igual que antes: sin adversarios; no toques los guiones de MARIA. D182 / D206
-siguen igual: si Emi dice que sí, dejás esto donde esté. D205, D206 y D208
-siguen con Emi. **Próxima D: D230** (rango D228–D233).
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 
