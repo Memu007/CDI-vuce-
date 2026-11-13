@@ -3,6 +3,7 @@
 // y `<sin ruta>` se lee tal cual. Corre la plantilla real en Chromium con la
 // API respondida acá, sin servidor ni base. Sale con error si algo no se cumple.
 // uso: node scripts/testing/pantalla_panel_dev.js
+// corredor: sin servidor
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
