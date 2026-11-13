@@ -13,6 +13,7 @@
 #   SHA     por defecto HEAD
 #   salida  carpeta donde queda el log de cada pantalla (por defecto, una nueva)
 #   TOPE    segundos por pantalla (600)
+#   SOLO    nombres de las pantallas a correr, separados por espacio (todas)
 set -u
 SHA=$(git rev-parse --verify "${1:-HEAD}^{commit}") || exit 2
 SAL=${2:-$(mktemp -d -t pantallas.XXXX)}
@@ -24,8 +25,15 @@ CHROMIUM=${CHROMIUM:-/opt/pw-browsers/chromium}
 TOPE=${TOPE:-600}
 
 WT=$(mktemp -d -t pantallas-wt.XXXX)
-retirar() { git worktree remove --force "$WT" >/dev/null 2>&1; rmdir "$WT" 2>/dev/null; }
+# Un TERM o un Ctrl-C a mitad de una pantalla no deja vivos su node ni su uvicorn.
+hijo= api=
+retirar() {
+  [ -n "$hijo" ] && kill "$hijo" 2>/dev/null; [ -n "$api" ] && kill "$api" 2>/dev/null; wait
+  git worktree remove --force "$WT" >/dev/null 2>&1; rmdir "$WT" 2>/dev/null
+}
 trap retirar EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 git worktree add --detach "$WT" "$SHA" >/dev/null 2>&1 || { echo "no pude armar el worktree de $SHA"; exit 2; }
 
 # Una línea por pedido de la cabecera que empieza con $2, sin el prefijo.
@@ -42,12 +50,19 @@ esperar_salud() {
   done
 }
 
+# Corre la pantalla en segundo plano: así bash atiende un TERM sin esperar a que termine.
+correr_nodo() {  # $1 = log; el resto, variables y argumentos de node
+  local log=$1; shift
+  (cd "$WT" && exec env PY="$PY" CHROMIUM="$CHROMIUM" "$@") >"$log" 2>&1 &
+  hijo=$!; wait "$hijo"; RC=$?; hijo=
+}
+
 correr_una() {  # $1 = nombre; deja rc en RC y el log en $SAL/$1.log
-  local js=scripts/testing/pantalla_$1.js d log=$SAL/$1.log extra args api puerto
+  local js=scripts/testing/pantalla_$1.js d log=$SAL/$1.log extra args puerto
   d=$(mktemp -d -p "$SAL" "$1.XXXX")
   args=$(cabecera "$WT/$js" argumentos)
   if cabecera "$WT/$js" 'sin servidor' | grep -q '^'; then
-    (cd "$WT" && PY=$PY CHROMIUM=$CHROMIUM timeout "$TOPE" node "$js" $args) >"$log" 2>&1; RC=$?
+    correr_nodo "$log" timeout "$TOPE" node "$js" $args
     return
   fi
   extra=$(cabecera "$WT/$js" servidor)
@@ -55,7 +70,7 @@ correr_una() {  # $1 = nombre; deja rc en RC y el log en $SAL/$1.log
     [[ $v =~ ^[A-Z_][A-Z0-9_]*=[^[:space:]]*$ ]] || { echo "FALLA: cabecera: «$v» no es VAR=valor" >"$log"; RC=2; return; }
   done
   puerto=$(puerto_libre)
-  (cd "$WT" && env ENVIRONMENT=development JWT_SECRET_KEY=clave-inventada-solo-local-0123456789abcdef \
+  (cd "$WT" && exec env ENVIRONMENT=development JWT_SECRET_KEY=clave-inventada-solo-local-0123456789abcdef \
     EMAIL_VERIFICATION_REQUIRED=false GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
     DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x \
     ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x \
@@ -63,18 +78,18 @@ correr_una() {  # $1 = nombre; deja rc en RC y el log en $SAL/$1.log
     "$PY" -m uvicorn proyecto_maria.main:app --host 127.0.0.1 --port "$puerto") >"$d/api.log" 2>&1 &
   api=$!
   if esperar_salud "$puerto" "$api"; then
-    (cd "$WT" && BASE_URL=http://127.0.0.1:$puerto CDI_DB=$d/local.db PY=$PY CHROMIUM=$CHROMIUM \
-      timeout "$TOPE" node "$js" $args) >"$log" 2>&1; RC=$?
+    correr_nodo "$log" BASE_URL="http://127.0.0.1:$puerto" CDI_DB="$d/local.db" timeout "$TOPE" node "$js" $args
   else
     { echo "FALLA: el servidor no contestó /health"; tail -5 "$d/api.log"; } >"$log"; RC=2
   fi
-  kill "$api" 2>/dev/null; wait "$api" 2>/dev/null
+  kill "$api" 2>/dev/null; wait "$api" 2>/dev/null; api=
 }
 
 echo "pantallas sobre $SHA; logs en $SAL"
 verdes=0; rojas=()
 for f in "$WT"/scripts/testing/pantalla_*.js; do
   n=$(basename "$f" .js); n=${n#pantalla_}
+  [ -n "${SOLO:-}" ] && [[ " $SOLO " != *" $n "* ]] && continue
   correr_una "$n"
   ultima=$(sed -E 's/\x1b\[[0-9;]*m//g' "$SAL/$n.log" | grep -v '^[[:space:]]*$' | tail -1)
   if [ "$RC" -eq 0 ]; then estado=verde; verdes=$((verdes + 1)); else estado=ROJA; rojas+=("$n"); fi

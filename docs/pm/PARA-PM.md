@@ -2,165 +2,146 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CORREDOR-PANTALLAS: un comando corre todas las pantallas sobre un SHA
+## INTERMITENTES: maria1c y maria7 dan lo mismo siempre
 
 | | SHA |
 |---|---|
-| Base | `67c8ff0d` |
-| Arnés | `868c0355` (corredor + cabeceras), `bfde5a5a` (cabecera CSRF de csrf2, csrf3 y orden1), `907e1edb63028953e3dfc0756d9ad3433720f89b` (sin colores en la última línea) |
-| Informe | el commit `docs:` que trae este archivo |
+| base | `90b66c5e33cc36b8d563636554b7ca13983696c3` |
+| arnés: las pantallas esperan la primera pantalla del tablero | `aa002538847b99f82819ad5819e63868d695f4d9` |
+| arnés: `forzar_arranque.js` carga el mismo playwright | `2d76e41963ade79fc96b547811e581959082c17b` |
+| informe | el commit `docs:` que trae este archivo |
 
-**Resultado:** `scripts/testing/correr_pantallas.sh [SHA] [carpeta]` corre las 30 `pantalla_*.js` sobre el SHA, cada una con su uvicorn y su sqlite nuevos, esperando `/health` (sin esperas fijas). Sobre 907e1ed: **26 verdes, 4 rojas** (`maria3 maria4 maria5 subitems1`, las de MARIA). Producto +0/−0.
-
-Una puerta no se cumple al pie de la letra: con el sabotaje, el resumen contó **dos** rojas más, no una. Una es la del sabotaje (`borrador1`). La otra es `maria7`, que es intermitente en el corredor (ver «Intermitentes»). Por nombre, el sabotaje hace exactamente lo pedido.
+**Resultado.** La causa de los dos intermitentes es una sola: la subida le gana al arranque del tablero. Con la carrera forzada por la prueba, la pantalla de hoy da las dos FALLAS de siempre y, con el arreglo, las dos dan verde. Producto +0/−0. El arreglo es una espera a una condición que la pantalla muestra (`[data-screen="upload"].is-active`), sin espera fija.
 
 ## Decisiones
 
-**D210. `maria7` y `maria1c` son intermitentes: ¿quién las mira?**
-- (a) **La Dev MARIA** (recomendada): son pantallas suyas y la causa probable de `maria7` está en el guion (abajo); yo no las toco.
-- (b) Yo, en una pieza aparte, cuando MARIA termine con maria3/4/5 y subitems1.
-- Mientras tanto, el resumen del corredor puede contar una o dos rojas de más por ellas: se comparan por nombre.
+**D211. Defecto de producto: una subida anterior a la primera pantalla del tablero se pierde o no prende el semáforo.**
+`app_v2.js` (alrededor de la línea 958) espera `/auth/current_user` o 4 s y recién ahí hace `goTo('upload')` si no hay pantalla activa. Si la usuaria sube antes:
+- si la subida ya terminó (maria1c): fue a revisión sin `currentScreen`, `goTo` no dispara `cdi:screen-leave`, el semáforo no se muestra (`#semaforoFAB hidden data-kind=empty`);
+- si la subida sigue en vuelo (maria7): `goTo('upload')` llama a `onEnter`, que hace `++uploadTicket` (`upload.js:706`) y la respuesta se descarta.
+Le pasa a una usuaria real con la red lenta. No lo toqué: la tarea es sólo arnés.
+- (a) Pieza de producto: que el `goTo` inicial no pise una pantalla ya activa ni una subida en curso. Es `app_v2.js` y `upload.js`, que hoy toca Dev MARIA.
+- (b) Dejarlo: el arnés ya no depende de eso.
+Recomiendo (a), para quien tenga abierto `upload.js`; `forzar_arranque.js` ya es su reproducción; que el arreglo de producto haga verde las pantallas de la base bajo la carrera forzada no lo probé.
 
-Supuestos reversibles: el corredor también recibe `CDI_DB`, `PY` y `CHROMIUM` en cada pantalla (algunas los usan), y saca los escapes de color de la última línea (commit aparte, 907e1ed).
+**D212. `orden1` tarda 581 s contra un tope de 600 por pantalla.**
+En la corrida completa la corté yo con `TOPE=300` (rc=124 después de su último OK). Sola, con el tope por defecto, dio verde en 581 s: 20 s de margen. En una máquina más cargada se va a cortar.
+- (a) Subir el `TOPE` por defecto de `correr_pantallas.sh` a 900.
+- (b) Dejarlo.
+Recomiendo (a): una línea del arnés, y un tope sigue existiendo.
 
-## Cabecera
+## Respuestas a lo que pediste
 
-Debajo de `// uso:`, la pantalla dice lo que necesita; el corredor lee sólo el bloque `//` de arriba:
+- **¿Tus corridas sueltas usaron un servidor ya tibio?** Sí. Las corridas sueltas de antes iban contra un uvicorn ya levantado y tibio, donde `/auth/current_user` contesta enseguida y la carrera casi no se da. El corredor levanta un servidor nuevo por pantalla; ahí la primera consulta tarda y la subida le gana.
+- **maria1c, confirmada.** Con la consulta de sesión retenida hasta que la subida terminó, da la misma FALLA que la intermitente (abajo).
+- **Tu hipótesis del escuchador de `upload.js`:** no es. El input es HTML fijo (`dashboard_v2.html:116`), los scripts van con `defer` (`app_v2.js` en la línea 1741, `upload.js` en la 1751) y `upload.js` hace `init()` en `DOMContentLoaded` y otra vez en `onEnter` si hace falta (`upload.js:710`). El escuchador está; lo que falla es lo de D211.
 
+## Forma repetible
+
+`scripts/testing/forzar_arranque.js` se carga antes de la pantalla con `NODE_OPTIONS`. Retiene `/auth/current_user` y lo suelta:
+- `maria1c` (modo `terminada`): cuando la página ya pasó a revisión;
+- `maria7` (modo `en_vuelo`): cuando sale la subida, y la subida contesta recién cuando el tablero eligió su primera pantalla.
+No toca la pantalla ni el producto. Cada log dice `forzar_arranque: <modo>`.
+
+Sobre la pantalla de hoy (90b66c5e):
 ```
-// corredor: servidor CSRF_ENFORCE=true          csrf1, csrf2, csrf3, orden1
-// corredor: argumentos tests/test_facturas.xlsx  excel1, maria1b
-// corredor: argumentos tests/test_factura.pdf    maria1c
-// corredor: sin servidor                         panel_dev
+ROJA  maria1c        rc=1   <S>/forz-hoy3/maria1c.log |        - waiting 500ms
+ROJA  maria7         rc=1   <S>/forz-hoy3/maria7.log | FALLA: la pregunta por la fecha no aparece al subir
+resumen: 0 verdes, 2 rojas: maria1c maria7
 ```
-
-Cada `VAR=valor` de `servidor` se valida; si no tiene esa forma, la pantalla da `FALLA: cabecera` con rc=2. `maria3`, `maria4`, `maria5` y `subitems1` **no necesitan cabecera**: sólo piden `BASE_URL`. No las toqué.
-
-**Hallazgo propio, ya arreglado:** en 868c0355 sólo `csrf1` tenía la cabecera CSRF, y `csrf2` y `csrf3` dieron verde **sin el control que prueban**. Sus guiones (`sabotajes/_csrf_comun.sh`, `orden1.sh`, `orden1b.sh`) levantan con `CSRF_ENFORCE=true`; bfde5a5 se lo agrega a `csrf2`, `csrf3` y `orden1`.
-
-**Diferencia conocida:** `sabotajes/sesion1.sh` levanta con `ENVIRONMENT=testing` y el corredor con `development`. `main.py:109` cambia `IS_TESTING` con eso. `sesion1` da verde igual. No lo agregué a la cabecera porque no hacía falta para correr; si lo querés idéntico al guion, es una línea.
-
-## Pantallas que hoy no corre ningún guion (medido por llamada)
-
-Son 11: `catalogo_ncm1`, `despacho1b`, `excel1`, `maria1b`, `maria1c`, `maria3`, `maria4`, `maria5`, `maria7`, `subitems1`, `sufijos1`.
-
-```bash
-for f in scripts/testing/pantalla_*.js; do n=$(basename $f .js); grep -rhE "$n\.js" scripts --include='*.sh' --include='*.py' --exclude=correr_pantallas.sh | grep -qvE '^[[:space:]]*#' || echo ${n#pantalla_}; done
-#   → catalogo_ncm1 despacho1b excel1 maria1b maria1c maria3 maria4 maria5 maria7 subitems1 sufijos1
+En `maria1c.log`:
 ```
-
-Cuenta una línea de un `.sh` o `.py` que no sea comentario. `maria1c`, `maria4`, `maria7`, `subitems1` y `sufijos1` aparecen sólo en comentarios de su `sabotaje_*.sh`; `maria5` no aparece en ninguno.
-
-## Puertas
-
-| Puerta | Resultado |
-|---|---|
-| Lista medida de pantallas sin guion | 11, arriba |
-| Línea del corredor = pantalla sola, sobre el mismo SHA | Coinciden la roja `maria3` y las verdes `csrf2` (con `CSRF_ENFORCE=true`) y `borrador1`. Las solas corrieron sobre bfde5a5; entre bfde5a5 y 907e1ed sólo cambia una línea de `correr_pantallas.sh` (`git diff --stat`: 1 file, 1+/1−), ninguna pantalla |
-| Sabotaje: verde → roja, una roja más | `borrador1` pasa a ROJA. El resumen va de 4 a 6 rojas, porque `maria7` también dio roja (intermitente). **No se cumple al pie de la letra** |
-| chequeo-6 | producto +0/−0, avisos: 0 |
-
-### Corrida sobre 907e1ed (salida exacta, sin la ruta de los logs)
-
+FALLA: locator.click: Timeout 30000ms exceeded.
+  - locator resolved to <div hidden="" tabindex="0" role="button" id="semaforoFAB" data-kind="empty" class="semaforo-fab" aria-label="Estado de validacion">…</div>
 ```
-pantallas sobre 907e1edb63028953e3dfc0756d9ad3433720f89b;
-verde borrador1      rc=0   borrador1.log | ok: el arranque no saca de Clientes y recupera si no fue a ninguna pantalla
-verde catalogo_ncm1  rc=0   catalogo_ncm1.log | OK: pantalla CATALOGO-NCM-1
-verde cliente1       rc=0   cliente1.log | PANTALLA CLIENTE-1 OK (con CLIENTE-1b y 1c)
-verde cobro_corte1   rc=0   cobro_corte1.log | pantalla COBRO-CORTE-1: OK
-verde cobro_mp1      rc=0   cobro_mp1.log | pantalla COBRO-MP-1: OK
-verde cobro_mp1_v2   rc=0   cobro_mp1_v2.log | OK | generación rechazada: generar /generate_maria
-verde csrf1          rc=0   csrf1.log | OK: CSRF-1 en el navegador
-verde csrf2          rc=0   csrf2.log | OK: CSRF-2 en el navegador
-verde csrf3          rc=0   csrf3.log | OK: CSRF-3 en el navegador
-verde despacho1a     rc=0   despacho1a.log | OK 390 px: «catalogo_cliente_inventado_d1a_390.xlsx» trae ["CABALLO INVENTADO","=1+1 NOTEBOOK INVENTADA
-verde despacho1b     rc=0   despacho1b.log | OK 390 px: 3 renglones, faltante marcado [["cxDesp2_kilo_neto",""]], nada guardado antes ni con error, gu
-verde destino1       rc=0   destino1.log | OK: pantalla DESTINO-1
-verde estudio1       rc=0   estudio1.log | PANTALLA ESTUDIO-1 OK
-verde estudio1b      rc=0   estudio1b.log | PANTALLA ESTUDIO-1b OK
-verde excel1         rc=0   excel1.log | OK: pantalla EXCEL-1
-verde maria1b        rc=0   maria1b.log | OK: pantalla MARIA-1b
-verde maria1c        rc=0   maria1c.log | OK: pantalla MARIA-1c
-ROJA  maria3         rc=1   maria3.log | Node.js v22.22.0
-ROJA  maria4         rc=1   maria4.log |        - waiting 500ms
-ROJA  maria5         rc=1   maria5.log | FALLA: no se generó el TXT: {"detail":"Falta el CUIT del despachante (CDDTAGR): elegí el estudio en la oper
-verde maria7         rc=0   maria7.log | PANTALLA MARIA-7 OK
-verde maria9         rc=0   maria9.log | PANTALLA MARIA-9 OK
-verde orden1         rc=0   orden1.log | OK: ORDEN-1 en el navegador
-verde org1b          rc=0   org1b.log | OK ORG-1b
-verde panel_dev      rc=0   panel_dev.log | fallas: 0
-verde separadores1   rc=0   separadores1.log | PANTALLA SEPARADORES-1 OK
-verde sesion1        rc=0   sesion1.log | OK: el perfil pide la contraseña sólo al cambiar el email y no saca a nadie al login
-ROJA  subitems1      rc=1   subitems1.log | FALLA: no se generó el TXT: {"detail":"Falta el CUIT del despachante (CDDTAGR): elegí el estudio en la o
-verde sufijos1       rc=0   sufijos1.log | PANTALLA SUFIJOS-1 OK
-verde validacion1    rc=0   validacion1.log | pantalla VALIDACION-1: OK
-resumen: 26 verdes, 4 rojas: maria3 maria4 maria5 subitems1
-rc=1
+Con el arreglo (2d76e419), bajo la misma condición:
+```
+verde maria1c        rc=0   <S>/forz-arreglo3/maria1c.log | OK: pantalla MARIA-1c
+verde maria7         rc=0   <S>/forz-arreglo3/maria7.log | PANTALLA MARIA-7 OK
+resumen: 2 verdes, 0 rojas
+```
+Corrí cada lado tres veces (`forz-hoy`, `forz-hoy2`, `forz-hoy3`; `forz-arreglo`, `forz-arreglo2`, `forz-arreglo3`): las tres rojas y las tres verdes, iguales. Muestro la tercera.
+
+## sesion1
+
+`pantalla_sesion1.js` lleva `// corredor: servidor ENVIRONMENT=testing`. Corrida sin forzar sobre aa002538 (maria1c, maria7 y sesion1: `3 verdes, 0 rojas`), con una vigía que lee el entorno de cada uvicorn:
+```
+uvicorn pid=1537 ENVIRONMENT=development CDI_DATA_DIR=maria1c.Ok7o
+uvicorn pid=1786 ENVIRONMENT=development CDI_DATA_DIR=maria7.r90f
+uvicorn pid=2011 ENVIRONMENT=testing CDI_DATA_DIR=sesion1.MOAJ
+```
+sesion1: «OK: el perfil pide la contraseña sólo al cambiar el email y no saca a nadie al login».
+
+## Huérfano
+
+**Corrijo el informe anterior.** Decía que el corredor «lo retira al salir (también si se corta con Ctrl-C, por el `trap`)». Era falso para un TERM: bash no atiende el trap mientras espera a un hijo en primer plano, y quedaban el uvicorn y el worktree. Ahora el hijo va en segundo plano con `wait` (y `exec`, para que `$!` sea el proceso real), y el trap mata la pantalla y el uvicorn.
+
+TERM a mitad de `borrador1`, corredor de la base:
+```
+antes:   2346 2325 python … -m uvicorn proyecto_maria.main:app --host 127.0.0.1 --port 60493
+         2422 2421 node node scripts/testing/pantalla_borrador1.js
+rc del corredor: 143
+2 s después: 2346 1 python … uvicorn …        (huérfano, ppid 1; también quedó el worktree)
+```
+Mismo TERM, corredor nuevo:
+```
+antes:   2602 2581 python … uvicorn …
+         2675 2674 node … pantalla_borrador1.js
+rc del corredor: 143
+2 s después: (nada vivo)
+worktrees del corredor: 0
 ```
 
-La última línea de `maria3` es `Node.js v22.22.0` porque tira un throw sin capturar (`page.waitForResponse: Timeout 15000ms exceeded`); el detalle está en su log. El corredor muestra la última línea, como pide la tarea.
-
-### Solas sobre bfde5a5 (un uvicorn a mano con el mismo entorno, `/health`, la pantalla)
+## Corrida completa (30 pantallas, aa002538, `TOPE=300`)
 
 ```
-sola maria3 rc=1 | Node.js v22.22.0
-sola csrf2 rc=0 | OK: CSRF-2 en el navegador
-sola borrador1 rc=0 | ok: el arranque no saca de Clientes y recupera si no fue a ninguna pantalla
+ROJA  maria3         rc=1   … | Node.js v22.22.0
+ROJA  maria4         rc=1   … |        - waiting 500ms
+ROJA  maria5         rc=1   … | FALLA: no se generó el TXT: {"detail":"Falta el CUIT del despachante (CDDTAGR)…
+ROJA  orden1         rc=124 … | FALLA: page.waitForFunction: Target page, context or browser has been closed
+ROJA  subitems1      rc=1   … | FALLA: no se generó el TXT: {"detail":"Falta el CUIT del despachante (CDDTAGR)…
+resumen: 25 verdes, 5 rojas: maria3 maria4 maria5 orden1 subitems1
 ```
+- maria3, maria4, maria5 y subitems1: las conocidas de MARIA, que la tarea dice no tocar.
+- orden1: la corté yo con el tope (D212). Sola sobre 2d76e419, con el tope por defecto: `verde orden1 rc=0 | OK: ORDEN-1 en el navegador`, `rc=0 segundos=581`.
+- aa002538 y 2d76e419 se diferencian sólo en `forzar_arranque.js`, que sin `NODE_OPTIONS` no se carga.
 
-### Sabotaje
-
-Era un commit local, f650d24, en un worktree descartable que ya retiré. Cambia una línea de `pantalla_borrador1.js`: `if (pantalla !== caso.pantalla) mala(` pasa a `===`. La corrida completa del corredor sobre f650d24 dio (líneas relevantes):
-
-```
-ROJA  borrador1      rc=1   borrador1.log | FALLA: el tour la lleva a la carga: el arranque tenía que dejarla en review y la llevó a review
-ROJA  maria7         rc=1   maria7.log | FALLA: la pregunta por la fecha no aparece al subir
-resumen: 24 verdes, 6 rojas: borrador1 maria3 maria4 maria5 maria7 subitems1
-rc=1
-```
-
-Sin el sabotaje, sobre 907e1ed: `borrador1` verde, `maria7` verde, «26 verdes, 4 rojas».
-
-## Intermitentes (no son de esta pieza; no tapo nada repitiendo)
-
-| Pantalla | En el corredor | Sola |
-|---|---|---|
-| `maria7` | roja en bfde5a5 y f650d24, verde en 868c0355 y 907e1ed (2 de 4) | 5 de 5 verdes |
-| `maria1c` | roja en bfde5a5, verde en 868c0355, 907e1ed y f650d24 (1 de 4) | 5 de 6 verdes |
-
-- `maria7`: «la pregunta por la fecha no aparece al subir». Causa probable, **no verificada**: el guion espera `#uploadFileInput` con `state: 'attached'`. Ese input está en el HTML estático (`dashboard_v2.html:116`), así que la espera se cumple antes de que `upload.js` `init()` enganche el listener. Si `setInputFiles` llega antes, la subida no ocurre.
-- `maria1c`: `locator.click: Timeout 30000ms` sobre `#semaforoFAB`, que existe con `hidden`. No lo diagnostiqué más.
-
-## Para copiar
-
-```bash
-PY=<python del proyecto> scripts/testing/correr_pantallas.sh 907e1edb63028953e3dfc0756d9ad3433720f89b
-#   → 30 líneas y «resumen: 26 verdes, 4 rojas: maria3 maria4 maria5 subitems1» (±maria7/maria1c), rc=1; tarda unos 15 min (medido: 01:31→01:45)
-python docs/pm/herramientas/chequeo-6.py 67c8ff0d 907e1edb63028953e3dfc0756d9ad3433720f89b
-#   → producto +0/−0, avisos: 0
-```
-
-chequeo-6, salida entera:
+## chequeo-6
 
 ```
-chequeo-6 67c8ff0d..907e1edb63028953e3dfc0756d9ad3433720f89b: avisos para mirar, no un veredicto
+chequeo-6 90b66c5e33cc36b8d563636554b7ca13983696c3..2d76e41963ade79fc96b547811e581959082c17b: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +92/−0
+arnés +75/−9
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
 ```
 
+## Comandos
+
+```bash
+# 1. La carrera forzada sobre la base: tiene que dar 0 verdes, 2 rojas: maria1c maria7
+NODE_OPTIONS="--require $PWD/scripts/testing/forzar_arranque.js" SOLO="maria1c maria7" \
+  scripts/testing/correr_pantallas.sh 90b66c5e33cc36b8d563636554b7ca13983696c3 /tmp/forz-base
+# 2. La misma sobre la entrega: tiene que dar 2 verdes, 0 rojas, y cada log, «forzar_arranque: terminada» o «en_vuelo»
+NODE_OPTIONS="--require $PWD/scripts/testing/forzar_arranque.js" SOLO="maria1c maria7" \
+  scripts/testing/correr_pantallas.sh 2d76e41963ade79fc96b547811e581959082c17b /tmp/forz-entrega
+# 3. Huérfano: cortá con TERM a mitad de una pantalla; después, ps no muestra uvicorn ni node de la pantalla
+SOLO=borrador1 scripts/testing/correr_pantallas.sh HEAD /tmp/huerfano & sleep 60; kill -TERM $!; sleep 2; ps -eo pid,ppid,args | grep -E 'uvicorn|pantalla_' | grep -v grep
+```
+Ojo: el corredor toma desde el SHA las pantallas y `forzar_arranque.js` se carga desde tu árbol; en el 1 tiene que ser un árbol con 2d76e419.
+
 ## No corrido
 
-- La suite pytest: no hay cambios de producto.
-- Subagentes adversariales y `/code-review`: no, porque la tarea dice «sin adversarios».
-- La pantalla sola sobre 907e1ed: las solas son de bfde5a5, con las pantallas idénticas.
-- Una segunda corrida del sabotaje para tener «una roja más» limpia: no la hice para no buscar el verde repitiendo. Si la querés, es el mismo comando sobre un SHA saboteado.
+- **Ctrl-C (SIGINT):** no lo pude probar. Un bash no interactivo en segundo plano ignora SIGINT, así que mandarle INT no reproduce un Ctrl-C de una terminal. El trap `INT` está, sin prueba.
+- **pytest:** no aplica; la pieza es sólo arnés (producto +0/−0).
+- **Subagentes adversariales y `/code-review`:** la tarea dice «sin adversarios»; no los corrí.
 
-## Riesgos
+## Supuestos y riesgos
 
-- Con `TOPE` en 600 s por pantalla, la corrida completa tardó unos 15 min (medido: 01:31→01:45, 30 pantallas).
-- El corredor usa `git worktree add` en el repo desde donde se lo llama, y lo retira al salir (también si se corta con Ctrl-C, por el `trap`).
+- `SOLO` (elegir pantallas en el corredor) es nuevo: lo necesité para correr sólo maria1c y maria7. Se puede sacar.
+- La vigía del entorno y el script del TERM son míos, en el scratchpad, no en el repo.
+- `forzar_arranque.js` envuelve `chromium.launch`, `newContext` y `newPage`: si una pantalla abre el navegador de otra forma, no fuerza nada; el log lo muestra porque falta la línea del modo.
+- Archivos de producto tocados: ninguno.
 
-/compact conservar: Dev 1 técnica, rama claude/dev-tecnica; entregué CORREDOR-PANTALLAS (907e1ed + informe); D210 (intermitentes maria7/maria1c, recomiendo Dev MARIA); tests/test_conexiones1.py sin seguimiento (su copia está en el parche); espero veredicto.
+/compact conservar: Dev 1 técnica, rama claude/dev-tecnica; entregué INTERMITENTES (aa002538, 2d76e419 + informe); D211 (defecto de producto del arranque, recomiendo pieza para quien tenga upload.js) y D212 (TOPE 900, recomiendo); tests/test_conexiones1.py sin seguimiento (su copia está en el parche); espero veredicto.

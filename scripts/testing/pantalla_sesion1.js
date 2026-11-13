@@ -8,6 +8,7 @@
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_sesion1.js
 // (servidor local con EMAIL_VERIFICATION_REQUIRED=false)
+// corredor: servidor ENVIRONMENT=testing
 const { chromium } = require('playwright');
 const registrarCuenta = require('./_registrar');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }

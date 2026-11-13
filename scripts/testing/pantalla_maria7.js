@@ -25,7 +25,8 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
     operacion: { numero_factura: 'INV-2026/0457', fecha_emision: '' },
     items: [{ descripcion: 'Lona de PVC gris', cantidad: 750, valor_unitario: 1.85, peso_unitario: 0.62, origen: 'CN', pieza: '' }] }) }));
   await page.goto(base + '/dashboard');
-  await page.waitForSelector('#uploadFileInput', { state: 'attached' });
+  // Una subida anterior a la primera pantalla del tablero se descarta o no prende el semáforo.
+  await page.waitForSelector('[data-screen="upload"].is-active', { state: 'attached' });
   await page.setInputFiles('#uploadFileInput', { name: 'factura.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF\n') });
   const aviso = page.locator('#toastHost .toast', { hasText: PREGUNTA });
   await aviso.waitFor({ timeout: 10000 }).catch(() => falla('la pregunta por la fecha no aparece al subir'));
