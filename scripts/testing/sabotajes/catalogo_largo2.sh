@@ -257,13 +257,17 @@ if [ -n "$PG_URL" ]; then
       "FALLA | 2000 caracteres CJK por catálogo" "FALLA | 2000 caracteres CJK por guardar-uso" \
       "FALLA | 2000 caracteres CJK por cambiar la descripción"
   fi
-  # operation_items sólo lo mira catalogo3_postgres.py
+  # operation_items y el candado de las claves sólo los mira catalogo3_postgres.py
   CORRE=("${PRUEBA_PG_ITEMS[@]}")
   if base_en_verde "catalogo3_postgres.py"; then
     sabotaje $M "el arranque no pasa el origen de los ítems a text" \
       '                            ("operation_items", ("origen",))):' \
       '                            ):' \
       "FALLA | operation_items.origen pasa a text y la fila vieja queda igual"
+    sabotaje $M "dos workers migran las claves sin esperarse" \
+      '                await conn.exec_driver_sql("SELECT pg_advisory_xact_lock(7302551)")' \
+      '                pass' \
+      "FALLA | dos workers esperan juntos la migración y arrancan los dos: juntos False"
   fi
 else
   echo "SALTO | sin PG_URL: la migración no se midió"

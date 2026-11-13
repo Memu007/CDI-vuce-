@@ -10,7 +10,7 @@ const registrarCuenta = require('./_registrar');
 const AVISO = '2 fila(s) del Excel no se pudieron leer (filas 7, 9)';
 function falla(msg) { console.error('FALLA: ' + msg); process.exit(1); }
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const b = await chromium.launch();
   const page = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();

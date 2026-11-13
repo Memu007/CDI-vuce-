@@ -3,7 +3,8 @@
 # tests/test_catalogo3.py (o el caso nombrado de despacho1b/1c) tiene que
 # ponerse rojo por ese motivo. Necesita node. El recorte del origen al guardar
 # y el candado de la migración sólo se ven en Postgres:
-# scripts/testing/catalogo3_postgres.py.
+# scripts/testing/catalogo3_postgres.py; los sabotajes que corren ese arnés
+# están en catalogo_largo2.sh.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/catalogo3.sh [SHA]
 # Trabaja en un worktree descartable: no toca tu copia ni datos compartidos.
@@ -81,6 +82,14 @@ sabotaje $C "dos proveedores largos vuelven a compartir los 60 primeros" \
   'return clave[:39] + "~" + hashlib.sha256(clave.encode("utf-8")).hexdigest()[:20]' \
   'return clave[:60]' \
   "FAILED $T::test_dos_proveedores_distintos_no_comparten_catalogo[prefijo-60]"
+sabotaje $C "una clave de proveedor de 60 se corta" \
+  '    if len(clave) <= _MAX_VENDOR_ID:' \
+  '    if len(clave) < _MAX_VENDOR_ID:' \
+  "FAILED $T::test_un_proveedor_latino_conserva_su_id[60-entra]"
+sabotaje $C "una clave de proveedor de 61 se guarda entera" \
+  '_MAX_VENDOR_ID = 60' \
+  '_MAX_VENDOR_ID = 70' \
+  "FAILED $T::test_un_proveedor_latino_conserva_su_id[61-se-corta]"
 # D77: producto
 sabotaje $C "«º», «ª» y «µ» vuelven a cambiar el id del proveedor latino" \
   'c > "\u024f" and ' \

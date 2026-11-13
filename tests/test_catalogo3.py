@@ -78,6 +78,9 @@ def test_dos_proveedores_distintos_no_comparten_catalogo(client, a, b):
     # no entra en 60: corte y resumen
     ("Sudamericana de Importaciones y Distribuciones Generales del Litoral SA",
      "sudamericana_de_importaciones_y_distrib~b74fb800ad974e4778d7"),
+    # el tope se mide en la clave, no en el nombre: una de 60 entra entera, una de 61 ya no
+    pytest.param("x" * 30 + ", " + "x" * 29, "x" * 30 + "_" + "x" * 29, id="60-entra"),
+    pytest.param("x" * 61, "x" * 39 + "~c508e75f24e25db94dff", id="61-se-corta"),
 ])
 def test_un_proveedor_latino_conserva_su_id(nombre, vid):
     assert catalog_service._vendor_key(nombre) == vid
