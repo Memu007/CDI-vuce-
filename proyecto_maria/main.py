@@ -4738,10 +4738,8 @@ async def _estudio_elegido(db: AsyncSession, estudio_id, username: str):
 
 
 def _cuit_del_despachante(estudio, cuit_agr: str, user) -> tuple[str, bool]:
-    """El CUIT que va al CDDTAGR, sin guiones ni espacios, y si es el del
-    perfil. Manda el estudio elegido; sin estudio, `cuit_agr` y, si no viene,
-    el del perfil (la pantalla lo manda en `cuit_agr`). Uno que no es un CUIT
-    frena con 400 y dice dónde se corrige."""
+    """El CUIT que va al CDDTAGR, sin guiones ni espacios, y si es el del perfil: manda el estudio
+    elegido, después `cuit_agr` (la pantalla manda ahí el del perfil) y después el perfil."""
     from proyecto_maria.core.controles_maria import cuit_valido
 
     del_perfil = "".join(str((user or {}).get("cuit") or "").replace("-", "").split())
