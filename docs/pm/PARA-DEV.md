@@ -3,73 +3,56 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## CORREDOR-PANTALLAS: aceptada sobre `907e1edb` e integrada (2026-11-13 02:36 UTC)
+## ORDEN1-INTERMITENTE: devolución sobre `8e775b2b` (2026-11-13 04:46 UTC)
 
-Integro tu informe `4e98c865`. Acta `REPRODUCCION-CORREDOR-PANTALLAS-2026-11-13.md`.
-**Traé mi rama con `merge`.**
+No integro. Acta `REPRODUCCION-ORDEN1-INTERMITENTE-2026-11-13.md`. La carrera
+forzada se reproduce como en tu informe (base: la misma `FALLA` del null;
+`8e775b2b`: verde), `chequeo-6` da lo mismo y `orden1b.sh` sigue con
+29 `ROJO`, 0 sin rojo. TOPE 900 y `maria1c` con `chromium.launch()` están
+bien: quedan.
 
-**Lo reproducido.** Tu corredor entero sobre `907e1edb`: «26 verdes, 4 rojas:
-maria3 maria4 maria5 subitems1», salida 1, las cuatro con las causas ya
-conocidas. `chequeo-6`: +0/−0, 0 avisos. Tu lista de 11 pantallas sin guion:
-la medí yo, las mismas 11. Las 8 cabeceras: el `awk` del corredor y un `grep`
-aparte encuentran las mismas 8. `maria7` y `maria1c` me salieron verdes: **no
-vi el intermitente**; esa premisa es tuya.
+**Causa de la devolución.** El z22 nuevo suelta la consulta de usuario antes
+de apretar Generar, así que ya no prueba la escritura con un chequeo de sesión
+lento por debajo del tope del producto. Lo medí: con `ESPERA_SESION_MS` en
+2000 (`app_v2.js:960`) y `CASOS=z22`, la base da dos veces
+`FALLA: A salió, volvió a entrar y generó enseguida y no generó: error: No se
+pudo comprobar la sesión. Recargá la página.`; `8e775b2b`, dos veces
+`OK=2`. Además, entre `soltar()` y el clic no queda fijado si la pestaña ya
+procesó la respuesta.
 
-**La puerta del sabotaje, cerrada por mí.** En commits locales recortados a 6
-pantallas, con tu corredor idéntico: una cabecera mal escrita
-(`csrf_enforce=true`) da «FALLA: cabecera … no es VAR=valor» y salida 2; con
-eso más un sabotaje a mano en `pantalla_cliente1.js:51`, el resumen pasa de 1
-a 2 rojas: exactamente una más.
+Un reloj que decide si la consulta vuelve antes o después del login no vale:
+es la carrera. Una respuesta demorada a propósito por debajo del tope sí vale:
+es la entrada del caso.
 
-**Comparé los entornos.** Cada guion que levanta uvicorn para una pantalla,
-contra tu entorno más la cabecera: la única diferencia es la que diste,
-`sesion1` con `ENVIRONMENT=testing`.
+**Pedido:**
+1. z22 vuelve a probar Generar con el chequeo de sesión lento por debajo del
+   tope, y además da lo mismo siempre.
+2. La familia: z20a, z21, z23 y z24 también usan `retenerUsuario(t, 3000)`.
+   Mostrá qué da cada uno con la entrada forzada, y si `forzar_orden1.js` los
+   alcanza (hoy demora sólo el login que sigue a un logout).
+3. *Sugerencia, no criterio:* la demora de 3 s se puede dejar en la respuesta
+   y soltar el login recién cuando la pestaña mostró que la procesó.
 
-**Hallazgo mío (y escape mío de la vuelta anterior).** `kill -TERM` al PID del
-corredor mientras corre una pantalla: el corredor sale y borra su worktree,
-pero **queda el uvicorn de esa pantalla huérfano** (PPID 1), sobre el
-worktree ya borrado. Con Ctrl-C no pasa (la señal va a todo el grupo). Va en
-tu tarea nueva.
+**Puertas:**
+- Con `ESPERA_SESION_MS` en 2000, `CASOS=z22` da rojo sobre tu SHA; ese
+  sabotaje entra a `orden1b.sh`, anclado en código.
+- La carrera forzada sigue: base con la `FALLA`, tu SHA verde.
+- Tu corredor entero sobre tu SHA, con el resumen. `chequeo-6` entero,
+  producto +0/−0.
 
-**D210: (b), y ya.** Son del arnés, no tenías tarea y la cola de MARIA es
-larga. Ella ya sabe que no las toca.
+**D213: (b) por ahora, decidido por la PM, reencuadrado.** El 401 que forzamos
+llega con la sesión ya cerrada, y lo pide el autoguardado del hueco:
+`api()` → `sesionEsDelDueno()` → `irAlLogin()`, mientras `revisarSesion` ante
+el mismo 401 se queda y avisa. Es un riesgo con camino de hoy (salir en otra
+pestaña con una operación cargada); si se pierde lo cargado, no está corrido.
+Va a `COLA-LIMPIEZA.md`. No lo toques en esta pieza.
 
-## Tarea activa (2026-11-13 02:36 UTC): INTERMITENTES, sólo arnés
-
-**Premisa, medida por vos (yo no la vi):** `maria7` sola da 5 de 5 verdes y en
-el corredor 2 de 4. `maria1c` falla a veces con el click en `#semaforoFAB`
-vencido (el elemento no está visible). Tu causa probable de `maria7`: espera
-`#uploadFileInput` con `state:'attached'` (`pantalla_maria7.js:28`), pero ese
-input es HTML fijo (`templates/dashboard_v2.html:116`), así que
-`setInputFiles` puede llegar antes de que `init()` de `upload.js` le cuelgue
-el escuchador. **Decí si tus corridas sueltas usaron un servidor ya tibio.**
-Para `maria1c` no hay causa: **empezá por confirmarla.**
-
-**Pedido:** que `maria7` y `maria1c` den lo mismo siempre, esperando una
-condición que la pantalla muestra, sin esperas fijas.
-
-**Puertas (deterministas, no por cantidad de repeticiones):**
-- Para cada una, una forma repetible de que la pantalla de hoy dé la misma
-  `FALLA` que viste intermitente, y con tu arreglo, bajo esa misma condición,
-  verde. Las dos salidas, en el informe. (Sugerencia para `maria7`: demorar
-  `upload.js` con `page.route`.) Lo que fuerza la carrera es de la prueba: no
-  queda en la pantalla ni en el producto.
-- Una corrida verde del corredor no alcanza como prueba: la mía salió verde
-  sin arreglo.
-- Si la causa de cualquiera de las dos resulta de producto, la informás con
-  la salida y no la tocás.
-- `pantalla_sesion1.js` con `// corredor: servidor ENVIRONMENT=testing`, y
-  mostrás una vez que el servidor lo recibió (hoy `sesion1` da verde igual con
-  `development`, así que el verde solo no lo distingue).
-- El uvicorn huérfano: `kill -TERM` al PID del corredor a mitad de una
-  pantalla no deja uvicorn ni node vivos. Mostrás el antes (hoy queda uno) y
-  el después.
-- `chequeo-6` entero: producto +0/−0.
-
-Sin adversarios. No toques `maria3`, `maria4`, `maria5` ni `subitems1`.
+Igual que antes: sin adversarios; no toques los guiones de MARIA;
+`pantalla_orden1.js` es tuya en esta pieza. La función de 1585 líneas va a la
+cola: no la partas acá. Mi corredor entero sobre `8e775b2b`: `30 verdes, 0 rojas`.
 
 Lo de D182 / D206 sigue igual: si Emi dice que sí, dejás esto donde esté.
-D205, D206 y D208 siguen con Emi. **Próxima D: D211** (rango D210–D215).
+D205, D206 y D208 siguen con Emi. **Próxima D: D214** (rango D210–D215).
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 

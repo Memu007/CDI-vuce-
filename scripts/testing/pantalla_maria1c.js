@@ -21,7 +21,8 @@ function falla(msg) { console.error('FALLA: ' + msg); process.exit(1); }
     operacion: { numero_factura: 'F-1', flete: 0, seguro: 0, campos_sin_leer: ['flete', 'seguro'] },
     items: [{ descripcion: 'Tornillo de acero inoxidable M6', cantidad: 2, valor_unitario: 3, peso_unitario: 1, origen: 'CN', pieza: '' }] }) }));
   await page.goto(base + '/dashboard');
-  await page.waitForSelector('#uploadFileInput', { state: 'attached' });
+  // Una subida anterior a la primera pantalla del tablero se descarta o no prende el semáforo.
+  await page.waitForSelector('[data-screen="upload"].is-active', { state: 'attached' });
   await page.setInputFiles('#uploadFileInput', process.argv[2]);
 
   await page.locator('#toastHost .toast', { hasText: FLETE }).waitFor({ timeout: 10000 }).catch(() => falla('el aviso de la subida no nombra el flete'));
