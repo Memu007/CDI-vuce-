@@ -2,8 +2,8 @@
 # Negativos de CATALOGO-LARGO-2: cada sabotaje deshace una línea de la pieza y
 # tests/test_catalogo_largo2.py tiene que ponerse roja por ese motivo. Con
 # PG_URL (un Postgres local y descartable), también la migración contra
-# scripts/testing/catalogo_largo2_postgres.py. El tope medido en NFC lo
-# distinguen los sabotajes de catalogolargo1.sh.
+# scripts/testing/catalogo_largo2_postgres.py y catalogo3_postgres.py. El tope
+# medido en NFC lo distinguen los sabotajes de catalogolargo1.sh.
 #
 # uso: PY=/ruta/al/venv/bin/python [PG_URL=postgresql://cdi@127.0.0.1:5432/postgres] \
 #        scripts/testing/sabotajes/catalogo_largo2.sh [SHA]
