@@ -1,6 +1,7 @@
 // Al entrar a «Validación», el campo del sufijo de valor muestra el de la operación en curso, vacío si no
 // tiene: una operación sin sufijo abierta después de otra que lo tenía no genera con el ajeno, y la tarjeta
-// del despachante tampoco lo usa. Con el suyo escrito, los avisos y el TXT llevan ese.
+// del despachante tampoco lo usa. Con el suyo escrito, los avisos y el TXT llevan ese. El aviso de que falta
+// el sufijo tampoco pasa de una operación a la otra, y se va cuando la persona lo escribe.
 // Navegador local, servidor local. Datos inventados.
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_sufijo_otra1.js
@@ -41,7 +42,7 @@ async function generar(page) {
   const quedo = await (await page.waitForFunction(freno => {
     const pantalla = document.querySelector('.screen.is-active').dataset.screen;
     if (pantalla !== 'validating') return 'siguió a «' + pantalla + '»';
-    // El foco en el campo lo pone el freno de este clic: el aviso puede venir de la operación anterior.
+    // El foco en el campo lo pone el freno de este clic.
     const el = document.getElementById('sbtFieldError');
     return !el.hidden && el.textContent === freno && document.activeElement.id === 'sbtSufijoValor' && 'frenó';
   }, FRENO, { timeout: 15000 })).jsonValue();
@@ -84,9 +85,14 @@ async function generar(page) {
   }
   if (mal) process.exit(1);
 
+  const aviso = () => page.evaluate(() => { const el = document.getElementById('sbtFieldError'); return el.hidden ? '' : el.textContent; });
+  if (await aviso() !== FRENO) falla('la última llegada frenó y no dejó su aviso a la vista');
   await entrar(page, Object.assign({}, ANTERIOR, { numero_factura: 'INV-2026/0733' }), [ITEM]);
+  if (await aviso()) falla('otra operación entra con el aviso de la anterior a la vista: «' + await aviso() + '»');
+  if (await generar(page) !== 'frenó') falla('la operación siguiente, sin sufijo, no frenó');
   const avisado = page.waitForRequest(r => r.url().endsWith('/generate_maria/avisos') && (r.postDataJSON() || {}).sbt_sufijo_valor === PROPIO, { timeout: 15000 });
   await page.fill('#sbtSufijoValor', PROPIO);
+  if (await aviso()) falla('con el sufijo ya escrito, el aviso sigue a la vista: «' + await aviso() + '»');
   await avisado.catch(() => falla('con «' + PROPIO + '» escrito, los avisos no se pidieron con ese sufijo'));
   const txt = page.waitForResponse(r => esGenerar(r.request()), { timeout: 20000 });
   await page.click('#validatingGenerate');
