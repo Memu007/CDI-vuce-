@@ -217,6 +217,13 @@ async function cerrar(p) {
   await cerrada;
 }
 
+// La pestaña puede hacer otra consulta mientras se cierra: una ruta que la
+// atendiera se quedaría sin contexto a mitad de camino.
+async function cerrarConRutas(ctx, p) {
+  await p.unrouteAll({ behavior: 'ignoreErrors' });
+  await ctx.close();
+}
+
 // Abre, carga la operación, espera a que se guarde y cierra la pestaña.
 async function dejarAMedias(ctx, factura) {
   const p = await abrir(ctx);
@@ -1157,7 +1164,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     if (!/Entró otro usuario/.test(aviso)) falla('entró otro usuario con la primera consulta del usuario en camino y la pestaña no avisa: «' + aviso + '»');
     if (!tapada) falla('entró otro usuario con la primera consulta del usuario en camino y la pestaña no se tapa');
     console.log('OK si entra otro usuario con la primera consulta en camino, no guarda a su nombre y avisa');
-    await ctx.close();
+    await cerrarConRutas(ctx, t);
   }
 
   // Lo guardado en el navegador, mirado desde una página que no corre la app.
