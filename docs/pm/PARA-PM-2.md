@@ -2,257 +2,255 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## D237 (a): entregada en `346a1c9`. (z22) de `orden1` cierra la sesión recién cuando la pestaña terminó lo que pide sola al entrar a «Validación». Forzada, la base da rojo y esto da verde. Sin producto. Una decisión: D241
+## D238 (a): entregada en `80cd954`. El aviso rojo del sufijo SBT se va al escribir en el campo y no entra con la pantalla de «Validación»; el rechazo del servidor sigue saliendo bajo el campo. Una decisión: D242
 
 | qué | SHA |
 |---|---|
-| base (integración de tu rama hasta `cfc707a`) | `c3eb7cf` |
-| (z22) espera los pedidos de la pestaña antes de salir | `1d20002` |
-| forzador de la carrera, `scripts/testing/forzar_avisos_orden1.js` | `7a37f46` |
-| ajuste después de las revisiones: el sufijo va en la operación, la entrada pasa a una función aparte. **Lo que se entrega** | `346a1c9` |
-| integración de tu rama hasta `7104db7` (sólo `docs/pm/`) | `f89dc13` |
+| base (informe de D237) | `73f8db7` |
+| producto: `finalize.js` y `CHANGELOG.md` | `e1ecc29` |
+| pruebas. **Lo que se entrega** | `80cd954` |
+| integración de tu rama hasta `543671b` (sólo `docs/pm/`), después de las puertas | `202e3b4` |
 | informe | el commit siguiente |
 
-`producto +0/−0`: sólo `scripts/testing/`. Sin línea en `CHANGELOG.md`.
+`producto +7/−1` (más 5 líneas de `CHANGELOG.md`). Ninguna función nueva.
 
-Son tres commits de prueba y no uno porque los dos primeros ya estaban subidos
-cuando terminaron las revisiones: lo que salió de ellas va encima, sin
-reescribir.
+**Lo primero que tenés que saber: mi primera versión rompía cinco pruebas de
+pytest y no lo vi yo ni la primera ronda de revisión; lo encontró la suite
+completa.** Detalle en «Lo que salió mal». Lo que entrego es la tercera
+versión; todo lo de abajo está corrido sobre `80cd954`.
 
 ## Decisiones
 
-**D241. La espera nueva no tiene un sabotaje que corra solo.** Sacando la
-espera, (z22) sigue verde en una corrida normal; el rojo sólo sale con el
-forzador puesto a mano (está abajo, en «Negativos»). Si alguien la saca, vuelve
-el rojo intermitente de antes, no un defecto del producto.
-- (a) un sabotaje más en `sabotajes/orden1b.sh` que corra (z22) con
-  `forzar_avisos_orden1.js` y la espera sacada. El guion es de la Técnica: lo
-  hace ella o me lo das. Suma cerca de un minuto a cada corrida del guion.
-- (b) queda así: el forzador y el comando están en este informe.
-- **Recomiendo (b).** Es una espera del arnés, no un control del producto, y
-  §6 pide guion propio sólo para lo de §3.
+**D242. El motivo de un rechazo del servidor también se va con la primera
+tecla.** El aviso bajo el campo tiene dos orígenes: el de la pantalla
+(«Ingresá el sufijo de valor SBT. Es obligatorio.») y el del servidor al
+generar («Sufijo de valor de la operación: falta AA00.», «… queda de 121
+caracteres y no puede superar los 120», y también los «Item N: … SBT …», que
+caen ahí porque la pantalla manda bajo ese campo todo rechazo que nombre
+«sbt», `finalize.js:753`). Hoy el arreglo no los distingue: cualquier cosa
+que se escriba en el campo esconde el aviso, sea de quien sea. Antes el del
+servidor quedaba a la vista hasta el próximo «Generar».
+- (a) queda así. El aviso habla del valor que había al tocar «Generar»; al
+  cambiarlo deja de ser cierto, y el servidor lo repite en el próximo
+  «Generar» si sigue mal. Lo que se pierde: quien corrige un sufijo largo
+  deja de ver qué le faltaba («falta AA00») en cuanto empieza a escribir, y
+  un «Item 3: …» se va aunque lo que se escriba en el campo de la operación
+  no arregle el ítem 3.
+- (b) pieza chica aparte: sólo el aviso de la pantalla se va al escribir; el
+  del servidor queda hasta el próximo «Generar» o hasta salir de
+  «Validación». Unas tres líneas de producto y un caso. Lo que se pierde: el
+  motivo del servidor puede quedar a la vista al lado de un sufijo ya
+  corregido, que es el mismo defecto de esta pieza dentro de una operación.
+- **Recomiendo (a)**: es lo que te escribí («se esconde cuando se escribe en
+  el campo») y no deja un aviso viejo en ningún camino. Si un despachante se
+  queja de que pierde el motivo, (b) es chica. No lo probé con una persona.
 
 ## Lo que hice distinto de lo que te escribí (supuestos reversibles)
 
-Te había escrito «z22 espera a que terminen los pedidos de avisos de la
-entrada a «Validación» antes de cerrar la sesión». Con eso solo no alcanzaba,
-y lo que sumé es esto:
+Te había escrito: «el aviso se esconde cuando se escribe en el campo y
+cuando se entra a «Validación» con otra operación».
 
-1. **Espera también las validaciones.** Al entrar a «Validación» la pestaña
-   pide sola cuatro cosas: los avisos dos veces (al entrar y cuando llegan
-   las tarjetas, `finalize.js:76-102`) y la validación dos veces (la de la
-   pantalla y la del semáforo, que sale de un temporizador a los 500 ms,
-   `semaforo.js`). Cualquiera de las cuatro, emitida antes de la salida y
-   atendida después, da 401 y manda la pestaña al login.
-2. **Espera cantidades (2 y 2), no sólo «ninguno en vuelo».** El semáforo
-   sale de un temporizador y el segundo pedido de avisos sale cuando vuelven
-   otros: entre uno y otro puede no haber nada en vuelo. **Esto no lo pude
-   mostrar con un rojo** (abajo, «Lo que no demostré»).
-3. **Entra a «Validación» en un solo paso** (`CDI.state` y `CDI.goTo` en el
-   mismo `evaluate`), no con `cargar` y después `goTo`. Con dos pasos la
-   pestaña queda un rato en la pantalla de NCM, y si ese rato pasa de 500 ms
-   el semáforo valida desde ahí: las validaciones después de entrar son una,
-   dos o tres según el tiempo, y la cuenta deja de ser exacta.
-4. **El sufijo va en la operación; (z22) ya no lo escribe en el campo.**
-   Escribirlo dispara otro pedido de avisos (a los 400 ms) y otra validación
-   (a los 500 ms), que salían antes o después del login según cuánto tardara.
-   Ahora la pantalla muestra el sufijo de la operación al entrar
-   (`finalize.js:195-199`) y «Generar» lo lee del estado (`:681`). En el
-   `api.log`, después de la salida la pestaña sólo consulta la sesión y
-   genera. **Lo que se pierde con esto**, dicho por el revisor del ajuste y
-   comprobado en los logs:
-   - (z22) ya no pasa por «lo que la persona escribe en el campo llega a la
-     operación». Lo siguen haciendo `generar` y `listaParaGenerar` (z20, z23).
-   - En la base, esos dos pedidos solían salir con la sesión ya cambiada y
-     quedaban detrás de la consulta de sesión, junto con «Generar». Dependía
-     del reloj y ningún chequeo de (z22) lo miraba; ahora no pasa nunca. Con
-     el forzador de la Técnica el `api.log` lo muestra: después del login, la
-     base tiene dos `GET /auth/current_user` antes de `POST /generate_maria`
-     y `346a1c9` tiene una.
+1. **Se esconde en toda entrada a «Validación», no sólo «con otra
+   operación».** Distinguir «otra operación» pide guardar cuál era la
+   anterior; esconderlo siempre no pide estado. Lo que cambia para la
+   persona: sale de «Validación» con el aviso a la vista, vuelve con la misma
+   operación y el aviso no está; «Generar» lo vuelve a poner.
+2. **El rechazo del servidor ahora vuelve a «Validación» primero y pone el
+   aviso después** (`finalize.js:755-760`). Antes era al revés, y con el
+   punto 1 la entrada lo habría borrado: es el camino que me marcaste que no
+   había que romper. `CDI.goTo` corre la entrada de la pantalla en el momento
+   (`app_v2.js:139-177`), así que el orden alcanza.
+3. **Toqué un caso de pytest que ya existía**, `tests/test_avisos1_seguro.py`:
+   su `CDI.goTo` de mentira ahora esconde el aviso al entrar a «Validación»,
+   como la pantalla. Sin eso, pytest no veía el orden del punto 2 (lo marcó
+   `/code-review`). Los otros dieciséis casos del archivo no cambian de
+   resultado.
 
-   Si preferís que (z22) siga escribiendo el sufijo, vuelve con una línea,
-   entre la salida y el login, y vuelven los dos caminos según el reloj.
-5. **Un forzador nuevo**, `forzar_avisos_orden1.js`, al lado del de la
-   Técnica (`forzar_orden1.js`, que no toqué): el de ella fuerza la consulta
-   de sesión del hueco, no este pedido. Se carga igual, con `NODE_OPTIONS`.
-   Demora un segundo cada pedido de avisos y hace que el login llegue dos
-   segundos después de la salida: es la «respuesta demorada a propósito» de
-   tu criterio, no un reloj dentro de la prueba.
-6. **Una función nueva, `enValidacionQuieta`**, con la entrada y la espera.
-   La función principal de la pantalla, que tiene más de 150 líneas, queda
-   del largo que tenía.
+Lo que no toqué: `enlazarValor`, `onGenerate` (su línea que esconde el aviso
+cuando el sufijo está) y el texto de los avisos.
 
-Lo que (z22) comprueba no cambió: que genera (`y no generó`), que «Generar»
-comprobó la sesión (`y Generar no comprobó la sesión`) y que queda una sola
-operación. `listaParaGenerar` y los demás casos no cambiaron.
+## Lo que salió mal
+
+La primera versión (`2d1dea7`, local, nunca subida) sumaba una función
+chica, `quitarAvisoDelSufijo`, y la llamaba desde `enlazarValor` y
+`pintarSufijo`. La pantalla andaba y el caso nuevo daba verde. La suite
+completa sobre esa versión dio `5 failed, 6126 passed, 110 skipped,
+3 xfailed`: tres casos de `tests/test_valor1.py` y dos de
+`tests/test_valor1c.py`, todos con `ReferenceError: quitarAvisoDelSufijo is
+not defined`. Esos archivos sacan funciones de `finalize.js` por nombre y las
+corren en node con un DOM de mentira: una función nueva llamada desde una de
+las que sacan no existe ahí.
+
+Lo arreglé sin función nueva: el oyente va en `init()` (que ninguna prueba
+saca) y `pintarSufijo` esconde el aviso con dos líneas propias. La primera
+ronda de revisión (adversario y `/code-review`) leyó la versión rota y no lo
+encontró; por eso repetí las dos sobre la segunda versión y un adversario
+más sobre la tercera. Abajo dice qué SHA leyó cada una. Los SHA de las dos
+primeras versiones (`2d1dea7`/`ca5f257` y `0e1526f`/`76d9d90`) fueron
+locales y los reescribí antes de subir: no están en la rama. Sus registros
+quedaron en mi scratch, no en el repositorio.
 
 ## Resultado
 
-Todo con `CASOS=z22`, cada corrida con su API y su base nuevas. Textos
-copiados de los logs.
+**Rojo antes del arreglo.** `finalize.js` de `73f8db7` con las pruebas de
+`80cd954`, en un worktree descartable (textos copiados de la salida):
 
 | qué | resultado | lo que dice |
 |---|---|---|
-| base `c3eb7cf` con `forzar_avisos_orden1.js` | rc=1 | `forzar_avisos_orden1: un pedido de avisos sale antes de salir` · `forzar_avisos_orden1: un pedido de avisos sale 964 ms después de salir` · `FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')`. En el `api.log`: `POST /auth/logout 200`, `POST /generate_maria/avisos 401`, `POST /auth/login 200`. Es la `FALLA` de mi D237 |
-| `346a1c9` con `forzar_avisos_orden1.js` | rc=0 | `forzar_avisos_orden1: un pedido de avisos sale antes de salir`, dos veces · `OK A salió, volvió a entrar y generó enseguida: genera sin falsos bloqueos`. En el `api.log`, las dos validaciones y los dos avisos con 200 antes de `POST /auth/logout` |
-| `346a1c9` sola, tres corridas seguidas | rc=0 las tres | `OK A salió, volvió a entrar y generó enseguida: genera sin falsos bloqueos` |
-| `346a1c9` con `forzar_orden1.js` (el de la Técnica) | rc=0 | `forzar_orden1: la consulta del hueco se cortó sin respuesta antes de entrar` · el mismo `OK` |
-| base `c3eb7cf` con `forzar_orden1.js` | rc=0 | las mismas dos líneas: lo que fuerza ella no cambió |
+| `SOLO=sufijo_otra1`, arreglo revertido | `rc=1`, `resumen: 0 verdes, 1 rojas: sufijo_otra1` | `FALLA: otra operación entra con el aviso de la anterior a la vista: «Ingresá el sufijo de valor SBT. Es obligatorio.»` |
+| `tests/test_avisos1_seguro.py`, arreglo revertido | `1 failed, 16 passed` | `test_cada_400_que_cambia_de_pantalla_deja_el_motivo_a_la_vista[sufijo]`: `AssertionError: assert None == 'Sufijo de valor de la operación: falta AA00.'` |
+| `SOLO=sufijo_otra1`, entrega | `rc=0`, `resumen: 1 verdes, 0 rojas` | `PANTALLA SUFIJO-OTRA OK` |
+| `tests/test_avisos1_seguro.py`, entrega | `17 passed` | |
+
+El rojo de pytest con el arreglo revertido no dice que la base estuviera
+mal en ese camino: en la base el aviso del servidor se veía. Cae porque el
+`goTo` de mentira ya modela la pantalla nueva. El que discrimina de verdad es
+el negativo «sin reordenar», abajo.
+
+El caso de pantalla, en su parte nueva (`pantalla_sufijo_otra1.js:88-95`):
+la última de las tres llegadas frenó y dejó su aviso a la vista (lo afirma,
+no lo supone); entra otra operación y el aviso no está; «Generar» sin sufijo
+frena con su aviso; se escribe el sufijo y el aviso se va. Ninguna espera
+fija nueva.
 
 ## Negativos
 
-Cada uno, un commit descartable sobre `346a1c9` (no se suben), con
-`CASOS=z22`.
+Uno por mitad del arreglo, cada uno un commit descartable sobre `80cd954`
+(no se suben). La pieza no es de las de §3: no lleva guion de sabotaje
+propio.
 
-| qué saqué o cambié | resultado | lo que dice |
-|---|---|---|
-| producto: con la sesión cambiada no escribe aunque sea el mismo usuario (`app_v2.js`) | rc=1 | `FALLA: A salió, volvió a entrar y generó enseguida y no generó: error: No se pudo comprobar la sesión. Recargá la página.` |
-| producto: `ESPERA_SESION_MS` de 10000 a 2000 (tu sabotaje de la reproducción) | rc=1 | la misma `FALLA` |
-| producto: «Generar» no comprueba la sesión | rc=1 | `FALLA: A salió, volvió a entrar y generó enseguida y Generar no comprobó la sesión` |
-| prueba: espera tres pedidos de avisos en vez de dos | rc=1 | `FALLA: A salió, volvió a entrar y generó enseguida: antes de salir, la pestaña no terminó sus pedidos: faltan /generate_maria/avisos (2 de 3); en vuelo: ninguno` |
-| prueba: sin la espera, con el forzador | rc=1 | `forzar_avisos_orden1: un pedido de avisos sale 931 ms después de salir` · `FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')`. `api.log`: `POST /auth/logout 200`, `POST /generate_maria/avisos 401` |
-| prueba: la espera sin cantidades (`terminaron([])`), con el forzador | **rc=0** | `OK A salió, volvió a entrar y generó enseguida: genera sin falsos bloqueos`. Es lo que no demostré |
+| negativo | corrida | resultado | lo que dice |
+|---|---|---|---|
+| `pintarSufijo` no esconde el aviso | `SOLO=sufijo_otra1` | `rc=1` | `FALLA: otra operación entra con el aviso de la anterior a la vista: «Ingresá el sufijo de valor SBT. Es obligatorio.»` |
+| sin el oyente de `input` | `SOLO=sufijo_otra1` | `rc=1` | `FALLA: con el sufijo ya escrito, el aviso sigue a la vista: «Ingresá el sufijo de valor SBT. Es obligatorio.»` |
+| el rechazo pone el aviso y después vuelve (orden viejo) | `SOLO="sufijo_borrador1 maria9"` | `rc=1`, `resumen: 0 verdes, 2 rojas: maria9 sufijo_borrador1` | `FALLA: generado y devuelto a la validación: el servidor no devolvió a la validación: page.waitForFunction: Timeout 15000ms exceeded.` · `FALLA: el de la operación: no sale bajo el campo del sufijo de la operación` |
+| el mismo | `tests/test_avisos1_seguro.py` | `1 failed, 16 passed` | `…[sufijo]`: `AssertionError: assert None == 'Sufijo de valor de la operación: falta AA00.'` |
 
-## Lo que no demostré
-
-- **Las cantidades (2 y 2).** Con la espera puesta pero sin cantidades
-  (`terminaron([])`, que espera sólo «ninguno en vuelo») y el forzador, (z22)
-  dio **verde**. El hueco que cubren las cantidades es de pocos milisegundos:
-  entre que vuelve un pedido y sale el siguiente (el semáforo, desde su
-  temporizador). Para abrirlo haría falta un reloj que decida cuándo sale el
-  temporizador respecto de la salida, y eso es lo que tu criterio no acepta
-  («un reloj que decide… es la carrera»). Queda sostenido por lectura de
-  código, no por un rojo. Si preferís la versión sin cantidades, es una línea.
-- **La mitad de las validaciones.** El forzador demora los avisos, no
-  `/api/validate/smart`. Que una validación atendida después de la salida
-  manda al login lo sostiene el código (`api()` → 401 → `irAlLogin`), no un
-  rojo de esta entrega.
-- **Lo frágil de las cantidades.** Son datos de la prueba, no del producto.
-  Si el producto deja de pedir alguna de las cuatro, (z22) falla a los 15 s
-  con `la pestaña no terminó sus pedidos: faltan … (1 de 2)`: se ve. Si
-  empieza a pedir una quinta, (z22) no se entera y la carrera puede volver,
-  sin aviso. Un caso conocido: con estudios cargados la pantalla pide los
-  avisos una tercera vez (`estudios.js:105`); el usuario de (z22) no tiene.
-- **La barra de arriba** se actualiza sola cada 5 minutos
-  (`topbar_financials.js:11`). Si ese pedido cae justo en la salida, la
-  carrera es la misma: no lo cubro.
-- **El caso contrario ya no se prueba en ningún lado:** «un pedido de A
-  atendido después de la salida manda la pestaña al login» era lo que (z22)
-  hacía sin querer. Ahora se evita por construcción y ningún caso lo mira.
+El tercero muestra que el camino del rechazo del servidor ya estaba cubierto
+por dos pantallas que no toqué (`maria9` y `sufijo_borrador1`).
 
 ## Revisión adversarial
 
+Pieza chica de pantalla: Sonnet, medio, según la tabla. Tres rondas porque
+hubo tres versiones.
+
 | quién | sobre | hallazgo | qué hice |
 |---|---|---|---|
-| `adversario-sonnet-alto` (Sonnet, alto), corrió | `c3eb7cf..7a37f46` | nada que rompa o debilite la prueba. Reprodujo las cuentas 2 y 2 con el servidor frío y caliente, y el rojo de la base forzada por el motivo correcto | |
-| | | baja: las etiquetas «antes / después de salir» del forzador se miden en Node, no en el servidor | el `api.log` es lo que vale; lo cito en cada rojo |
-| | | baja: sin `CASOS=z22` el forzador demora todos los casos | el comando lleva `CASOS=z22` |
-| | | baja: un pedido contado que falla hace esperar los 15 s | riesgo, abajo |
-| | | baja: el caso contrario quedó sin prueba | «Lo que no demostré» |
-| `adversario-sonnet-alto` (Sonnet, alto), sólo lectura | `7a37f46..346a1c9` | media-baja: lo que (z22) pierde por no escribir el sufijo | supuesto 4 |
-| | | baja: la carrera no tiene guardia que corra sola | D241 |
-| | | baja: `forzar_orden1.js` sigue diciendo «activo» al cargarse aunque no demore nada | línea para la cola (es de la Técnica) |
-| | | baja: un tope de la entrada sale ahora con el prefijo «antes de salir,» | queda: el texto es correcto |
+| `adversario-sonnet-medio` (Sonnet, medio), corrió | `73f8db7..ca5f257` (primera versión, la rota) | nada que rompa; cuatro menores. **No vio las cinco pruebas de pytest rotas** | la versión se descartó |
+| `adversario-sonnet-medio` (Sonnet, medio), corrió | `73f8db7..76d9d90` (segunda) | nada que rompa. Comprobó el oyente, las pruebas que sacan funciones, las anclas de los sabotajes y los caminos del aviso | |
+| `adversario-sonnet-medio` (Sonnet, medio), sólo lectura | `73f8db7..80cd954` (la entrega) | nada que rompa. Repasó los tres lugares que escriben el aviso, los dos `goTo('validating')`, el oyente, el `goTo` de mentira para los otros parámetros del caso y las anclas | |
+| | | menor, ya existía: con el aviso a la vista, quien completa el sufijo de cada producto en la tarjeta del despachante lo sigue viendo hasta el próximo «Generar» | riesgo, abajo |
+| | | estilo: `pintarSufijo` busca el nodo con `getElementById` en vez de usar `hide(sbtError)` | queda: corre antes que `init()`, y `tests/test_valor1c.py:247` la saca sola |
 
-El segundo no corrió nada (había una corrida en curso): lo suyo es lectura.
-Lo que afirma del producto lo comprobé en los `api.log` de arriba.
+El tercero no corrió nada (había una suite en curso): lo suyo es lectura.
 
-## `/code-review high` sobre `c3eb7cf..7a37f46`
+## `/code-review high` sobre `73f8db7..76d9d90`
 
-Los revisores heredan Fable. Siete hallazgos:
+Los revisores heredan Fable. Dos corridas: la primera leyó la versión rota
+(`73f8db7..ca5f257`, ocho hallazgos bajos, ninguno era la rotura) y se
+descartó con ella. La segunda, sobre la segunda versión, ocho hallazgos
+bajos:
 
 | # | hallazgo | qué hice |
 |---|---|---|
-| 1 | las cantidades están fijas: con estudios hay un tercer pedido de avisos; si el producto junta pedidos, (z22) da rojo | «Lo que no demostré» |
-| 2 | el forzador muestra sólo la mitad de los avisos | «Lo que no demostré» |
-| 3 | escribir el sufijo entre la salida y el login dejaba dos caminos del producto según el reloj, ninguno comprobado | arreglado en `346a1c9`: supuesto 4 |
-| 4 | `seguirPedidos` sirve para una sola espera y no cuenta los pedidos que fallan: ahí espera los 15 s | queda: (z22) la usa una vez. Riesgo, abajo |
-| 5 | (z22) tenía adentro una copia de `cargar` y `listaParaGenerar` | a medias: pasó a `enValidacionQuieta` (`346a1c9`). Unificarla con `listaParaGenerar` toca (z20) y (z23): línea para la cola |
-| 6 | tercera copia del gancho de `launch` y `newContext`; el forzador decía «activo» sin saber si demoraba | lo segundo, arreglado (`346a1c9`); lo primero, línea para la cola |
-| 7 | `chequeo-6`: la función principal de la pantalla crecía de 1584 a 1594 líneas | arreglado (`346a1c9`): `avisos: 0` |
+| 1 | con el aviso a la vista, llenar el sufijo de cada producto en la tarjeta del despachante no lo esconde | riesgo, abajo: ya era así y la pieza no lo pide |
+| 2 | los «Item N: … SBT …» del servidor salen bajo el campo de la operación, y ahora escribir ahí los esconde | D242 |
+| 3 | el motivo de un rechazo del servidor se pierde con la primera tecla y al salir y volver con la misma operación | D242 y supuesto 1 |
+| 4 | el `goTo` de mentira de `tests/test_avisos1_seguro.py` no modelaba que «Validación» entra sin aviso | arreglado en `80cd954`: supuesto 3, con su negativo |
+| 5 | la precondición de la parte nueva del caso era un comentario | arreglado en `80cd954`: ahora es una afirmación (`pantalla_sufijo_otra1.js:89`) |
+| 6 | el rechazo tardío de un «Generar» anterior deja un aviso sobre un sufijo que ya no está en el campo | riesgo, abajo: ventana angosta, ya existía |
+| 7 | tres formas de esconder el aviso; `pintarSufijo` podría usar `hide($(…))` | queda: la razón de arriba |
+| 8 | el comentario de `pintarSufijo` había quedado de tres líneas | arreglado en `e1ecc29` |
 
-Después del ajuste no volví a correr `/code-review`: corrí el adversario de
-lectura de arriba y todas las puertas sobre `346a1c9`.
+Después de esos tres ajustes (un comentario de producto, una afirmación en el
+caso y una línea del `goTo` de mentira) no volví a correr `/code-review`:
+corrí el adversario de lectura de arriba y todas las puertas sobre
+`80cd954`.
+
+`/security-review` y `ataque_aislamiento.sh`: no corresponden. La pieza no
+toca sesión, permisos ni datos de otro usuario.
 
 ## Comandos
 
 ```bash
 # desde la raíz del repo, con esta rama; PY es tu python con las dependencias
 export PY=/ruta/al/venv/bin/python
-F=$PWD/scripts/testing/forzar_avisos_orden1.js
-# 1. la base, forzada: rc=1 y «FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')»
-NODE_OPTIONS="--require $F" CASOS=z22 SOLO=orden1 env -u DATABASE_URL -u ENVIRONMENT bash scripts/testing/correr_pantallas.sh c3eb7cf /tmp/z22-base
-# 2. la entrega, forzada: rc=0 y «OK A salió, volvió a entrar y generó enseguida: genera sin falsos bloqueos»
-NODE_OPTIONS="--require $F" CASOS=z22 SOLO=orden1 env -u DATABASE_URL -u ENVIRONMENT bash scripts/testing/correr_pantallas.sh 346a1c9 /tmp/z22-entrega
-# 3. el orden en el servidor: en la base, logout y después un avisos con 401; en la entrega, ningún 401
-grep -h "auth/logout\|generate_maria\|validate/smart" /tmp/z22-base/orden1.*/api.log /tmp/z22-entrega/orden1.*/api.log
-# 4. los sabotajes de la pantalla: 30 «ROJO» y «sabotajes sin rojo: 0»
-scripts/testing/sabotajes/orden1b.sh 346a1c9
-# 5. producto +0/−0, avisos: 0
-python docs/pm/herramientas/chequeo-6.py c3eb7cf 346a1c9
+# 1. la entrega: rc=0 y «PANTALLA SUFIJO-OTRA OK»
+SOLO=sufijo_otra1 env -u DATABASE_URL -u ENVIRONMENT bash scripts/testing/correr_pantallas.sh 80cd954 /tmp/d238-verde
+# 2. el arreglo revertido: «FALLA: otra operación entra con el aviso de la anterior a la vista: …»
+git worktree add -q --detach /tmp/d238-wt 80cd954
+git -C /tmp/d238-wt checkout -q 73f8db7 -- proyecto_maria/static/v2/screens/finalize.js
+git -C /tmp/d238-wt -c user.name=x -c user.email=x@x commit -qam descartable
+SOLO=sufijo_otra1 env -u DATABASE_URL -u ENVIRONMENT bash scripts/testing/correr_pantallas.sh $(git -C /tmp/d238-wt rev-parse HEAD) /tmp/d238-rojo
+# 3. en ese mismo worktree: «1 failed, 16 passed», el caso [sufijo]
+(cd /tmp/d238-wt && GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake env -u DATABASE_URL -u ENVIRONMENT $PY -m pytest -q --no-cov -p no:cacheprovider tests/test_avisos1_seguro.py)
+git worktree remove --force /tmp/d238-wt
+# 4. el camino del rechazo del servidor: «resumen: 2 verdes, 0 rojas»
+SOLO="sufijo_borrador1 maria9" env -u DATABASE_URL -u ENVIRONMENT bash scripts/testing/correr_pantallas.sh 80cd954 /tmp/d238-servidor
+# 5. producto +7/−1, avisos
+python docs/pm/herramientas/chequeo-6.py 73f8db7 80cd954
 ```
-
-El forzador se toma del árbol de trabajo: en `c3eb7cf` no existe.
 
 ## Puertas
 
-Todas sobre `346a1c9`, de a una.
+Todas sobre `80cd954`, de a una.
 
 | puerta | salida |
 |---|---|
-| `sabotajes/orden1b.sh 346a1c9` | 30 `ROJO`, `sabotajes sin rojo: 0`, rc=0. Los dos de (z22): `FALLA: A salió, volvió a entrar y generó enseguida y no generó` y `… y no generó: error: No se pudo comprobar la sesión` |
-| `SOLO=orden1` entero (todos los casos) | `verde orden1` con `rc=0`, `resumen: 1 verdes, 0 rojas`; 71 líneas `OK`, entre ellas la de (z22) |
-| `anclas_perdidas.py 346a1c9` | `102 guiones, 2466 anclas medidas y 11 llamadas sin medir`; salida igual a la de `c3eb7cf`, línea por línea |
-| `chequeo-6.py c3eb7cf 346a1c9` | abajo, entera |
-| grep de historia de §6 | no aplica: no hay líneas de producto |
+| suite completa de pytest | `6131 passed, 110 skipped, 3 xfailed` en 0:20:51, `rc=0`. La misma cuenta que la tuya sobre `a2c6dc6`: no hay casos nuevos de pytest, cambió uno |
+| `compileall -q proyecto_maria` | `rc=0`, sin salida |
+| las 34 pantallas (`correr_pantallas.sh 80cd954`) | `resumen: 34 verdes, 0 rojas`, `rc=0` |
+| `e2e_maria.sh` | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.`, `rc=0` |
+| `anclas_perdidas.py 80cd954` | `102 guiones, 2466 anclas medidas y 11 llamadas sin medir`; salida igual a la de `73f8db7`, línea por línea |
+| `chequeo-6.py 73f8db7 80cd954` | abajo, entera |
+| grep de historia de §6 sobre `proyecto_maria/` | vacío |
 
-**No corrí:** la suite de pytest, `compileall`, `e2e_maria.sh`,
-`smoke_friccion.sh`, `ataque_aislamiento.sh` ni `/security-review`. La entrega
-son dos archivos de `scripts/testing/` que ninguna prueba de `tests/` lee
-(busqué `pantalla_orden1` y `forzar_` en `tests/`, `.github/` y
-`docs/pm/herramientas/`: nada) y no toca producto, sesión ni datos.
+**No corrí:** `smoke_friccion.sh` (no toqué backend), `ataque_aislamiento.sh`
+ni `/security-review` (arriba), ni los guiones de sabotaje de piezas
+anteriores que anclan en `finalize.js` (`sabotaje_maria9.sh`,
+`sabotajes/avisos1.sh` y los demás): `anclas_perdidas.py` dice que ninguno
+perdió un ancla, pero correrlos enteros es lo de antes de publicar. Las
+puertas corrieron sobre `80cd954`; la integración de tu rama vino después y
+sólo trae `docs/pm/`.
 
 ## `chequeo-6`
 
 ```
-chequeo-6 c3eb7cf..346a1c9: avisos para mirar, no un veredicto
-producto +0/−0
-arnés +73/−1
+chequeo-6 73f8db7..80cd954: avisos para mirar, no un veredicto
+producto +7/−1
+arnés +10/−3
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
+  proyecto_maria/static/v2/screens/finalize.js: 1488 → 1494
 avisos: 0
 ```
 
 ## Riesgos
 
-- Los de «Lo que no demostré»: las cantidades son datos de la prueba y un
-  quinto pedido automático del producto pasaría sin aviso.
-- Un pedido contado que falla (no que tarda) no se cuenta: (z22) espera el
-  tope de 15 s y falla con el texto de `faltan …`. Se ve, pero tarda.
-- (z22) tarda ahora lo que tardan esos cuatro pedidos antes de salir. No
-  medí cuánto.
-
-## Para la cola de limpieza (propongo; el archivo es tuyo)
-
-- Los tres forzadores (`forzar_arranque.js`, `forzar_orden1.js`,
-  `forzar_avisos_orden1.js`) repiten el mismo gancho de `launch` y
-  `newContext`, y cargan `require('playwright')` mientras la pantalla carga
-  `/opt/node-tools/node_modules/playwright` (`pantalla_orden1.js:78`): si un
-  día no son el mismo módulo, no fuerzan nada. `forzar_orden1.js:66` dice
-  «activo» al cargarse, lo demore o no. Un ayudante común para los tres.
-- `pantalla_orden1.js`: el sufijo de prueba `'AA(DemoPouchs)-CA00-'` está en
-  tres lugares (174, 335, 1429) y hay dos formas de dejar una operación lista
-  en «Validación» (`listaParaGenerar` y `enValidacionQuieta`).
+- D242: el motivo de un rechazo del servidor se va con la primera tecla.
+- Con el aviso «Es obligatorio» a la vista, quien completa el sufijo de cada
+  producto en la tarjeta del despachante (en vez del campo de la operación)
+  lo sigue viendo hasta el próximo «Generar», que ya no frena. Ya era así;
+  no lo toqué porque la pieza no lo pide.
+- Si el rechazo de un «Generar» llega cuando la persona ya cambió el sufijo
+  o de operación, el aviso habla de un valor que ya no está. Ventana angosta
+  y ya existía; ahora se va al escribir o al volver a entrar.
+- El orden «volver y después avisar» depende de que `CDI.goTo` corra la
+  entrada de la pantalla en el momento. Si un día `goTo` pasa a ser
+  diferido, el aviso del servidor se borra: lo frenan `maria9`,
+  `sufijo_borrador1` y el caso `[sufijo]` de pytest.
+- No lo probé con una persona ni en un navegador que no sea el Chromium de
+  las pruebas.
 
 ## Archivos de producto que toqué
 
-Ninguno. De arnés: `scripts/testing/pantalla_orden1.js` ((z22) y dos
-funciones nuevas, `seguirPedidos` y `enValidacionQuieta`) y
-`scripts/testing/forzar_avisos_orden1.js` (nuevo).
+`proyecto_maria/static/v2/screens/finalize.js` (`init`, `pintarSufijo` y el
+camino del rechazo del sufijo en `generateMaria`) y `CHANGELOG.md`. De
+pruebas: `scripts/testing/pantalla_sufijo_otra1.js` y
+`tests/test_avisos1_seguro.py`.
 
 ## Sigo con
 
-D238 (a): el aviso «Es obligatorio» del sufijo no queda a la vista de una
-operación a otra.
+CUIT-GENERAR (D235 a), con revisión fuerte (§3).
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama `claude/dev-maria`, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `7104db7`). PAIS-NL aceptada e integrada; D239 y «Holanda» esperan a Emi: no se tocan; D240 (b). D237 (a) entregada sobre `346a1c9` (base `c3eb7cf`; sólo arnés: (z22) de `scripts/testing/pantalla_orden1.js` espera los cuatro pedidos de la entrada a «Validación» antes de salir; forzador `scripts/testing/forzar_avisos_orden1.js`), con D241 (la espera no tiene sabotaje que corra solo; recomiendo (b), queda así) sin contestar. Pieza activa: D238 (a) (el aviso «Es obligatorio» del sufijo no queda a la vista de una operación a la otra; pieza chica aparte; mi texto está en `git show 6fbfefd:docs/pm/PARA-PM-2.md`; borrador de pantalla en el scratch `pantalla_sufijo_otra1.js`). Después: CUIT-GENERAR (D235 a; apartada con las reversiones `3a6f656` y `2f04637`, se recupera revirtiéndolas; hallazgos del adversario en el scratch `cg_adversario.md`; revisión fuerte §3 con `/security-review` y `ataque_aislamiento.sh`; sus D toman número nuevo), y los vencidos de `sabotajes-conocidos.txt`, uno por pieza, primero `sabotaje_subitems1.sh` y `sabotaje_sufijos1.sh`. Próxima D: D242. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, sin secretos ni datos reales, VUCE y Gemini simulados, una corrida por vez, un rojo se diagnostica y no se repite hasta verde, las Devs no usan el consejero ni subagentes de esfuerzo muy alto.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama `claude/dev-maria`, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `543671b`). D237 (a) aceptada, D241 (b). D239 y «Holanda» esperan a Emi: no se tocan; D240 (b). D238 (a) entregada sobre `80cd954` (base `73f8db7`, producto `e1ecc29`: `finalize.js`, el aviso del sufijo se va al escribir y al entrar a «Validación», y el rechazo del servidor vuelve a «Validación» antes de poner el aviso), con D242 (el motivo del servidor también se va con la primera tecla; recomiendo (a), queda así) sin contestar. Pieza activa: CUIT-GENERAR (D235 a; apartada con las reversiones `3a6f656` y `2f04637`, se recupera revirtiéndolas; hallazgos del adversario en el scratch `cg_adversario.md`; revisión fuerte §3: suite completa, Opus y Sonnet alto, `/security-review` y `ataque_aislamiento.sh`; sus D toman número nuevo). Después: los vencidos de `sabotajes-conocidos.txt`, uno por pieza, primero `sabotaje_subitems1.sh` y `sabotaje_sufijos1.sh`. Próxima D: D243. Lección de D238: las pruebas de `tests/test_valor1.py`, `test_valor1c.py` y `test_avisos1_seguro.py` sacan funciones de `finalize.js` por nombre; una función auxiliar nueva llamada desde ellas las rompe, y eso sólo lo ve la suite completa. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, sin secretos ni datos reales, VUCE y Gemini simulados, una corrida por vez, un rojo se diagnostica y no se repite hasta verde, las Devs no usan el consejero ni subagentes de esfuerzo muy alto.
