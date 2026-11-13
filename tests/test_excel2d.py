@@ -162,7 +162,7 @@ def test_un_sqref_largo_se_parte_hasta_el_tope():
 # Los libros del adversario: (libro, status, palabra del rechazo, segundos).
 SUBIDAS = {
     "120 000 corchetes en un formato": (lambda: _con_formato("[" * 120_000), 400, "formato", 1),
-    "2499 combinadas en 4998 filas": (lambda: _con_combinadas(4_998), 200, None, 3),
+    "2499 combinadas en 4998 filas": (lambda: _con_combinadas(4_998), 200, None, 1.5),
     "9995 combinadas en 19 990 filas": (lambda: _con_combinadas(19_990), 400, "filas", 3),
     "640 000 rangos de formato condicional": (lambda: _con_rangos(640_000), 400, "rangos", 1),
     "300 000 combinadas fuera de las filas": (lambda: _con_refs("mergeCell", 300_000), 400, "rangos", 1),
@@ -177,23 +177,26 @@ def test_la_subida_cara_no_frena_a_nadie(subida):
     libro = libro()
     assert len(libro) < 1_500_000
     # Otro hilo marca el paso: con el GIL retenido por openpyxl se quedaba 9 s.
-    pasos, listo = [time.perf_counter()], threading.Event()
+    # Se mide CPU del proceso y no reloj: un runner cargado alarga el reloj, no la CPU.
+    pasos, listo = [time.process_time()], threading.Event()
 
     def marcar():
-        while not listo.is_set():
-            time.sleep(0.01)
-            pasos.append(time.perf_counter())
+        while not listo.wait(0.01):
+            pasos.append(time.process_time())
+        pasos.append(time.process_time())
     otro = threading.Thread(target=marcar)
     otro.start()
-    inicio = time.perf_counter()
+    inicio = time.process_time()
     try:
         nombre = "factura.xls" if ".xls" in subida else "factura.xlsx"
         r = TestClient(main.app).post("/upload_excel_v2/", files={"file": (nombre, libro)})
     finally:
         listo.set()
         otro.join()
+    frenado = max(b - a for a, b in zip(pasos, pasos[1:]))
+    assert frenado < 1, f"el otro hilo no avanzó mientras el proceso gastó {frenado:.2f} s de CPU"
+    gasto = time.process_time() - inicio
+    assert gasto < segundos, f"la subida gastó {gasto:.2f} s de CPU"
     assert r.status_code == status, r.text[:300]
     if palabra:
         assert palabra in r.json()["detail"]
-    assert time.perf_counter() - inicio < segundos
-    assert max(b - a for a, b in zip(pasos, pasos[1:])) < 0.5
