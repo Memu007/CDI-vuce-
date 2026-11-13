@@ -86,6 +86,10 @@ sabotaje $C "«º», «ª» y «µ» vuelven a cambiar el id del proveedor latin
   'c > "\u024f" and ' \
   '' \
   "FAILED $T::test_un_proveedor_latino_conserva_su_id"
+sabotaje $C "«Nº» en el nombre se lee «No» y el proveedor latino cambia de id" \
+  'text = unicodedata.normalize("NFD", text)' \
+  'text = unicodedata.normalize("NFKD", text)' \
+  "FAILED $T::test_un_proveedor_latino_conserva_su_id[Industrias Garc"
 sabotaje $C "la clave del producto vuelve a perder las letras no latinas" \
   'return f"{clave}~{sufijo}" if sufijo else clave' \
   'return clave' \

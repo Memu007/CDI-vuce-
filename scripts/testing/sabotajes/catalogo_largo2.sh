@@ -178,10 +178,6 @@ sabotaje $CS "la clave junta ß con ss" \
   '    text = re.sub(r"[^a-z0-9\s]", " ", text.lower())' \
   '    text = re.sub(r"[^a-z0-9\s]", " ", text.casefold())' \
   "FAILED $T::${SIN}[catalogo]" "FAILED $T::${SIN}[guardar-uso]"
-sabotaje $CS "la clave junta ﬁ con fi" \
-  '    text = unicodedata.normalize("NFD", text)' \
-  '    text = unicodedata.normalize("NFKD", text)' \
-  "FAILED $T::${SIN}[catalogo]" "FAILED $T::${SIN}[guardar-uso]"
 sabotaje $CS "guardar en el catálogo usa la clave vieja" \
   '        product_key = clave_de_producto(desc)' \
   '        product_key = _normalize(desc)' \
