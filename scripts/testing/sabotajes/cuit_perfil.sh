@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Negativos de CUIT-PERFIL: cada sabotaje deshace una regla de lo que «Mi perfil»
-# guarda como CUIT (main.py) o de cómo la pantalla muestra el rechazo
+# guarda como CUIT (main.py, controles_maria.py) o de cómo la pantalla muestra el rechazo
 # (profile.js). Los casos de tests/test_cuit_perfil.py tienen que fallar por ese
 # motivo y ningún otro; la pantalla, con su frase.
 #
@@ -21,6 +21,7 @@ export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
        DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=.
 FALLAS=0
 M=proyecto_maria/main.py
+C=proyecto_maria/core/controles_maria.py
 P=proyecto_maria/static/v2/screens/profile.js
 T=tests/test_cuit_perfil.py
 MALO=test_lo_que_no_es_un_cuit_no_se_guarda
@@ -133,6 +134,9 @@ sabotaje casos $M "se guarda como llegó" \
 sabotaje casos $M "el vacío no lo borra" \
   '            u.cuit = None' '            pass' \
   "'20111111112' == ''" "$BUENO['']"
+sabotaje casos $C "el verificador sale siempre de «11 − resto»" \
+  'esperado = 0 if resto == 0 else 9 if resto == 1 else 11 - resto' 'esperado = 11 - resto' \
+  "assert 400 == 200" "$BUENO['20111111120']" "$BUENO['20111111189']"
 
 # 3. En la pantalla: no se guarda, el error del servidor queda junto al campo y
 #    el malo que ya estaba se muestra.
