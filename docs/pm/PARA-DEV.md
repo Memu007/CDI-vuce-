@@ -37,40 +37,24 @@ no dependa de cuántos hilos tenga el proceso. Puertas:
 
 Fuera: subir el tope de 1 s.
 
-## DOS-RELOJES: aceptada sobre `894bc67a` (informe `89d74bbe`) e integrada (2026-11-13 08:30 UTC)
+## CONFTEST-FORK: aceptada sobre `caad310a` (informe `3392daf4`) e integrada (2026-11-13 10:28 UTC)
 
-Integro `89d74bbe`. Acta `REPRODUCCION-DOS-RELOJES-2026-11-13.md`. **Traé mi
-rama con `merge`.** CONFTEST-TMP quedó en Git y en su acta. Sin D.
+Integro `70d5f962`. Acta `REPRODUCCION-CONFTEST-FORK-2026-11-13.md`. **Traé mi
+rama con `merge`.** Sin D.
 
-**Lo reproducido.** Tu preload, 4 de 4 «se cortó sin respuesta»; el viejo,
-1 «se cortó» y 3 «seguía retenida a los 10 s». Sobre `74e3cc74` sigue rc=1.
-`chequeo-6` igual. Mis negativos, una corrida cada uno: con la espera del
-producto en 14 s, «se cortó»; en 16 s, «seguía retenida a los 15 s de
-pedida». De `orden1b.sh` vi sólo la cola; los 30 `ROJO` son tuyos.
+**Lo reproducido.** El test, `1 passed` con tu SHA y `1 failed` («el hijo
+borró la base del padre») con el conftest de `fa6df9bc`. Usa el mismo
+`tests.conftest` que cargó pytest. Mi suite entera sobre `caad310a`: `1 failed,
+6110 passed, 110 skipped, 3 xfailed`, con el único rojo de D234, como la tuya.
+`chequeo-6` igual.
 
-**Ahora: CONFTEST-FORK** (sólo pruebas, `tests/conftest.py`). Base: mi
-commit de este veredicto. Hoy un hijo creado con `fork` hereda el `atexit`
-de `_borrar_db_de_prueba` y, si sale normal, borra la base del padre (el
-negativo está entero en `REPRODUCCION-CONFTEST-TMP-2026-11-13.md`).
-Comportamiento pedido: el hijo que sale no borra nada; el padre la sigue
-borrando al salir. Puertas, cada una con su salida en el informe:
+**Un dato para tu informe.** Decías que la puerta 2 no distingue: no
+distingue el defecto original, pero sí un arreglo pasado de rosca. Con la
+guarda que siempre vuelve (nadie borra), tu test queda verde y sólo la cuenta
+de `/tmp` lo muestra (4151 → 4152). Las dos puertas juntas cubren los dos
+lados.
 
-1. Ese negativo queda en `tests/` y la suite lo recolecta: `1 failed`
-   («el hijo borró la base del padre») con tu arreglo revertido, `1 passed`
-   con tu SHA. Que corra dentro de la suite entera, no sólo solo.
-2. Corrida sana: `ls /tmp/cdi_pytest_* | wc -l` antes y después de
-   `pytest tests/test_excel2d.py --no-cov` da lo mismo (el padre borra).
-3. La prueba del pool del acta (`ProcessPoolExecutor(4)`) sigue `1 passed`;
-   a mano, no hace falta dejarla en `tests/`.
-4. Suite entera sobre tu SHA: los `passed` de la base más uno y los mismos
-   rojos que la base (hoy trae el de EXCEL2D-RELOJ, arriba).
-
-Para la puerta 1 vale otra prueba que también distinga: ojo que
-`atexit._run_exitfuncs()` corre todos los cierres registrados, no sólo el del
-conftest.
-
-Fuera: SIGTERM (queda en la cola). Sugerencia, no criterio: borrar sólo
-desde el proceso que creó la base.
+**Ahora: EXCEL2D-RELOJ** (arriba).
 
 **Después de EXCEL2D-RELOJ: NAVEGADOR** (sólo arnés, tus pantallas).
 `pantalla_borrador1.js:41` abre el navegador por ruta fija y
