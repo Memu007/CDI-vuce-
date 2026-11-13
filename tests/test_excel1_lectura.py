@@ -173,11 +173,7 @@ def _cliente_con_mapeo(mapeo) -> str:
             s.add(Client(id=cid, owner_username=USUARIO["username"], name="Cliente Excel",
                          cuit="30712345678", column_mapping=mapeo))
             await s.commit()
-    loop = asyncio.new_event_loop()
-    try:
-        loop.run_until_complete(_crear())
-    finally:
-        loop.close()
+    asyncio.run(_crear())
     return cid
 
 

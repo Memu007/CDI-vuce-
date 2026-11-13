@@ -153,7 +153,7 @@ def test_g7_2_corte_por_vencimiento_devuelve_402(client):
     assert _me(client)["billing_status"] == "trial"
 
     # Vencer el trial en la base (ayer).
-    asyncio.new_event_loop().run_until_complete(
+    asyncio.run(
         _set_trial_ends_at(uname, datetime.now(timezone.utc) - timedelta(days=1))
     )
 
@@ -189,7 +189,7 @@ def test_g7_4_reactivacion_tras_corte_vuelve_a_active(client):
     _register(client, uname)
 
     # Llevarlo a past_due: vencer el trial y disparar el gate con una operación.
-    asyncio.new_event_loop().run_until_complete(
+    asyncio.run(
         _set_trial_ends_at(uname, datetime.now(timezone.utc) - timedelta(days=1))
     )
     corte = client.post("/api/operations/manual", json={"client_id": "x", "items": []})

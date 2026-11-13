@@ -146,7 +146,7 @@ def _leer(username: str) -> dict:
             return {"billing_status": u.billing_status, "trial_ends_at": u.trial_ends_at,
                     "mp_preapproval_id": u.mp_preapproval_id, "organization_id": u.organization_id,
                     "cancelar_sin_confirmar": u.cancelar_sin_confirmar}
-    return asyncio.new_event_loop().run_until_complete(_run())
+    return asyncio.run(_run())
 
 
 def _suscripto(client, prefijo, estado_mp="authorized", billing_status="active", dias=20):
@@ -514,7 +514,7 @@ def test_en_una_org_reactivar_lo_pagado_lleva_al_checkout(client, tipo, queda):
             db.add(PagoMercadoPagoAplicado(payment_id=_unique("pago"), cuenta=f"org:{org_id}", tipo=tipo))
             await db.commit()
             return
-    asyncio.new_event_loop().run_until_complete(_pago())
+    asyncio.run(_pago())
     assert client.post("/api/billing/cancel").status_code == 200
     r = client.post("/api/billing/reactivate")
     assert r.status_code == 200, r.text

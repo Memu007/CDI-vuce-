@@ -30,14 +30,6 @@ USUARIO = "roles_texto_ais2"
 RUTA_ADMIN = "/api/dev/stats"
 
 
-def _run(coro):
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
-
-
 async def _borrar():
     async with AsyncSessionLocal() as s:
         await s.execute(delete(User).where(User.username == USUARIO))
@@ -56,11 +48,11 @@ async def _crear(roles):
 def _limpio(monkeypatch):
     monkeypatch.delenv("ADMIN_USERNAMES", raising=False)
     yield
-    _run(_borrar())
+    asyncio.run(_borrar())
 
 
 def _pedir_como(roles):
-    _run(_crear(roles))
+    asyncio.run(_crear(roles))
     client = TestClient(main.app)
     client.cookies.set("access_token", create_access_token({"sub": USUARIO}))
     return client.get(RUTA_ADMIN)
@@ -82,10 +74,10 @@ def test_el_rol_admin_entero_entra(roles):
 def test_require_role_no_cuenta_admin_por_una_parte(roles):
     checker = require_role("auditor")
     with pytest.raises(main.HTTPException) as e:
-        _run(checker({"username": USUARIO, "roles": roles}))
+        asyncio.run(checker({"username": USUARIO, "roles": roles}))
     assert e.value.status_code == 403
 
 
 def test_require_role_con_el_rol_en_texto_entra():
     usuario = {"username": USUARIO, "roles": "auditor"}
-    assert _run(require_role("auditor")(usuario)) == usuario
+    assert asyncio.run(require_role("auditor")(usuario)) == usuario

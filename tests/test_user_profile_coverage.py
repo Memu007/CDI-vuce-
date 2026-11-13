@@ -116,7 +116,7 @@ def test_simulate_charge_sin_metodo_pago_trial(auth_override, client):
                 u.payment_method_last4 = None
                 await db.commit()
             return
-    asyncio.new_event_loop().run_until_complete(_set_trial())
+    asyncio.run(_set_trial())
 
     r = client.post("/api/billing/simulate-charge")
     assert r.status_code == 400
@@ -130,7 +130,7 @@ def test_simulate_charge_sin_metodo_pago_trial(auth_override, client):
                 u.billing_status = "active"
                 await db.commit()
             return
-    asyncio.new_event_loop().run_until_complete(_set_active())
+    asyncio.run(_set_active())
 
 
 def test_billing_me_devuelve_plan(auth_override, client):

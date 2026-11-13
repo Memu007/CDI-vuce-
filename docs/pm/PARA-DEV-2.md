@@ -3,40 +3,29 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## AJUSTE-BORRADOR: aceptada sobre `d094c24` (informe `fdaa2da`) e integrada (2026-11-13 09:30 UTC)
+## CUIT-PERFIL: aceptada sobre `af396041` (informe `9ed8b9a9`) e integrada (2026-11-13)
 
-Acta `REPRODUCCION-AJUSTE-BORRADOR-2026-11-13.md`. **Traé mi rama con
-`merge`.** valor1 quedó en Git y en su acta.
+Acta `REPRODUCCION-CUIT-PERFIL-2026-11-13.md`. **Traé mi rama con `merge`.**
+Reproduje el rojo (tus 5 casos con el `main.py` de `fdaa2da`), los 11
+sabotajes, `e2e_maria.sh` y las pantallas sobre `af396041`. El pytest entero
+sobre la unión con la rama de la Técnica: `6126 passed`, sin rojos. Tus cuatro supuestos, aceptados.
+z8 de `orden1`: leído y aceptado; tu forzado no lo reproduje (no quedó
+guion), y así consta en el acta.
 
-**Lo reproducido.** `pantalla_ajuste1.js`: `ROJA` sobre `a57b584` y verde
-sobre `d094c24`. `tests/test_valor1.py`: `76 passed`; con el `finalize.js` de
-`a647bee`, `1 failed` (el caso nuevo). `e2e_maria.sh` sobre `d094c24`, OK.
-`chequeo-6` igual al tuyo. Mi negativo: la guarda vuelta a poner sólo en
-Ajustes a deducir pone rojo el caso nuevo. Tus tres supuestos, aceptados.
+**D235: (a), decidido por la PM.** ESTUDIO-1 ya rechaza el verificador malo
+al guardar el CUIT del estudio; `/generate_maria` saltea esa regla para el
+CUIT del perfil y para `cuit_agr`. Va como pieza aparte, **CUIT-GENERAR**,
+después de SUFIJO-BORRADOR: primero los dos rojos (un TXT con un CUIT malo
+ya guardado en el perfil, y otro con `cuit_agr` malo), y el mensaje dice
+dónde corregirlo. El conteo de producción lo llevo yo a la nota del «dale».
 
-**D227: (a), decidido por la PM.** Lo leí igual que vos: ninguna línea le
-asigna valor a `sbtInput`. Va como pieza aparte, después de CUIT-PERFIL
-(abajo).
+**`00000000000`** pasa `cuit_valido` (lo encontró mi adversario): es de la
+función, no de tu pieza. Queda como riesgo; no lo toques sin tarea.
 
-**D234: (a), decidido por la PM.** Vuelve a la Técnica como devolución de
-EXCEL2D-RELOJ; lo reproduje con tu comando 4, 2 de 2. Es un escape mío.
-**Al día (11:39 UTC):** el test nuevo de la Técnica ya está en mi rama, y con
-él mi `pytest` entero da verde. Traé mi rama con `merge`. Si tu `pytest`
-entero trae ese rojo igual, informalo con su salida.
+Tus cuatro propuestas pasaron a `COLA-LIMPIEZA.md`.
 
 **Cómo sigue, en este orden:**
-1. **CUIT-PERFIL (D225)**, en curso. Producto, con datos: revisión fuerte
-   (§3: adversarios y sabotaje propio).
-   - Primero el camino de hoy: mostrá en rojo que «Mi perfil» (o la API que
-     usa) guarda un CUIT con el dígito verificador malo.
-   - `PUT /api/user/profile` rechaza un CUIT inválido y la pantalla muestra
-     el error (sugerencia: `cuit_valido`, `controles_maria.py:52`).
-   - Decí qué pasa con los perfiles que ya tengan uno inválido guardado, sin
-     cambiar datos guardados.
-   - En la misma pieza, `orden1`, `validacion1`, `cobro_corte1` y
-     `cobro_mp1_v2` pasan a `_cuit_perfil.js` (hoy cargan un CUIT inválido y
-     se pondrían rojos). `pantalla_orden1.js` ya es tuya.
-2. **SUFIJO-BORRADOR (D227)**, producto en `static/v2`. Primero un caso de
+1. **SUFIJO-BORRADOR (D227)**, producto en `static/v2`. Primero un caso de
    pantalla: sufijo de la operación, generar, volver, recargar, recuperar;
    el campo tiene que mostrar el sufijo guardado. Mostralo en rojo sobre el
    código de hoy; si no reproduce, se informa con la salida. Corre
@@ -44,9 +33,10 @@ entero trae ese rojo igual, informalo con su salida.
    `test_lo_que_se_esta_escribiendo_no_se_pisa` mira sólo Ajustes a
    deducir; sacar `document.activeElement !== incluir` (`finalize.js:451`)
    la deja en verde. Los dos campos como datos de ese caso.
+2. **CUIT-GENERAR (D235 a)**, producto con datos: revisión fuerte (§3).
 3. Los vencidos que quedan en `sabotajes-conocidos.txt`, uno por pieza.
 
-**Próxima D: D235.**
+**Próxima D: D236.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
