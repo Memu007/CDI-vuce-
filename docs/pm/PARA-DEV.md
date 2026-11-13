@@ -3,56 +3,61 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## DATOS1-DOS-OPERACIONES: aceptada sobre `53bd7df1` e integrada (2026-11-12 23:20 UTC)
+## REGISTRO-GUIONES: aceptada sobre `b832fc2` e integrada (2026-11-13 01:05 UTC)
 
-Integro tu rama hasta `67fef76b`. Acta `REPRODUCCION-DATOS1-DOS-OPERACIONES-2026-11-12.md`.
+Integro tu rama hasta `19f890a5`. Acta `REPRODUCCION-REGISTRO-GUIONES-2026-11-13.md`.
 **Traé mi rama con `merge`.**
 
-Reproducido sobre `53bd7df1`, con tu guion de esa versión: `test_datos1.py`
-11 passed; `datos1.sh` 22 `ROJO`, ningún `ROTO`, salida 0, y los dos nuevos
-con tu mismo texto; `chequeo-6` producto +0/−0, 0 avisos; `anclas_perdidas`
-sin nada de `datos1`. Mis negativos dan rojo por su razón: presupuesto sólo
-de la última operación («operación 1»), ítems de todas menos la primera
-(«ítems de la operación 1») y ítems de todas las operaciones de todos
-(«otro cliente»). Ese último con el caso de la base da **verde**: tu supuesto
-de mirar también los ítems ajenos suma un borde que nadie veía, queda. Tu
-riesgo del orden de `operaciones[0]` es sólo del guion, y mi negativo con
-`[-1]` muestra que el caso sigue en rojo con el orden al revés: queda anotado.
+Reproducido sobre `b832fc2`: `chequeo-6` producto +0/−0, 0 avisos; tu
+medición, 13 en la base y 0 después; doce pantallas de a una, cada una con
+servidor y base nuevos, con los mismos cuatro rojos que en `08ae9654`; y
+enteros `sabotajes/estudio1.sh`, `sabotaje_maria9.sh`,
+`sabotaje_separadores1.sh` y `sabotajes/destino1.sh`: los cuatro con
+salida 0, sin `ROTO` y sin «registro: 4xx». Ningún otro guion llama a las 13
+de la base (medido por llamada, no por mención). Mi negativo, en otro borde que tu 429: registrar dos veces la misma cuenta corta
+con `registro: 400 {"detail":"Usuario ya existe"}`. No corrí las otras 16
+pantallas, tu `csrf1` con `CSRF_ENFORCE` ni tu 429 con proxy: el acta lo dice.
 
-## Tarea activa (2026-11-12 23:20 UTC): el registro de los guiones de pantalla, sólo arnés
+**Escape mío.** La puerta decía que `sabotaje_maria1c`, `4`, `7` y `9` corren
+sus pantallas «medido con grep». Sólo `maria9` corre la suya; en los otros
+tres es un comentario. La puerta de `maria4` que diste por no cumplida no
+correspondía: no cuenta contra la entrega.
 
-De `COLA-LIMPIEZA.md` (la línea de `pantalla_destino1.js`). La premisa,
-mirada: `pantalla_destino1.js:21` hace el `POST /auth/register` y no lee la
-respuesta; si el registro falla (por ejemplo, el tope por IP), el guion
-sigue y cae más adelante en algo que no dice por qué. No es el único: un
-grep grueso mío (el `auth/register` sin `ok()` ni `status()` en las tres
-líneas siguientes) marca 15 guiones `scripts/testing/*.js`, entre ellos
-`pantalla_catalogo_ncm1`, `pantalla_excel1`, `pantalla_maria1b` y
-`pantalla_separadores1`. Puede tener falsos positivos: la lista exacta la
-medís vos.
+**D209: (a), MARIA.** Le queda como paso 2 de su cola (`PARA-DEV-2.md`).
 
-**Pedido:** todo guion de pantalla que registra una cuenta, si el registro
-no da 2xx, falla en ese momento diciendo el status y el cuerpo. El chequeo
-queda una sola vez, donde pasan todos (§6); un ayudante al lado de
-`_ip_nueva.js` es una forma (sugerencia).
+## Tarea activa (2026-11-13 01:05 UTC): un corredor de todas las pantallas, sólo arnés
+
+La premisa, mirada: `maria3`, `maria4`, `maria5` y `subitems1` estuvieron
+rojas tres semanas y nadie lo vio, porque ningún guion las corre; cada una
+se corre a mano, levantando servidor y base. No sé cuántas más están así:
+medilo vos.
+
+**Pedido:** un comando que corre todas las `scripts/testing/pantalla_*.js`
+sobre un SHA, cada una con su servidor y su base nuevos, y escribe una línea
+por pantalla con su salida y su última línea, y al final un resumen. Lo que
+una pantalla necesita para correr (por ejemplo, `CSRF_ENFORCE=true` en
+`csrf1`, o un archivo de entrada) lo dice la pantalla misma, no una lista
+aparte en el corredor (sugerencia: un comentario de cabecera que el corredor
+lee). Sin esperas fijas: espera `/health`.
 
 **Puertas:**
-- La lista exacta de guiones que hoy registran sin mirar, medida, y después
-  del cambio, ninguno.
-- Una vez, con el chequeo sacado: un guion de los tocados contra un servidor
-  que rechaza el registro sigue de largo; con el chequeo, falla diciendo el
-  status. Uno basta (no es §3).
-- Cada guion tocado, corrido sobre tu SHA, sigue en verde. Los que corre un
-  guion de sabotaje (`sabotaje_maria1c`, `4`, `7` y `9` los llaman, lo medí
-  con grep), con la base en verde de ese guion; no hace falta correr sus
-  sabotajes.
+- La lista medida de pantallas que hoy no corre ningún guion (llamada, no
+  mención).
+- Sobre tu SHA: la línea de cada pantalla coincide con correrla sola sobre
+  el mismo SHA. Mostrás al menos una roja y una verde que coinciden. No pido
+  «exactamente cuatro rojas»: MARIA está arreglando esas.
+- Una vez, con un sabotaje a mano en una pantalla verde, su línea pasa de
+  verde a roja y el resumen cuenta una roja más que sin el sabotaje (hoy ya
+  termina distinto de 0 por las de MARIA). Uno basta (no es §3).
 - `chequeo-6` entero: producto +0/−0.
 
-Sin adversarios. No toques las entradas de `test_email1` ni de
-`IS_PRODUCTION` de la cola: son de la comparación.
+Sin adversarios. No toques `maria3`, `maria4`, `maria5` ni `subitems1`:
+las está arreglando MARIA. Si alguna de esas necesita algo para correr (una
+cabecera, por ejemplo), lo anotás en el informe y no lo hacés; en las demás,
+la cabecera la ponés vos.
 
 Lo de D182 / D206 sigue igual: si Emi dice que sí, dejás esto donde esté.
-D205, D206 y D208 siguen con Emi. Tu rango libre: D209 a D215.
+D205, D206 y D208 siguen con Emi. Tu rango libre: D210 a D215.
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 
