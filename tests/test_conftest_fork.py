@@ -1,5 +1,6 @@
-import atexit
 import os
+
+from tests import conftest
 
 
 def test_un_hijo_que_sale_no_borra_la_base_del_padre():
@@ -7,8 +8,9 @@ def test_un_hijo_que_sale_no_borra_la_base_del_padre():
     assert os.path.exists(ruta)
     pid = os.fork()
     if pid == 0:
+        # Sólo el cierre del conftest: los demás atexit podrían borrar cosas del padre.
         try:
-            atexit._run_exitfuncs()  # lo que hace un hijo que sale normal
+            conftest._borrar_db_de_prueba()
         finally:
             os._exit(0)
     os.waitpid(pid, 0)
