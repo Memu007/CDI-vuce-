@@ -491,6 +491,13 @@ def test_lo_que_se_esta_escribiendo_no_se_pisa():
     assert r["els"]["valorDeducir"]["value"] == "12"
 
 
+def test_un_ajuste_mal_escrito_se_ve_en_el_campo_que_llega_vacio():
+    # La página se recargó: el campo arranca vacío y la operación trae el texto.
+    campos = {"ajustes_incluir": "valorIncluir", "ajustes_deducir": "valorDeducir"}
+    vistos = {el: _pantalla({campo: "1-2"}, "", VALOR)["els"][el]["value"] for campo, el in campos.items()}
+    assert vistos == {"valorIncluir": "1-2", "valorDeducir": "1-2"}
+
+
 def _avisos(despues):
     """refrescarAvisos de verdad, con CDI.api que contesta cuando se le dice."""
     stubs = ("let ultimoValor = null; let cuentasCon = null; let avisosSeq = 0;\n"
@@ -561,8 +568,6 @@ def test_las_cuentas_se_ven_y_el_error_tambien():
     r = _pantalla({"ajustes_deducir": "mal escrito"}, "", {"error": "Ajustes a deducir: x"})
     assert r["els"]["valorError"]["hidden"] is False
     assert r["els"]["valorError"]["textContent"] == "Ajustes a deducir: no es un número. Ajustes a deducir: x"
-    # El campo llega vacío (la página se recargó) y muestra lo que el aviso nombra.
-    assert r["els"]["valorDeducir"]["value"] == "mal escrito"
     assert r["els"]["valorCuentas"]["innerHTML"] == ""
     assert r["els"]["valorCalcularSeguro"]["hidden"] is True
 
