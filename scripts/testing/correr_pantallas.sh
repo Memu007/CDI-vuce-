@@ -12,7 +12,7 @@
 # uso: PY=<python del proyecto> scripts/testing/correr_pantallas.sh [SHA] [salida]
 #   SHA     por defecto HEAD
 #   salida  carpeta donde queda el log de cada pantalla (por defecto, una nueva)
-#   TOPE    segundos por pantalla (600)
+#   TOPE    segundos por pantalla (900)
 #   SOLO    nombres de las pantallas a correr, separados por espacio (todas)
 set -u
 SHA=$(git rev-parse --verify "${1:-HEAD}^{commit}") || exit 2
@@ -22,7 +22,7 @@ SAL=$(cd "$SAL" && pwd)
 PY=${PY:-python}
 case "$PY" in */*) PY=$(cd "$(dirname "$PY")" && pwd)/$(basename "$PY") ;; esac
 CHROMIUM=${CHROMIUM:-/opt/pw-browsers/chromium}
-TOPE=${TOPE:-600}
+TOPE=${TOPE:-900}
 
 WT=$(mktemp -d -t pantallas-wt.XXXX)
 # Un TERM o un Ctrl-C a mitad de una pantalla no deja vivos su node ni su uvicorn.

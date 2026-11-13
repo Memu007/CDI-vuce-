@@ -121,6 +121,28 @@ async function entrar(ctx, usuario) {
   if (!r.ok()) falla('no se pudo volver a entrar como ' + usuario + ': ' + r.status());
 }
 
+// Cada consulta de usuario de la pestaña vuelve a los 3 s, y ninguna antes de que llegue la
+// de Generar: así Generar comprueba la sesión, lenta pero bajo el tope. Devuelve si llegó.
+async function demorarHastaGenerar(p) {
+  let abrirPuerta, llego = false;
+  const puerta = new Promise(r => { abrirPuerta = r; });
+  await p.route('**/auth/current_user', async ruta => {
+    const demora = new Promise(r => setTimeout(r, 3000));
+    if (ruta.request().headers()['x-arnes-generar']) { llego = true; abrirPuerta(); }
+    await Promise.all([demora, puerta]);
+    return ruta.continue().catch(() => {});
+  });
+  await p.evaluate(() => {
+    const original = window.fetch;
+    window.fetch = function (url, opciones) {
+      if (String(url).endsWith('/auth/current_user') && new Error().stack.includes('generateMaria'))
+        opciones = { ...opciones, headers: { ...(opciones && opciones.headers), 'x-arnes-generar': '1' } };
+      return original.call(this, url, opciones);
+    };
+  });
+  return () => llego;
+}
+
 // Con `pestana`, la página arranca con ese id de pestaña en sessionStorage,
 // como la duplica o la restaura el navegador; sólo en la primera carga.
 async function abrir(ctx, pestana) {
@@ -1480,13 +1502,13 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const t = await abrir(ctx);
     await t.waitForLoadState('networkidle');  // como en (m)
     await listaParaGenerar(t, 'GEN-Z22');
-    const soltar = await retenerUsuario(t, 3000);
+    const comprobo = await demorarHastaGenerar(t);
     const salida = await salir(ctx);
     if (!salida.ok()) falla('no se pudo salir: ' + salida.status());
     await entrar(ctx, a);
     const fin = await apretarGenerar(t);
-    soltar();
     if (fin !== 'generado') falla(que + ' y no generó: ' + fin);
+    if (!comprobo()) falla(que + ' y Generar no comprobó la sesión');
     const s = await enElServidor(a);
     if (s.operaciones !== 1) falla(que + ' y A tiene ' + s.operaciones + ' operaciones en el servidor');
     console.log('OK ' + que + ': genera sin falsos bloqueos');
