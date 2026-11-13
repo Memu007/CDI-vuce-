@@ -181,6 +181,12 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `scripts/testing/sabotaje_maria3.sh`: contar los casos en `caso` en vez de a
   mano; el ancla de transacción copia toda la lista de tablas; tres pares
   ancla/reemplazo repetidos entre SQLite y Postgres (propuestas de MARIA, D216–D220).
+- Guiones de `scripts/testing/sabotajes/` que tiran la salida del chequeo de
+  base (`>/dev/null 2>&1`): una base roja dice sólo `BASE  | …` (113 líneas en
+  58 guiones). `catalogo_largo2.sh` ya muestra la cola con `base_en_verde`:
+  pasarla a `_entorno_comun.sh` (MARIA, D218).
+- `catalogo3_postgres.py`: `entorno()` devuelve el entorno entero; en los
+  arneses vecinos devuelve sólo lo que pisa. Unificar el contrato (MARIA, D218).
 
 ## Riesgos que esperan a Emi (no son tareas: no se toman de esta cola)
 

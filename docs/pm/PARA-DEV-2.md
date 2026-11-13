@@ -3,62 +3,57 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D199 y `sabotaje_valor1.sh`: aceptadas sobre `fe0f1b4` e integradas (2026-11-13 00:31 UTC)
+## D218 y D219: aceptadas sobre `1f8ffa6` e integradas (2026-11-13 02:22 UTC)
 
-Integro tu informe `4b5ef688`, no la punta de tu rama (que ya trae D218/D219
-a medio hacer). Acta: `REPRODUCCION-D199-VALOR1-2026-11-13.md`.
+Integro tu informe `166c46c5`, no la punta de tu rama (`0ec63435`, que ya
+trae PANTALLAS-MARIA sin revisar). Acta: `REPRODUCCION-D218-D219-2026-11-13.md`.
 **Traé mi rama con `merge`.**
 
-**Lo reproducido, con los guiones de `fe0f1b4`.** `catalogo3.sh`: 51 `ROJO`,
-`fallas: 0`, salida 0, con el de D199 en rojo por «Industrias Garc».
-`catalogo_largo2.sh` con Postgres 16: 37 `ROJO`, `fallas: 0`, salida 0.
-`sabotaje_valor1.sh`: 30 `ROJO` y la `FALLA` de `mal_escrito_se_borra`,
-salida 1. `chequeo-6` y `anclas_perdidas` coinciden con tu informe. Negativo
-mío: `NFD`→`NFKC` da 6 failed en `test_catalogo3.py`. Escape mío otra vez: la
-primera corrida la hice con los guiones de mi rama; queda en el acta.
+**Lo reproducido, con los guiones de `1f8ffa6`.** `catalogo_largo2.sh` entero
+con Postgres 16 y consola limpia (`env -u DATABASE_URL -u ENVIRONMENT`):
+38 `ROJO`, ningún `ROJO?`, `VERDE`, `ROTO` ni `BASE`, `fallas: 0`, salida 0.
+`catalogo3_postgres.py` solo, consola limpia: en `d5a96aa` corta en el
+`RuntimeError` que encontró tu adversario; en `1f8ffa6` da 10 `OK`, salida 0.
+`chequeo-6` en tus tres tramos: +0/−0, 0 avisos. Mutaciones mías en
+`catalog_service.py` con los cuatro `test_catalogo*`: resumen sacado de
+`nombre` → 1 failed (tu dato nuevo); separador `-` → 4 failed. No corrí el
+camino de base roja de `base_en_verde` (lo leí): queda en el acta.
 
-**D221: (b), se retira el 13.** Lo confirmé: todo error de `montos_ar.js`
-lleva `valor: null`, el sabotaje 5 de `separadores1b` aplicado a mano da 4
-failed (entre ellos `[abc-ajusteDelPedido]`), y el 14 de `valor1` sigue
-nombrando la prueba del pedido.
+**D223: (a).** Un sabotaje del candado en `catalogo_largo2.sh`; el
+`lock_timeout` queda como riesgo anotado.
+**D224: (a).** Dos datos más en la misma prueba: clave de 60 entera, de 61
+cortada. Lo confirmé: `<=`→`<` hoy da 186 passed.
+Las dos, como una pieza chica, después de PANTALLAS-MARIA.
 
-**D222: (a), se retira el 24. Pero las guardas no van a la cola como
-limpieza.** Tu premisa es que la pantalla no produce el estado donde la guarda
-actúa. Leyendo el código, sí lo produce: recuperar un borrador.
-`guardarBorrador` (`app_v2.js:1082`) guarda la operación con el ajuste mal
-escrito; al recargar, `adoptarBorrador` la trae, el campo arranca vacío
-(`dashboard_v2.html:622`), `pintarValor(null)` corre al entrar
-(`finalize.js:90`) y la guarda (`:451`, `:454`) no lo copia. El aviso
-(`:475–476`) dice «Ajustes a incluir: …» y el pedido manda ese texto, pero el
-campo se ve vacío. Es lectura mía, **no lo vi en un navegador.**
+Tus dos líneas para `COLA-LIMPIEZA.md` (la línea `BASE` muda y el contrato
+de `entorno()`) ya están en la cola.
+
+**`maria7` y `maria1c` no son tuyas.** En el corredor nuevo de la Técnica
+salen rojas a veces; se las doy a ella (D210 (b)). No las toques.
 
 **Cómo sigue, en este orden:**
-1. D218 y D219, como venías.
-2. **PANTALLAS-MARIA** (D209 de la Técnica, agregado 00:44 UTC).
-   `pantalla_maria3`, `maria4`, `maria5` y `subitems1` dan rojo desde
-   MARIA-7 (24/10) y ningún guion los corre, así que nadie lo vio. Lo
-   reproduje en `08ae9654` y en `b832fc2`, igual. `maria5` y `subitems1`
-   cortan en «Falta el CUIT del despachante (CDDTAGR)…». `maria3` (espera un
-   `POST /generate_maria` que no llega) y `maria4` («Generar» deshabilitado)
-   **no tienen causa confirmada**: empezá por ahí. Vos decidís si el guion
-   carga el CUIT en el perfil o elige un estudio en la operación. Puerta: los
+1. **PANTALLAS-MARIA**, como venías (`0ec63435`). La puerta no cambia: los
    cuatro, cada uno con servidor y base nuevos, salen 0, y mostrás una vez el
-   rojo de hoy de cada causa. Sólo arnés; si la causa resulta de producto,
-   frená y avisá.
-3. Retirar los sabotajes 13 y 24 de `valor1`. Como tocás el guion, reanclá en
-   código el 10 (hoy en un comentario, línea 108) y el 28 (comentario al final
-   de la línea 187): es la regla de la familia D168 en `COLA-LIMPIEZA.md`.
+   rojo de hoy de cada causa. Ahora también se puede con
+   `scripts/testing/correr_pantallas.sh <SHA>` de la Técnica: las cuatro
+   tienen que salir verdes ahí. Si alguna necesita algo para correr, la
+   cabecera `// corredor: …` la ponés vos. Sólo arnés; si la causa resulta de
+   producto, frená y avisá.
+2. **D223 + D224**, una pieza.
+3. Retirar los sabotajes 13 y 24 de `valor1` y reanclar en código el 10
+   (comentario, línea 108) y el 28 (comentario al final de la línea 187).
    Puerta: `valor1` entero da 29 `ROJO` y salida 0, y su línea sale de
    `sabotajes-conocidos.txt`.
 4. **AJUSTE-BORRADOR** (producto). Primero un caso de pantalla: ajuste mal
    escrito, borrador guardado, recargar, recuperar; el caso pide que el campo
-   muestre lo que el aviso nombra. Mostralo en rojo sobre el código de hoy.
-   Si da rojo, arreglalo (sugerencia: sacar las dos guardas resta antes de
-   sumar). Si no reproduce, informalo con la salida y las guardas pasan a la
-   cola. Producto en `static/v2`: corre `e2e_maria.sh`.
+   muestre lo que el aviso nombra (`guardarBorrador`, `app_v2.js:1082`;
+   `adoptarBorrador`; la guarda en `finalize.js:451`/`:454`). Mostralo en rojo
+   sobre el código de hoy. Si da rojo, arreglalo (sugerencia: sacar las dos
+   guardas resta antes de sumar). Si no reproduce, informalo con la salida y
+   las guardas pasan a la cola. Producto en `static/v2`: corre `e2e_maria.sh`.
 5. Los vencidos que quedan en `sabotajes-conocidos.txt`, uno por pieza.
 
-**Próxima D: D223.**
+**Próxima D: D225.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
