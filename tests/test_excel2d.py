@@ -177,23 +177,26 @@ def test_la_subida_cara_no_frena_a_nadie(subida):
     libro = libro()
     assert len(libro) < 1_500_000
     # Otro hilo marca el paso: con el GIL retenido por openpyxl se quedaba 9 s.
-    pasos, listo = [time.perf_counter()], threading.Event()
+    # Se mide CPU del proceso y no reloj: un runner cargado alarga el reloj, no la CPU.
+    pasos, listo = [time.process_time()], threading.Event()
 
     def marcar():
         while not listo.is_set():
             time.sleep(0.01)
-            pasos.append(time.perf_counter())
+            pasos.append(time.process_time())
     otro = threading.Thread(target=marcar)
     otro.start()
-    inicio = time.perf_counter()
+    inicio = time.process_time()
     try:
         nombre = "factura.xls" if ".xls" in subida else "factura.xlsx"
         r = TestClient(main.app).post("/upload_excel_v2/", files={"file": (nombre, libro)})
     finally:
         listo.set()
         otro.join()
+    frenado = max(b - a for a, b in zip(pasos, pasos[1:]))
+    assert frenado < 1, f"el otro hilo no avanzó mientras el proceso gastó {frenado:.2f} s de CPU"
+    gasto = time.process_time() - inicio
+    assert gasto < segundos, f"la subida gastó {gasto:.2f} s de CPU"
     assert r.status_code == status, r.text[:300]
     if palabra:
         assert palabra in r.json()["detail"]
-    assert time.perf_counter() - inicio < segundos
-    assert max(b - a for a, b in zip(pasos, pasos[1:])) < 0.5
