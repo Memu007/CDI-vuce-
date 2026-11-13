@@ -15,7 +15,7 @@ const CUIT = 'El CUIT del importador';
 const MONEDA = 'Falta la moneda de la operación.';
 function falla(msg) { console.error('FALLA: ' + msg); process.exit(1); }
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const b = await chromium.launch();
   const page = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
