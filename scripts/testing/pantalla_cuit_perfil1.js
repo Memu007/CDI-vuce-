@@ -12,6 +12,12 @@ const base = process.env.BASE_URL || 'http://127.0.0.1:8822';
 const baseLocal = process.env.CDI_DB || falla('falta CDI_DB: la base sqlite local del servidor, para sembrar un CUIT guardado');
 const MALO = '20-99999999-8', BUENO = '20-11111111-2';
 const sinGuiones = c => c.replace(/-/g, '');
+// Deja un CUIT en el perfil sin pasar por la API, que no lo guardaría.
+function sembrar(usuario, cuit) {
+  execFileSync('python3', ['-c',
+    'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); n=c.execute("UPDATE users SET cuit=? WHERE username=?", (sys.argv[3], sys.argv[2])).rowcount; c.commit(); sys.exit(0 if n == 1 else 1)',
+    baseLocal, usuario, cuit]);
+}
 
 (async () => {
   const b = await chromium.launch();
@@ -57,9 +63,7 @@ const sinGuiones = c => c.replace(/-/g, '');
   if (fin !== 'guardado' || p.cuit !== sinGuiones(BUENO)) falla('con ' + BUENO + ' terminó en «' + fin + '» y el perfil quedó con «' + p.cuit + '»');
   console.log('OK ' + BUENO + ' se guarda como ' + p.cuit);
 
-  execFileSync('python3', ['-c',
-    'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); n=c.execute("UPDATE users SET cuit=? WHERE username=?", (sys.argv[3], sys.argv[2])).rowcount; c.commit(); sys.exit(0 if n == 1 else 1)',
-    baseLocal, usuario, sinGuiones(MALO)]);
+  sembrar(usuario, sinGuiones(MALO));
   await abrir();
   const visto = await page.inputValue('#pfCuit');
   if (visto !== MALO) falla('con ' + MALO + ' ya guardado, el campo muestra «' + visto + '»');
