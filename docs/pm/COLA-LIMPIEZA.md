@@ -207,9 +207,11 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `SELECT` (hasta `movidas = choques = 0`) sale verde: falta un caso que lo
   distinga. `lock_timeout` sigue sin sabotaje (MARIA, D223).
 - `scripts/testing/catalogo3_postgres.py:218`: `esperando_candado` espera
-  hasta 120 s fijos; y `tests/conftest.py:17` deja un `cdi_pytest_*.db` por
-  corrida en `/tmp` (contados 3869, 1,4 G): borrarlo al terminar (asignado a
-  la Técnica, CONFTEST-TMP).
+  hasta 120 s fijos.
+- `tests/conftest.py` `_borrar_db_de_prueba`: un hijo creado con `fork` hereda
+  el `atexit` y, si sale normal, borra la base del padre (negativo en
+  `REPRODUCCION-CONFTEST-TMP-2026-11-13.md`; hoy ninguna prueba hace `fork`).
+  Con SIGTERM (`timeout`) el archivo queda, como antes; leído, no corrido.
 - `tests/test_excel2d.py` `_otro_hilo_listo`: el testigo gasta CPU propia y,
   si coincide en `R` con una espera, la tapa (verde falso); un hilo trabado
   en disco (`D`) cuenta como espera. Cargas medidas sólo de CPU (Técnica,
