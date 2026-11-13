@@ -191,12 +191,11 @@
         if (estudio) estudio.addEventListener('change', programar);
     }
 
-    // El campo muestra el sufijo guardado con la operación. Sin uno guardado
-    // queda lo que tiene: «Generar» lo toma de ahí.
+    // El campo muestra el sufijo de la operación en curso, vacío si no tiene:
+    // «Generar» y la tarjeta del despachante lo toman de ahí.
     function pintarSufijo() {
         const campo = document.getElementById('sbtSufijoValor');
-        const guardado = ((CDI.state || {}).operacion || {}).sbt_sufijo_valor;
-        if (campo && guardado) campo.value = guardado;
+        if (campo) campo.value = ((CDI.state || {}).operacion || {}).sbt_sufijo_valor || '';
     }
 
     // SEPARADORES-1d (D25): el flete y el seguro van al TXT con dos
