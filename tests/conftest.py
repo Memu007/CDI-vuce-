@@ -17,12 +17,16 @@ os.environ['SENTRY_DSN'] = ''  # Disable Sentry in tests
 # por cada conexión async, lo que rompe tests que abren más de una sesión.
 _test_db_fd, _test_db_path = tempfile.mkstemp(suffix='.db', prefix='cdi_pytest_')
 os.close(_test_db_fd)
+_pid_creador = os.getpid()
 
 
 @atexit.register
 def _borrar_db_de_prueba():
     # atexit y no pytest_sessionfinish: también corre si la corrida se corta
     # antes de la sesión. Con la base se van su -journal, -wal y -shm.
+    # Un hijo con fork hereda este atexit: la base es del padre.
+    if os.getpid() != _pid_creador:
+        return
     for ruta in glob.glob(glob.escape(_test_db_path) + '*'):
         with contextlib.suppress(FileNotFoundError):
             os.remove(ruta)
