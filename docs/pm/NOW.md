@@ -111,23 +111,8 @@ antes de cerrar la Fase 3.
 5. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
    de mandárselo al despachante. El código publicado corta el país a dos
    letras: si la lectura devuelve «CHN» o «China», sale Suiza.
-6. **Límite de uso de la cuenta:** lo tocó dos veces el 2026-10-07: entre
-   las ~02:05 y las 03:40 UTC, y entre las ~18:34 y las 18:50 UTC (las dos
-   Devs quedaron paradas; la PM las despertó a las 18:56). Por la regla de
-   Emi (`DECISIONS.md`), **hoy se compacta desde el 30 % las Devs y el 40 %
-   las PMs**; mañana vuelve a 60 y 50.
 7. **No pedirle a ningún asistente cambios sobre `main`:** desde el
    2026-10-07 `main` tiene las reglas nuevas, pero cada push publica.
-8. **Decidido por la PM (2026-10-29), D de COBRO-MP-1:** D8 (a), las
-   consultas a Mercado Pago a un hilo con tope van en una tarea aparte
-   después de esta tanda; D9 (b), una renovación sin pago identificado
-   responde 503 para que Mercado Pago reintente; D10 (a), el botón que
-   queda en «Abriendo…» se arregla recargando (riesgo aceptado).
-9. **Emi respondió lo pendiente (04/11, `DECISIONS.md`):** `8b45207`
-   probada y funciona; sí a COBRO-MP-3, CSRF-1 (con D16 b),
-   CATALOGO-LARGO-1 y SEGURO-2; fechas re-estimadas, el piloto cierra el
-   07/02. Las claves las cambia ella más adelante.
-
 10. **Pieza CATALOGO-3 aceptada el 10/11, sin publicar.** Las facturas
    chinas ya no mezclan catálogos ni se pisan entre sí.
    **Para decidir más adelante (recomiendo sí): CATALOGO-4.** Cuando dos
@@ -266,7 +251,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-13 17:56 UTC: sin entregas nuevas. Rutina de la Técnica apagada (sin pieza, su cola espera a Emi; se prende con su sí). MARIA corre su suite de la devolución de SUFIJO-BORRADOR.
+2026-11-13 18:20 UTC: Emi pidió publicar; preparo 7436c6e5 (detalle en el /compact conservar). Técnica sin pieza, rutina apagada; MARIA en la devolución de SUFIJO-BORRADOR.
 
 ## /compact conservar de la PM principal
 
