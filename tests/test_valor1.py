@@ -468,10 +468,11 @@ def test_al_escribir_un_ajuste_el_boton_se_esconde_hasta_que_vuelvan_las_cuentas
               "sbtSufijoValor": "sbt_sufijo_valor"}
     vistos = {}
     for campo in campos:
-        r = _pantalla({}, f"enlazarValor(); const c = el('{campo}'); c.value = '500';"
-                          " (c.listeners.input || (() => 0))();", VALOR)
-        vistos[campo] = (r["op"], r["els"]["valorCalcularSeguro"]["hidden"])
-    assert vistos == {campo: ({atributo: "500"}, True) for campo, atributo in campos.items()}
+        # El pedido de las cuentas nuevas sale con un reloj: acá corre en el acto.
+        r = _pantalla({}, f"globalThis.setTimeout = f => f(); enlazarValor(); const c = el('{campo}');"
+                          " c.value = '500'; (c.listeners.input || (() => 0))();", VALOR)
+        vistos[campo] = (r["op"], r["els"]["valorCalcularSeguro"]["hidden"], r["refrescos"])
+    assert vistos == {campo: ({atributo: "500"}, True, 1) for campo, atributo in campos.items()}
 
 
 def test_mientras_se_rehacen_las_cuentas_no_se_calcula_con_las_viejas():

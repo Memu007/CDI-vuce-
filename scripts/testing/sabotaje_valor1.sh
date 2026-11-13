@@ -170,7 +170,12 @@ caso "boton_con_cuentas_viejas" "FAILED $T::test_al_escribir_un_ajuste_el_boton_
 # 23b. el sufijo de la operación se escribe sin guardarse ni dejar viejas las cuentas
 reemplazar $JS "valorDeducir: 'ajustes_deducir',
                          sbtSufijoValor: 'sbt_sufijo_valor' };" "valorDeducir: 'ajustes_deducir' };"
-caso "sufijo_sin_guardar" "{'sbtSufijoValor': ({}, False)} != {'sbtSufijoValor': ({'sbt_sufijo_valor': '500'}, True)}"
+caso "sufijo_sin_guardar" "{'sbtSufijoValor': ({}, False, 0)} != {'sbtSufijoValor': ({'sbt_sufijo_valor': '500'}, True, 1)}"
+
+# 23c. se escribe y las cuentas nuevas no se piden: el botón queda escondido
+reemplazar $JS '                programar();
+' ''
+caso "sin_pedir_cuentas" "{'sbtSufijoValor': ({'sbt_sufijo_valor': '500'}, True, 0)} != {'sbtSufijoValor': ({'sbt_sufijo_valor': '500'}, True, 1)}"
 
 # 24. el seguro sugerido de otra operación se usa
 reemplazar $JS '        if (!cuentasCon || cuentasCon !== ahora) {' '        if (false) {'
@@ -202,4 +207,4 @@ reemplazar $JS '        cuentasCon = firma || null;' '        cuentasCon = null;
 caso "sin_operacion_no_calcula" "FAILED $T::test_sin_operacion_todavia_el_boton_igual_pone_el_seguro"
 
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
-echo "OK: los 31 sabotajes dan rojo por la razón esperada"
+echo "OK: los 32 sabotajes dan rojo por la razón esperada"
