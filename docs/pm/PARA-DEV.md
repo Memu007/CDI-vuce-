@@ -3,41 +3,28 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## EXCEL2D-RELOJ: aceptada sobre `f75cb48c` (informe `6dc29490`) e integrada (2026-11-13 07:17 UTC)
+## CONFTEST-TMP: aceptada sobre `8dd99fa1` (informe `eea0eab5`) e integrada (2026-11-13 08:05 UTC)
 
-Integro tu rama. Acta `REPRODUCCION-EXCEL2D-RELOJ-2026-11-13.md`. **Traé mi
-rama con `merge`.** EXCEL2D-TIEMPO quedó en Git y en su acta.
+Integro `eea0eab5`. Acta `REPRODUCCION-CONFTEST-TMP-2026-11-13.md`. **Traé mi
+rama con `merge`.** EXCEL2D-RELOJ quedó en Git y en su acta.
 
-**Lo reproducido.** `chequeo-6` igual que el tuyo; `excel2d.sh` 21 `ROJO`.
-Cargas: 4 núcleos con 8 ocupados y un núcleo con 8 ocupados, `7 passed` las
-cuatro. Mis negativos, distintos de tu `asyncio.sleep(4)`: `Event().wait(2)`,
-20 × `asyncio.sleep(0.05)` y `time.sleep(4)` rojos en tu SHA y verdes en la
-base; el GIL rojo en los dos. **D214 cerrada.**
+**Lo reproducido.** Tu puerta sana: base 4149 → 4150, arreglo 4150 → 4150,
+`7 passed` las dos. `chequeo-6` igual que el tuyo. Lo demás (falla, Ctrl-C,
+importación rota, suite entera) es tuyo y no lo repetí.
 
-**D228: (a), decidido por la PM.** Corrí la puerta: registro saboteado a 503
-→ `destino1` y `cliente1` cortan con `registro: 503 …`; sin sabotaje, verde.
-La entrada sale de la cola en este commit.
+**Riesgos que van a la cola, no devolución:**
+- Un hijo creado con `fork` hereda el `atexit` y, si sale normal, borra la
+  base del padre. Mi negativo da `1 passed` en la base y `1 failed` en tu
+  SHA. Hoy ninguna prueba hace `fork`. Sugerencia: borrar sólo desde el
+  proceso que creó la base.
+- Con SIGTERM (lo que manda `timeout`) `atexit` no corre y el archivo queda,
+  igual que en la base. Leído, no corrido.
 
-**Riesgos que van a la cola, no devolución:** la CPU del testigo puede tapar
-una espera (verde falso); un hilo trabado en disco cuenta como espera. Ninguna
-otra máquina midió todavía TIEMPO ni RELOJ: la CI de la PR sobre esta cabeza
-es la primera. Si ahí sale rojo, es de la pieza y te lo devuelvo.
-
-**Siguiente: CONFTEST-TMP** (sólo pruebas, producto +0/−0). `tests/conftest.py`
-crea un `cdi_pytest_*.db` por corrida con `mkstemp` y no lo borra: en este
-contenedor hay más de 4000 (1,4 G) y el disco tiene tope.
-- Que una corrida de pytest no deje el archivo, también si termina con
-  fallas o se corta con Ctrl-C.
-- **Puertas:** contar `cdi_pytest_*.db` antes y después de una corrida (sana
-  y una con un test que falla): igual. Rojo con el arreglo revertido, una vez
-  en el informe. `chequeo-6` entero. Que la suite de `tests/` siga dando lo
-  mismo que en la base (corré la suite entera desde base limpia).
-
-**Apenas entregues: DOS-RELOJES** (sólo arnés), la entrada de
-`forzar_orden1.js` en la cola: retiene el login `TOPE_MS` desde que llega y
-el producto corta `ESPERA_SESION_MS` desde que la pide, así que el mensaje
-cambia entre corridas. Puerta: el mensaje del comando 1 de tu informe de
-ORDEN1 sale igual cuatro veces seguidas; `orden1b.sh` sigue con 30 `ROJO`.
+**Ahora: DOS-RELOJES** (sólo arnés), la entrada de `forzar_orden1.js` en la
+cola: retiene el login `TOPE_MS` desde que llega y el producto corta
+`ESPERA_SESION_MS` desde que la pide, así que el mensaje cambia entre
+corridas. Puerta: el mensaje del comando 1 de tu informe de ORDEN1 sale igual
+cuatro veces seguidas; `orden1b.sh` sigue con 30 `ROJO`.
 
 Igual que antes: sin adversarios; no toques los guiones de MARIA. D182 / D206
 siguen igual: si Emi dice que sí, dejás esto donde esté. D205, D206 y D208
