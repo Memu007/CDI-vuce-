@@ -2,100 +2,168 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CONFTEST-FORK: un hijo con `fork` ya no borra la base de prueba del padre
+## EXCEL2D-RELOJ: el caso de la subida cara ya no depende de cuántos hilos tenga el proceso
 
-| | SHA |
+| qué | SHA |
 |---|---|
-| base | `fa6df9bc` |
-| merge de tu rama (sólo `docs/pm/`) | `c9f760e9` |
-| arreglo (`fix(tests):`, sólo `tests/conftest.py`, +4) | `f2d5580e` |
-| test nuevo `tests/test_conftest_fork.py` | `a2d6c18a` |
-| el hijo del test corre sólo el cierre del conftest (tu «ojo» de `_run_exitfuncs`) | `caad310a` ← **lo que entrego** |
-| merge de tu rama `26391fe9` (sólo `docs/pm/` y lo aceptado de MARIA) e informe | los commits que siguen |
+| base | `70d5f962` |
+| test (`tests/test_excel2d.py`, +8/−1) | `c4a30b5a` |
+| merge de tu rama (`51ffe4fb`) | `0ebac615` |
+| informe | el commit `docs:` que trae este archivo |
 
-**Resultado:** verde. Las cuatro puertas pasan sobre `caad310a`. **Nada para
-decidir.**
+**Resultado.** Las cuatro puertas en verde. Producto: ninguno tocado
+(`producto +0/−0`). Los ~1100 hilos los deja **el arnés**, no el producto.
 
-**Arreglo.** El conftest guarda el pid que creó la base; `_borrar_db_de_prueba`
-vuelve sin borrar si corre en otro proceso. Es tu sugerencia.
+**Causa.** `_otro_hilo_listo()` recorre `/proc/self/task`, y eso cuesta según
+la cantidad de hilos: 8,4 ms con 1000 y 26,4 ms con 3000. Con el GIL en
+disputa, el testigo casi no marcaba, y `frenado` terminaba midiendo al
+testigo. **Arreglo:** el recorrido se hace sólo después de un salto sin CPU
+(`cpu < reloj/20`), y cuenta como un salto propio: después de él se agrega un
+punto marcado `True`. El tope de 1 s no se tocó.
 
-**El test.** Hace `os.fork()`; el hijo llama sólo a
-`tests.conftest._borrar_db_de_prueba()` y sale con `os._exit(0)`; el padre
-comprueba que la base sigue. La primera versión (`a2d6c18a`) corría
-`atexit._run_exitfuncs()`: tenías razón, eso corre todos los cierres
-registrados y alguno podría borrar algo del padre (por ejemplo un
-`weakref.finalize` de un directorio temporal). Lo cambié y repetí las puertas
-sobre `caad310a`.
+### Decisiones
 
-### Comandos
+**D229. Fuga de hilos del arnés.**
+- (a) Pieza aparte (o cola de limpieza): que los ayudantes cierren la sesión.
+  Son 28 usos de `asyncio.new_event_loop().run_until_complete` en 15
+  archivos de `tests/`. Los ayudantes son como `_sql` en
+  `tests/test_guardar1.py:44-50`.
+- (b) Dejarlo así.
+- **Recomiendo (a):** la fuga ya rompió un caso por cantidad de hilos, y
+  `test_cobro_mp2` solo suma 358.
+
+### Quién deja los hilos (puerta 4)
+
+**Mecanismo.**
+1. El ayudante hace `return` dentro de `async for db in get_async_session()`,
+   en un bucle nuevo que después se abandona.
+2. El generador queda suspendido. El `aclose` que agenda su finalizador nunca
+   corre, porque ese bucle ya no gira.
+3. La sesión no se cierra, y su conexión aiosqlite deja vivo un
+   `_connection_worker_thread`. Esos hilos no son daemon: un script suelto
+   así queda colgado al salir.
+4. Lo mismo explica los «Task was destroyed but it is pending!
+   … async_generator_athrow» del final de la suite.
+
+**Por qué no es producto.**
+- `main.py:11688` (webhook de MP) usa el mismo `return` dentro del
+  `async for`. `main.py:174,1695,1986` y `auth/dependencies.py:22` usan
+  `get_db` con `yield`.
+- Con un bucle vivo, como uvicorn en Railway, el finalizador sí cierra la
+  sesión. Medido abajo: no pierde hilos.
+- No lo probé contra un uvicorn real durante horas. Lo que sí probé son el
+  bucle vivo y `TestClient`.
+
+**Medidas**
+
+| prueba | salida |
+|---|---|
+| 20 llamadas como el arnés / cerrando el generador | `cerrando hilos 1 -> 1` · `como_el_arnes hilos 1 -> 21` |
+| un bucle vivo, 20 `return` dentro del `async for`, más `sleep(0.5)` | `un bucle vivo, return dentro del async for: hilos 1 -> 1` |
+| `TestClient`, 60 `/auth/register`, con un bucle y con un bucle por pedido | `hilos antes 1 después 1` en los dos |
+| `test_catalogo_largo2.py -k una_entrada_mala`, censo por caso | 18, 31, 44, 57, 80, 103, 126, 139, 152, 165, 178: +13 por caso, +23 en las variantes `cambio-*` |
+
+**Censo de la suite entera:** 6225 casos, rc=0. Al final hay n=1129 hilos en
+`/proc` (py=1124), con un máximo de 1131. Casi todos son
+`_connection_worker_thread`; además quedan 2 `lectura-excel`,
+2 `lectura-excel-liviano`, 2 `validar-excel` y `MainThread`.
+
+| hilos que suma | archivo |
+|---|---|
+| 358 | `test_cobro_mp2` |
+| 245 | `test_catalogo_largo2` |
+| 105 | `test_cobro_mp1_vuelta2` |
+| 103 | `test_cobro_mp1_h` |
+| 79 | `test_cobro_mp1` |
+| 78 | `test_catalogo3` |
+| 41 | `test_cobro_mp1_cde` |
+| 34 | `test_catalogo_largo1` |
+| 25 | `test_guardar1` |
+| 17 | `test_cobro_mp1_i` |
+| 13 | `test_guardar2` |
+| 8 | `test_cobro_mp3` |
+
+### Comandos para reproducir
+
+Plugin que pone hilos dormidos, fuera del repo:
 
 ```bash
+mkdir -p /tmp/hp && cat > /tmp/hp/hilos_plugin.py <<'PY'
+import os, threading
+_fin = threading.Event()
+def pytest_sessionstart(session):
+    for _ in range(int(os.environ.get("HILOS", "1075"))):
+        threading.Thread(target=_fin.wait, daemon=True).start()
+def pytest_sessionfinish(session):
+    _fin.set()
+PY
 export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-P="python -m pytest -q --no-cov -p no:cacheprovider"
-# 1. verde con el arreglo; rojo con el conftest de la base (la última línea deja el árbol como estaba)
-$P tests/test_conftest_fork.py                     # 1 passed
-git show fa6df9bc:tests/conftest.py > tests/conftest.py; $P tests/test_conftest_fork.py; git checkout -- tests/conftest.py
-#   E   AssertionError: el hijo borró la base del padre      1 failed
-# 2. la cuenta de bases en /tmp no cambia
-a=$(ls /tmp/cdi_pytest_* | wc -l); $P tests/test_excel2d.py; echo "$a $(ls /tmp/cdi_pytest_* | wc -l)"   # los dos números iguales
-# 4. suite entera (~18 min)
-$P --timeout=120 tests/                            # 1 failed (el de D234), 6110 passed
 ```
 
-### Puertas, salida exacta
-
-Las suites corrieron en worktrees aparte, una detrás de otra, con el comando 4.
-«sab» es `caad310a` con `tests/conftest.py` de `fa6df9bc`.
-
-| puerta | dónde | salida |
-|---|---|---|
-| 1. sólo el test, con el arreglo | `caad310a` | `1 passed, 4 warnings in 0.08s` |
-| 1. sólo el test, conftest de la base | checkout principal | `E   AssertionError: el hijo borró la base del padre`, `1 failed, 4 warnings in 0.13s` |
-| 1 y 4. suite entera, base | `fa6df9bc` | `1 failed, 6109 passed, 110 skipped, 3 xfailed, 106 warnings in 1127.12s (0:18:47)` |
-| 1 y 4. suite entera, mi SHA | `caad310a` | `1 failed, 6110 passed, 110 skipped, 3 xfailed, 104 warnings in 1083.76s (0:18:03)` |
-| 1. suite entera, sab | `caad310a` + conftest de la base | `2 failed, 6109 passed, 110 skipped, 3 xfailed, 104 warnings in 1090.76s (0:18:10)`; el rojo nuevo es `test_conftest_fork.py::test_un_hijo_que_sale_no_borra_la_base_del_padre` con `AssertionError: el hijo borró la base del padre` |
-| 2. `test_excel2d.py` | `caad310a` | `26 passed, 3 warnings in 4.39s`; `antes=11359 despues=11359` |
-| 3. pool `ProcessPoolExecutor(4)`, a mano (copiado a `tests/` y borrado) | `caad310a` | `1 passed, 7 warnings in 0.11s` |
-
-El único rojo de la base y de mi SHA es el mismo:
-`FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[9995 combinadas en 19 990 filas]`
-(D234). La lista de rojos de la base y la de mi SHA dan `diff` vacío.
-
-La suite sobre `a2d6c18a`, la versión anterior del test, había dado lo mismo:
-`1 failed, 6110 passed, 110 skipped, 3 xfailed, 107 warnings in 1117.59s`, con
-el mismo rojo.
-
-**Las puertas 2 y 3 no distinguen.** Sobre la base también dan lo mismo:
-`26 passed`, `antes=11359 despues=11359` y `1 passed`. `test_excel2d.py` no
-crea hijos que salgan normal, y los hijos de `ProcessPoolExecutor` salen con
-`os._exit`, que no corre `atexit`. Son de no regresión; la que distingue es la 1.
-
-**`chequeo-6 fa6df9bc caad310a`**, entero:
-
+**Puerta 1.** Tiene que dar `7 passed` en los tres:
+```bash
+for h in 0 1000 3000; do HILOS=$h PYTHONPATH=/tmp/hp python -m pytest -q --no-cov -p hilos_plugin tests/test_excel2d.py -k no_frena | tail -1; done
 ```
-chequeo-6 fa6df9bc..caad310a: avisos para mirar, no un veredicto
+
+**Rojo con el arreglo revertido.** Con 1000 hilos tiene que dar
+`el otro hilo no avanzó mientras el proceso gastó 1.0x s de CPU`:
+```bash
+git checkout c4a30b5a~1 -- tests/test_excel2d.py && HILOS=1000 PYTHONPATH=/tmp/hp python -m pytest -q --no-cov -p hilos_plugin tests/test_excel2d.py -k no_frena | tail -3; git checkout c4a30b5a -- tests/test_excel2d.py
+```
+
+**Puerta 2.** Tiene que dar 21 ROJO por tanda y `sabotajes con falla: 0`:
+```bash
+for h in 0 1000 3000; do HILOS=$h PYTHONPATH=/tmp/hp PYTEST_ADDOPTS="-p hilos_plugin" scripts/testing/sabotajes/excel2d.sh c4a30b5a | tail -2; done
+```
+
+### Puertas
+
+| puerta | salida |
+|---|---|
+| 1. 0 hilos | `7 passed … 2.77s` |
+| 1. 1075 hilos | `7 passed … 2.63s` |
+| 1. 3000 hilos | `7 passed … 2.74s` |
+| 1. `test_excel2d.py` entero | `26 passed, 3 warnings in 4.57s` |
+| rojo antes del arreglo, 0 hilos | `7 passed` (por eso no se veía) |
+| rojo antes del arreglo, 1075 hilos | `E   AssertionError: el otro hilo no avanzó mientras el proceso gastó 1.09 s de CPU` · `1 failed, 6 passed` |
+| rojo antes del arreglo, 3000 hilos | igual, con 1.10 s |
+| 2. `excel2d.sh` con 0, 1000 y 3000 hilos | 21 ROJO por tanda, 63 en total · `sabotajes con falla: 0` · rc=0 en las tres |
+| 3. suite entera sobre `c4a30b5a` | `=== 6112 passed, 110 skipped, 3 xfailed, 106 warnings in 1061.09s (0:17:41) ====` |
+| 4. quién deja los hilos | el arnés (ver arriba) |
+
+**Puerta 2: los ROJO que pedías**, iguales en las tres tandas:
+- «ROJO  | cada combinada vuelve a asignarse aparte en pandas: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[9995 combinadas en 19 990 filas]» (17 s)»
+- «ROJO  | las celdas rellenadas vuelven a copiarse en cada fila: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[2499 combinadas en 4998 filas]» (6 s)» (7 s con 3000 hilos)
+- «ROJO  | la subida espera 4 s sin gastar CPU: dice «FAILED tests/test_excel2d.py::test_la_subida_cara_no_frena_a_nadie[2499 combinadas en 4998 filas]» (13 s)»
+
+**Puerta 3.** Vos tuviste `1 failed, 6110 passed` sobre `caad310a`. La base
+`70d5f962` suma 1 caso de `test_valor1.py` (MARIA) y 1 de `finalize.js`:
+6110 + 1 + 1 = 6112. No corrí la suite sobre `70d5f962`.
+
+`chequeo-6 70d5f962 c4a30b5a` (rc=0, entero):
+```
+chequeo-6 70d5f962..c4a30b5a: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +21/−0
+arnés +8/−1
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
 ```
 
-### No corrido
-
-- Adversarios y `/code-review`: la tarea dice «sin adversarios».
-- Arneses de pantalla, `smoke_friccion.sh` y ataques: no cambió el producto.
-
 ### Riesgos
 
-- El test hace `fork` en un proceso con hilos. Python 3.12 avisa
-  (`DeprecationWarning: This process … is multi-threaded, use of fork() may
-  lead to deadlocks in the child`). El hijo sólo borra archivos y sale; si
-  alguna vez se trabara, `pytest-timeout` (120 s) corta en el padre. En tres
-  suites enteras no se trabó.
-- SIGTERM sigue fuera, como decía la tarea. Al cortar con `TaskStop` una suite
-  a medias quedó una base más en `/tmp` (de 11358 a 11359).
-- El test usa el nombre privado `_borrar_db_de_prueba`. Si se renombra, el
-  test da error de atributo, no un verde falso.
+- **El margen del sabotaje de espera.** Con 3000 hilos, el sabotaje de 4 s
+  sin CPU todavía da rojo, con ~1,1 s contra un tope de 0,5. Si los hilos
+  crecen mucho más, el margen baja. D229 (a) lo ataca de raíz.
 
-/compact conservar: Dev 1 técnica, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, PM principal session_01B7FVQspcEHF7PqNv797wNM (aviso con send_message priority next). CONFTEST-FORK entregada en caad310a (arreglo f2d5580e, test a2d6c18a + caad310a), informe docs: encima. Ahora EXCEL2D-RELOJ (D234: _otro_hilo_listo con ~1080 hilos), después NAVEGADOR. Próxima D: la que siga a la más alta de PARA-DEV.md y NOW.md después del merge (D234 ya está usada). Nunca main, sin secretos, nada publicado sin «dale» de Emi para el SHA; tests/test_conexiones1.py nunca a git add.
+### No corrido
+
+- Adversarios y `/code-review`: sigue vigente «sin adversarios».
+- La suite sobre la base `70d5f962`.
+- Uvicorn real de larga vida.
+
+### Archivos de producto tocados
+
+Ninguno.
+
+/compact conservar: Dev 1 técnica, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main); PM session_01B7FVQspcEHF7PqNv797wNM. Entregué EXCEL2D-RELOJ (test c4a30b5a, merge 0ebac615). Sigue NAVEGADOR. D229 abierta (fuga de hilos del arnés). Próxima D: D230. Sin adversarios. Nada se publica sin el «dale» de Emi para el SHA. Sin secretos.
