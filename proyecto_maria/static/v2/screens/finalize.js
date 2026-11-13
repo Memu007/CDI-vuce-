@@ -66,6 +66,8 @@
         if (vGenerate) vGenerate.addEventListener('click', onGenerate);
         if (rDownload) rDownload.addEventListener('click', onDownload);
         if (rCopy)     rCopy.addEventListener('click', onCopy);
+        // El aviso habla de lo que había en el campo al tocar «Generar».
+        if (sbtInput)  sbtInput.addEventListener('input', () => hide(sbtError));
 
         initialized = true;
     }
@@ -196,6 +198,9 @@
     function pintarSufijo() {
         const campo = document.getElementById('sbtSufijoValor');
         if (campo) campo.value = ((CDI.state || {}).operacion || {}).sbt_sufijo_valor || '';
+        // El aviso es de un «Generar» que ya pasó: no entra con la pantalla.
+        const aviso = document.getElementById('sbtFieldError');
+        if (aviso) aviso.hidden = true;
     }
 
     // SEPARADORES-1d (D25): el flete y el seguro van al TXT con dos
@@ -747,11 +752,12 @@
                 // junto al campo y volver a validación
                 if (typeof detail === 'string' && (detail.toLowerCase().includes('sbt') ||
                         detail.startsWith('Sufijo de valor de la operación: '))) {
+                    // Después de volver: la pantalla entra sin aviso.
+                    CDI.goTo('validating');
                     if (sbtError) {
                         sbtError.textContent = detail;
                         sbtError.hidden = false;
                     }
-                    CDI.goTo('validating');
                     throw new Error(detail);
                 }
                 // El seguro calculado con otros importes se resuelve en

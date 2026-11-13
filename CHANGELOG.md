@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-13 · fix: el aviso «Ingresá el sufijo de valor SBT» no queda de una operación a otra
+
+- El aviso rojo bajo el campo del sufijo se va al escribir en el campo y no aparece al entrar a «Validación»: antes seguía a la vista en la operación siguiente, aunque ya tuviera su sufijo.
+- Si el servidor rechaza el sufijo al generar, el aviso sale como siempre.
+
 ## 2026-11-13 · fix: «NL» y «NLD» son Países Bajos, código 423 (PAIS-NL)
 
 - La sigla «NL» y «NLD» dan 423 (PAISES BAJOS) en el TXT, el catálogo y la pantalla: antes daban 434 (HOLANDA). «HOLANDA» escrito así sigue en 434.
