@@ -4737,6 +4737,26 @@ async def _estudio_elegido(db: AsyncSession, estudio_id, username: str):
     return estudio
 
 
+def _cuit_del_despachante(estudio, cuit_agr: str, user) -> tuple[str, bool]:
+    """El CUIT que va al CDDTAGR, sin guiones ni espacios, y si es el del
+    perfil. Manda el estudio elegido; sin estudio, `cuit_agr` y, si no viene,
+    el del perfil (la pantalla lo manda en `cuit_agr`). Uno que no es un CUIT
+    frena con 400 y dice dónde se corrige."""
+    from proyecto_maria.core.controles_maria import cuit_valido
+
+    del_perfil = "".join(str((user or {}).get("cuit") or "").replace("-", "").split())
+    crudo = (estudio.cuit if estudio is not None else cuit_agr) or del_perfil
+    cuit = "".join(str(crudo).replace("-", "").split())
+    es_el_del_perfil = estudio is None and bool(cuit) and cuit == del_perfil
+    if crudo and not cuit_valido(cuit):
+        donde = ("Corregilo en «Mi perfil», campo «Mi CUIT (despachante)»." if es_el_del_perfil
+                 else "Es el que manda la operación, no el de tu perfil: corregilo ahí.")
+        raise HTTPException(status_code=400, detail={"errors": [
+            f"El CUIT del despachante «{cuit}» no es válido: son 11 dígitos (0-9) y el último es el "
+            f"verificador. {donde}"]})
+    return cuit, es_el_del_perfil
+
+
 class MariaRequest(BaseModel):
     """Request para generar archivo MARIA TXT."""
     operation_id: str
@@ -5146,30 +5166,8 @@ async def generate_maria_endpoint(
         if _por_corregir:
             raise HTTPException(status_code=400, detail=_por_corregir)
 
-        # Si el user tiene CUIT en su perfil y la request no manda cuit_agr,
-        # usamos el del perfil (para que el despachante no tenga que re-escribir
-        # su propio CUIT en cada operacion).
-        # El estudio elegido manda (ESTUDIO-1); su CUIT se validó al guardarlo.
-        effective_cuit_agr = estudio.cuit if estudio is not None else request.cuit_agr
-        try:
-            if not effective_cuit_agr and user and user.get("cuit"):
-                effective_cuit_agr = str(user["cuit"]).strip()
-        except Exception:
-            pass
-        # El CUIT del despachante, sólo 11 dígitos 0-9 (sin guiones ni
-        # espacios), también el que viene del perfil (EXCEL-2, de paso).
-        if effective_cuit_agr:
-            effective_cuit_agr = "".join(str(effective_cuit_agr).replace("-", "").split())
-            import re as _re_cuit  # la función importa «re» más abajo
-            if not _re_cuit.fullmatch(r"[0-9]{11}", effective_cuit_agr):
-                raise HTTPException(status_code=400, detail={"errors": [
-                    f"El CUIT del despachante «{effective_cuit_agr}» tiene que tener 11 dígitos (0-9). "
-                    "Corregilo en la operación o en tu perfil."]})
-        # Sin estudio y con el CUIT del perfil (la pantalla lo manda en
-        # `cuit_agr`): cuenta como uso del perfil para la preselección
-        # (ESTUDIO-1b, D23 b). Un `cuit_agr` distinto no.
-        cuit_del_perfil = "".join(str((user or {}).get("cuit") or "").replace("-", "").split())
-        con_el_perfil = estudio is None and bool(effective_cuit_agr) and effective_cuit_agr == cuit_del_perfil
+        # Con el del perfil, después de generar se anota su uso para la preselección.
+        effective_cuit_agr, con_el_perfil = _cuit_del_despachante(estudio, request.cuit_agr, user)
 
         # Sin número de factura, el de la operación: el mismo en el TXT y en
         # el nombre del archivo.
