@@ -2,267 +2,311 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## SUFIJO-BORRADOR, vuelta de la devolución con D236 (b): entregada en `52f13ca`. Una operación sin sufijo ya no genera con el de la anterior: el campo entra vacío, la tarjeta del despachante no usa el ajeno y «Generar» frena sin pedir el TXT. Una decisión: D238 (el aviso «Es obligatorio» queda a la vista de una operación a otra)
-
-Integré tu rama hasta `de4d121` (merge `c18039c`). Tus commits propios tocan
-sólo `docs/pm/`; los de `tests/` que llegan son de la Técnica. Encima va un
-commit más, `52f13ca`: corrige un comentario mío de `92f4ec1` que quedó falso
-con `a0acbe7` (decía que «Generar» toma el sufijo del campo).
-
-Antes del informe integré otra vez tu rama, hasta `6e4a427` (`1163424`):
-`git diff --stat 52f13ca 1163424` da sólo `docs/pm/NOW.md`, que ningún test ni
-guion de las puertas lee. Las puertas son sobre `52f13ca` y no las repetí
-sobre esa integración. Mi canal no cambió.
-
-**Una puerta en rojo:** en la corrida entera de pantallas, `orden1` cayó en
-z22 con la carrera de D237. Diagnóstico y segunda corrida, abajo.
+## PAIS-NL: entregada en `a2c6dc6`. «NL» y «NLD» dan 423 (PAISES BAJOS) en el TXT, el catálogo y la pantalla; la tabla no repite claves; ninguna otra forma de escribir un país cambia de código. Dos decisiones: D239 y D240
 
 | qué | SHA |
 |---|---|
-| base (integración de tu rama hasta `32dfcd5`) | `0d4cd72` |
-| producto: el campo muestra el sufijo de la operación en curso, vacío si no tiene (+ `CHANGELOG.md`) | `92f4ec1` |
-| el caso, primera versión | `bcb3e9c` |
-| producto: «Generar» toma el sufijo de la operación, no del campo | `a0acbe7` |
-| el caso mira la tarjeta del despachante y que el freno sea de ese clic | `a0c1c69` |
-| el caso, partido en dos funciones (mismas comprobaciones) | `ebbe181` |
-| integración de tu rama hasta `de4d121` | `c18039c` |
-| producto, sólo un comentario: quién lee el campo. **Lo que se entrega** | `52f13ca` |
-| integración de tu rama hasta `6e4a427` (sólo cambia `docs/pm/NOW.md`) | `1163424` |
+| base (informe de SUFIJO-BORRADOR) | `6fbfefd` |
+| producto: una sola «NL» en `PAISES_INDEC`, en 423; «NL» y «NLD» en 423 en la pantalla (+ `CHANGELOG.md`) | `7908921` |
+| pruebas | `fc26da0`, `5b4a238`, `a2c6dc6` |
+| `CHANGELOG.md`: lo que cambia en los lectores y al agrupar | `f779bd1` |
+| integración de tu rama (`431b2ec`) | `54eff7a` |
+| integración de tu rama (`6887343`), después de las puertas: sólo `docs/pm/` | `a1000dd` |
+| **Lo que se entrega** | `a2c6dc6` |
 | informe | el commit siguiente |
 
-**Tu objeción era correcta.** Escribí que la herencia «venía de antes y no la
-cambié», y la entrega le sumaba un camino: recuperar A, «Nueva operación», B
-sin sufijo, «Generar». Lo reproduje antes de tocar nada: con el caso nuevo
-sobre `ee2ee3c` (commit descartable `b1e5cdb`) las tres llegadas dan
-`«Generar» siguió a «ready» y salieron 1 POST /generate_maria`.
+`producto +2/−2` (más 6 líneas de `CHANGELOG.md`).
 
-**Dos cosas que subí y no son entrega.**
-- CUIT-GENERAR ya estaba subida (`64079aa`, `bb01070`, `4b42b42`, `f249547`)
-  cuando leí «apartalo». La aparté con dos reversiones, `3a6f656` (producto) y
-  `2f04637` (pruebas), las dos antes de la base `0d4cd72`:
-  `git diff 765db40 2f04637 -- proyecto_maria scripts tests CHANGELOG.md` da
-  vacío. Se recupera revirtiendo esas dos.
-- `a0c1c69` quedó en el remoto antes de las puertas (para no perder el trabajo
-  del contenedor). Las puertas de abajo son todas sobre `52f13ca`.
+**Lo que tenés que saber antes de publicar** (medido, sin migración, detalle
+abajo):
+
+1. Lo guardado como «NL» o «NLD» pasa de 434 a 423 solo, al generar.
+2. Lo que alguien **escribió** «NL» en el campo de origen de la pantalla antes
+   de este cambio quedó guardado como «434» (la pantalla guarda el código, no
+   la sigla) y sigue en 434. No se distingue de un «434 · HOLANDA» elegido a
+   propósito. En una misma operación pueden quedar los dos: un producto que
+   llegó como «NL» (ahora 423) y otro tipeado «NL» a mano (guardado «434»).
+3. Un «NL» guardado pudo venir de una factura que decía «Holanda»: el lector
+   de facturas convertía «Holanda» y «434» a «NL». Esos también pasan a 423.
+4. El lector de facturas y el de despachos cambian qué guardan, porque arman
+   su mapa código→sigla desde la misma tabla: ahora «NL» es la sigla de 423 y
+   434 queda sin sigla. Tabla abajo. El único caso que pierde algo es el
+   despacho que trae «434» solo, sin nombre: antes daba «NL», ahora queda sin
+   origen con el aviso «No reconocí el origen» (D239).
+5. En un grupo, «NL» ya no va junto con «Holanda», «434» ni «434 · HOLANDA»:
+   da «Grupo …: todos los ítems deben tener el mismo origen» (antes generaba
+   434). **Un grupo ya guardado así deja de generar** hasta que alguien
+   corrija el origen. Al revés, «NL» con «Países Bajos» o «423» en un grupo
+   antes daba ese error y ahora genera 423. Tabla abajo.
+6. Una pestaña abierta desde antes de publicar sigue con la tabla vieja hasta
+   que se recarga: «NL» tipeado ahí se sigue guardando «434». No lo medí; es
+   lo que hace un navegador con un script ya cargado.
 
 ## Decisiones
 
-**D238. El aviso «Ingresá el sufijo de valor SBT. Es obligatorio.» queda a la
-vista de una operación a otra.** Venía de antes; no lo toqué. `#sbtFieldError`
-sólo se esconde cuando «Generar» pasa. Medido con una sonda (commit
-descartable `15893f6`, salida en el bloque de comandos): después de que A
-frena, B entra con su sufijo guardado en el campo **y el aviso a la vista**; y
-en una operación sin sufijo el aviso sigue ahí después de escribirlo, hasta
-tocar «Generar».
-- (a) pieza chica aparte: el aviso se esconde cuando se escribe en el campo y
-  cuando se entra a «Validación» con otra operación;
-- (b) dejarlo.
+**D239. El lector de despachos no guarda un código de la tabla escrito solo
+cuando ese país no tiene sigla de dos letras, y la pantalla no deja
+escribirlo.** `origen_iso2` (`despacho_lector.py:246`) con «434» da `None`: el
+renglón queda sin origen y con el aviso «No reconocí el origen «434»». Les
+pasa a 115 de los 309 códigos de la tabla, antes y ahora: con este cambio 434
+entra a ese grupo (antes «434» daba «NL») y 423 sale (antes «423» solo no se
+reconocía). Con el nombre al lado («434 HOLANDA», que es el formato de las
+fixtures: «310 CHINA») se reconoce. Dos cosas más del mismo lector:
+- El campo de origen de la pantalla de importar despachos acepta dos letras
+  (`clientes.js:1692`, `maxlength="2"`): con «434» solo, ahí no se puede
+  escribir ni «434» ni «HOLANDA». En la edición del catálogo el campo acepta
+  tres (`clientes.js:1427`). Leído en el código, no corrido en el navegador.
+- «434 NL» y «434 PAISES BAJOS» dan «NL» (423) aunque el documento imprime
+  434: el control de contradicción entre código y nombre sólo actúa cuando el
+  código tiene sigla. El agujero ya estaba («423 NL» daba «NL», que era 434);
+  se mudó de 423 a 434.
 
-Recomiendo **(a)**, aparte: con D236 (b) el campo entra vacío más seguido y un
-aviso rojo de otra operación al lado confunde. No lo metí acá porque no es la
-causa de la devolución, y esconderlo siempre al entrar rompe el camino del
-error del servidor, que pone el aviso y vuelve a «Validación».
+No sé qué tan seguido un despacho real trae el código solo: los reales los
+tenés vos.
+- (a) pieza aparte, chica: con un código de la tabla sin sigla, el lector
+  guarda el código, y con código y nombre de países distintos no elige el
+  nombre. Pocas líneas de producto y su caso; la pantalla de importar tiene
+  que poder mostrar y guardar tres cifras.
+- (b) queda así: es visible (aviso y origen vacío), salvo «434 NL», que
+  guarda 423 sin avisar.
+- **Recomiendo (a)**, sin apuro, detrás de lo que ya está en fila: el lector
+  existe para no volver a tipear, y 115 códigos de 309 caen ahí.
+  (`docs/archive/` y los despachos reales no los miré para esto.)
+
+**D240. Los nombres de país en inglés se reconocen a medias.** Medido en
+`codigo_de_pais`: dan `None` «Netherlands», «The Netherlands», «Nederland»,
+«Holland», «Belgium», «United States», «Switzerland», «Sweden», «Turkey»,
+«Denmark», «Poland» e «Ireland»; se reconocen Germany, Italy, Spain, France,
+Japan, Brazil, Austria, United Kingdom, South Korea, India, Mexico, Vietnam,
+Thailand, Taiwan, Hong Kong y Canada. A la factura leída con IA se le pide la
+sigla («Código ISO2 del país», `pdf_extractor.py:432`), así que ahí el nombre
+en inglés casi no llega; donde sí llega es en una celda de Excel
+(`main.py:5898`): «Netherlands» termina en «XX». No es un dato mal: frena
+antes de generar. El mensaje de `fc26da0` dice «toda forma de escribir»: el
+caso cubre las ocho formas que lista, no éstas.
+- (a) pieza aparte: sumar los nombres en inglés de los países que faltan. Si
+  va, Emi tiene que decir si «Holland» es 423 o 434.
+- (b) queda así.
+- **Recomiendo (b)** hasta que un despachante lo pida: no hay dato mal y la
+  lista se abre sin fin.
 
 ## Resultado
 
-Lo pedido, y dónde se prueba (`scripts/testing/pantalla_sufijo_otra1.js`):
+**Rojo antes del arreglo, con cada mitad revertida y con dos sabotajes**
+(`tests/test_catalogo3.py` de `5b4a238` en un worktree descartable; `a2c6dc6`
+le cambia sólo un comentario; textos copiados de la salida):
 
-| pedido | cómo lo prueba el caso |
-|---|---|
-| al entrar a «Validación» el campo muestra el sufijo de la operación en curso, vacío si no tiene | lee campo y operación en el mismo instante de entrar; con la anterior recuperada, exige antes que haya vuelto con `AA(000123)` en los dos |
-| una B sin sufijo no genera | cuenta los `POST /generate_maria` y exige el aviso con el foco en el campo, que lo pone el freno de ese clic (en dos llegadas el aviso ya estaba a la vista desde la anterior: D238) |
-| avisos, tarjeta del despachante y TXT usan el mismo valor | B lleva un segundo producto con sufijo escrito cuando la operación no tenía ninguno: la tarjeta lo marca «Lo escribiste con otro sufijo de la operación» sólo si compara contra uno ajeno. Con `AA(000456)` escrito, los avisos se piden con ese y todos los `CSBTSVL` del TXT son ese |
-
-La familia va como datos de un caso: después de recuperar la anterior, sin
-recargar, y con el sufijo borrado (`sbt_sufijo_valor: ''`).
-
-**Producto +5/−11** (`finalize.js`, 1494 → 1488 líneas). Dos cambios:
-- `pintarSufijo` pinta siempre lo que guarda la operación, vacío si no guarda
-  nada (`92f4ec1`);
-- «Generar» ya no copia el campo a la operación: el control de «Es
-  obligatorio» lee la operación, igual que los avisos y el TXT (`a0acbe7`). Era
-  la copia por la que el sufijo ajeno llegaba al TXT.
-
-`CHANGELOG.md`: una entrada (`92f4ec1`), que cubre los dos commits de
-producto; dice también que quien carga varias operaciones seguidas escribe el
-sufijo en cada una.
-
-**Rojos, cada uno un commit descartable sobre el caso final** (salidas copiadas
-del log; las tres llegadas dicen lo mismo en cada uno):
-
-| qué se le saca al producto | SHA | qué dice el caso |
+| producto | resultado | lo que dice |
 |---|---|---|
-| todo: `finalize.js` de la primera entrega | `3e1f90d` | `al entrar, campo / operación / tarjeta = «AA(000123) /  / lo marca escrito con otro sufijo»; «Generar» siguió a «ready» y salieron 1 POST /generate_maria` |
-| el orden: pintar el campo después de la tarjeta | `740b38a` | `al entrar, campo / operación / tarjeta = « /  / lo marca escrito con otro sufijo»; «Generar» frenó y salieron 0 POST /generate_maria` |
-| sólo el pintado (vuelve el «pinta si hay») | `8a9a8f6` | `al entrar, campo / operación / tarjeta = «AA(000123) /  / lo marca escrito con otro sufijo»; «Generar» frenó y salieron 0 POST /generate_maria` |
-| sólo el freno de «Es obligatorio» | `8e6b598` | `al entrar, campo / operación / tarjeta = « /  / sin marca»; «Generar» siguió a «ready» y salieron 1 POST /generate_maria` |
+| todo el arreglo revertido (el de `6fbfefd`) | `2 failed, 106 passed` | `test_la_tabla_de_paises_no_tiene_claves_repetidas`: `AssertionError: assert {'NL'} == set()` · `test_paises_bajos_es_423_y_holanda_434`: `At index 0 diff: 434 != 423` |
+| sin sacar la «NL» repetida de `PAISES_INDEC` | `3 failed, 105 passed` | los dos de arriba y `test_la_pantalla_y_el_servidor_reconocen_los_mismos_paises`: `Left contains 3 more items, first extra item: ('NL', '423', '434')` |
+| sin «NL» en 423 en la pantalla | `1 failed, 107 passed` | `test_la_pantalla_y_el_servidor_reconocen_los_mismos_paises`: `first extra item: ('NL', '434', '423')` |
+| sin «NLD» en 423 en la pantalla | `1 failed, 107 passed` | `test_paises_bajos_es_423_y_holanda_434`: `At index 2 diff: 434 != 423` |
+| sabotaje: el mapa de los lectores vuelve a dar «NL» para 434 (`por_codigo[434] = 'NL'` en `_iso2_por_codigo_maria`) | `1 failed, 107 passed` | `test_paises_bajos_es_423_y_holanda_434`: `AssertionError: _origen_desde_factura` · `At index 8 diff: 423 != 434` |
+| sabotaje: al exportar, «NL» y «NLD» dan 434 (`maria_generator_export.get_pais_codigo`) | `1 failed, 107 passed` | `test_paises_bajos_es_423_y_holanda_434`: `At index 0 diff: 434 != 423` |
+| entero | `108 passed` | |
 
-Los tres últimos corrieron con el caso de `a0c1c69`; `ebbe181` sólo saca dos
-funciones del recorrido, y el primero se volvió a correr sobre `52f13ca`.
+Con el arreglo entero revertido el caso de paridad queda verde: la pantalla y
+el servidor coincidían, los dos en 434. «NLD» sale sólo de la tabla de la
+pantalla (el servidor la lee de ahí), por eso sin esa mitad cae el caso del
+servidor y no el de paridad. La primera fila la repetí con
+el caso de `a2c6dc6` (comando abajo): los mismos dos rojos.
 
-El tercero muestra para qué sirve sacar la copia: con el pintado viejo de
-vuelta, el campo muestra el ajeno pero «Generar» frena y no sale ningún
-pedido. Con la copia puesta (la primera fila), salía.
+**«Ninguna otra entrada cambia de valor».** Volqué, antes y después, lo que
+resuelven el servidor (`codigo_de_pais`, `get_pais_codigo`) y la pantalla de
+verdad (`resolve`, `label`, con node) para 2.515 formas: todas las claves de
+`PAISES_INDEC`, de `ALIASES`, las ISO3, los nombres, códigos y etiquetas de la
+tabla, y sus minúsculas. Cambian cuatro: «NL», «NLD», «nl» y «nld», de
+`434 · HOLANDA` a `423 · PAISES BAJOS`, igual en los cuatro valores.
 
-**Lo que ningún caso distingue.** Volver a poner sola la copia campo →
-operación deja todo en verde: con el campo bien pintado copia lo mismo que ya
-está guardado. La saqué porque sobra y porque era el camino del defecto, no
-porque un caso la pida.
+**Lo que el caso no fija** (medido una vez, sin caso): «434» solo en el lector
+de despachos queda sin origen (si va D239 (a), eso cambia: no lo quise clavar),
+y el rechazo del grupo «NL» + «Holanda» (es el control de grupos de siempre
+sobre dos códigos que el caso ya fija como distintos). El caso de claves
+repetidas mira el literal de `PAISES_INDEC`; una clave repetida dentro de
+`ALIASES` de `paises_maria.js` no la vería (hoy no hay: 728 claves, ninguna repetida, contadas del texto).
 
-## Lo que cambia además (supuestos reversibles)
+## Medido y no arreglado
 
-- **Un valor que llega al campo sin evento `input` ya no se genera.** Antes
-  «Generar» lo levantaba del campo; ahora frena con «Es obligatorio» con el
-  texto a la vista. No encontré un camino de una persona en Chromium (teclado,
-  pegar, deshacer y rehacer disparan `input`; el campo tiene
-  `autocomplete="off"`). No corrido: IME, autocompletar de extensiones,
-  Firefox, WebKit. Si preferís la copia de vuelta, es revertir `a0acbe7`: el
-  caso sigue en verde.
-- La operación guarda el sufijo como se escribió, con sus espacios; el pedido
-  lo recorta, como ya hacía. Antes «Generar» lo dejaba recortado en la
-  operación.
+### Qué queda guardado cuando se carga «NL»
+
+Por la API, en la base y con el arreglo. El servidor guarda el texto como
+llega; el código se resuelve al generar.
+
+| se carga | `operation_items.origen` | memoria (`client_product_history.origen_frecuente`) | catálogo (`vendor_catalog_products.origen`, al confirmar el NCM) | TXT antes | TXT ahora |
+|---|---|---|---|---|---|
+| «NL» | «NL» | «NL» | «NL» | 434 | **423** |
+| «nl» | «nl» | (no medido: mi dato chocaba con el de «NL») | «NL» | 434 | **423** |
+| «NLD» | «NLD» | «NLD» | «NLD» | 434 | **423** |
+| «434» | «434» | «434» | «434» | 434 | 434 |
+| «HOLANDA» | «HOLANDA» | «HOLANDA» | «HOLANDA» | 434 | 434 |
+| «434 · HOLANDA» | igual | igual | igual | 434 | 434 |
+| «423», «PAISES BAJOS», «423 · PAISES BAJOS» | igual | igual | igual | 423 | 423 |
+
+Guardar la operación no escribe el catálogo; lo escribe confirmar el NCM.
+
+### Qué guarda la pantalla (navegador real)
+
+| | llega guardado: lo que muestra el campo | escrito a mano en el campo de origen: lo que queda en el estado |
+|---|---|---|
+| «NL», «nl», «NLD», antes | «434 · HOLANDA» (el estado conserva la sigla) | **«434»** |
+| «NL», «nl», «NLD», ahora | «423 · PAISES BAJOS» (el estado conserva la sigla) | «423» |
+| «Holanda», antes y ahora | «434 · HOLANDA» | «434» |
+| «Países Bajos», antes y ahora | «423 · PAISES BAJOS» | «423» |
+
+De ahí sale el punto 2 de arriba: lo escrito a mano como «NL» antes del cambio
+ya es un «434» en la base.
+
+### Qué cambia en los lectores (por el mapa código→sigla)
+
+`_iso2_por_codigo_maria` (`pdf_extractor.py:2057`) se arma con las claves de
+dos letras de `PAISES_INDEC`: antes 434→«NL»; ahora 423→«NL» y 434 sin sigla.
+
+| leído | lector de facturas, antes → ahora | lector de despachos, antes → ahora |
+|---|---|---|
+| «NL», «nl», «NLD» | «NL» (434) → «NL» (**423**) | «NL» (434) → «NL» (**423**) |
+| «Holanda», «HOLANDA» | «NL» (434) → como está escrito (434) | «NL» (434) → como está escrito (434) |
+| «Países Bajos», «PAISES BAJOS» | como está escrito (423) → «NL» (423) | como está escrito (423) → «NL» (423) |
+| «434» | «NL» (434) → «434» (434) | «NL» (434) → **sin origen, con aviso** |
+| «423» | «423» (423) → «NL» (423) | sin origen → «NL» (423) |
+| «434 HOLANDA» | | «NL» (434) → «HOLANDA» (434) |
+| «423 PAISES BAJOS» | | «PAISES BAJOS» (423) → «NL» (423) |
+| «423 NL», «434 NL» | | «NL» (434) → «NL» (**423**) |
+| «423 HOLANDA» | | «NL» (434) → sin origen (el código y el nombre dicen países distintos) |
+| «434 PAISES BAJOS» | | sin origen → «NL» (423): la contradicción ya no se ve, porque 434 no tiene sigla |
+| «434 · HOLANDA» | «NL» (434) → como está escrito (434) | «NL» (434) → sin origen |
+| «423 · PAISES BAJOS» | como está escrito (423) → «NL» (423) | sin origen → «NL» (423) |
+
+Entre paréntesis, el código que da en el TXT. Nada de esto lo toqué: sale de
+sacar la clave repetida, que es lo pedido.
+
+### Qué pasa al generar con dos productos (por el control de grupos)
+
+Generador llamado directo, dos productos, el primero con origen «NL».
+
+| el segundo | mismo grupo, antes → ahora | sin grupo, antes → ahora |
+|---|---|---|
+| «Holanda», «434», «434 · HOLANDA» | genera 434 → **error** «Grupo g: todos los ítems deben tener el mismo origen» | un origen (434) → dos (423 y 434) |
+| «Países Bajos», «423» | **error** (el mismo) → genera 423 | dos (434 y 423) → uno (423) |
+| «nld» | genera 434 → genera 423 | 434 → 423 |
+
+«434» con «Holanda», sin «NL»: genera 434 antes y ahora.
 
 ## Revisión adversarial
 
 | quién | sobre | hallazgo | qué hice |
 |---|---|---|---|
-| `adversario-sonnet-alto` (Sonnet, alto) | `0d4cd72..bcb3e9c` | media, del caso: sin la copia campo → operación en «Generar» (`6f0e9f9`) el caso seguía en verde | la copia salió del producto (`a0acbe7`); el rojo `8a9a8f6` muestra la diferencia |
-| | | baja, de antes: un valor puesto en el campo sin evento `input` daba el TXT bien y los avisos con `""` (`13e4dd8`) | ahora frena; va en supuestos reversibles |
-| | | baja, diseño anterior: si el arancel propone sufijo para todos los productos, una B sin sufijo genera con `sbt_sufijo_valor=''` y el propio de cada producto (no el de A) | queda: es la regla de «todos con sufijo propio»; lo anoto en riesgos |
-| | | baja, del caso: el orden «pintar el campo antes que la tarjeta» no lo protegía nada (no lo corrió) | el caso mira la tarjeta (`a0c1c69`); rojo `740b38a` |
-| `adversario-sonnet-alto` (Sonnet, alto) | `bcb3e9c..a0c1c69` | ninguno. Informativo: quedan dos fuentes, «Generar» lee la operación y la tarjeta lee el campo | riesgo, abajo, con línea para la cola |
+| `adversario-sonnet-alto` (Sonnet, alto) | `6fbfefd..fc26da0` | media, del caso: con el mapa de los lectores dando otra vez «NL» para 434, todo seguía verde | el caso mira los dos lectores (`5b4a238`); rojo arriba |
+| | | media, del caso: al exportar, «NL» no tenía prueba | el caso mira `maria_generator_export.get_pais_codigo` (`5b4a238`); rojo arriba |
+| | | media: en un grupo, «NL» con «Holanda», «434» o «434 · HOLANDA» ahora da error | reproducido (tabla de arriba); `CHANGELOG.md` (`f779bd1`) y punto 5 |
+| | | baja-media: el campo de origen de la pantalla de importar despachos acepta dos letras; con «434» solo no hay cómo corregirlo ahí (leído, no corrido) | D239 |
+| | | baja: el `CHANGELOG.md` decía menos de lo que cambia | tercera viñeta (`f779bd1`) |
 
-El primero no encontró camino de usuario que llegue a `/generate_maria`, a los
-avisos o a la tarjeta con un sufijo ajeno. El segundo corrió una sonda con
-teclado y mouse (commit descartable `f78b781`): espacios al final, ir a
-«ready» y volver, borrar todo, deshacer y rehacer, pegar 130 caracteres, error
-del servidor y vuelta, ir a «clientes» y volver, borrador y recarga; campo y
-operación iguales en cada paso. No reprodujo arrastrar texto (en el navegador
-sin ventana no hubo arrastre) ni corrió IME ni autocompletar.
+No encontró otra copia de la tabla, otra entrada que cambie de valor, ni un
+desfase entre servidor y pantalla al cargar la página. Midió además las formas
+en inglés que no se reconocen (D240).
 
-## `/code-review high` sobre `0d4cd72..bcb3e9c`
+## `/code-review high` sobre `6fbfefd..54eff7a`
 
-Los revisores heredan Fable. Cinco hallazgos:
+Los revisores heredan Fable. Nueve hallazgos; ninguno pide tocar el producto
+de la pieza:
 
 | # | hallazgo | qué hice |
 |---|---|---|
-| 1 | el aviso `#sbtFieldError` de una operación queda bajo el campo repintado de la siguiente | de antes: D238 |
-| 2 | en dos llegadas el «frenó» del caso ya era cierto antes del clic | el caso exige el foco en el campo (`a0c1c69`); rojo `8e6b598` |
-| 3 | el caso no miraba la tarjeta del despachante | la mira (`a0c1c69`); rojo `740b38a` |
-| 4 | dos fuentes de verdad: `despachante.js` lee el sufijo del campo del DOM | no toco `despachante.js`: riesgo y línea para la cola |
-| 5 | quedaba la copia campo → operación en «Generar», que mi D236 decía que se iba con (b) | sacada (`a0acbe7`) |
+| 1 | un «NL» guardado genera 423 y un «434» que salió del mismo «NL» tipeado sigue en 434: una operación puede llevar los dos, y nada marca cuáles | punto 2 y riesgos; sin migración, como pediste |
+| 2 | un grupo guardado con «NL» y «434» u «Holanda» deja de generar | punto 5 y riesgos |
+| 3 | `origen_iso2('434 NL')` y `('434 PAISES BAJOS')` dan «NL» (423) aunque el documento imprime 434 | de antes, mudado de código: D239 |
+| 4 | `origen_iso2('434')` y `('434 · HOLANDA')` dan `None` | D239 |
+| 5 | el comentario del caso prometía más de lo que mira (con «434» el lector de despachos da `None`); dos frases del `CHANGELOG.md` no tienen caso | comentario corregido (`a2c6dc6`); lo que no fijo y por qué, arriba |
+| 6 | el caso de claves repetidas sólo mira el literal de Python | hueco anotado arriba; hoy no hay repetidas en `ALIASES` |
+| 7 | «NL» se mantiene a mano en más de un lugar (`PAISES_INDEC` y `ALIASES` de la pantalla) | línea para la cola, abajo |
+| 8 | las formas en inglés no se reconocen | D240 |
+| 9 | una pestaña abierta durante la publicación sigue guardando «434» para «NL» tipeado | punto 6 y riesgos |
 
-No volví a correr `/code-review` sobre `bcb3e9c..52f13ca`: lo que cambió
-después son los arreglos de esta tabla, y el producto nuevo (−7/+2) lo miró la
-segunda pasada adversarial.
+Después de `/code-review` sólo cambió un comentario de la prueba (`a2c6dc6`):
+no lo volví a correr.
 
 ## Comandos
 
 ```bash
 S=<carpeta descartable>; PY=<python del entorno virtual>
-# verde: los dos casos del sufijo
-SOLO="sufijo_otra1 sufijo_borrador1" env -u DATABASE_URL -u ENVIRONMENT PY=$PY bash scripts/testing/correr_pantallas.sh 52f13ca $S/verde   # resumen: 2 verdes, 0 rojas
-# rojo: el caso de hoy con el producto de la primera entrega (commit descartable)
-git worktree add -q --detach $S/wt 52f13ca
-ROJO=$(cd $S/wt && git checkout -q ee2ee3c -- proyecto_maria/static/v2/screens/finalize.js \
-  && git -c user.name=x -c user.email=x@x commit -qm descartable && git rev-parse HEAD)
+export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
+# verde
+env -u DATABASE_URL -u ENVIRONMENT $PY -m pytest -q --no-cov -p no:cacheprovider tests/test_catalogo3.py   # 108 passed
+# rojo: los casos de hoy con el producto de la base
+git worktree add -q --detach $S/wt a2c6dc6
+(cd $S/wt && git checkout -q 6fbfefd -- proyecto_maria/core/maria_generator.py proyecto_maria/static/v2/paises_maria.js \
+  && env -u DATABASE_URL -u ENVIRONMENT $PY -m pytest -q --no-cov -p no:cacheprovider tests/test_catalogo3.py)
+#   2 failed, 106 passed:
+#   test_la_tabla_de_paises_no_tiene_claves_repetidas   AssertionError: assert {'NL'} == set()
+#   test_paises_bajos_es_423_y_holanda_434              At index 0 diff: 434 != 423
 git worktree remove --force $S/wt
-SOLO=sufijo_otra1 env -u DATABASE_URL -u ENVIRONMENT PY=$PY bash scripts/testing/correr_pantallas.sh $ROJO $S/rojo   # resumen: 0 verdes, 1 rojas: sufijo_otra1
-grep FALLA $S/rojo/sufijo_otra1.log   # tres líneas: campo «AA(000123)», la tarjeta lo marca, «siguió a «ready»» y 1 POST
-```
-
-La sonda de D238 (`15893f6`, no está en la rama) dio:
-
-```
-SONDA A sin sufijo, al entrar: oculto «»
-SONDA A sin sufijo, después de «Generar»: a la vista «Ingresá el sufijo de valor SBT. Es obligatorio.»
-SONDA B con sufijo guardado, al entrar: campo «AA(000456)», cartel a la vista «Ingresá el sufijo de valor SBT. Es obligatorio.»
-SONDA C sin sufijo, al entrar: cartel a la vista «Ingresá el sufijo de valor SBT. Es obligatorio.»
-SONDA C después de escribir su sufijo: cartel a la vista «Ingresá el sufijo de valor SBT. Es obligatorio.»
-PANTALLA SONDA-CARTEL OK
 ```
 
 ## Puertas
 
-Todas sobre `52f13ca`, una por vez.
+Todas sobre `a2c6dc6`, una por vez.
 
 | puerta | salida |
 |---|---|
-| `pytest -q --no-cov --timeout=120` (entera, con la guarda de conexiones) | `6130 passed, 110 skipped, 3 xfailed, 106 warnings in 1299.87s (0:21:39)` (antes, sobre `c18039c`: `6130 passed, 110 skipped, 3 xfailed, 109 warnings in 1331.38s (0:22:11)`) |
+| `pytest -q --no-cov --timeout=120` (entera) | `6131 passed, 110 skipped, 3 xfailed, 104 warnings in 1372.01s (0:22:52)` (antes, sobre `52f13ca`: `6130 passed, 110 skipped, 3 xfailed`; el que suma es `test_la_tabla_de_paises_no_tiene_claves_repetidas`) |
 | `python -m compileall -q proyecto_maria` | sin salida, sale 0 |
-| `correr_pantallas.sh 52f13ca` (las 34) | `resumen: 33 verdes, 1 rojas: orden1` (z22: abajo) |
-| `SOLO=orden1 correr_pantallas.sh 52f13ca`, una vez | `resumen: 1 verdes, 0 rojas` |
+| `correr_pantallas.sh a2c6dc6` (las 34) | `resumen: 34 verdes, 0 rojas` (z22 de `orden1` esta vez no dio la carrera de D237) |
 | `e2e_maria.sh` | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` |
-| `sabotaje_valor1.sh 52f13ca` | `OK: los 32 sabotajes dan rojo por la razón esperada` |
-| `sabotaje_valor1c.sh 52f13ca` | `OK: los 25 sabotajes dan rojo por la razón esperada` |
-| `anclas_perdidas.py 52f13ca` | `revisión 52f13ca: 102 guiones, 2466 anclas medidas y 11 llamadas sin medir` (igual que la base `0d4cd72`, fila por fila) |
+| `smoke_friccion.sh` (API local con base descartable) | `==> OK · telemetría y alias session/state rechazan sin sesión + by-cuit protegido`, sale 0 |
+| `anclas_perdidas.py a2c6dc6` | `revisión a2c6dc6: 102 guiones, 2466 anclas medidas y 11 llamadas sin medir` (igual que la base `6fbfefd`, fila por fila) |
 | grep de historia de §6 sobre `proyecto_maria/` | vacío |
 
-### El rojo de `orden1` (z22, la carrera de D237)
-
-- En la corrida entera, z22:
-  `FALLA: page.evaluate: TypeError: Cannot read properties of null (reading 'click')`.
-- El servidor registró, en ese orden: `POST /generate_maria/avisos 200`,
-  `POST /auth/logout 200`, `POST /generate_maria/avisos 401`,
-  `GET /?next=%2Fdashboard 200`, `POST /auth/login 200`. Es la firma de D237:
-  un pedido de avisos llega con la sesión cerrada, la pestaña se va al login y
-  «Generar» ya no está en la página.
-- Corrí `orden1` sola una vez más, no para taparlo: con z22 en rojo el guion
-  corta y los casos que siguen no habían corrido sobre este SHA. Dio verde
-  (71 `OK`; la corrida roja llegó a 52). Van las dos.
-- **No probado:** que esta pieza no cambie la frecuencia de la carrera. No toca
-  los pedidos de avisos ni su demora, y z22 escribe el sufijo igual que antes;
-  la medición forzada sobre la base es la de la primera entrega.
-- Con D237 (a) todavía pendiente, la puerta de pantallas de PAIS-NL puede
-  volver a dar este rojo.
-
-No corrí: `smoke_friccion.sh` ni `ataque_aislamiento.sh` (la pieza no toca
-servidor, datos, sesión ni permisos), `/security-review` (lo mismo), Firefox
-ni WebKit. Sin guion de sabotaje propio: la pieza no es de §3; los rojos van
-arriba, una vez cada uno.
+No corrí: `ataque_aislamiento.sh` ni `/security-review` (la pieza cambia qué
+código da una sigla: no toca qué se guarda, sesión, permisos ni una entrada
+nueva de usuario; si la contás como pieza de datos de §3, falta eso y lo
+corro), Postgres, Firefox ni WebKit, ni la pantalla de importar despachos en
+el navegador (lo de `maxlength` de D239 está leído). Sin guion de sabotaje
+propio: los rojos van arriba, una vez cada uno.
 
 ## `chequeo-6`
 
 ```
-chequeo-6 0d4cd72..52f13ca: avisos para mirar, no un veredicto
-producto +5/−11
-arnés +210/−1
+chequeo-6 6fbfefd..a2c6dc6: avisos para mirar, no un veredicto
+producto +2/−2
+arnés +25/−4
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/static/v2/screens/finalize.js: 1494 → 1488
+  proyecto_maria/core/maria_generator.py: 2391 → 2391
+  proyecto_maria/static/v2/paises_maria.js: 47 → 47
 avisos: 0
 ```
 
-De `arnés +210/−1`, 99 líneas son mías (`pantalla_sufijo_otra1.js`); las otras
-111/−1 son `tests/conftest.py` y `tests/test_guarda_conexiones.py`, de la
-Técnica, que llegaron con la integración de tu rama.
-
 ## Riesgos
 
-- **Medio-bajo: dos fuentes del sufijo.** «Generar», los avisos y el TXT leen
-  la operación; la tarjeta del despachante lee el campo
-  (`despachante.js:255`, `sufijoDeLaOperacion`). Hoy coinciden porque el campo
-  se pinta al entrar y cada tecla va a la operación. Línea que propongo para
-  `COLA-LIMPIEZA.md`: «`despachante.js`: `sufijoDeLaOperacion()` lee el sufijo
-  del campo del DOM; que lea la operación, como «Generar» y los avisos».
-- **Bajo: todos los productos con sufijo propio.** Si el arancel propone
-  sufijo para cada producto, una operación sin sufijo genera sin frenar, con el
-  propio de cada producto. Es la regla anterior («No hace falta si todos los
-  productos llevan sufijo propio»); no lleva el sufijo de la operación
-  anterior. Tu «una B sin sufijo no genera» vale cuando algún producto depende
-  del de la operación, que es lo que prueba el caso.
-- **Bajo: el aviso viejo a la vista** (D238).
-- El caso tiene 99 líneas contra las ~80 de §6: tres llegadas, la tarjeta y el
-  positivo de avisos y TXT en un solo caso; `chequeo-6` no lo marca.
-- Los avisos con el sufijo a medio escribir se corrigen solos 400 ms después
-  de la última tecla. Ya era así.
+- **Sin migración.** Los puntos 1 a 3 de arriba. Para saber cuánto hay antes
+  de publicar alcanza con contar, en producción y sin cambiar nada, los
+  `origen` «NL», «NLD» y «434» de `operation_items`,
+  `client_product_history.origen_frecuente` y `vendor_catalog_products`. Los
+  «434» no dicen si fueron «NL» escrito a mano o «HOLANDA» elegido: eso sólo
+  lo sabe quien lo cargó.
+- **Grupos guardados** con «NL» junto a «Holanda» o «434» (punto 5): dejan de
+  generar con un error que dice el grupo, no cuál producto ni qué país. No
+  medí cuántos hay: se cuenta igual que arriba, mirando `grupo_id`.
+- **Pestañas abiertas** al publicar (punto 6): hasta recargar siguen
+  guardando «434» para «NL» tipeado.
+- **«HOLANDA» sigue en 434**, como decidiste. Lo que eso da hoy: una factura
+  o una celda que dice «Holanda» genera 434 y la pantalla muestra
+  «434 · HOLANDA»; una que dice «NL» o «Países Bajos», 423.
+- Un TXT ya generado con «NL» salió con 434: no se regenera solo.
+
+Línea que propongo para `COLA-LIMPIEZA.md`: «`paises_maria.js` repite a mano
+alias que el servidor tiene en `PAISES_INDEC` («NL» está en los dos; «NLD»
+sólo en la pantalla): una sola fuente para las siglas.»
 
 ## Archivos de producto que toqué
 
-`proyecto_maria/static/v2/screens/finalize.js`, `CHANGELOG.md`.
+`proyecto_maria/core/maria_generator.py` (una línea de `PAISES_INDEC`),
+`proyecto_maria/static/v2/paises_maria.js` (dos alias), `CHANGELOG.md`.
 
 ## Sigo con
 
-**PAIS-NL**: primero el rojo en `tests/test_catalogo3.py`.
+D237 (a): z22 de `scripts/testing/pantalla_orden1.js` espera los pedidos de
+avisos antes de cerrar la sesión.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama `claude/dev-maria`, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `6e4a427`). SUFIJO-BORRADOR, vuelta de la devolución con D236 (b), entregada sobre `52f13ca` (base `0d4cd72`), con D238 (el aviso «Es obligatorio» queda a la vista entre operaciones; recomiendo (a), pieza aparte) sin contestar. Pieza activa: PAIS-NL (toda sigla de Países Bajos da 423 en TXT, catálogo y pantalla; `PAISES_INDEC` sin claves repetidas; «HOLANDA» queda en 434; ninguna otra entrada cambia; rojo cambiando `tests/test_catalogo3.py:291` y `:298`; las formas de escribirlo como datos de un caso; en el informe, medido y no arreglado, qué queda guardado con «NL» y si algo ya guardado en 434 no se distingue; sin migración). Después: D237 (a) (z22 de `pantalla_orden1.js` espera los avisos, sin espera fija), CUIT-GENERAR (D235 a; apartada con las reversiones `3a6f656` y `2f04637`, se recupera revirtiéndolas; hallazgos del adversario en el scratch `cg_adversario.md`; revisión fuerte §3 con `/security-review`; sus D toman número nuevo), y los vencidos de `sabotajes-conocidos.txt`, uno por pieza. Próxima D: D239. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, sin secretos ni datos reales, VUCE y Gemini simulados, una corrida por vez, un rojo se diagnostica y no se repite hasta verde, las Devs no usan el consejero ni subagentes de esfuerzo muy alto.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama `claude/dev-maria`, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `6887343`). PAIS-NL entregada sobre `a2c6dc6` (base `6fbfefd`), con D239 (el lector de despachos no guarda un código de la tabla sin sigla escrito solo, el campo de origen de esa pantalla acepta dos letras y «434 NL» guarda 423; recomiendo (a), pieza chica aparte) y D240 (nombres de país en inglés reconocidos a medias; recomiendo (b), queda así) sin contestar. Pieza activa: D237 (a) (z22 de `scripts/testing/pantalla_orden1.js` espera los pedidos de avisos antes de cerrar la sesión, sin espera fija). Después: D238 (a) (el aviso «Es obligatorio» del sufijo no queda a la vista de una operación a la otra; pieza chica aparte), CUIT-GENERAR (D235 a; apartada con las reversiones `3a6f656` y `2f04637`, se recupera revirtiéndolas; hallazgos del adversario en el scratch `cg_adversario.md`; revisión fuerte §3 con `/security-review`; sus D toman número nuevo), y los vencidos de `sabotajes-conocidos.txt`, uno por pieza. Próxima D: D241. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, sin secretos ni datos reales, VUCE y Gemini simulados, una corrida por vez, un rojo se diagnostica y no se repite hasta verde, las Devs no usan el consejero ni subagentes de esfuerzo muy alto.
