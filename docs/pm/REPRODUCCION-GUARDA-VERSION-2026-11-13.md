@@ -35,3 +35,21 @@ ejemplo que no le di.
 
 No corrido: pytest entero sobre `3f39ff36`, aiosqlite 0.19 y 0.20,
 Postgres, adversarios (pieza sin adversarios).
+
+## Vuelta 2
+
+Entrega: `f0ec76d1` (saca la línea fija del resumen, −6) y `1be2477b`
+(`tests/test_guarda_conexiones.py`, +85: un caso con cuatro datos que corre
+pytest aparte con el `conftest.py` real), informe `bb83ecc6`, merge
+`9661f5d3`, que ya trae mi rama (`32dfcd5b`): la unión es `9661f5d3`.
+Revisado en un worktree en `9661f5d3`.
+
+| qué | salida |
+|---|---|
+| `chequeo-6.py 703066b1 1be2477b` | producto +0/−0, arnés +85/−6, historia vacía, 0 avisos: igual que el informe |
+| `chequeo-6.py 64106289 1be2477b` | producto +0/−0, arnés +111/−1, historia vacía, 0 avisos |
+| `tests/test_guarda_conexiones.py` | `4 passed, 5 warnings in 23.84s`, rc=0 |
+| mi ejemplo guardado: `pytest_runtest_setup` sin la foto (`pass`) | `3 failed, 1 passed`: rojos «veredicto del cierre», «foto antes de los fixtures», «la culpa es de quien la deja» |
+| negativo mío: `or reporte.failed` → `or True` (el cierre nunca juzga) | `3 failed, 1 passed`: los mismos tres |
+| negativo mío: la foto vacía (`= set()`) | `1 failed, 3 passed`: rojo «la culpa es de quien la deja» |
+| pytest entero sobre `9661f5d3` | corriendo (empezó 17:08 UTC); el veredicto espera esta fila |
