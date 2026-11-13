@@ -142,6 +142,28 @@ async function demorarHastaGenerar(p) {
   return () => llego;
 }
 
+// Lo que la pestaña pide por su cuenta al entrar a «Validación», y cuántas veces: los avisos, al entrar y
+// cuando llegan las tarjetas; la validación, la de la pantalla y la del semáforo.
+const AL_ENTRAR_A_VALIDACION = [['/generate_maria/avisos', 2], ['/api/validate/smart', 2]];
+// Sigue los pedidos de la pestaña. Lo que devuelve espera a que no quede ninguno en vuelo y a que haya
+// terminado, de cada ruta, la cantidad dada: «ninguno en vuelo» solo no alcanza, porque la pantalla saca
+// pedidos nuevos cuando vuelven otros y desde temporizadores.
+function seguirPedidos(p) {
+  const enVuelo = new Set(), terminados = {};
+  let mirar = () => {};
+  const ruta = r => new URL(r.url()).pathname;
+  p.on('request', r => enVuelo.add(r));
+  p.on('requestfailed', r => { enVuelo.delete(r); mirar(); });
+  p.on('requestfinished', r => { enVuelo.delete(r); terminados[ruta(r)] = (terminados[ruta(r)] || 0) + 1; mirar(); });
+  return esperados => new Promise((bien, mal) => {
+    const faltan = () => esperados.filter(([cual, n]) => (terminados[cual] || 0) < n).map(([cual, n]) => cual + ' (' + (terminados[cual] || 0) + ' de ' + n + ')');
+    const tope = setTimeout(() => mal(new Error('la pestaña no terminó sus pedidos: faltan ' + (faltan().join(', ') || 'ninguno') +
+      '; en vuelo: ' + ([...enVuelo].map(ruta).join(', ') || 'ninguno'))), 15000);
+    mirar = () => { if (!enVuelo.size && !faltan().length) { clearTimeout(tope); mirar = () => {}; bien(); } };
+    mirar();
+  });
+}
+
 // Con `pestana`, la página arranca con ese id de pestaña en sessionStorage,
 // como la duplica o la restaura el navegador; sólo en la primera carga.
 async function abrir(ctx, pestana) {
@@ -1507,10 +1529,20 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const a = await nuevoUsuario(ctx, 'ord1z22');
     const t = await abrir(ctx);
     await t.waitForLoadState('networkidle');  // como en (m)
-    await listaParaGenerar(t, 'GEN-Z22');
+    const terminaron = seguirPedidos(t);
+    // En un solo paso: si la pestaña se queda en otra pantalla, el semáforo valida una vez más o una menos.
+    await t.evaluate(([op, items]) => {
+      CDI.state = { operacion: op, items };
+      CDI.goTo('validating');
+    }, [Object.assign({ numero_factura: 'GEN-Z22' }, OPERACION), [prod('Producto de GEN-Z22', '84714900100D', 2, 10)]]);
+    await t.waitForFunction(() => !document.getElementById('validatingGenerate').disabled, null, { timeout: 15000 });
+    // Un pedido de A que el servidor atiende después de la salida da 401 y manda la pestaña al login.
+    await terminaron(AL_ENTRAR_A_VALIDACION).catch(e => falla(que + ': antes de salir, ' + e.message));
     const comprobo = await demorarHastaGenerar(t);
     const salida = await salir(ctx);
     if (!salida.ok()) falla('no se pudo salir: ' + salida.status());
+    // Con la sesión ya cerrada: lo que dispara escribir sale después de la consulta de sesión, que está demorada.
+    await t.fill('#sbtSufijoValor', 'AA(DemoPouchs)-CA00-');
     await entrar(ctx, a);
     const fin = await apretarGenerar(t);
     if (fin !== 'generado') falla(que + ' y no generó: ' + fin);
