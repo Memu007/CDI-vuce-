@@ -446,12 +446,12 @@
         const op = (CDI.state && CDI.state.operacion) || {};
         const incluir = document.getElementById('valorIncluir');
         const deducir = document.getElementById('valorDeducir');
-        // Lo que la persona está escribiendo no se pisa, y un número mal
-        // escrito queda a la vista para que lo corrija.
-        if (incluir && document.activeElement !== incluir && !ajusteMalEscrito(op.ajustes_incluir)) {
+        // Lo que la persona está escribiendo no se pisa. Lo demás se muestra
+        // como está guardado, también lo mal escrito: el aviso lo nombra.
+        if (incluir && document.activeElement !== incluir) {
             incluir.value = op.ajustes_incluir == null ? '' : op.ajustes_incluir;
         }
-        if (deducir && document.activeElement !== deducir && !ajusteMalEscrito(op.ajustes_deducir)) {
+        if (deducir && document.activeElement !== deducir) {
             deducir.value = op.ajustes_deducir == null ? '' : op.ajustes_deducir;
         }
 
