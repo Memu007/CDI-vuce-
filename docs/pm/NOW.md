@@ -264,7 +264,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-13 23:50 UTC: D238 (a) de MARIA aceptada sobre 80cd954 e integrada; D242 (a) decidida por la PM; acta REPRODUCCION-D238-2026-11-13 (un negativo mío no distingue: hueco del caso, se suma como dato a sufijo_otra1 con la pieza de sufijos1). MARIA sigue con CUIT-GENERAR. Técnica sin pieza, rutina apagada, espera a Emi. «Para Emi» 15 espera su respuesta. Sabotajes siguen (sabot/run3.sh): cobro_corte1, mp1 y mp2 cortados por mi tope de 1200 s con todo lo hecho en ROJO; se repiten cada uno en su propia tarea larga.
+2026-11-13 23:57 UTC: vuelta sin novedades (MARIA en CUIT-GENERAR, 145k/250k; Técnica quieta 134k; sin rechazos por límite). 23:50 UTC: D238 (a) de MARIA aceptada sobre 80cd954 e integrada; D242 (a) decidida por la PM; acta REPRODUCCION-D238-2026-11-13 (un negativo mío no distingue: hueco del caso, se suma como dato a sufijo_otra1 con la pieza de sufijos1). MARIA sigue con CUIT-GENERAR. Técnica sin pieza, rutina apagada, espera a Emi. «Para Emi» 15 espera su respuesta. Sabotajes siguen (sabot/run3.sh y, al cortarse, sabot/run5.sh separado del turno con tope 3600): cobro_corte1, mp1 y mp2 cortados por mi tope de 1200 s con todo lo hecho en ROJO; van al final con tope 4 h.
 
 ## /compact conservar de la PM principal
 
