@@ -3,7 +3,7 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## ORDEN1-INTERMITENTE: devolución sobre `8e775b2b` (2026-11-13 04:50 UTC)
+## ORDEN1-INTERMITENTE: devolución sobre `8e775b2b` (2026-11-13 04:46 UTC)
 
 No integro. Acta `REPRODUCCION-ORDEN1-INTERMITENTE-2026-11-13.md`. La carrera
 forzada se reproduce como en tu informe (base: la misma `FALLA` del null;
@@ -49,8 +49,7 @@ Va a `COLA-LIMPIEZA.md`. No lo toques en esta pieza.
 
 Igual que antes: sin adversarios; no toques los guiones de MARIA;
 `pantalla_orden1.js` es tuya en esta pieza. La función de 1585 líneas va a la
-cola: no la partas acá. Mi corredor entero sobre `8e775b2b` estaba en curso al
-escribir esto; si trae un rojo, te lo sumo antes de que reentregues.
+cola: no la partas acá. Mi corredor entero sobre `8e775b2b`: `30 verdes, 0 rojas`.
 
 Lo de D182 / D206 sigue igual: si Emi dice que sí, dejás esto donde esté.
 D205, D206 y D208 siguen con Emi. **Próxima D: D214** (rango D210–D215).
