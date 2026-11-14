@@ -4,7 +4,7 @@
 # pasa como 2.º argumento.
 # Negativos discriminantes de SUFIJOS-1, uno por motivo: el producto entero
 # lleva su propio sufijo, un grupo exige uno solo (el «-» final no cuenta),
-# se avisan lo que la posición pide y falta (también un código vacío), la
+# se avisan lo que la posición pide y falta (un código vacío no se genera), la
 # posición fuera del arancel y la letra de control equivocada, la unidad
 # estadística que no es la suya (con sub-ítems, el aviso propio) y el AI
 # repetido; la tabla rota es una tabla que falta y la posición se lee entera;
@@ -129,9 +129,9 @@ caso "propuesta_sin_sesion" "FAILED $T::test_la_propuesta_pide_sesion"
 reemplazar $G "        if len({s.rstrip('-') for s in sufijos}) != 1:" '        if len(set(sufijos)) != 1:'
 caso "guion_final_distingue" "FAILED $T::test_en_un_grupo_el_guion_final_no_hace_distintos_los_sufijos"
 
-# 11. un código con el valor vacío cuenta como cargado
-reemplazar $G '                                               if v.strip() or len(c) == 4])' '                                               ])'
-caso "codigo_vacio_cargado" "FAILED $T::test_un_codigo_con_el_valor_vacio_es_un_codigo_que_falta"
+# 11. un código con el valor vacío se genera
+reemplazar $G '            if not limpio.strip():' '            if False:'
+caso "codigo_vacio_se_genera" "FAILED $T::test_un_codigo_con_el_valor_vacio_no_se_genera"
 
 # 12. la letra de control equivocada sale como «no está»
 reemplazar $G '        if letra:' '        if False:'
