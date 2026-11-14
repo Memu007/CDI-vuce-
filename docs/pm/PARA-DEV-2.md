@@ -30,6 +30,31 @@ semáforo, fuera de esos tres archivos, da rojo (los siete que leíste y la tuya
 - **Supuestos:** acepto los cinco. **Riesgos:** aceptados tal como los escribiste.
 - Las dos líneas que propusiste para `COLA-LIMPIEZA.md` quedaron puestas.
 
+## SABOTAJE-SUFIJOS1: aceptada sobre `afeae84` (informe `1215a8a`) e integrada (2026-11-14 05:15 UTC)
+
+Acta `REPRODUCCION-SABOTAJE-SUFIJOS1-2026-11-14.md`. Con la copia de `afeae84`: guion
+47 `ROJO`, `rc=0`; las tres pantallas verdes; anclas en 6; chequeo-6 igual al tuyo.
+Un negativo mío (el aviso se esconde sólo si la operación no trae sufijo) da rojo en
+`afeae84` por «con su sufijo guardado» y verde en `4474108`. Tus dos filas de arrastre
+no las repetí: quedan como medición tuya.
+
+- **D246: (b), decidido por la PM.** `VACIOS` de `test_sufijos2.py` ya trae
+  `"AA(   )-"`. Pieza chica **después de D245 (a)**: sacás el caso 11 y
+  `test_sufijos1.py::test_un_codigo_con_el_valor_vacio_no_se_genera`. Se acepta con
+  `sabotaje_sufijos1.sh` en 46 `ROJO`, `sabotajes/sufijos2.sh` entero en `ROJO`,
+  `anclas_perdidas.py` en 6 y `test_sufijos1.py` y `test_sufijos2.py` verdes.
+- **Riesgos:** aceptados como los escribiste; el de los avisos sin sufijo no se pide.
+- La línea de `COLA-LIMPIEZA.md` del filtro de `:2013` quedó con tu medición: está
+  muerto, sacarlo.
+
+**Cómo sigue:** 1) D245 (a); 2) D246 (b); 3) los demás vencidos (quedan 7). D244 y
+D239 esperan a Emi. Si dice que sí a D244, te la escribo con su criterio. Si dice que
+sí a D239 (a), lleva adentro, como datos de un caso, un código sin sigla con el nombre
+de otro país («434 BELGICA» guarda `BE` sin avisar). Si Emi dice que «Holanda» también
+es 423, es una pieza chica aparte.
+
+**Próxima D: D247.**
+
 ## D243 (b): aceptada sobre `0dff850` (informe `4474108`) e integrada (2026-11-14 05:00 UTC)
 
 Acta `REPRODUCCION-D243-2026-11-14.md`. Los tres guiones enteros con la copia de
@@ -41,14 +66,6 @@ de `excel2.sh:171` quedó en `COLA-LIMPIEZA.md`.
 CUIT-GENERAR quedó aceptada sobre `29327d2` (acta
 `REPRODUCCION-CUIT-GENERAR-2026-11-14.md`). **D244 espera a Emi**; hasta que conteste
 no la tocás.
-
-**Cómo sigue:** 1) espera mi veredicto de SABOTAJE-SUFIJOS1 (y D246); mientras, 2)
-D245 (a); 3) los demás vencidos. D244 y D239 esperan a Emi. Si dice que sí a D244, te
-la escribo con su criterio. Si dice que sí a D239 (a), lleva adentro, como datos de un
-caso, un código sin sigla con el nombre de otro país («434 BELGICA» guarda `BE` sin
-avisar). Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
-
-**Próxima D: D247.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
