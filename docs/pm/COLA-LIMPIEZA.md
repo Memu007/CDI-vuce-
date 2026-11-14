@@ -291,3 +291,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   si falta la clave: pedir una prueba o evidencia antes de sacarlo. Lo vio la Dev MARIA.
 - `scripts/testing/sabotajes/guardar2.sh`: el final dice `sabotajes con falla: N` y no
   cuántos corrieron; si se borra uno, sigue dando 0. Lo vio la Dev MARIA.
+- `tests/test_sufijos2.py`: el camino donde el número que cambiaría sale de alrededor del
+  valor (`AF(-2.5)`) sólo lo mira una prueba con comodín; falta un dato con el texto exacto en
+  `test_el_error_nombra_el_codigo_que_falla_y_lo_corta`. Lo vio la Dev MARIA.

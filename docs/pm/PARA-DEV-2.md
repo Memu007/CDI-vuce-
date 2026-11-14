@@ -20,6 +20,18 @@ Acta `REPRODUCCION-SABOTAJE-GUARDAR2-2026-11-14.md`. No queda ningún vencido.
   sacarlo»: el `.get` evita un `KeyError` si falta la clave, y que hoy siempre esté no lo
   prueba ninguna prueba.
 
+## D249 (a): aceptada sobre `50dabfa` (informe `5682f6e`) e integrada (2026-11-14 11:44 UTC)
+
+Acta `REPRODUCCION-D249-2026-11-14.md`.
+
+- Con la copia de `50dabfa`: 49 `ROJO`, `117 passed`, `rc=0`; sobre la base `279a685`, 16 sin
+  rojo (15 `VERDE` y el `ROJO?` de «pide», que la base ve con un solo dato). Mi sabotaje,
+  «cerca de» corrido en uno, da `ROJO` en `[no_se_separa_largo]`. `sabotaje_sufijos1.sh` en 46,
+  anclas 0/0/0, chequeo-6 igual al tuyo.
+- **Supuestos 1 y 2 y riesgos 1 y 3:** aceptados. El riesgo 2 (`AF(-2.5)`) va a la cola.
+- **`/code-review`:** esta vez pasa (sin producto y el SHA pasó por el adversario), decidido por
+  la PM. `/entregar` no lo exceptúa: en las próximas, correlo o decí por qué no.
+
 ## D250 (a) (2026-11-14 10:26 UTC)
 
 D250 (a), decidida por la PM. Medí tu mutación de `maria_generator.py:2235`: los 27
@@ -35,9 +47,7 @@ Criterio de D250:
 3. `sabotaje_maria8.sh` entero en `ROJO`, con la cuenta exacta.
 4. Las anclas no empeoran.
 
-**Cómo sigue:**
-1. D249 (a), con el criterio de la sección D247 de abajo.
-2. D250 (a).
+**Cómo sigue:** D250 (a).
 
 D244 y D239 esperan a Emi:
 - Si dice que sí a D244, te la escribo con su criterio.
@@ -72,28 +82,6 @@ Acta `REPRODUCCION-D247-2026-11-14.md`. Con la copia de `4a58c68`: las dos prueb
 `0224f01`; `sufijos2.sh` 33 `ROJO`, 0 `FALLA`, `rc=0`; `sabotaje_sufijos1.sh` 46 `ROJO`,
 `rc=0`; anclas en 5 y 1; chequeo-6 igual al tuyo. Gracias por medir D249 sin que te lo
 pidiera.
-
-- **D249: (a), decidido por la PM. Va después de D248 (c) y los 6 vencidos.** Te
-  autorizo a tocar sólo `tests/test_sufijos2.py` y `scripts/testing/sabotajes/sufijos2.sh`
-  (ya le avisé a la Técnica). Medí la familia entera de los fragmentos «…» de
-  `limpiar_sufijo`: además de tus dos, hay siete más que nadie distingue (tabla en el
-  acta). Se acepta así, con cada cambio solo:
-  - da rojo en la entrega y queda verde en la base `4a58c68`:
-    - «pide» con `«{sufijo[:40]}»`, en más de un dato (hoy lo sostiene uno solo);
-    - «pide» con `«{sufijo[pos:pos + 40]}»`;
-    - «cambiaría» con `en «{sufijo[:40]}»`;
-    - `«{cambiaria[:20]}»` cambiado por `«{cambiaria}»` y por `«{sufijo[:20]}»`;
-    - «está vacío» sin recorte (`«{uno[0]}»`);
-    - «cerca de» con `sufijo[:20]` y con `sufijo[pos:]`;
-    - «no se puede separar» con `sufijo[:10]` en lugar de `sufijo[:80]`;
-    - el aviso con `limpio[:10]` en lugar de `limpio[:80]`;
-  - `sufijos2.sh` entero en `ROJO`, con un sabotaje por cambio y la cuenta exacta en
-    el informe;
-  - `sabotaje_sufijos1.sh` sigue en 46, anclas en 5 y 1, las dos pruebas verdes.
-  - **Sugerencia** (no es criterio): pares (sufijo, lo que nombra el error) y un
-    código de más de 40 o de 80 letras, para que el recorte se vea.
-- **Riesgos:** aceptados. `.upper()` y el texto de la instrucción, que tu adversario
-  mostró verdes, son previos: no entran en D249.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
