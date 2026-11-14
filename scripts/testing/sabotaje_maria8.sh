@@ -143,13 +143,15 @@ caso "sufijo_de_la_operacion" "FAILED $T::test_cada_subitem_lleva_lo_de_su_rengl
 
 # 19. el sufijo del renglón sale sin limpiar
 reemplazar $F '                sufijo = limpiar_sufijo(str(renglon.get("sufijo") or "").strip(),
-                                        f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0] or sufijo_de_la_operacion()' '                sufijo = str(renglon.get("sufijo") or "").strip() or sufijo_de_la_operacion()'
+                                        f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0]' '                sufijo = str(renglon.get("sufijo") or "").strip()'
 caso "sufijo_sucio" "FAILED $T::test_el_sufijo_del_renglon_se_limpia"
 
 # 20. pide el sufijo de la operación aunque cada renglón tenga el suyo
-reemplazar $F '                                        f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0] or sufijo_de_la_operacion()
-                if not sufijo:' '                                        f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0] or sufijo_de_la_operacion()
-                if not sufijo or not sufijo_de_la_operacion():'
+reemplazar $F '                if not sufijo:
+                    raise ValueError(
+                        f"Item {lugar_en_el_pedido[id(renglon)]}: falta' '                if not sufijo or not sufijo_de_la_operacion():
+                    raise ValueError(
+                        f"Item {lugar_en_el_pedido[id(renglon)]}: falta'
 caso "pide_sufijo_operacion" "FAILED $T::test_con_todos_los_sufijos_propios_no_hace_falta_el_de_la_operacion"
 
 # 21. el error del peso no dice el renglón de la pantalla
