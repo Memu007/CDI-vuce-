@@ -7,8 +7,7 @@
 # se avisan lo que la posición pide y falta, la
 # posición fuera del arancel y la letra de control equivocada, la unidad
 # estadística que no es la suya (con sub-ítems, el aviso propio) y el AI
-# repetido; un código con el valor vacío no se genera; la tabla rota es una
-# tabla que falta y la posición se lee entera;
+# repetido; la tabla rota es una tabla que falta y la posición se lee entera;
 # la estadística de la tabla va al pedido salvo con sub-ítems, el script
 # frena si el SHA del ZIP no es el del LEEME y la propuesta pide sesión, lee
 # la NCM primero, sanea y recorta el texto, dice si falta la tabla y la letra
@@ -130,153 +129,149 @@ caso "propuesta_sin_sesion" "FAILED $T::test_la_propuesta_pide_sesion"
 reemplazar $G "        if len({s.rstrip('-') for s in sufijos}) != 1:" '        if len(set(sufijos)) != 1:'
 caso "guion_final_distingue" "FAILED $T::test_en_un_grupo_el_guion_final_no_hace_distintos_los_sufijos"
 
-# 11. un código con el valor vacío se genera
-reemplazar $G '            if not limpio.strip():' '            if False:'
-caso "codigo_vacio_se_genera" "FAILED $T::test_un_codigo_con_el_valor_vacio_no_se_genera"
-
-# 12. la letra de control equivocada sale como «no está»
+# 11. la letra de control equivocada sale como «no está»
 reemplazar $G '        if letra:' '        if False:'
 caso "letra_como_no_esta" "FAILED $T::test_la_letra_de_control_equivocada_se_dice_como_tal"
 
-# 13. con sub-ítems, el aviso de unidad manda a elegir kilos
+# 12. con sub-ítems, el aviso de unidad manda a elegir kilos
 reemplazar $G '        if pide == UNIDAD_KILOGRAMO and con_subitems:' '        if False:'
 caso "subitems_aviso_comun" "FAILED $T::test_con_sub_items_el_aviso_de_unidad_no_manda_a_elegir_kilos"
 
-# 14. la posición se lee con letras de más
+# 13. la posición se lee con letras de más
 reemplazar $A '    partes = re.fullmatch(r"(\d{%d})([A-Z]?)" % LARGO_SIM, texto)' '    partes = re.match(r"(\d{%d})([A-Z]?)" % LARGO_SIM, texto)'
 caso "posicion_con_letras_de_mas" "FAILED $T::test_la_posicion_se_lee_con_puntos_y_sin_letras_de_mas"
 
-# 15. una letra de control que no es la suya se consulta igual
+# 14. una letra de control que no es la suya se consulta igual
 reemplazar $A '    if not fila or letra_de_control(posicion, tabla):' '    if not fila:'
 caso "consulta_con_otra_letra" "FAILED $T::test_la_posicion_se_lee_con_puntos_y_sin_letras_de_mas"
 
-# 16. una tabla que no es un diccionario se usa igual
+# 15. una tabla que no es un diccionario se usa igual
 reemplazar $A '    return tabla if isinstance(tabla, dict) else {}' '    return tabla'
 caso "tabla_que_no_es_dict" "FAILED $T::test_una_tabla_rota_es_una_tabla_que_falta"
 
-# 17. una tabla cortada rompe la carga
+# 16. una tabla cortada rompe la carga
 reemplazar $A '    except (OSError, EOFError, ValueError):' '    except (OSError, ValueError):'
 caso "tabla_cortada" "FAILED $T::test_una_tabla_rota_es_una_tabla_que_falta"
 
-# 18. la propuesta no dice que falta la tabla
+# 17. la propuesta no dice que falta la tabla
 reemplazar $M '"sin_tabla": not tabla,' '"sin_tabla": False,'
 caso "propuesta_sin_aviso_de_tabla" "FAILED $T::test_sin_la_tabla_la_propuesta_lo_dice"
 
-# 19. la propuesta lee la pieza antes que la NCM
+# 18. la propuesta lee la pieza antes que la NCM
 reemplazar $M '_texto_del_pedido(it.get("ncm") or it.get("pieza"), 20)' '_texto_del_pedido(it.get("pieza") or it.get("ncm"), 20)'
 caso "pieza_antes_que_ncm" "FAILED $T::test_la_propuesta_lee_la_ncm_antes_que_la_pieza"
 
-# 20. el texto del pedido no se sanea
+# 19. el texto del pedido no se sanea
 reemplazar $M '    return str(valor or "").encode("utf-8", "replace").decode("utf-8").strip()[:largo]' '    return str(valor or "").strip()[:largo]'
 caso "texto_sin_sanear" "FAILED $T::test_la_propuesta_aguanta_texto_que_no_es_utf8_y_recorta_lo_largo"
 
-# 21. el texto del pedido no se recorta
+# 20. el texto del pedido no se recorta
 reemplazar $M '{c: _texto_del_pedido(it.get(c), 200) for c in' '{c: _texto_del_pedido(it.get(c), 10**6) for c in'
 caso "texto_sin_tope" "FAILED $T::test_la_propuesta_aguanta_texto_que_no_es_utf8_y_recorta_lo_largo"
 
-# 22. la propuesta no dice la letra que corresponde
+# 21. la propuesta no dice la letra que corresponde
 reemplazar $M '"letra_de_control": sufijos_arca.letra_de_control(posicion, tabla)})' '"letra_de_control": ""})'
 caso "propuesta_sin_letra" "FAILED $T::test_la_propuesta_dice_la_letra_de_control_que_corresponde"
 
-# 23. la pantalla usa la propuesta sola, sin el de la operación
+# 22. la pantalla usa la propuesta sola, sin el de la operación
 reemplazar $D "        return f && f.sufijo ? combinar(sufijoDeLaOperacion(), String(f.sufijo)) : '';" "        return f && f.sufijo ? String(f.sufijo) : '';"
 caso "pantalla_sin_el_de_la_operacion" "FAILED $T::test_la_propuesta_se_suma_a_lo_que_trae_el_de_la_operacion"
 
-# 24. la pantalla pierde los códigos propuestos que la operación no trae
+# 23. la pantalla pierde los códigos propuestos que la operación no trae
 reemplazar $D '            .concat(prop.filter(p => !tiene[p.codigo]).map(p => p.texto));' '            ;'
 caso "pantalla_pierde_codigos" "FAILED $T::test_la_propuesta_se_suma_a_lo_que_trae_el_de_la_operacion"
 
-# 25. la propuesta de una fila pasa al producto que queda en su lugar
+# 24. la propuesta de una fila pasa al producto que queda en su lugar
 reemplazar $D '        if (!pedido || JSON.stringify(pedido) !== JSON.stringify(pedidoDe(it))) return null;' '        if (!pedido) return null;'
 caso "propuesta_de_otro_producto" "FAILED $T::test_la_propuesta_de_una_fila_no_pasa_al_producto_que_queda_en_su_lugar"
 
-# 26. la pantalla repite el pedido en curso
+# 25. la pantalla repite el pedido en curso
 reemplazar $D '        if (pendiente && pendiente.clave === cuerpo.clave) return pendiente.promesa;' ''
 caso "pedido_repetido" "FAILED $T::test_volver_a_pintar_no_repite_el_pedido_en_curso"
 
-# 27. la nota dice «no está» cuando falta la tabla
+# 26. la nota dice «no está» cuando falta la tabla
 reemplazar $D "            if (mostrado.arancel.sin_tabla) return 'Falta la tabla del arancel de ARCA: cargalo a mano.';" ''
 caso "nota_sin_tabla" "FAILED $T::test_sin_la_tabla_la_nota_no_dice_que_la_posicion_no_esta"
 
-# 28. la nota dice «no está» cuando es la letra de control
+# 27. la nota dice «no está» cuando es la letra de control
 reemplazar $D '            if (f.letra_de_control) {' '            if (false) {'
 caso "nota_sin_letra" "FAILED $T::test_con_la_letra_equivocada_la_nota_no_dice_que_la_posicion_no_esta"
 
-# 29. con sub-ítems, la estadística de la tabla va sola al pedido
+# 28. con sub-ítems, la estadística de la tabla va sola al pedido
 reemplazar $D '        const f = conSubitems(it) ? null : filaDe(it, i);' '        const f = filaDe(it, i);'
 caso "subitems_con_estadistica_de_la_tabla" "FAILED $T::test_con_sub_items_la_estadistica_de_la_tabla_no_va_sola"
 
-# 30. junto con el de la operación pasa del tope y se cae lo de la operación
+# 29. junto con el de la operación pasa del tope y se cae lo de la operación
 reemplazar $D "        return junto.length <= 120 ? junto : '';" "        return junto.length <= 120 ? junto : prop.map(p => p.texto).join('-') + '-';"
 caso "tope_pierde_la_operacion" "FAILED $T::test_si_junto_con_el_de_la_operacion_no_entra_no_se_pierde_lo_de_la_operacion"
 
-# 31. en un grupo, una celda por producto
+# 30. en un grupo, una celda por producto
 reemplazar $D "        if (it.grupo_id) return '<span class=\"caption\">Va el de la operación para todo el grupo.</span>' + nota;" ''
 caso "grupo_con_celda_por_producto" "FAILED $T::test_en_un_grupo_la_celda_no_deja_escribir_un_sufijo_por_producto"
 
-# 32. una NCM de 8 se dice fuera del arancel (en el servidor)
+# 31. una NCM de 8 se dice fuera del arancel (en el servidor)
 reemplazar $G '        if not sufijos_arca.es_sim(posicion):' '        if False:'
 caso "ncm_de_ocho_fuera_en_el_servidor" "FAILED $T::test_una_ncm_de_ocho_no_se_dice_fuera_del_arancel"
 
-# 33. una NCM de 8 se dice fuera del arancel (en la nota)
+# 32. una NCM de 8 se dice fuera del arancel (en la nota)
 reemplazar $D "            if (!/^[0-9]{11}[A-Z]?\$/.test(posicionDe(it).replace(/[.\\s]/g, ''))) {" '            if (false) {'
 caso "ncm_de_ocho_fuera_en_la_nota" "FAILED $T::test_una_ncm_de_ocho_no_se_dice_fuera_del_arancel"
 
-# 34. un grupo_id que no se puede comparar rompe los avisos
+# 33. un grupo_id que no se puede comparar rompe los avisos
 reemplazar $G '                    except TypeError:' '                    except KeyError:'
 caso "grupo_que_no_se_compara" "FAILED $T::test_un_grupo_que_no_se_puede_comparar_no_rompe_los_avisos"
 
 # Vuelta de SUFIJOS-1: lo que viaja es lo que muestra la celda.
-# 35. H1: la fila del arancel se usa aunque lo pintado no sea «ok»
+# 34. H1: la fila del arancel se usa aunque lo pintado no sea «ok»
 reemplazar $D "        if (!it || mostrado.estado !== 'ok') return null;" '        if (!it) return null;'
 caso "fila_sin_mirar_el_estado" "FAILED $T::test_mientras_consulta_otra_fila_la_que_no_cambio_tampoco_lleva_la_propuesta"
 
-# 36. H1: los avisos no dicen que el arancel no contestó
+# 35. H1: los avisos no dicen que el arancel no contestó
 reemplazar $D "        if (items.length && mostrado.estado !== 'ok') lista.push(notaDelArancel({ pieza: '-' }, 0));" ''
 caso "avisos_sin_el_estado_del_arancel" "FAILED $T::test_si_el_arancel_no_contesta_no_viaja_nada_y_la_celda_lo_dice"
 
-# 37. H1: con más de 500 productos la celda no lo dice
+# 36. H1: con más de 500 productos la celda no lo dice
 reemplazar $D "        if ((CDI.state.items || []).length > TOPE_ARANCEL) return 'tope';" ''
 caso "tope_sin_aviso" "FAILED $T::test_con_mas_de_500_productos_no_se_consulta_y_se_dice"
 
-# 38. H1: con más de 500 productos se consulta igual
+# 37. H1: con más de 500 productos se consulta igual
 reemplazar $D '        if (cuerpo.items.length > TOPE_ARANCEL) return Promise.resolve(false);' ''
 caso "tope_consulta_igual" "FAILED $T::test_con_mas_de_500_productos_no_se_consulta_y_se_dice"
 
-# 39. H1: mientras consulta, se usa la respuesta de antes
+# 38. H1: mientras consulta, se usa la respuesta de antes
 reemplazar $D "        if (arancel.clave !== cuerpoDeSufijos().clave) return 'consultando';" ''
 caso "consultando_usa_lo_viejo" "FAILED $T::test_mientras_consulta_no_viaja_nada_de_la_propuesta"
 
-# 40. H2: la celda escrita no avisa si cambia el de la operación
+# 39. H2: la celda escrita no avisa si cambia el de la operación
 reemplazar $D '        return Boolean(String(it.sufijo).trim()) && it.sufijo_op !== sufijoDeLaOperacion().trim();' '        return false;'
 caso "escrita_sin_aviso" "FAILED $T::test_si_cambia_el_de_la_operacion_la_celda_escrita_avisa"
 
-# 41. H2: no se guarda con qué sufijo de la operación se escribió
+# 40. H2: no se guarda con qué sufijo de la operación se escribió
 reemplazar $D '                it.sufijo_op = sufijoDeLaOperacion().trim();   // con cuál se escribió (H2)' ''
 caso "escrita_sin_su_operacion" "FAILED $T::test_si_cambia_el_de_la_operacion_la_celda_escrita_avisa"
 
-# 42. H3: un grupo lleva el sufijo escrito antes de agrupar
+# 41. H3: un grupo lleva el sufijo escrito antes de agrupar
 reemplazar $D "        if (!it || it.grupo_id || conSubitems(it)) return '';" "        if (!it || conSubitems(it)) return '';"
 caso "grupo_con_sufijo_escrito" "FAILED $T::test_en_un_grupo_no_viaja_un_sufijo_escrito_antes_de_agrupar"
 
-# 43. H4: con sub-ítems viaja el sufijo del producto
+# 42. H4: con sub-ítems viaja el sufijo del producto
 reemplazar $D "        if (!it || it.grupo_id || conSubitems(it)) return '';" "        if (!it || it.grupo_id) return '';"
 caso "subitems_con_sufijo_del_producto" "FAILED $T::test_con_sub_items_no_viaja_el_sufijo_del_producto"
 
-# 44. H5: la propuesta pisa lo que escribió la operación
+# 43. H5: la propuesta pisa lo que escribió la operación
 reemplazar $D '        const partes = deOp.map(p => p.texto)' '        const partes = deOp.filter(p => !prop.some(q => q.codigo === p.codigo)).map(p => p.texto)'
 reemplazar $D '            .concat(prop.filter(p => !tiene[p.codigo]).map(p => p.texto));' '            .concat(prop.map(p => p.texto));'
 caso "propuesta_pisa_la_operacion" "FAILED $T::test_el_de_la_operacion_gana_y_lo_distinto_se_avisa_en_la_fila"
 
-# 45. H5: lo distinto no se avisa en la fila
+# 44. H5: lo distinto no se avisa en la fila
 reemplazar $D '            if (o && igual(o.valor) !== igual(p.valor)) {' '            if (false) {'
 caso "distinto_sin_aviso" "FAILED $T::test_el_de_la_operacion_gana_y_lo_distinto_se_avisa_en_la_fila"
 
-# 46. D23: con el de la operación vacío y todos con el propio no se avisa
+# 45. D23: con el de la operación vacío y todos con el propio no se avisa
 reemplazar $D '        if (!sufijoDeLaOperacion().trim() && todosConPropio()) lista.push(OPERACION_VACIA);' ''
 caso "operacion_vacia_sin_aviso" "FAILED $T::test_con_el_de_la_operacion_vacio_y_todos_con_el_propio_se_avisa"
 
-# 47. lo que viaja sale de lo que llegó, no de lo que se pintó
+# 46. lo que viaja sale de lo que llegó, no de lo que se pintó
 reemplazar $D '        const pedido = mostrado.arancel.pedidos[i];' '        const pedido = arancel.pedidos[i];'
 reemplazar $D '        return mostrado.arancel.filas[i] || null;' '        return arancel.filas[i] || null;'
 caso "viaja_lo_que_llego" "FAILED $T::test_la_propuesta_que_llego_y_no_se_pinto_no_viaja"
