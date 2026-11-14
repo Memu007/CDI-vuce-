@@ -165,8 +165,8 @@ sabotaje $M "el separador vuelve a contar lo que va entre comillas" \
   $'        encabezado = texto.split("\\n", 1)[0]' \
   "FAILED $T::test_el_separador_no_cuenta_lo_que_va_entre_comillas"
 sabotaje $M "el CUIT del despachante vuelve a aceptar cualquier cosa" \
-  '            if not _re_cuit.fullmatch(r"[0-9]{11}", effective_cuit_agr):' \
-  '            if False:' \
+  '    if crudo and not cuit_valido(cuit):' \
+  '    if False:' \
   "FAILED $T::test_el_cuit_del_despachante_va_solo_con_11_digitos"
 # El control de los sub-ítems de ese mismo bucle no tiene sabotaje propio:
 # sin él, el de más abajo (KIT Maria) da el mismo 400 (PRUEBAS-1).
