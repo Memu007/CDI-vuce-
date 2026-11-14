@@ -7,6 +7,28 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
+## D245 (a): aceptada sobre `e17c11e` (informe `a8d7f7b`) e integrada (2026-11-14 05:35 UTC)
+
+Acta `REPRODUCCION-D245-2026-11-14.md`. Tus números salen iguales con
+`GEMINI_API_KEY` vacía: los tres archivos `166 passed, 2 xfailed`; con el `raise`,
+`36 failed` en los 11 archivos (14 por `success`, 22 por `KeyError`). Mi negativo:
+el semáforo contesta `success: False` sin error. Da `14 failed`, sólo en los cuatro
+archivos que lo afirman, y en la base `1215a8a` los tres archivos quedan verdes.
+Los guiones `punta_a_punta1`, `sabotaje_subitems1`, `destino1` y `avisos1`, con tu copia,
+`rc=0` y todo `ROJO` (9, 11, 19 y 22).
+
+- **Supuestos y riesgos:** aceptados. Las `xfail` que no distinguen quedan como
+  riesgo bajo. El de la pantalla con `success: false` quedó en `NOW.md`.
+- Tu línea del ayudante único quedó en `COLA-LIMPIEZA.md`.
+
+**Cómo sigue:** 1) D246 (b), con el criterio de la sección de SABOTAJE-SUFIJOS1;
+2) los demás vencidos (quedan 7). D244 y D239 esperan a Emi. Si dice que sí a D244,
+te la escribo con su criterio. Si dice que sí a D239 (a), lleva adentro, como datos
+de un caso, un código sin sigla con el nombre de otro país («434 BELGICA» guarda
+`BE` sin avisar). Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
+
+**Próxima D: D247.**
+
 ## SABOTAJE-SUBITEMS1: aceptada sobre `bf6778e` (informe `2a0b8e8`) e integrada (2026-11-14 03:33 UTC)
 
 Acta `REPRODUCCION-SABOTAJE-SUBITEMS1-2026-11-14.md`. Corrí
@@ -16,17 +38,7 @@ semáforo corrí los 11 archivos de `tests/` que lo llaman: `26 failed`, y queda
 verdes justo los tres de D245. Mirado prueba por prueba: toda prueba que llama al
 semáforo, fuera de esos tres archivos, da rojo (los siete que leíste y la tuya).
 
-- **D245: (a), decidido por la PM**, con los tres archivos. La hacés vos, aunque
-  `test_cobro_corte1.py` es de la Técnica: sólo se suma la afirmación de `success`,
-  sin cambiar lo que ya mira. Como toca cobro, la revisión fuerte es ésta: en el
-  diff de ese archivo sólo cambia esa afirmación, y el informe trae el rojo medido
-  con el `raise`. No hace falta adversario ni `/security-review` para esta pieza.
-  Se acepta así: con el `raise` dentro del `try`, ninguna prueba que llama al
-  semáforo queda verde en los 11 archivos; sin él, los tres archivos verdes enteros.
-  Ya lo medí con una afirmación de `success` en cada sitio: sin sabotaje
-  `166 passed, 2 xfailed`; con el `raise`, `10 failed` (8 de `test_punta_a_punta1`,
-  1 de `test_generar_maria_txt`, 1 de `test_cobro_corte1`). Hoy el semáforo contesta
-  `success: true` en los tres, así que la pieza es sólo de pruebas.
+- **D245: (a), decidido por la PM.** Aceptada aparte, más arriba.
 - **Supuestos:** acepto los cinco. **Riesgos:** aceptados tal como los escribiste.
 - Las dos líneas que propusiste para `COLA-LIMPIEZA.md` quedaron puestas.
 
@@ -46,14 +58,6 @@ no las repetí: quedan como medición tuya.
 - **Riesgos:** aceptados como los escribiste; el de los avisos sin sufijo no se pide.
 - La línea de `COLA-LIMPIEZA.md` del filtro de `:2013` quedó con tu medición: está
   muerto, sacarlo.
-
-**Cómo sigue:** 1) D245 (a); 2) D246 (b); 3) los demás vencidos (quedan 7). D244 y
-D239 esperan a Emi. Si dice que sí a D244, te la escribo con su criterio. Si dice que
-sí a D239 (a), lleva adentro, como datos de un caso, un código sin sigla con el nombre
-de otro país («434 BELGICA» guarda `BE` sin avisar). Si Emi dice que «Holanda» también
-es 423, es una pieza chica aparte.
-
-**Próxima D: D247.**
 
 ## D243 (b): aceptada sobre `0dff850` (informe `4474108`) e integrada (2026-11-14 04:51 UTC)
 
