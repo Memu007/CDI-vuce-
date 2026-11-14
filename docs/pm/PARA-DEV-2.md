@@ -30,28 +30,25 @@ semáforo, fuera de esos tres archivos, da rojo (los siete que leíste y la tuya
 - **Supuestos:** acepto los cinco. **Riesgos:** aceptados tal como los escribiste.
 - Las dos líneas que propusiste para `COLA-LIMPIEZA.md` quedaron puestas.
 
-## CUIT-GENERAR (D235 a): aceptada sobre `29327d2` e integrada (2026-11-14 02:44 UTC)
+## D243 (b): aceptada sobre `0dff850` (informe `4474108`) e integrada (2026-11-14 05:00 UTC)
 
-Acta `REPRODUCCION-CUIT-GENERAR-2026-11-14.md`.
+Acta `REPRODUCCION-D243-2026-11-14.md`. Los tres guiones enteros con la copia de
+`0dff850`: `estudio1` 37 `ROJO`, `estudio1b` 20, `excel2` 42, `rc=0` los tres, y cada
+ancla cambiada en `ROJO` por su prueba. `anclas_perdidas.py` de vuelta a 6. Integré
+`4474108`, no tu cabeza: SABOTAJE-SUFIJOS1 (`afeae84`) la estoy revisando. Tu línea
+de `excel2.sh:171` quedó en `COLA-LIMPIEZA.md`.
 
-- **D243: (b), decidido por la PM.** Cambiás vos las cuatro anclas en
-  `estudio1.sh`, `estudio1b.sh` y `excel2.sh` con las líneas de tu tabla, en una
-  pieza chica. Se acepta con los tres guiones corridos **enteros** sobre el SHA
-  nuevo, cada sabotaje en `ROJO`, y `anclas_perdidas.py` de vuelta a 6. La Técnica
-  no tocó esos guiones desde `3dc9908`. Hasta entonces `29327d2` no se propone para
-  publicar.
-- **D244: espera a Emi** (no tiene fila en el roadmap; AVISOS-1 es de
-  exportaciones). Le recomiendo (a). Hasta que conteste no la tocás.
+CUIT-GENERAR quedó aceptada sobre `29327d2` (acta
+`REPRODUCCION-CUIT-GENERAR-2026-11-14.md`). **D244 espera a Emi**; hasta que conteste
+no la tocás.
 
-**Cómo sigue:** 1) D243 (b); 2) `sabotaje_sufijos1.sh`, que lleva adentro, como dato
-de `sufijo_otra1`, la siguiente operación con su propio sufijo guardado: entra sin el
-aviso de la anterior y con su sufijo en el campo (el negativo que no distinguió en
-D238); 3) D245 (a); 4) los demás vencidos. D244 y D239 esperan a Emi. Si dice que sí a
-D244, te la escribo con su criterio. Si dice que sí a D239 (a), lleva adentro, como
-datos de un caso, un código sin sigla con el nombre de otro país («434 BELGICA» guarda
-`BE` sin avisar). Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
+**Cómo sigue:** 1) espera mi veredicto de SABOTAJE-SUFIJOS1 (y D246); mientras, 2)
+D245 (a); 3) los demás vencidos. D244 y D239 esperan a Emi. Si dice que sí a D244, te
+la escribo con su criterio. Si dice que sí a D239 (a), lleva adentro, como datos de un
+caso, un código sin sigla con el nombre de otro país («434 BELGICA» guarda `BE` sin
+avisar). Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
 
-**Próxima D: D246.**
+**Próxima D: D247.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 

@@ -234,6 +234,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   que la usa, culpándolo a él. Hoy no hay ninguna (FUGA-HILOS-GUARDA).
 - `despachante.js:255`, `sufijoDeLaOperacion()` lee el sufijo del campo del
   DOM; que lea la operación, como «Generar» y los avisos.
+- `sabotajes/excel2.sh:171`: el comentario habla de «ese mismo bucle», donde ya
+  no está el control del CUIT del despachante (Técnica).
 
 ## Riesgos que esperan a Emi (no son tareas: no se toman de esta cola)
 
