@@ -384,9 +384,9 @@ def test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo(caso):
     for renglon, propio in zip(renglones, propios):
         if propio is not None:
             renglon["sufijo"] = propio
-    # Otro ítem, con dos sufijos distintos: el aviso mira sólo los renglones del suyo.
-    renglones += [dict(LONA, pieza="39211390900F", sufijo=otro) for otro in ("AA(OTRO)-", "AA(OTRA)-")]
-    cuales = {2: "1 y 2", 3: "1, 2 y 3", 4: "1, 2, 3 y 4"}[len(propios)]
+    # Primero va otro ítem, con dos sufijos distintos: el aviso mira sólo los renglones del suyo.
+    renglones = [dict(LONA, pieza="39211390900F", sufijo=otro) for otro in ("AA(OTRO)-", "AA(OTRA)-")] + renglones
+    cuales = {2: "3 y 4", 3: "3, 4 y 5", 4: "3, 4, 5 y 6"}[len(propios)]
     avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor=de_la_operacion)
     assert [a for a in avisos if "llevan el mismo sufijo" in a] == ([] if muestra is None else [
         f"Sufijo de valor: en el ítem de los renglones {cuales} los {len(propios)} sub-ítems llevan "
