@@ -234,6 +234,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   que la usa, culpándolo a él. Hoy no hay ninguna (FUGA-HILOS-GUARDA).
 - `despachante.js:255`, `sufijoDeLaOperacion()` lee el sufijo del campo del
   DOM; que lea la operación, como «Generar» y los avisos.
+- `sabotajes/excel2.sh:171`: el comentario habla de «ese mismo bucle», donde ya
+  no está el control del CUIT del despachante (Técnica).
 
 ## Riesgos que esperan a Emi (no son tareas: no se toman de esta cola)
 
@@ -254,7 +256,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   del CUIT, sin camino medido de daño hoy (adversario de CUIT-PERFIL).
 - `main.py` (`/generate_maria`): el control de forma de los sub-ítems está dos veces (`:5082` y `:5111` sobre `bf6778e`). El segundo es código muerto: el primero corre antes y frena todo lo que el segundo frenaría (adversario: 0 diferencias en 364 pedidos). Sale el segundo, y del caso 7 de `sabotaje_subitems1.sh` sale su línea.
 - El control de forma de los sub-ítems vive en `/generate_maria` y no en `controles_antes_de_generar`: el semáforo (`/api/validate/smart`) da OK con sub-ítems mal armados que generar rechaza con 400. Una sola copia, en la función que usan los dos (Dev MARIA, SABOTAJE-SUBITEMS1).
-- `maria_generator.py:2013` (`_avisos_del_arancel`): el filtro `if v.strip() or len(c) == 4` de los códigos con valor vacío; desde SUFIJOS-2 un valor vacío frena antes, ver si quedó muerto y sacarlo.
+- `maria_generator.py:2013` (`_avisos_del_arancel`): el filtro `if v.strip() or len(c) == 4` de los códigos con valor vacío está muerto: lo que llega ya pasó por `limpiar_sufijo` (`:1947`), que frena el vacío (`:417`); sin el filtro, `test_sufijos1.py` verde (medido por la Dev MARIA en SABOTAJE-SUFIJOS1). Sacarlo.
 - `paises_maria.js` repite a mano alias que el servidor tiene en `PAISES_INDEC` («NL» está en los dos; «NLD» sólo en la pantalla): una sola fuente para las siglas (MARIA, PAIS-NL).
 - `scripts/testing/ataque_aislamiento.sh`, `limpiar()`: como root `pg_ctl stop` falla («cannot be run as root») y el Postgres queda en 5434 hasta un minuto; una corrida pegada a otra no levanta el suyo. Pararlo con `correr` (PM, sabotajes 13/11).
 - `scripts/testing/forzar_orden1.js` y `forzar_avisos_orden1.js` (y uno más que
