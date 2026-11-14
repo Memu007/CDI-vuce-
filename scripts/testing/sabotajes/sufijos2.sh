@@ -195,6 +195,55 @@ sabotaje $A "un cero adelante también se toma como miles" \
   'and entero.lstrip("0") != ""' '' \
   "test_lo_que_no_cambia_un_numero_sale_como_antes[AJ(0.750)--AJ(0,750)-]"
 
+# 5. Lo que el error y el aviso muestran entre «»: el código que falla, cortado.
+T=test_el_error_nombra_el_codigo_que_falla_y_lo_corta
+sabotaje $G "el error de los decimales nombra el sufijo entero y no el código" \
+  '«{uno[0][:40]}» pide' '«{sufijo[:40]}» pide' \
+  "$T[pide]" "$T[pide_largo]" \
+  "test_un_sufijo_que_pide_numero_no_acepta_decimales[AA(X)-ZB(16.384)-CA00-]"
+sabotaje $G "el error de los decimales nombra también lo que sigue al código" \
+  '«{uno[0][:40]}» pide' '«{sufijo[pos:pos + 40]}» pide' \
+  "$T[pide]"
+sabotaje $G "el error de los decimales nombra el código sin cortarlo" \
+  '«{uno[0][:40]}» pide' '«{uno[0]}» pide' \
+  "$T[pide_largo]"
+sabotaje $G "el error del número que cambiaría nombra el sufijo entero y no el código" \
+  'en «{uno[0][:40]}»,' 'en «{sufijo[:40]}»,' \
+  "$T[cambiaria]" "$T[cambiaria_largo]"
+sabotaje $G "el error del número que cambiaría nombra también lo que sigue al código" \
+  'en «{uno[0][:40]}»,' 'en «{sufijo[pos:pos + 40]}»,' \
+  "$T[cambiaria]"
+sabotaje $G "el error del número que cambiaría nombra el código sin cortarlo" \
+  'en «{uno[0][:40]}»,' 'en «{uno[0]}»,' \
+  "$T[cambiaria_largo]"
+sabotaje $G "el número que cambiaría sale sin cortar" \
+  '«{cambiaria[:20]}»' '«{cambiaria}»' \
+  "$T[cambiaria_largo]"
+sabotaje $G "en lugar del número que cambiaría sale el principio del sufijo" \
+  '«{cambiaria[:20]}»' '«{sufijo[:20]}»' \
+  "$T[cambiaria]" "$T[cambiaria_largo]"
+sabotaje $G "el error del vacío nombra el código sin cortarlo" \
+  '«{uno[0][:40]}» está vacío' '«{uno[0]}» está vacío' \
+  "$T[vacio_largo]"
+sabotaje $G "«cerca de» muestra el principio del sufijo y no dónde se trabó" \
+  '(cerca de «{sufijo[pos:pos + 20]}»)' '(cerca de «{sufijo[:20]}»)' \
+  "$T[no_se_separa_largo]"
+sabotaje $G "«cerca de» muestra todo lo que sigue, sin cortar" \
+  '(cerca de «{sufijo[pos:pos + 20]}»)' '(cerca de «{sufijo[pos:]}»)' \
+  "$T[no_se_separa_largo]"
+sabotaje $G "el sufijo que no se separa sale cortado en 10" \
+  '«{sufijo[:80]}» no se puede separar' '«{sufijo[:10]}» no se puede separar' \
+  "$T[no_se_separa_largo]"
+sabotaje $G "el sufijo que no se separa sale sin cortar" \
+  '«{sufijo[:80]}» no se puede separar' '«{sufijo}» no se puede separar' \
+  "$T[no_se_separa_largo]"
+sabotaje $G "el aviso muestra el sufijo cortado en 10" \
+  'sale «{limpio[:80]}».' 'sale «{limpio[:10]}».' \
+  "test_el_aviso_corta_el_sufijo_que_muestra"
+sabotaje $G "el aviso muestra el sufijo sin cortar" \
+  'sale «{limpio[:80]}».' 'sale «{limpio}».' \
+  "test_el_aviso_corta_el_sufijo_que_muestra"
+
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]

@@ -241,3 +241,34 @@ def test_cada_palabra_se_mira_una_vez(monkeypatch, largo):
         mg.limpiar_sufijo(f"AJ({largo})-")
     miradas, palabras = len(vistas), len(largo.split())
     assert miradas <= palabras
+
+
+# ------------------------ 6. Lo que el error y el aviso muestran entre «»
+# El código que falla, no el sufijo entero ni lo que le sigue, y cortado: un
+# sufijo largo no tiene que tapar la instrucción.
+
+LO_QUE_MUESTRA = {
+    "pide": ("AA(X)-ZB(16.384)-CA00-", "«ZB(16.384)» pide"),
+    "pide_largo": ("AA(X)-ZA(" + "9" * 50 + ",5)-CA00-", "«ZA(" + "9" * 37 + "» pide"),
+    "cambiaria": ("AA(X)-AF(-2.5)-CA00-", "en «AF(-2.5)», «-2.5» cambiaría"),
+    "cambiaria_largo": ("AA(X)-AJ(" + "B" * 40 + "-1.500)-CA00-",
+                        "en «AJ(" + "B" * 37 + "», «" + "B" * 20 + "» cambiaría"),
+    "vacio_largo": ("AA(X)-AB(" + "-" * 50 + ")-CA00-", "«AB(" + "-" * 37 + "» está vacío"),
+    "no_se_separa_largo": ("AA(OK)-AB(" + "X" * 90,
+                           "«AA(OK)-AB(" + "X" * 70 + "» no se puede separar en códigos "
+                           "(cerca de «AB(" + "X" * 17 + "»)"),
+}
+
+
+@pytest.mark.parametrize("caso", LO_QUE_MUESTRA)
+def test_el_error_nombra_el_codigo_que_falla_y_lo_corta(caso):
+    sufijo, muestra = LO_QUE_MUESTRA[caso]
+    with pytest.raises(ValueError) as error:
+        mg.limpiar_sufijo(sufijo, " del ítem 3")
+    assert f"Sufijo de valor del ítem 3: {muestra}" in str(error.value)
+
+
+def test_el_aviso_corta_el_sufijo_que_muestra():
+    largo = "AF(2.5)-AA(" + "X" * 100 + ")-"
+    avisos = mg.supuestos_declarados([dict(LONA, sufijo=largo)], sbt_sufijo_valor="")
+    assert any("ítem 1" in a and "sale «AF(2,5)-AA(" + "X" * 69 + "»." in a for a in avisos), avisos
