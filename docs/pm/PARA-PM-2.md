@@ -2,255 +2,418 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## D238 (a): entregada en `80cd954`. El aviso rojo del sufijo SBT se va al escribir en el campo y no entra con la pantalla de «Validación»; el rechazo del servidor sigue saliendo bajo el campo. Una decisión: D242
+## CUIT-GENERAR (D235 a): entregada en `29327d2`. Con un CUIT del despachante que no cierra con su verificador no se genera el TXT, venga del perfil, de `cuit_agr` o del estudio elegido, y el error dice dónde corregirlo. Dos decisiones: D243 y D244
 
 | qué | SHA |
 |---|---|
-| base (informe de D237) | `73f8db7` |
-| producto: `finalize.js` y `CHANGELOG.md` | `e1ecc29` |
-| pruebas. **Lo que se entrega** | `80cd954` |
-| integración de tu rama hasta `543671b` (sólo `docs/pm/`), después de las puertas | `202e3b4` |
+| base (informe de D238) | `3dc9908` |
+| producto: `main.py` y `CHANGELOG.md` | `84e0f5e` |
+| pruebas de esa primera versión | `6f0199f` |
+| producto, arreglo del texto del error (lo encontraron los adversarios) | `6943d3b` |
+| pruebas. **Lo que se entrega** | `29327d2` |
+| integración de tu rama (sólo `docs/pm/`), después de las puertas | `13633e9` |
 | informe | el commit siguiente |
 
-`producto +7/−1` (más 5 líneas de `CHANGELOG.md`). Ninguna función nueva.
+`producto +25/−24` (más 5 líneas de `CHANGELOG.md`). Una función nueva,
+`_cuit_del_despachante` (21 líneas, `main.py:4740-4760`), que reemplaza el
+bloque que estaba dentro de `generate_maria_endpoint`.
 
-**Lo primero que tenés que saber: mi primera versión rompía cinco pruebas de
-pytest y no lo vi yo ni la primera ronda de revisión; lo encontró la suite
-completa.** Detalle en «Lo que salió mal». Lo que entrego es la tercera
-versión; todo lo de abajo está corrido sobre `80cd954`.
+**Lo que tenés que saber antes de publicar:** quien tenga hoy guardado en el
+perfil un CUIT de 11 dígitos con el verificador mal deja de poder generar
+hasta corregirlo en «Mi perfil». El error se lo dice con el nombre del campo.
+Lo mismo con un estudio guardado con un CUIT que no cierra, si existe alguno
+(el alta no los guarda desde `8bbfbe6`): el error manda a «Mis estudios». El
+conteo de producción lo llevás vos (lo escribiste en D235); sumale la tabla
+de estudios.
 
 ## Decisiones
 
-**D242. El motivo de un rechazo del servidor también se va con la primera
-tecla.** El aviso bajo el campo tiene dos orígenes: el de la pantalla
-(«Ingresá el sufijo de valor SBT. Es obligatorio.») y el del servidor al
-generar («Sufijo de valor de la operación: falta AA00.», «… queda de 121
-caracteres y no puede superar los 120», y también los «Item N: … SBT …», que
-caen ahí porque la pantalla manda bajo ese campo todo rechazo que nombre
-«sbt», `finalize.js:753`). Hoy el arreglo no los distingue: cualquier cosa
-que se escriba en el campo esconde el aviso, sea de quien sea. Antes el del
-servidor quedaba a la vista hasta el próximo «Generar».
-- (a) queda así. El aviso habla del valor que había al tocar «Generar»; al
-  cambiarlo deja de ser cierto, y el servidor lo repite en el próximo
-  «Generar» si sigue mal. Lo que se pierde: quien corrige un sufijo largo
-  deja de ver qué le faltaba («falta AA00») en cuanto empieza a escribir, y
-  un «Item 3: …» se va aunque lo que se escriba en el campo de la operación
-  no arregle el ítem 3.
-- (b) pieza chica aparte: sólo el aviso de la pantalla se va al escribir; el
-  del servidor queda hasta el próximo «Generar» o hasta salir de
-  «Validación». Unas tres líneas de producto y un caso. Lo que se pierde: el
-  motivo del servidor puede quedar a la vista al lado de un sufijo ya
-  corregido, que es el mismo defecto de esta pieza dentro de una operación.
-- **Recomiendo (a)**: es lo que te escribí («se esconde cuando se escribe en
-  el campo») y no deja un aviso viejo en ningún camino. Si un despachante se
-  queja de que pierde el motivo, (b) es chica. No lo probé con una persona.
+**D243. Cuatro sabotajes de la Técnica quedaron sin ancla.** Saqué de
+`generate_maria_endpoint` las líneas a las que apuntaban (`effective_cuit_agr
+= estudio.cuit if …`, `con_el_perfil = estudio is None and …` y el `if not
+_re_cuit.fullmatch…`): ahora esa lógica vive en `_cuit_del_despachante`.
+`anclas_perdidas.py` da 6 perdidas de una línea en la base y 10 con la
+pieza; las 4 nuevas son
+`sabotajes/estudio1.sh:77`, `sabotajes/estudio1b.sh:70` y `:74` y
+`sabotajes/excel2.sh:167`. Esos cuatro sabotajes ya no encuentran su patrón
+en `main.py` (lo dice `anclas_perdidas.py`; no corrí sus guiones enteros):
+los comportamientos siguen cubiertos por sus pruebas
+(`test_estudio1` 26, `test_estudio1b` 47 y `test_excel2` 119 passed sobre
+`29327d2`), lo que se perdió es el negativo. Hasta que se decida, ningún
+guion mide una mutación de la marca «uso del perfil» ni del orden
+estudio → `cuit_agr` → perfil. Los tres guiones son de ella y no los toqué.
 
-## Lo que hice distinto de lo que te escribí (supuestos reversibles)
+Dejé medidas las líneas de reemplazo: cada una, aplicada sobre `29327d2`, da
+exactamente el rojo que su guion espera.
 
-Te había escrito: «el aviso se esconde cuando se escribe en el campo y
-cuando se entra a «Validación» con otra operación».
+| guion | ancla nueva (en `main.py`) | sabotaje | rojo medido |
+|---|---|---|---|
+| `estudio1.sh:77` | `crudo = (estudio.cuit if estudio is not None else cuit_agr) or del_perfil` | `crudo = cuit_agr or (estudio.cuit if estudio is not None else "") or del_perfil` | `1 failed, 25 passed`: `test_el_estudio_elegido_va_al_cddtagr_aunque_haya_perfil_y_cuit_agr` |
+| `estudio1b.sh:70` | `es_el_del_perfil = estudio is None and bool(cuit) and cuit == del_perfil` | `es_el_del_perfil = estudio is None and not cuit_agr and bool(cuit)` | `1 failed, 46 passed`: `test_el_cuit_del_perfil_en_cuit_agr_cuenta_como_uso_del_perfil` |
+| `estudio1b.sh:74` | la misma | `es_el_del_perfil = estudio is None and bool(cuit)` | `1 failed, 46 passed`: `test_un_cuit_agr_propio_no_cuenta_como_uso_del_perfil` |
+| `excel2.sh:167` | `if crudo and not cuit_valido(cuit):` | `if False:` | `6 failed, 113 passed`: los 4 de `test_el_cuit_del_despachante_va_solo_con_11_digitos` y 2 de `test_cuit_del_despachante_o_id_del_vendedor_con_digitos_raros_no_deja_generar` |
 
-1. **Se esconde en toda entrada a «Validación», no sólo «con otra
-   operación».** Distinguir «otra operación» pide guardar cuál era la
-   anterior; esconderlo siempre no pide estado. Lo que cambia para la
-   persona: sale de «Validación» con el aviso a la vista, vuelve con la misma
-   operación y el aviso no está; «Generar» lo vuelve a poner.
-2. **El rechazo del servidor ahora vuelve a «Validación» primero y pone el
-   aviso después** (`finalize.js:755-760`). Antes era al revés, y con el
-   punto 1 la entrada lo habría borrado: es el camino que me marcaste que no
-   había que romper. `CDI.goTo` corre la entrada de la pantalla en el momento
-   (`app_v2.js:139-177`), así que el orden alcanza.
-3. **Toqué un caso de pytest que ya existía**, `tests/test_avisos1_seguro.py`:
-   su `CDI.goTo` de mentira ahora esconde el aviso al entrar a «Validación»,
-   como la pantalla. Sin eso, pytest no veía el orden del punto 2 (lo marcó
-   `/code-review`). Los otros dieciséis casos del archivo no cambian de
-   resultado.
+- (a) la Técnica cambia esas cuatro anclas con las líneas de la tabla.
+- (b) me autorizás a mí a cambiarlas en sus tres guiones, en una pieza chica
+  aparte, y corro los tres enteros.
+- (c) vuelvo el producto a la forma anterior (el bloque dentro del endpoint)
+  para que las anclas viejas sigan valiendo. No lo recomiendo: es darle forma
+  al producto por un guion de prueba, y el bloque viejo tenía un `try/except`
+  que tapaba cualquier error.
+- **Recomiendo (b)** si ella está con otra cosa, (a) si no: son cuatro líneas
+  ya medidas. Hasta entonces `anclas_perdidas.py` va a marcar esas cuatro.
 
-Lo que no toqué: `enlazarValor`, `onGenerate` (su línea que esconde el aviso
-cuando el sufijo está) y el texto de los avisos.
+**D244. Los avisos de antes de generar no anuncian el CUIT que no cierra, y
+tratan distinto un `cuit_agr` en blanco.** Dos cosas del mismo lugar
+(`/generate_maria/avisos`, `main.py:~4990`), que no toqué porque tu
+definición de la pieza habla de `/generate_maria`:
+
+1. Con un CUIT del despachante que no cierra, los avisos no dicen nada del
+   CUIT (sólo avisan cuando falta) y la persona se entera recién al tocar
+   «Generar». Medido por el adversario Opus contra una API local: `avisos
+   200`, 9 avisos, ninguno del CUIT; `generar 400`. Es el mismo patrón que ya
+   tenían los demás rechazos de antes de generar; la pieza suma uno.
+2. `/avisos` tiene su propia copia del orden estudio → `cuit_agr` → perfil.
+   Para generar, un `cuit_agr` de puros espacios o de puros guiones no cae al
+   perfil y da un 400 que nombra «» (ya era así en la base, lo comprobé en el
+   diff); para los avisos cuenta como que no vino. Sólo se alcanza por la
+   API: la pantalla nunca manda eso. Mi caso «en cuit_agr de puros espacios»
+   fija hoy ese 400; con (a) cambia a «Falta el CUIT…» o a generar con el
+   del perfil.
+
+- (a) pieza chica aparte: `/avisos` usa `_cuit_del_despachante` (su 400 pasa
+  a ser un aviso con el mismo texto) y un `cuit_agr` en blanco cuenta como
+  ausente en los dos. Queda una sola copia del orden.
+- (b) queda así: el 400 al generar ya dice qué pasa y dónde se corrige.
+- **Recomiendo (a)**, sin apuro: saca una copia y evita que alguien revise
+  los avisos, no vea nada y se choque con el 400. No la metí acá porque es
+  funcionalidad que la tarea no pide (§3).
+
+## Lo que hice distinto de lo que me escribiste (supuestos reversibles)
+
+Me escribiste: «`/generate_maria` saltea esa regla para el CUIT del perfil y
+para `cuit_agr` … primero los dos rojos … y el mensaje dice dónde
+corregirlo».
+
+1. **El CUIT del estudio elegido también pasa por el verificador.** La base
+   ya le pedía 11 dígitos en el mismo `if`; dejarlo afuera era darle al
+   estudio una regla más floja que al perfil. Sólo alcanza a un estudio
+   guardado antes de que el alta mirara el verificador.
+2. **Tres textos de «dónde», no uno.** Según de dónde sale el CUIT malo:
+   - del perfil: «Corregilo en «Mi perfil», campo «Mi CUIT (despachante)».»
+   - del estudio elegido: «Es el del estudio elegido: en «Mi perfil», «Mis
+     estudios», borralo y agregalo de nuevo.» (no hay cómo editar un
+     estudio: sólo alta y baja).
+   - de `cuit_agr` y distinto del perfil: «No es el de tu perfil: lo mandó
+     la operación. Si ya lo corregiste en «Mi perfil», recargá la página.»
+     La operación no tiene campo de CUIT; la pantalla manda en `cuit_agr` el
+     del perfil que tenía al cargar. El único camino que encontré para
+     llegar acá desde la pantalla es una pestaña vieja.
+3. **El texto del rechazo que ya existía cambió.** «… tiene que tener 11
+   dígitos (0-9). Corregilo en la operación o en tu perfil.» pasó a «… no es
+   válido: son 11 dígitos (0-9) y el último es el verificador. …» con el
+   «dónde» de arriba. Ninguna prueba anterior fijaba el texto viejo entero
+   (la suite completa da verde sin tocar ninguna).
+4. **Saqué un `try/except` que tapaba cualquier error** al leer el CUIT del
+   perfil (`except Exception: pass`). Con el `user` que entrega la sesión no
+   puede fallar; si un día falla, se ve.
+5. **Arnés de sabotajes compartido.** `sabotajes/_casos_y_pantalla.sh`
+   (nuevo, 95 líneas) lleva lo que `cuit_perfil.sh` y `cuit_generar.sh`
+   tenían igual; `cuit_perfil.sh` quedó en sus datos (+3/−93) y sigue
+   dando sus 11 rojos. Lo hice para no copiar 90 líneas (§6: lo repetido va
+   una vez). No lo monté sobre `_entorno_comun.sh`: ese corre
+   `test_entorno1` como base y lo usan cuatro guiones que no son míos.
+
+Lo que no toqué: `cuit_valido` (el `00000000000` sigue pasando, como
+dijiste), `/generate_maria/avisos`, `finalize.js`, `profile.js`,
+`estudios.js` y los guiones de la Técnica.
 
 ## Lo que salió mal
 
-La primera versión (`2d1dea7`, local, nunca subida) sumaba una función
-chica, `quitarAvisoDelSufijo`, y la llamaba desde `enlazarValor` y
-`pintarSufijo`. La pantalla andaba y el caso nuevo daba verde. La suite
-completa sobre esa versión dio `5 failed, 6126 passed, 110 skipped,
-3 xfailed`: tres casos de `tests/test_valor1.py` y dos de
-`tests/test_valor1c.py`, todos con `ReferenceError: quitarAvisoDelSufijo is
-not defined`. Esos archivos sacan funciones de `finalize.js` por nombre y las
-corren en node con un DOM de mentira: una función nueva llamada desde una de
-las que sacan no existe ahí.
-
-Lo arreglé sin función nueva: el oyente va en `init()` (que ninguna prueba
-saca) y `pintarSufijo` esconde el aviso con dos líneas propias. La primera
-ronda de revisión (adversario y `/code-review`) leyó la versión rota y no lo
-encontró; por eso repetí las dos sobre la segunda versión y un adversario
-más sobre la tercera. Abajo dice qué SHA leyó cada una. Los SHA de las dos
-primeras versiones (`2d1dea7`/`ca5f257` y `0e1526f`/`76d9d90`) fueron
-locales y los reescribí antes de subir: no están en la rama. Sus registros
-quedaron en mi scratch, no en el repositorio.
+1. **La primera versión mandaba a corregir al lugar equivocado en dos
+   casos**, y no lo vi yo: lo encontraron los dos adversarios. Con un
+   estudio elegido de CUIT malo, y con una pestaña vieja que manda el CUIT
+   anterior del perfil, el error decía «Es el que manda la operación, no el
+   de tu perfil: corregilo ahí», y en la operación no hay dónde. Como
+   `84e0f5e` y `6f0199f` ya estaban subidos, el arreglo va en commits nuevos
+   (`6943d3b`, `29327d2`), con su rojo antes. Además un mutante que no
+   miraba el CUIT del estudio pasaba toda la batería: ahora hay un dato y un
+   sabotaje para eso.
+2. Antes de subir `6f0199f`, mi guion de sabotajes tenía una frase esperada
+   que ya no coincidía con el texto final; lo vi al correrlo entero y lo
+   corregí antes del commit.
+3. El contenedor se reinició en la primera ronda de adversarios y la mató;
+   la relancé entera.
+4. Una marca de fin vieja en mi scratch hizo que dos esperas volvieran antes
+   de tiempo y estuve por leer un registro sin terminar. Lo vi con `ps`,
+   borré la marca y esperé de nuevo. Ahora borro la marca antes de lanzar.
 
 ## Resultado
 
-**Rojo antes del arreglo.** `finalize.js` de `73f8db7` con las pruebas de
-`80cd954`, en un worktree descartable (textos copiados de la salida):
+**Rojo antes del arreglo** (textos copiados de la salida):
 
 | qué | resultado | lo que dice |
 |---|---|---|
-| `SOLO=sufijo_otra1`, arreglo revertido | `rc=1`, `resumen: 0 verdes, 1 rojas: sufijo_otra1` | `FALLA: otra operación entra con el aviso de la anterior a la vista: «Ingresá el sufijo de valor SBT. Es obligatorio.»` |
-| `tests/test_avisos1_seguro.py`, arreglo revertido | `1 failed, 16 passed` | `test_cada_400_que_cambia_de_pantalla_deja_el_motivo_a_la_vista[sufijo]`: `AssertionError: assert None == 'Sufijo de valor de la operación: falta AA00.'` |
-| `SOLO=sufijo_otra1`, entrega | `rc=0`, `resumen: 1 verdes, 0 rojas` | `PANTALLA SUFIJO-OTRA OK` |
-| `tests/test_avisos1_seguro.py`, entrega | `17 passed` | |
+| los 12 casos de `29327d2` con `main.py` de `3dc9908`, en un worktree descartable | `7 failed, 5 passed` | los siete de los malos. Seis: `<origen>: 200 {"success":true,…` y `assert 200 == 400` (se generaba el TXT). El de puros espacios ya daba 400 y cae por el texto: `assert {'errors': ['... tu perfil.']} == {'errors': ['... la página.']}` |
+| los mismos con `main.py` de `84e0f5e` (la primera versión) | `4 failed, 8 passed` | los tres de `cuit_agr`: `assert {'errors': ['...regilo ahí.']} == {'errors': ['... la página.']}`; el del estudio: `… == {'errors': ['...o de nuevo.']}` |
+| la pantalla, con el servidor que sólo cuenta dígitos (el sabotaje 17, igual a la base) | ROJO | `FALLA: con 20999999998 guardado en el perfil se generó el TXT: CDDTAGR=20999999998` |
+| los 12 casos, entrega | `12 passed` | |
+| `pantalla_cuit_generar1.js`, entrega | `rc=0` | `PANTALLA CUIT-GENERAR-1 OK` |
 
-El rojo de pytest con el arreglo revertido no dice que la base estuviera
-mal en ese camino: en la base el aviso del servidor se veía. Cae porque el
-`goTo` de mentira ya modela la pantalla nueva. El que discrimina de verdad es
-el negativo «sin reordenar», abajo.
+Los casos (`tests/test_cuit_generar.py`, 94 líneas, dos pruebas con sus
+datos):
 
-El caso de pantalla, en su parte nueva (`pantalla_sufijo_otra1.js:88-95`):
-la última de las tres llegadas frenó y dejó su aviso a la vista (lo afirma,
-no lo supone); entra otra operación y el aviso no está; «Generar» sin sufijo
-frena con su aviso; se escribe el sufijo y el aviso se va. Ninguna espera
-fija nueva.
+- **Malos, 7** — de dónde sale el CUIT malo: guardado en el perfil; guardado
+  y mandado por la pantalla; guardado con guiones y un espacio; en
+  `cuit_agr` con uno bueno en el perfil; en `cuit_agr` con guiones y sin
+  perfil; `cuit_agr` de puros espacios; en el estudio elegido con uno bueno
+  en el perfil y en `cuit_agr`. Cada uno afirma el 400, el texto entero
+  (cuál CUIT y dónde se corrige) y que no quedó ninguna operación contada.
+- **Buenos, 5** — qué se usa: el del perfil; `cuit_agr` aunque el del
+  perfil sea malo; el estudio aunque los otros dos sean malos; los dos
+  verificadores que no salen de «11 − resto» (0 y 9). Cada uno afirma el
+  200, el `CDDTAGR` exacto y una operación contada.
+
+Los malos se ponen directo en la base de la prueba: la API ya no guarda uno.
+
+La pantalla (`pantalla_cuit_generar1.js`, 70 líneas, sin esperas fijas): con
+el CUIT malo en el perfil, «Generar» termina en el error con el CUIT y el
+nombre del campo tal como está en el DOM de «Mi perfil»; se corrige ahí,
+«Reintentar» genera y el `CDDTAGR` sale con el bueno.
+
+**La pestaña vieja, corrida aparte sobre `29327d2`** (guion del adversario
+con un paso más, en mi scratch; no entra al repositorio, así que no la
+podés repetir: lo del servidor lo fija el caso «en cuit_agr, con uno bueno en
+el perfil»):
+
+```
+perfil en el servidor tras B: "20111111112"
+cuit_agr enviado por A: 20999999998 status 400
+A ve: error: El CUIT del despachante «20999999998» no es válido: son 11 dígitos (0-9) y el último es el verificador. No es el de tu perfil: lo mandó la operación. Si ya lo corregiste en «Mi perfil», recargá la página.
+campos CUIT visibles en A: []
+Reintentar: cuit_agr 20999999998 status 400 {"detail":{"errors":["El CUIT del despachante «20999999998» no es válido: son 11 dígitos (0-9) y el último es el verificador. No es el de tu perfil: lo mandó la operación. Si ya lo corregiste en «Mi perfil», recargá la p
+tras recargar: cuit_agr 20111111112 status 200 CDDTAGR 20111111112
+```
 
 ## Negativos
 
-Uno por mitad del arreglo, cada uno un commit descartable sobre `80cd954`
-(no se suben). La pieza no es de las de §3: no lleva guion de sabotaje
-propio.
+`scripts/testing/sabotajes/cuit_generar.sh 29327d2`: 21 sabotajes, uno por
+motivo; 16 contra los casos y 5 contra la pantalla. Salida de las puertas:
 
-| negativo | corrida | resultado | lo que dice |
-|---|---|---|---|
-| `pintarSufijo` no esconde el aviso | `SOLO=sufijo_otra1` | `rc=1` | `FALLA: otra operación entra con el aviso de la anterior a la vista: «Ingresá el sufijo de valor SBT. Es obligatorio.»` |
-| sin el oyente de `input` | `SOLO=sufijo_otra1` | `rc=1` | `FALLA: con el sufijo ya escrito, el aviso sigue a la vista: «Ingresá el sufijo de valor SBT. Es obligatorio.»` |
-| el rechazo pone el aviso y después vuelve (orden viejo) | `SOLO="sufijo_borrador1 maria9"` | `rc=1`, `resumen: 0 verdes, 2 rojas: maria9 sufijo_borrador1` | `FALLA: generado y devuelto a la validación: el servidor no devolvió a la validación: page.waitForFunction: Timeout 15000ms exceeded.` · `FALLA: el de la operación: no sale bajo el campo del sufijo de la operación` |
-| el mismo | `tests/test_avisos1_seguro.py` | `1 failed, 16 passed` | `…[sufijo]`: `AssertionError: assert None == 'Sufijo de valor de la operación: falta AA00.'` |
+```
+BASE  | casos: ======================== 12 passed, 5 warnings in 9.70s ========================
+BASE  | pantalla: PANTALLA CUIT-GENERAR-1 OK
+ROJO  | sólo se cuentan los dígitos: «guardado en el perfil: 200», 6 casos
+ROJO  | el del perfil no se mira: «guardado con guiones y un espacio: 200», 3 casos
+ROJO  | el que manda la operación no se mira: «sin CUIT en el perfil: 200», 3 casos
+ROJO  | el del estudio elegido no se mira: «en el estudio elegido, con uno bueno en el perfil y en cuit_agr: 200», 1 casos
+ROJO  | uno de puros espacios cuenta como que falta: «assert 'Falta el CUIT del despachante (CDDTAGR)», 1 casos
+ROJO  | se rechaza después de contar la operación: «lo que no se genera no queda contado ni guardado», 7 casos
+ROJO  | dónde se corrige, al revés: «recargá la página.']} != {'errors': ['El CUIT del despachante «20999999998»», 6 casos
+ROJO  | el del estudio elegido manda a corregir como si lo mandara la operación: «recargá la página.']} != {'errors': ['El CUIT del despachante «20999999998»», 1 casos
+ROJO  | uno vacío cuenta como el del perfil: «campo «Mi CUIT (despachante)».']} != {'errors': ['El CUIT del despachante «»», 1 casos
+ROJO  | el del perfil guardado con guiones no se reconoce como el del perfil: «recargá la página.']} != {'errors': ['El CUIT del despachante «20999999998»», 1 casos
+ROJO  | el del perfil guardado con un espacio en el medio no se reconoce como el del perfil: «recargá la página.']} != {'errors': ['El CUIT del despachante «20999999998»», 1 casos
+ROJO  | se nombra como llegó: «assert ['20-11111118 9'] == ['20111111189']», 3 casos
+ROJO  | un espacio en el medio queda en el CDDTAGR: «assert ['2011111118 9'] == ['20111111189']», 1 casos
+ROJO  | el del perfil manda sobre cuit_agr: «cuit_agr, aunque el del perfil sea malo: 400», 2 casos
+ROJO  | el estudio elegido no manda: «el estudio, aunque los otros dos sean malos: 400», 2 casos
+ROJO  | el verificador sale siempre de «11 − resto»: «cuit_agr con verificador 0: 400», 2 casos
+ROJO  | el servidor sólo cuenta los dígitos: «FALLA: con 20999999998 guardado en el perfil se generó el TXT: CDDTAGR=20999999998»
+ROJO  | el error manda a corregirlo en la operación: «la pantalla no dice cuál es ni «Corregilo en «Mi perfil», campo «Mi CUIT (despachante)».»: error: El CUIT»
+ROJO  | la pantalla no muestra los errores del servidor: «campo «Mi CUIT (despachante)».»: error: [object Object]»
+ROJO  | el campo del perfil se llama de otra manera: «la pantalla no dice cuál es ni «Corregilo en «Mi perfil», campo «CUIT».»»
+ROJO  | el CUIT corregido no llega a la operación sin recargar: «FALLA: corregido en «Mi perfil», «Reintentar» terminó en «error: El CUIT del despachante «20999999998»»
+sabotajes sin rojo: 0
+```
 
-El tercero muestra que el camino del rechazo del servidor ya estaba cubierto
-por dos pantallas que no toqué (`maria9` y `sufijo_borrador1`).
+`scripts/testing/sabotajes/cuit_perfil.sh 29327d2` (sobre el arnés
+compartido, sin cambios en sus datos):
+
+```
+BASE  | casos: ======================== 14 passed, 5 warnings in 9.35s ========================
+BASE  | pantalla: PANTALLA CUIT-PERFIL-1 OK
+ROJO  | sólo se cuentan los dígitos: «verificador equivocado: 200», 5 casos
+ROJO  | no se mira nada: «diez dígitos: 200», 7 casos
+ROJO  | el rechazo deja guardado el resto del pedido: «el pedido rechazado no deja nada guardado», 7 casos
+ROJO  | uno malo ya guardado pasa si llega igual: «Con el malo», 1 casos
+ROJO  | se guarda como llegó: «'20-11111111-2' == '20111111112'», 4 casos
+ROJO  | el vacío no lo borra: «'20111111112' == ''», 1 casos
+ROJO  | el verificador sale siempre de «11 − resto»: «assert 400 == 200», 2 casos
+ROJO  | el servidor sólo cuenta los dígitos: «FALLA: «Mi perfil» guardó 20-99999999-8, que tiene el verificador equivocado»
+ROJO  | la pantalla no dice lo que contestó el servidor: «FALLA: con 20-99999999-8 escrito terminó en «error: No se pudo guardar» y no en el error del CUIT»
+ROJO  | el campo no queda marcado: «FALLA: el campo del CUIT no queda marcado»
+ROJO  | el que ya estaba guardado no se muestra: «FALLA: con 20-99999999-8 ya guardado, el campo muestra «»»
+sabotajes sin rojo: 0
+```
 
 ## Revisión adversarial
 
-Pieza chica de pantalla: Sonnet, medio, según la tabla. Tres rondas porque
-hubo tres versiones.
+Pieza de §3 (datos y validación de lo que sale en el TXT): dos adversarios,
+según la tabla. Los dos leyeron y corrieron la primera versión
+(`84e0f5e` + `6f0199f`); la versión final la leyeron `/code-review` y la
+revisión de seguridad, abajo.
 
-| quién | sobre | hallazgo | qué hice |
-|---|---|---|---|
-| `adversario-sonnet-medio` (Sonnet, medio), corrió | `73f8db7..ca5f257` (primera versión, la rota) | nada que rompa; cuatro menores. **No vio las cinco pruebas de pytest rotas** | la versión se descartó |
-| `adversario-sonnet-medio` (Sonnet, medio), corrió | `73f8db7..76d9d90` (segunda) | nada que rompa. Comprobó el oyente, las pruebas que sacan funciones, las anclas de los sabotajes y los caminos del aviso | |
-| `adversario-sonnet-medio` (Sonnet, medio), sólo lectura | `73f8db7..80cd954` (la entrega) | nada que rompa. Repasó los tres lugares que escriben el aviso, los dos `goTo('validating')`, el oyente, el `goTo` de mentira para los otros parámetros del caso y las anclas | |
-| | | menor, ya existía: con el aviso a la vista, quien completa el sufijo de cada producto en la tarjeta del despachante lo sigue viendo hasta el próximo «Generar» | riesgo, abajo |
-| | | estilo: `pintarSufijo` busca el nodo con `getElementById` en vez de usar `hide(sbtError)` | queda: corre antes que `init()`, y `tests/test_valor1c.py:247` la saca sola |
+| quién | hallazgo | qué hice |
+|---|---|---|
+| `adversario-opus-alto` (Opus, alto), corrió | **ningún camino de un CUIT inválido al `CDDTAGR`**: 148 combinaciones estudio × `cuit_agr` × perfil contra la base y contra la pieza; espacios raros, guiones raros, dígitos de ancho completo y arábigos, tipos que no son texto. Un 400 no deja operación, uso del perfil, uso del estudio ni archivo (foto de todas las tablas antes y después) | |
+| | media: pestaña vieja → el error mandaba a corregir «en la operación», donde no hay campo | arreglado en `6943d3b`, casos y sabotaje en `29327d2` |
+| | baja: estudio con CUIT malo → el mismo texto equivocado | arreglado, ídem |
+| | baja: un mutante que no mira el CUIT del estudio pasaba 337 pruebas | dato nuevo en los malos y sabotaje «el del estudio elegido no se mira» |
+| | baja: `/avisos` no dice nada del CUIT inválido | D244 |
+| | baja: cortar el arnés con TERM al padre durante un sabotaje de casos dejó un directorio en `/tmp` (una vez; no midió frecuencia) | riesgo, abajo |
+| `adversario-sonnet-alto` (Sonnet, alto), corrió | media: el estudio elegido sin prueba y con el texto equivocado (lo mismo, por otro camino) | arreglado, ídem |
+| | baja: los casos no miran el segundo valor de la función (la marca «uso del perfil»); lo cubre sólo `tests/test_estudio1b.py` | queda: es de ESTUDIO-1b y ahí están sus casos. Ver D243 |
+| | baja: `/avisos` | D244 |
+| | baja, dato de prueba: `20-11111118-9` (prefijo 20 con resto 1) no es un CUIT que ARCA emita; `cuit_valido` lo acepta | riesgo, abajo. No cambié el dato: prueba la rama `resto == 1 → 9` de la función tal como está |
+| | baja: dos arneses comunes (`_casos_y_pantalla.sh` y `_entorno_comun.sh`) | línea propuesta para la cola, abajo |
+| | la pantalla y el arnés: no encontró cómo dar verde sin que el producto haga lo que dice; corrió los dos guiones enteros (19 y 11 rojos en esa versión) | |
 
-El tercero no corrió nada (había una suite en curso): lo suyo es lectura.
+## `/code-review high` sobre `3dc9908..29327d2`
 
-## `/code-review high` sobre `73f8db7..76d9d90`
-
-Los revisores heredan Fable. Dos corridas: la primera leyó la versión rota
-(`73f8db7..ca5f257`, ocho hallazgos bajos, ninguno era la rotura) y se
-descartó con ella. La segunda, sobre la segunda versión, ocho hallazgos
-bajos:
+Los revisores heredan Fable. Seis hallazgos; ninguno pide cambiar el
+producto dentro de la pieza.
 
 | # | hallazgo | qué hice |
 |---|---|---|
-| 1 | con el aviso a la vista, llenar el sufijo de cada producto en la tarjeta del despachante no lo esconde | riesgo, abajo: ya era así y la pieza no lo pide |
-| 2 | los «Item N: … SBT …» del servidor salen bajo el campo de la operación, y ahora escribir ahí los esconde | D242 |
-| 3 | el motivo de un rechazo del servidor se pierde con la primera tecla y al salir y volver con la misma operación | D242 y supuesto 1 |
-| 4 | el `goTo` de mentira de `tests/test_avisos1_seguro.py` no modelaba que «Validación» entra sin aviso | arreglado en `80cd954`: supuesto 3, con su negativo |
-| 5 | la precondición de la parte nueva del caso era un comentario | arreglado en `80cd954`: ahora es una afirmación (`pantalla_sufijo_otra1.js:89`) |
-| 6 | el rechazo tardío de un «Generar» anterior deja un aviso sobre un sufijo que ya no está en el campo | riesgo, abajo: ventana angosta, ya existía |
-| 7 | tres formas de esconder el aviso; `pintarSufijo` podría usar `hide($(…))` | queda: la razón de arriba |
-| 8 | el comentario de `pintarSufijo` había quedado de tres líneas | arreglado en `e1ecc29` |
+| 1 | cuatro anclas perdidas en guiones de la Técnica | D243 |
+| 2 | un `cuit_agr` en blanco o de puros guiones frena el paso al perfil y da 400 con «», mientras `/avisos` lo toma como ausente | D244. Ya era así en la base |
+| 3 | `/avisos` no anuncia el rechazo nuevo y tiene su copia del orden | D244 |
+| 4 | el tercer texto supone una pestaña vieja; a un cliente de la API, o a un estado que traiga `op.cuit_agr`, recargar no le sirve | queda, riesgo bajo: la primera frase es cierta siempre y la segunda es condicional («Si ya lo corregiste…»). Nada en las pantallas v2 escribe `op.cuit_agr` |
+| 5 | `_casos_y_pantalla.sh` repite el preámbulo y `aplicar` de `_entorno_comun.sh` | línea propuesta para la cola |
+| 6 | la limpieza de guiones y espacios aparece dos veces en la función | queda: son las dos que ya estaban en el endpoint, movidas, no sumadas. La línea de la cola «una sola limpieza» la cubre |
 
-Después de esos tres ajustes (un comentario de producto, una afirmación en el
-caso y una línea del `goTo` de mentira) no volví a correr `/code-review`:
-corrí el adversario de lectura de arriba y todas las puertas sobre
-`80cd954`.
+Sus corridas: los 12 casos; los archivos que tocan `generate_maria`,
+`2476 passed, 2 xfailed`; `chequeo-6`, 0 avisos.
 
-`/security-review` y `ataque_aislamiento.sh`: no corresponden. La pieza no
-toca sesión, permisos ni datos de otro usuario.
+## `/security-review` sobre `3dc9908..29327d2`
+
+Un `adversario-opus-alto` (Opus, alto), sólo lectura, con las reglas del
+comando (se informa sólo lo de confianza 8 o más). **Ningún hallazgo.** Lo
+que miró: el CUIT dentro del texto del error en la pantalla (sale con
+`textContent`, `finalize.js:1426-1432`: lo comprobé); el CUIT de un estudio
+ajeno (`_estudio_elegido` filtra por dueño antes de la función nueva); qué
+deja un 400 (nada: corre antes de contar la operación y de escribir el
+archivo); si al mover la lógica se perdió un control (el orden y la limpieza
+son los mismos y la regla quedó más estricta); tipos raros; inyección y
+secretos. Como no hubo hallazgos, no hubo nada que filtrar.
+
+Una cosa que descartó y dejo anotada: el texto del error va a la telemetría
+propia (`CDI.track('maria_generate_error')`, al mismo servidor). El texto
+viejo ya llevaba el CUIT (lo comprobé en la base); ahora también va cuando
+el CUIT tiene 11 dígitos y no cierra. Es el CUIT del propio usuario.
 
 ## Comandos
 
 ```bash
 # desde la raíz del repo, con esta rama; PY es tu python con las dependencias
 export PY=/ruta/al/venv/bin/python
-# 1. la entrega: rc=0 y «PANTALLA SUFIJO-OTRA OK»
-SOLO=sufijo_otra1 env -u DATABASE_URL -u ENVIRONMENT bash scripts/testing/correr_pantallas.sh 80cd954 /tmp/d238-verde
-# 2. el arreglo revertido: «FALLA: otra operación entra con el aviso de la anterior a la vista: …»
-git worktree add -q --detach /tmp/d238-wt 80cd954
-git -C /tmp/d238-wt checkout -q 73f8db7 -- proyecto_maria/static/v2/screens/finalize.js
-git -C /tmp/d238-wt -c user.name=x -c user.email=x@x commit -qam descartable
-SOLO=sufijo_otra1 env -u DATABASE_URL -u ENVIRONMENT bash scripts/testing/correr_pantallas.sh $(git -C /tmp/d238-wt rev-parse HEAD) /tmp/d238-rojo
-# 3. en ese mismo worktree: «1 failed, 16 passed», el caso [sufijo]
-(cd /tmp/d238-wt && GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake env -u DATABASE_URL -u ENVIRONMENT $PY -m pytest -q --no-cov -p no:cacheprovider tests/test_avisos1_seguro.py)
-git worktree remove --force /tmp/d238-wt
-# 4. el camino del rechazo del servidor: «resumen: 2 verdes, 0 rojas»
-SOLO="sufijo_borrador1 maria9" env -u DATABASE_URL -u ENVIRONMENT bash scripts/testing/correr_pantallas.sh 80cd954 /tmp/d238-servidor
-# 5. producto +7/−1, avisos
-python docs/pm/herramientas/chequeo-6.py 73f8db7 80cd954
+export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake
+# 1. los casos: «12 passed»
+env -u DATABASE_URL -u ENVIRONMENT $PY -m pytest -q --no-cov -p no:cacheprovider tests/test_cuit_generar.py
+# 2. el arreglo revertido: «7 failed, 5 passed», seis con «assert 200 == 400»
+git worktree add -q --detach /tmp/cg-wt 29327d2
+git -C /tmp/cg-wt checkout -q 3dc9908 -- proyecto_maria/main.py
+(cd /tmp/cg-wt && env -u DATABASE_URL -u ENVIRONMENT $PY -m pytest -q --no-cov -p no:cacheprovider tests/test_cuit_generar.py)
+git worktree remove --force /tmp/cg-wt
+# 3. los 21 negativos: «BASE» verde dos veces, 21 líneas «ROJO» y «sabotajes sin rojo: 0» (unos 5 minutos)
+env -u DATABASE_URL -u ENVIRONMENT PY=$PY bash scripts/testing/sabotajes/cuit_generar.sh 29327d2
+# 4. la pantalla sola: «PANTALLA CUIT-GENERAR-1 OK»
+SOLO=cuit_generar1 env -u DATABASE_URL -u ENVIRONMENT PY=$PY bash scripts/testing/correr_pantallas.sh 29327d2 /tmp/cg-pantalla
+# 5. D243: 10 anclas perdidas (6 en la base); las 4 nuevas, de estudio1.sh, estudio1b.sh y excel2.sh
+$PY scripts/testing/anclas_perdidas.py 29327d2
+# 6. producto y avisos
+python docs/pm/herramientas/chequeo-6.py 3dc9908 29327d2
 ```
 
 ## Puertas
 
-Todas sobre `80cd954`, de a una.
+Todas sobre `29327d2`, de a una.
 
 | puerta | salida |
 |---|---|
-| suite completa de pytest | `6131 passed, 110 skipped, 3 xfailed` en 0:20:51, `rc=0`. La misma cuenta que la tuya sobre `a2c6dc6`: no hay casos nuevos de pytest, cambió uno |
+| suite completa de pytest | `6143 passed, 110 skipped, 3 xfailed` en 0:19:46, `rc=0`. Son los 6131 de `80cd954` más los 12 casos nuevos |
 | `compileall -q proyecto_maria` | `rc=0`, sin salida |
-| las 34 pantallas (`correr_pantallas.sh 80cd954`) | `resumen: 34 verdes, 0 rojas`, `rc=0` |
-| `e2e_maria.sh` | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.`, `rc=0` |
-| `anclas_perdidas.py 80cd954` | `102 guiones, 2466 anclas medidas y 11 llamadas sin medir`; salida igual a la de `73f8db7`, línea por línea |
-| `chequeo-6.py 73f8db7 80cd954` | abajo, entera |
+| las pantallas (`correr_pantallas.sh 29327d2`) | `rc=0`, `resumen: 35 verdes, 0 rojas` (las 34 de antes y `cuit_generar1`) |
+| `e2e_maria.sh` | `rc=0`, `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` |
+| `smoke_friccion.sh` contra una API local | `rc=0`, `==> OK · telemetría y alias session/state rechazan sin sesión + by-cuit protegido` |
+| `ataque_aislamiento.sh` (Postgres 16 local y descartable) | `rc=0`, `Bloqueado: 47 · Fugas: 0 · Sin probar: 0`, `PUERTA G3 PASADA. Ningún despachante ve datos de otro.` |
+| `sabotajes/cuit_generar.sh 29327d2` | `rc=0`, base verde (`12 passed` y `PANTALLA CUIT-GENERAR-1 OK`), 21 `ROJO`, `sabotajes sin rojo: 0` |
+| `sabotajes/cuit_perfil.sh 29327d2` | `rc=0`, base verde (`14 passed` y `PANTALLA CUIT-PERFIL-1 OK`), 11 `ROJO`, `sabotajes sin rojo: 0` |
+| `anclas_perdidas.py` | `29327d2`: `perdida, una línea 10 guiones: 8`; base `3dc9908`: `perdida, una línea 6 guiones: 5`. Las de varias líneas, 3 en los dos. Las 4 nuevas son las de D243 |
+| `chequeo-6.py 3dc9908 29327d2` | abajo, entera |
 | grep de historia de §6 sobre `proyecto_maria/` | vacío |
 
-**No corrí:** `smoke_friccion.sh` (no toqué backend), `ataque_aislamiento.sh`
-ni `/security-review` (arriba), ni los guiones de sabotaje de piezas
-anteriores que anclan en `finalize.js` (`sabotaje_maria9.sh`,
-`sabotajes/avisos1.sh` y los demás): `anclas_perdidas.py` dice que ninguno
-perdió un ancla, pero correrlos enteros es lo de antes de publicar. Las
-puertas corrieron sobre `80cd954`; la integración de tu rama vino después y
+**No corrí:** los guiones de sabotaje de piezas anteriores (los de la
+Técnica de D243 incluidos: sólo medí sus cuatro líneas de reemplazo);
+Postgres fuera de `ataque_aislamiento.sh`; nada contra producción. Las
+puertas corrieron sobre `29327d2`; la integración de tu rama vino después y
 sólo trae `docs/pm/`.
 
 ## `chequeo-6`
 
 ```
-chequeo-6 73f8db7..80cd954: avisos para mirar, no un veredicto
-producto +7/−1
-arnés +10/−3
+chequeo-6 3dc9908..29327d2: avisos para mirar, no un veredicto
+producto +25/−24
+arnés +386/−93
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/static/v2/screens/finalize.js: 1488 → 1494
+  proyecto_maria/main.py: 12271 → 12272
 avisos: 0
 ```
 
 ## Riesgos
 
-- D242: el motivo de un rechazo del servidor se va con la primera tecla.
-- Con el aviso «Es obligatorio» a la vista, quien completa el sufijo de cada
-  producto en la tarjeta del despachante (en vez del campo de la operación)
-  lo sigue viendo hasta el próximo «Generar», que ya no frena. Ya era así;
-  no lo toqué porque la pieza no lo pide.
-- Si el rechazo de un «Generar» llega cuando la persona ya cambió el sufijo
-  o de operación, el aviso habla de un valor que ya no está. Ventana angosta
-  y ya existía; ahora se va al escribir o al volver a entrar.
-- El orden «volver y después avisar» depende de que `CDI.goTo` corra la
-  entrada de la pantalla en el momento. Si un día `goTo` pasa a ser
-  diferido, el aviso del servidor se borra: lo frenan `maria9`,
-  `sufijo_borrador1` y el caso `[sufijo]` de pytest.
-- No lo probé con una persona ni en un navegador que no sea el Chromium de
-  las pruebas.
+- **Publicar frena a quien tenga un CUIT guardado que no cierra** (perfil o
+  estudio). Es lo que pide la pieza; el conteo es tuyo.
+- `00000000000` pasa `cuit_valido` (lo dejaste como riesgo). También pasa un
+  prefijo 20 con resto 1 y verificador 9, que ARCA no emite. No sé si ARCA
+  rechaza alguno de los dos en el `CDDTAGR`: no probado.
+- D244: los avisos no anuncian el rechazo y un `cuit_agr` en blanco se trata
+  distinto en los dos lugares.
+- Una pestaña vieja con un CUIT anterior **bueno** sigue generando con ese,
+  aunque el perfil ya tenga otro: `cuit_agr` manda sobre el perfil. Ya era
+  así; la pieza no lo cambia.
+- El tercer texto («recargá la página») no le sirve a un cliente de la API
+  que mande un `cuit_agr` propio y malo: le dice que no es el del perfil, y
+  nada más útil.
+- `generate_maria_txt` no controla el CUIT por sí sola: el control está en
+  el endpoint, que es su único llamador. Otro llamador futuro lo saltea.
+- Si la ventana del 25/10 de 02:14 a 02:26 (alta de estudios con 11 dígitos
+  y sin verificador, entre `609ec52` y `8bbfbe6`) llegó a desplegarse, puede
+  haber estudios guardados con un CUIT que no cierra. No lo sé.
+- El arnés de sabotajes, cortado con TERM sólo al proceso padre durante un
+  sabotaje de casos, dejó una vez un directorio en `/tmp`. Con Ctrl-C (INT
+  al grupo) no deja nada.
+- D243: hasta que se decida, cuatro negativos de la Técnica no corren.
+- No lo probé con una persona ni en otro navegador que el Chromium de las
+  pruebas.
+
+De paso, para vos: `CLAUDE.md` §5 dice que la CI deselecciona tests de
+presupuestos compartidos; `.github/workflows/ci.yml:40-49` dice que desde
+LIMPIEZA-1 corre la suite entera (`python -m pytest --no-cov`). No lo
+corrí en la CI.
+
+## Líneas que propongo para `COLA-LIMPIEZA.md` (no la toco)
+
+- En lugar de «`sabotajes/cuit_perfil.sh` sobre `_entorno_comun.sh`»:
+  «`sabotajes/_casos_y_pantalla.sh` y `_entorno_comun.sh` repiten worktree,
+  trampa y `aplicar`: un solo arnés común (MARIA, CUIT-GENERAR)».
+- «`tests/test_cuit_generar.py`: sumar a los buenos la familia que ARCA sí
+  emite con resto 1 (prefijo 23 y verificador 9 o 4). Baja (MARIA,
+  CUIT-GENERAR)».
 
 ## Archivos de producto que toqué
 
-`proyecto_maria/static/v2/screens/finalize.js` (`init`, `pintarSufijo` y el
-camino del rechazo del sufijo en `generateMaria`) y `CHANGELOG.md`. De
-pruebas: `scripts/testing/pantalla_sufijo_otra1.js` y
-`tests/test_avisos1_seguro.py`.
+`proyecto_maria/main.py` (`_cuit_del_despachante`, nueva, y su llamada en
+`generate_maria_endpoint`) y `CHANGELOG.md`. De pruebas:
+`tests/test_cuit_generar.py`, `scripts/testing/pantalla_cuit_generar1.js`,
+`scripts/testing/sabotajes/cuit_generar.sh`, `_casos_y_pantalla.sh` y
+`cuit_perfil.sh`.
 
 ## Sigo con
 
-CUIT-GENERAR (D235 a), con revisión fuerte (§3).
+Los guiones vencidos de `sabotajes-conocidos.txt`, uno por pieza: primero
+`sabotaje_subitems1.sh`.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama `claude/dev-maria`, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `543671b`). D237 (a) aceptada, D241 (b). D239 y «Holanda» esperan a Emi: no se tocan; D240 (b). D238 (a) entregada sobre `80cd954` (base `73f8db7`, producto `e1ecc29`: `finalize.js`, el aviso del sufijo se va al escribir y al entrar a «Validación», y el rechazo del servidor vuelve a «Validación» antes de poner el aviso), con D242 (el motivo del servidor también se va con la primera tecla; recomiendo (a), queda así) sin contestar. Pieza activa: CUIT-GENERAR (D235 a; apartada con las reversiones `3a6f656` y `2f04637`, se recupera revirtiéndolas; hallazgos del adversario en el scratch `cg_adversario.md`; revisión fuerte §3: suite completa, Opus y Sonnet alto, `/security-review` y `ataque_aislamiento.sh`; sus D toman número nuevo). Después: los vencidos de `sabotajes-conocidos.txt`, uno por pieza, primero `sabotaje_subitems1.sh` y `sabotaje_sufijos1.sh`. Próxima D: D243. Lección de D238: las pruebas de `tests/test_valor1.py`, `test_valor1c.py` y `test_avisos1_seguro.py` sacan funciones de `finalize.js` por nombre; una función auxiliar nueva llamada desde ellas las rompe, y eso sólo lo ve la suite completa. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, sin secretos ni datos reales, VUCE y Gemini simulados, una corrida por vez, un rojo se diagnostica y no se repite hasta verde, las Devs no usan el consejero ni subagentes de esfuerzo muy alto.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama `claude/dev-maria`, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `40de701`). D238 (a) aceptada, D242 (a). D239 y «Holanda» esperan a Emi: no se tocan. CUIT-GENERAR (D235 a) entregada sobre `29327d2` (base `3dc9908`; producto `84e0f5e` y `6943d3b`: `main.py`, `_cuit_del_despachante`; pruebas `6f0199f` y `29327d2`; suite `6143 passed`), con D243 (cuatro anclas de la Técnica perdidas en `estudio1.sh`, `estudio1b.sh` y `excel2.sh`; recomiendo (b)) y D244 (`/generate_maria/avisos` no anuncia el CUIT que no cierra y trata distinto un `cuit_agr` en blanco; recomiendo (a), pieza aparte) sin contestar. Si vuelve con devolución, va primero. Pieza activa: los vencidos de `sabotajes-conocidos.txt`, uno por pieza: primero `sabotaje_subitems1.sh`; después `sabotaje_sufijos1.sh`, que lleva lo que sumó la PM (a `sufijo_otra1`, como dato del mismo caso, la siguiente operación con su propio sufijo guardado: entra sin el aviso de la anterior y con su sufijo en el campo; su rojo: `pintarSufijo` que esconde el aviso sólo cuando el campo entra vacío). Después, los demás vencidos míos. Próxima D: D245. Lecciones: antes de lanzar algo en segundo plano se borra su marca de fin; un texto de error que manda a corregir se prueba por cada origen del dato, no sólo por el que nombra la tarea. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto y sin consejero.
