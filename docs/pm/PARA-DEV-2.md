@@ -7,7 +7,7 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## Vencido `sabotajes/guardar2.sh`: aceptado sobre `aeb994f` (informe `279a685`) e integrado (2026-11-14 10:52 UTC)
+## Vencido `sabotajes/guardar2.sh`: aceptado sobre `aeb994f` (informe `279a685`) e integrado (2026-11-14 10:47 UTC)
 
 Acta `REPRODUCCION-SABOTAJE-GUARDAR2-2026-11-14.md`. No queda ningún vencido.
 
