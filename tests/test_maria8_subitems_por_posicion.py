@@ -351,7 +351,7 @@ def test_kilos_de_un_renglon_que_al_centesimo_dan_cero_no_se_generan():
 def _dichos(numeros):
     """Los renglones como los dice un aviso: «1, 2 y 3»."""
     *antes, ultimo = (str(n) for n in numeros)
-    return f"{', '.join(antes)} y {ultimo}" if antes else ultimo
+    return f"{', '.join(antes)} y {ultimo}"
 
 
 def _aviso_del_mismo_sufijo(cuales, cuantos, sufijo):
@@ -361,27 +361,31 @@ def _aviso_del_mismo_sufijo(cuales, cuantos, sufijo):
 
 
 POSICIONES = {"A": LONA["pieza"], "B": "39211390900F", "C": "39211200900X"}
-# caso: (la posición de cada renglón, los renglones que los avisos dicen de cada ítem de varios)
+# caso: (la posición de cada renglón, los renglones que los avisos dicen de cada ítem de varios,
+# las posiciones en las que cada renglón lleva su sufijo: de esas no sale el aviso del mismo sufijo)
 JUNTOS = {
-    "seguidos": ("AAAB", {"A": "1, 2 y 3"}),
-    "salteados": ("ABA", {"A": "1 y 3"}),
-    "tres_items": ("ABCCAB", {"A": "1 y 5", "B": "2 y 6", "C": "3 y 4"}),
-    "doce_renglones": ("A" * 12, {"A": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 y 12"}),
+    "seguidos": ("AAAB", {"A": "1, 2 y 3"}, ""),
+    "salteados": ("ABA", {"A": "1 y 3"}, ""),
+    "tres_items": ("ABCCAB", {"A": "1 y 5", "B": "2 y 6", "C": "3 y 4"}, ""),
+    "doce_renglones": ("A" * 12, {"A": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 y 12"}, ""),
+    "cada_renglon_su_sufijo": ("ABAB", {"A": "1 y 3", "B": "2 y 4"}, "B"),
 }
 
 
 @pytest.mark.parametrize("caso", JUNTOS)
 def test_los_avisos_dicen_que_renglones_van_juntos(caso):
-    posiciones, juntos = JUNTOS[caso]
+    posiciones, juntos, con_el_suyo = JUNTOS[caso]
     # Cada posición lleva su sufijo: el renglón de otro ítem que queda en el medio no cuenta.
-    renglones = [dict(LONA, pieza=POSICIONES[letra], sufijo=f"AA({letra})-") for letra in posiciones]
+    renglones = [dict(LONA, pieza=POSICIONES[letra], sufijo=f"AA({letra}{n if letra in con_el_suyo else ''})-")
+                 for n, letra in enumerate(posiciones)]
     avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor="AA(X)-")
-    # De cada ítem salen los dos avisos seguidos: el de los sub-ítems y el del sufijo.
+    # De cada ítem sale el aviso de los sub-ítems y, pegado, el del sufijo si llevan todos el mismo.
     assert [a for a in avisos if a.startswith("Sub-ítems:") or "llevan el mismo sufijo" in a] == [
         aviso for letra, cuales in juntos.items() for aviso in (
             f"Sub-ítems: los renglones {cuales} van en un solo ítem con {posiciones.count(letra)} sub-ítems "
             "(misma posición SIM, origen, procedencia y estado).",
-            _aviso_del_mismo_sufijo(cuales, posiciones.count(letra), f"AA({letra})-"))]
+            *([] if letra in con_el_suyo else [
+                _aviso_del_mismo_sufijo(cuales, posiciones.count(letra), f"AA({letra})-")]))]
 
 
 SUCIO, LIMPIO = "AA(MARCA)-AI(620G-BLUE.010 150CMX50M)-", "AA(MARCA)-AI(620G BLUE 010 150CMX50M)-"
