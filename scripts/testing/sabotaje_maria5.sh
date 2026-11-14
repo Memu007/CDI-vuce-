@@ -190,7 +190,7 @@ reemplazar $X "    if aviso:" "    if False:"
 caso lector_sin_aviso "${D}test_si_no_coinciden_gana_el_de_la_linea_con_aviso[pymupdf]"
 
 # 26. el aviso del lector no llega a la pantalla
-reemplazar $M "        avisos = operacion_data.pop('avisos_peso', []) if isinstance(operacion_data, dict) else []" "        avisos = []"
+reemplazar $M "operacion_data.pop('avisos_peso', [])" "[]"
 caso aviso_del_lector_perdido "${D}test_el_aviso_del_lector_llega_a_la_pantalla"
 
 # 27. Excel: el total le gana al neto
@@ -224,7 +224,7 @@ reemplazar $G "    if round(kilos, 3) <= 0:" "    if kilos < 0:"
 caso peso_sin_guarda "${D}test_un_peso_imposible_no_llega_al_txt["
 
 # 33. la guarda existe pero el TXT no la usa
-reemplazar $G 'QARTKGRNET={peso_valido(peso_kg, idx):.3f}' 'QARTKGRNET={peso_kg:.3f}'
+reemplazar $G 'peso_valido(peso_kg, lugar_en_el_pedido.get(id(item), idx))' 'peso_kg'
 caso guarda_sin_usar "${D}test_un_peso_imposible_no_llega_al_txt["
 
 # 34. sin tope en el peso
@@ -301,5 +301,12 @@ reemplazar $G '    if not math.isfinite(kilos):
         raise ValueError(f"Item {donde}: el peso «{str(peso)[:20]}» no es un número válido.")' '    pass'
 caso nan_sin_mensaje "${E}test_los_mensajes_del_peso_dicen_la_razon["
 
+# 50. los avisos antes de generar salen sin los supuestos: lo que falta en la
+# carátula no se avisa ahí
+reemplazar $M "
+    supuestos = _supuestos_maria(request, items, gastos)" "
+    supuestos = []"
+caso previos_sin_supuestos "${T}caratula_vacia.py::test_los_avisos_antes_de_generar_tambien["
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 49 sabotajes dan rojo por la razón esperada"
+echo "OK: los 50 sabotajes dan rojo por la razón esperada"
