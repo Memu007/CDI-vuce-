@@ -86,14 +86,14 @@ def test_un_pedido_mal_armado_da_400_y_no_500(client, auth_override, subitems):
 
 @pytest.mark.parametrize("subitems", [5, True, 3.5, {"cantidad": 6}])
 def test_subitems_que_no_son_una_lista_dan_400_y_no_500(client, auth_override, subitems):
-    """Los controles de antes de generar corren primero y no pueden reventar
-    con la forma del pedido: el control de forma dice qué ítem está mal."""
+    """Con sub-ítems que no son una lista, el control de forma dice qué ítem
+    está mal."""
     r = _pedir(client, subitems)
     assert r.status_code == 400, r.text
     assert "Item 1" in r.text and "sub-ítems" in r.text, r.text
 
 
-@pytest.mark.parametrize("subitems", [5, True])
+@pytest.mark.parametrize("subitems", [5, True, 3.5, [1]])
 def test_la_validacion_no_revienta_con_subitems_raros(client, auth_override, subitems):
     item = dict(ITEM_BASE, estado=2, subitems=subitems)
     r = client.post("/api/validate/smart", json={

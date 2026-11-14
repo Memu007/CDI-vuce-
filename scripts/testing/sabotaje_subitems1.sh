@@ -102,5 +102,9 @@ caso numero_de_linea "${T}test_el_error_del_subitem_dice_el_numero_de_la_pantall
 reemplazar $M '                if _s.get("sufijo") is not None and not isinstance(_s.get("sufijo"), str):' "                if False:"
 caso sufijo_no_texto "${T}test_un_pedido_mal_armado_da_400_y_no_500[subitems2]"
 
+# 11. los controles de antes de generar revientan con un sub-ítem que no es un objeto
+reemplazar $C "            if not isinstance(sub, dict):" "            if False:"
+caso subitem_no_objeto "${T}test_la_validacion_no_revienta_con_subitems_raros[subitems3]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 10 sabotajes dan rojo por la razón esperada"
+echo "OK: los 11 sabotajes dan rojo por la razón esperada"
