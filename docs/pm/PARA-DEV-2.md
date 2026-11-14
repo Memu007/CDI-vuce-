@@ -7,53 +7,48 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## SABOTAJE-SUBITEMS1: aceptada sobre `bf6778e` (informe `2a0b8e8`) e integrada (2026-11-14 03:33 UTC)
+## D246 (b): aceptada sobre `0224f01` (informe `b8571ff`) e integrada (2026-11-14 05:46 UTC)
 
-Acta `REPRODUCCION-SABOTAJE-SUBITEMS1-2026-11-14.md`. Corrí
-`sabotaje_subitems1.sh bf6778e`: `43 passed, 2 xfailed` sin sabotaje, 11 `ROJO`, `rc=0`.
-chequeo-6 igual al tuyo (producto +0/−0). Con un `raise` dentro del `try` del
-semáforo corrí los 11 archivos de `tests/` que lo llaman: `26 failed`, y quedan
-verdes justo los tres de D245. Mirado prueba por prueba: toda prueba que llama al
-semáforo, fuera de esos tres archivos, da rojo (los siete que leíste y la tuya).
+Acta `REPRODUCCION-D246-2026-11-14.md`. Con la copia de `0224f01`: las dos pruebas
+`171 passed`; anclas en 6; `sufijos2.sh` 32 `ROJO`; `sabotaje_sufijos1.sh` 46 `ROJO`, `rc=0`;
+chequeo-6 igual al tuyo. Tu negativo de D247 sale igual: con `«{sufijo[:40]}»`,
+`1 failed` en `a8d7f7b` y `171 passed` en `0224f01`.
 
-- **D245: (a), decidido por la PM**, con los tres archivos. La hacés vos, aunque
-  `test_cobro_corte1.py` es de la Técnica: sólo se suma la afirmación de `success`,
-  sin cambiar lo que ya mira. Como toca cobro, la revisión fuerte es ésta: en el
-  diff de ese archivo sólo cambia esa afirmación, y el informe trae el rojo medido
-  con el `raise`. No hace falta adversario ni `/security-review` para esta pieza.
-  Se acepta así: con el `raise` dentro del `try`, ninguna prueba que llama al
-  semáforo queda verde en los 11 archivos; sin él, los tres archivos verdes enteros.
-  Ya lo medí con una afirmación de `success` en cada sitio: sin sabotaje
-  `166 passed, 2 xfailed`; con el `raise`, `10 failed` (8 de `test_punta_a_punta1`,
-  1 de `test_generar_maria_txt`, 1 de `test_cobro_corte1`). Hoy el semáforo contesta
-  `success: true` en los tres, así que la pieza es sólo de pruebas.
-- **Supuestos:** acepto los cinco. **Riesgos:** aceptados tal como los escribiste.
-- Las dos líneas que propusiste para `COLA-LIMPIEZA.md` quedaron puestas.
+Lo de D247 fue un error mío, no tuyo: decidí D246 comparando los datos y no lo que
+afirmaba cada prueba. Quedó como escape de la PM en el acta.
 
-## SABOTAJE-SUFIJOS1: aceptada sobre `afeae84` (informe `1215a8a`) e integrada (2026-11-14 04:57 UTC)
+- **D247: (a), decidido por la PM. Es tu pieza activa, antes de los vencidos.** Te
+  autorizo a tocar sólo `tests/test_sufijos2.py` y `scripts/testing/sabotajes/sufijos2.sh`
+  (de la Técnica; ya le avisé). Se acepta así:
+  - con el cambio de `«{uno[0][:40]}»` por `«{sufijo[:40]}»`, la entrega da rojo en
+    las cuatro formas de `VACIOS` y la base `0224f01` queda verde;
+  - `sufijos2.sh` entero en `ROJO`, con un sabotaje más para ese cambio (33);
+  - `sabotaje_sufijos1.sh` sigue en 46, anclas en 6, las dos pruebas verdes.
+  - **Sugerencia** (no es criterio): `VACIOS` como pares (sufijo, código que nombra).
+- **Riesgos:** aceptados; el tuyo lo cierra D247.
+- Tus dos líneas para `COLA-LIMPIEZA.md` quedaron puestas.
 
-Acta `REPRODUCCION-SABOTAJE-SUFIJOS1-2026-11-14.md`. Con la copia de `afeae84`: guion
-47 `ROJO`, `rc=0`; las tres pantallas verdes; anclas en 6; chequeo-6 igual al tuyo.
-Un negativo mío (el aviso se esconde sólo si la operación no trae sufijo) da rojo en
-`afeae84` por «con su sufijo guardado» y verde en `4474108`. Tus dos filas de arrastre
-no las repetí: quedan como medición tuya.
+**Cómo sigue:** 1) D247 (a); 2) los 7 vencidos, primero `sabotaje_maria8.sh`.
+D244 y D239 esperan a Emi. Si dice que sí a D244, te la escribo con su criterio. Si
+dice que sí a D239 (a), lleva adentro, como datos de un caso, un código sin sigla con
+el nombre de otro país («434 BELGICA» guarda `BE` sin avisar). Si Emi dice que
+«Holanda» también es 423, es una pieza chica aparte.
 
-- **D246: (b), decidido por la PM.** `VACIOS` de `test_sufijos2.py` ya trae
-  `"AA(   )-"`. Pieza chica **después de D245 (a)**: sacás el caso 11 y
-  `test_sufijos1.py::test_un_codigo_con_el_valor_vacio_no_se_genera`. Se acepta con
-  `sabotaje_sufijos1.sh` en 46 `ROJO`, `sabotajes/sufijos2.sh` entero en `ROJO`,
-  `anclas_perdidas.py` en 6 y `test_sufijos1.py` y `test_sufijos2.py` verdes.
-- **Riesgos:** aceptados como los escribiste; el de los avisos sin sufijo no se pide.
-- La línea de `COLA-LIMPIEZA.md` del filtro de `:2013` quedó con tu medición: está
-  muerto, sacarlo.
+**Próxima D: D248.**
 
-**Cómo sigue:** 1) D245 (a); 2) D246 (b); 3) los demás vencidos (quedan 7). D244 y
-D239 esperan a Emi. Si dice que sí a D244, te la escribo con su criterio. Si dice que
-sí a D239 (a), lleva adentro, como datos de un caso, un código sin sigla con el nombre
-de otro país («434 BELGICA» guarda `BE` sin avisar). Si Emi dice que «Holanda» también
-es 423, es una pieza chica aparte.
+## D245 (a): aceptada sobre `e17c11e` (informe `a8d7f7b`) e integrada (2026-11-14 05:35 UTC)
 
-**Próxima D: D247.**
+Acta `REPRODUCCION-D245-2026-11-14.md`. Tus números salen iguales con
+`GEMINI_API_KEY` vacía: los tres archivos `166 passed, 2 xfailed`; con el `raise`,
+`36 failed` en los 11 archivos (14 por `success`, 22 por `KeyError`). Mi negativo:
+el semáforo contesta `success: False` sin error. Da `14 failed`, sólo en los cuatro
+archivos que lo afirman, y en la base `1215a8a` los tres archivos quedan verdes.
+Los guiones `punta_a_punta1`, `sabotaje_subitems1`, `destino1` y `avisos1`, con tu copia,
+`rc=0` y todo `ROJO` (9, 11, 19 y 22).
+
+- **Supuestos y riesgos:** aceptados. Las `xfail` que no distinguen quedan como
+  riesgo bajo. El de la pantalla con `success: false` quedó en `NOW.md`.
+- Tu línea del ayudante único quedó en `COLA-LIMPIEZA.md`.
 
 ## D243 (b): aceptada sobre `0dff850` (informe `4474108`) e integrada (2026-11-14 04:51 UTC)
 
