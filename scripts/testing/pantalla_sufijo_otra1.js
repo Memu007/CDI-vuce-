@@ -1,7 +1,8 @@
 // Al entrar a «Validación», el campo del sufijo de valor muestra el de la operación en curso, vacío si no
 // tiene: una operación sin sufijo abierta después de otra que lo tenía no genera con el ajeno, y la tarjeta
 // del despachante tampoco lo usa. Con el suyo escrito, los avisos y el TXT llevan ese. El aviso de que falta
-// el sufijo tampoco pasa de una operación a la otra, y se va cuando la persona lo escribe.
+// el sufijo tampoco pasa de una operación a la otra, traiga o no la otra el suyo guardado, y se va cuando la
+// persona lo escribe.
 // Navegador local, servidor local. Datos inventados.
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_sufijo_otra1.js
@@ -17,7 +18,7 @@ const ITEM = { pieza: '39211390900F', descripcion: 'Lona de PVC gris', origen: '
                valor_unitario: 1.85, peso_unitario: 0.62 };
 // Escrito cuando la operación no tenía sufijo: la tarjeta sólo lo marca si compara con uno que no es el suyo.
 const ESCRITO = Object.assign({}, ITEM, { descripcion: 'Lona de PVC azul', sufijo: 'AI(Y7)-', sufijo_op: '' });
-const AJENO = 'AA(000123)', PROPIO = 'AA(000456)', FRENO = 'Ingresá el sufijo de valor SBT. Es obligatorio.';
+const AJENO = 'AA(000123)', PROPIO = 'AA(000456)', GUARDADO = 'AA(000789)', FRENO = 'Ingresá el sufijo de valor SBT. Es obligatorio.';
 const OTRO = 'Lo escribiste con otro sufijo de la operación';
 // cómo se llega a la otra operación: si antes se recarga, lo que trae guardado como sufijo, cómo se nombra
 const LLEGADAS = [
@@ -87,9 +88,15 @@ async function generar(page) {
 
   const aviso = () => page.evaluate(() => { const el = document.getElementById('sbtFieldError'); return el.hidden ? '' : el.textContent; });
   if (await aviso() !== FRENO) falla('la última llegada frenó y no dejó su aviso a la vista');
-  await entrar(page, Object.assign({}, ANTERIOR, { numero_factura: 'INV-2026/0733' }), [ITEM]);
-  if (await aviso()) falla('otra operación entra con el aviso de la anterior a la vista: «' + await aviso() + '»');
-  if (await generar(page) !== 'frenó') falla('la operación siguiente, sin sufijo, no frenó');
+  // Cada una entra después de un freno. A la que trae su sufijo se le borra, para que frene y le deje el aviso a la otra.
+  for (const [numero, suyo] of [['INV-2026/0733', GUARDADO], ['INV-2026/0734', '']]) {
+    const cual = 'otra operación, ' + (suyo ? 'con su sufijo guardado' : 'sin sufijo');
+    const entra = await entrar(page, Object.assign({}, ANTERIOR, { numero_factura: numero }, suyo ? { sbt_sufijo_valor: suyo } : {}), [ITEM]);
+    if (await aviso()) falla(cual + ', entra con el aviso de la anterior a la vista: «' + await aviso() + '»');
+    if (!entra.startsWith(suyo + ' / ' + suyo + ' / ')) falla(cual + ', no entra con el suyo en el campo: ' + entra);
+    if (suyo) await page.fill('#sbtSufijoValor', '');
+    if (await generar(page) !== 'frenó') falla(cual + ', no frenó con el campo vacío');
+  }
   const avisado = page.waitForRequest(r => r.url().endsWith('/generate_maria/avisos') && (r.postDataJSON() || {}).sbt_sufijo_valor === PROPIO, { timeout: 15000 });
   await page.fill('#sbtSufijoValor', PROPIO);
   if (await aviso()) falla('con el sufijo ya escrito, el aviso sigue a la vista: «' + await aviso() + '»');
