@@ -297,3 +297,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `proyecto_maria/core/maria_generator.py` (`limpiar_sufijo`): un `.upper()` de más en
   `cambiaria[:20]` y el texto de la instrucción de los errores quedan verdes en
   `test_sufijos2.py`: pedir una prueba. Lo vio el adversario de la Dev MARIA.
+- `tests/test_maria8_subitems_por_posicion.py` (líneas 235, 237, 403 y 406): los textos que
+  ya están en `SUCIO` y `LIMPIO` se repiten como literales; usar las constantes. Lo vio la Dev
+  MARIA.
