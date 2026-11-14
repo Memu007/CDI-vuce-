@@ -302,7 +302,7 @@ reemplazar $G '    if not math.isfinite(kilos):
 caso nan_sin_mensaje "${E}test_los_mensajes_del_peso_dicen_la_razon["
 
 # 50. los avisos antes de generar salen sin los supuestos: lo que falta en la
-# carátula sólo se avisa al generar
+# carátula no se avisa ahí
 reemplazar $M "
     supuestos = _supuestos_maria(request, items, gastos)" "
     supuestos = []"
