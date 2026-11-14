@@ -222,6 +222,9 @@ sabotaje $G "el número que cambiaría sale sin cortar" \
 sabotaje $G "en lugar del número que cambiaría sale el principio del sufijo" \
   '«{cambiaria[:20]}»' '«{sufijo[:20]}»' \
   "$T[cambiaria]" "$T[cambiaria_largo]"
+sabotaje $G "en lugar del número que cambiaría sale el principio del valor" \
+  '«{cambiaria[:20]}»' '«{valor[:20]}»' \
+  "$T[cambiaria]"
 sabotaje $G "el error del vacío nombra el código sin cortarlo" \
   '«{uno[0][:40]}» está vacío' '«{uno[0]}» está vacío' \
   "$T[vacio_largo]"

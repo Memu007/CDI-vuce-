@@ -250,7 +250,7 @@ def test_cada_palabra_se_mira_una_vez(monkeypatch, largo):
 LO_QUE_MUESTRA = {
     "pide": ("AA(X)-ZB(16.384)-CA00-", "«ZB(16.384)» pide"),
     "pide_largo": ("AA(X)-ZA(" + "9" * 50 + ",5)-CA00-", "«ZA(" + "9" * 37 + "» pide"),
-    "cambiaria": ("AA(X)-AF(-2.5)-CA00-", "en «AF(-2.5)», «-2.5» cambiaría"),
+    "cambiaria": ("AA(X)-AJ(ROLLO 1.500 M)-CA00-", "en «AJ(ROLLO 1.500 M)», «1.500» cambiaría"),
     "cambiaria_largo": ("AA(X)-AJ(" + "B" * 40 + "-1.500)-CA00-",
                         "en «AJ(" + "B" * 37 + "», «" + "B" * 20 + "» cambiaría"),
     "vacio_largo": ("AA(X)-AB(" + "-" * 50 + ")-CA00-", "«AB(" + "-" * 37 + "» está vacío"),
