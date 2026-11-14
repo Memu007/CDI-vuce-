@@ -458,7 +458,8 @@ def _aviso_de_que_falta_el_codigo(donde):
 # caso: (la posición de cada renglón, en minúscula si va en un grupo a mano; cómo nombran los
 # avisos a cada renglón, en su orden. Fuera de un grupo, el que no está no trae sufijo)
 SE_LIMPIO = {
-    "seguidos": ("AAA", {1: "renglón 1", 2: "renglón 2"}),
+    # El 3 usa el sufijo de la operación; el 4 y el 5 van solos y se avisan en su orden.
+    "seguidos": ("AAABC", {4: "ítem 4", 5: "ítem 5", 1: "renglón 1", 2: "renglón 2"}),
     # El ítem tiene seis renglones; el 3 y el 6, de otras posiciones, quedan en el medio, y el 6
     # usa el sufijo de la operación.
     "salteados": ("AABAACAA", {3: "ítem 3", 1: "renglón 1", 2: "renglón 2", 4: "renglón 4",

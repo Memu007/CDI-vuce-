@@ -317,7 +317,7 @@ reemplazar $F '                    if nuevo:
                         grupos.add(gid)'
 caso "aviso_de_grupo_por_renglon" "$LIMPIO[un_grupo_en_el_medio]"
 
-# 56. los avisos de los que van solos salen del último al primero
+# 56. los avisos de la operación y de los que no van juntos salen al revés
 reemplazar $F '        for donde, sufijo in sufijos:' '        for donde, sufijo in reversed(sufijos):'
 caso "avisos_al_reves" "$LIMPIO[salteados]"
 
@@ -325,5 +325,9 @@ caso "avisos_al_reves" "$LIMPIO[salteados]"
 reemplazar $F 'sufijos = [("", sbt_sufijo_valor)] if usa_el_general else []' 'sufijos = [("", sbt_sufijo_valor)]'
 caso "aviso_de_la_operacion_sin_uso" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
 
+# 58. los ítems que van solos se avisan del último al primero
+reemplazar $F '                    sufijos.append((f" del ítem {idx}", item["sufijo"]))' '                    sufijos.insert(1 if usa_el_general else 0, (f" del ítem {idx}", item["sufijo"]))'
+caso "items_solos_al_reves" "$LIMPIO[seguidos]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 57 sabotajes dan rojo por la razón esperada"
+echo "OK: los 58 sabotajes dan rojo por la razón esperada"
