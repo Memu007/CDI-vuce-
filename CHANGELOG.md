@@ -9,7 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-13 · fix: no se genera el TXT con un CUIT del despachante que no cierra con su verificador (CUIT-GENERAR)
 
 - Al generar, el CUIT del despachante se controla con su dígito verificador, también el que ya estaba guardado en el perfil: antes alcanzaba con que tuviera 11 dígitos y salía así en el TXT.
-- El error dice dónde corregirlo: en «Mi perfil», campo «Mi CUIT (despachante)», o en la operación si es ella la que lo manda.
+- El error dice dónde corregirlo: en «Mi perfil», campo «Mi CUIT (despachante)»; si es el de un estudio elegido, en «Mis estudios» (borrarlo y agregarlo de nuevo); y si lo mandó la operación y no es el del perfil, avisa que hay que recargar la página si ya se corrigió.
 
 ## 2026-11-13 · fix: el aviso «Ingresá el sufijo de valor SBT» no queda de una operación a otra
 

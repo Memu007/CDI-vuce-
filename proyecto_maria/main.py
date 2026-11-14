@@ -4747,8 +4747,13 @@ def _cuit_del_despachante(estudio, cuit_agr: str, user) -> tuple[str, bool]:
     cuit = "".join(str(crudo).replace("-", "").split())
     es_el_del_perfil = estudio is None and bool(cuit) and cuit == del_perfil
     if crudo and not cuit_valido(cuit):
-        donde = ("Corregilo en «Mi perfil», campo «Mi CUIT (despachante)»." if es_el_del_perfil
-                 else "Es el que manda la operación, no el de tu perfil: corregilo ahí.")
+        if estudio is not None:
+            donde = "Es el del estudio elegido: en «Mi perfil», «Mis estudios», borralo y agregalo de nuevo."
+        elif es_el_del_perfil:
+            donde = "Corregilo en «Mi perfil», campo «Mi CUIT (despachante)»."
+        else:  # la pantalla manda el del perfil que tenía al cargar: otra pestaña pudo cambiarlo
+            donde = ("No es el de tu perfil: lo mandó la operación. Si ya lo corregiste en «Mi perfil», "
+                     "recargá la página.")
         raise HTTPException(status_code=400, detail={"errors": [
             f"El CUIT del despachante «{cuit}» no es válido: son 11 dígitos (0-9) y el último es el "
             f"verificador. {donde}"]})
