@@ -7,30 +7,33 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## Vencidos `sabotaje_valor1b.sh` y `sabotaje_doc1.py`: aceptados sobre `70eb5dc` y `d4c6b73` (informes `a926930` y `f3a7d29`) e integrados (2026-11-14 09:56 UTC)
+## Vencido `sabotaje_maria7.sh`: aceptado sobre `4477ae3` (informe `0260962`) e integrado; D250 (a) (2026-11-14 10:26 UTC)
 
-Actas `REPRODUCCION-SABOTAJE-VALOR1B-2026-11-14.md` y `REPRODUCCION-SABOTAJE-DOC1-2026-11-14.md`.
-Los dos SHA finales pasaron por revisor: bien.
+Acta `REPRODUCCION-SABOTAJE-MARIA7-2026-11-14.md`. El SHA final pasó por revisor: bien.
 
-**valor1b:** con la copia de `70eb5dc` da 22 `ROJO`, 0 `FALLA`, `rc=0`; casos 8 y 10 con 1 y
-2 failed; chequeo-6 igual al tuyo; anclas 2/0/0.
-- Mis negativos: el guion viejo da `PATRON NO ENCONTRADO (2 veces)` en el 8; con el caso 8
-  sacando `cuentasViejas();` de `borrarSeguroCalculado` da `FALLA … quedó verde`.
-- **Supuesto (23→22):** aceptado; son 22 casos y 22 `ROJO`.
-- **Riesgos 1 a 3:** aceptados. El 2 lo miré: el 9 y el 10 son mutaciones distintas que
-  espera una sola prueba. El 1 y el `22` a mano van a la cola de limpieza.
-
-**doc1.py:** con la copia de `d4c6b73`, en un worktree en ese SHA, da 3 `OK`, `rc=0`; a mano,
-38 y 5 failed, cada uno sólo en su prueba; chequeo-6 igual al tuyo.
-- Mis negativos: el guion viejo da `Patrón cambiado: servidor`; con «generador» neutro
-  (`destinacion_del_txt(tipo_destinacion, False)`) el guion corta con `5 passed`.
-- Miré por qué falla cada mutación: en las dos la EC pasa el control (el error siguiente o
-  `DID NOT RAISE`), ningún 500.
+- Con la copia de `4477ae3`: 25 `ROJO`, 0 `FALLA`, `rc=0`; caso 6 con `1 failed, 122 passed`;
+  chequeo-6 igual al tuyo; anclas 1/0/0; queda 1 vencido.
+- Mis negativos: el guion viejo da `PATRON NO ENCONTRADO (0 veces)`; con el caso 6 cambiando
+  sólo el texto de `donde` (sigue limpiando) da `FALLA … quedó verde`.
 - **Riesgos 1 a 4:** aceptados; tu línea va a la cola de limpieza.
 
+**D250: (a), decidida por la PM.** Medí tu mutación de `maria_generator.py:2235`: los 27
+archivos siguen en `1126 passed`, y `-k 'sufijo or maria'` sobre `tests/` también queda verde.
+Y cambia lo que se ve: con un sufijo de la operación que se limpia, el aviso muestra el sucio;
+si un renglón trae como propio el limpio y los otros heredan, el aviso no sale; con uno que no
+se separa, sale además del error. Va después de `guardar2.sh` y D249.
+
+Criterio de D250:
+1. La familia de entradas del aviso «los N sub-ítems llevan el mismo sufijo», como datos de un
+   solo caso: el texto que muestra, cuándo sale y cuándo no.
+2. Tu sabotaje de la línea 2235 en `sabotaje_maria8.sh` da `ROJO` con una prueba nombrada.
+3. `sabotaje_maria8.sh` entero en `ROJO`, con la cuenta exacta.
+4. Las anclas no empeoran.
+
 **Cómo sigue:**
-1. Los 2 vencidos que quedan, uno por pieza: vas por `sabotaje_maria7.sh`, después `guardar2.sh`.
+1. El último vencido, `guardar2.sh`.
 2. D249 (a), con el criterio de la sección D247 de abajo.
+3. D250 (a).
 
 D244 y D239 esperan a Emi:
 - Si dice que sí a D244, te la escribo con su criterio.
@@ -38,7 +41,11 @@ D244 y D239 esperan a Emi:
   el nombre de otro país («434 BELGICA» guarda `BE` sin avisar).
 - Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
 
-**Próxima D: D250.**
+**Próxima D: D251.**
+
+## Vencidos `sabotaje_valor1b.sh` y `sabotaje_doc1.py`: aceptados sobre `70eb5dc` y `d4c6b73` (informes `a926930` y `f3a7d29`) e integrados (2026-11-14 09:56 UTC)
+
+Actas `REPRODUCCION-SABOTAJE-VALOR1B-2026-11-14.md` y `REPRODUCCION-SABOTAJE-DOC1-2026-11-14.md`.
 
 ## Vencido `sabotaje_maria5.sh`: aceptado sobre `c0505cc` (informe `9153d23`) e integrado (2026-11-14 09:30 UTC)
 
