@@ -7,39 +7,50 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## D238 (a): aceptada sobre `80cd954` (informe `3dc9908`) e integrada (2026-11-13 23:50 UTC)
+## CUIT-GENERAR (D235 a): aceptada sobre `29327d2` (informe `47b8481`) e integrada (2026-11-14 02:44 UTC)
 
-Acta `REPRODUCCION-D238-2026-11-13.md`. Reproduje `sufijo_otra1` verde en `80cd954` y
-rojo con `finalize.js` de la base, `sufijo_borrador1` y `maria9` verdes, los 13 pytest
-que leen `finalize.js` (`690 passed`; con la base, el rojo de `[sufijo]`) y
-`e2e_maria.sh` OK. chequeo-6 igual al tuyo; la unión no cambia nada fuera de `docs/pm`.
+Acta `REPRODUCCION-CUIT-GENERAR-2026-11-14.md`. Reproduje los 12 casos (con `main.py`
+de la base, los 7 rojos), `cuit_generar.sh` (21 `ROJO`), `cuit_perfil.sh` sobre el
+arnés compartido (11 `ROJO`), la pantalla `cuit_generar1`, `e2e_maria.sh` OK y la
+suite entera (`6143 passed, 110 skipped, 3 xfailed`, igual a la tuya). chequeo-6 igual al tuyo; la unión no cambia nada fuera
+de `docs/pm`. Seis ejemplos míos (ancho completo, guion largo, 12 dígitos, perfil con
+espacio duro, verificador cambiado, guiones igual a un perfil malo): todos rechazan.
 
-Tres negativos míos: volver a «Validación» después de poner el aviso da 2 rojas
-(`maria9`, `sufijo_borrador1`); escuchar `change` en vez de `input` da rojo en
-`sufijo_otra1`. El tercero no distingue: si `pintarSufijo` esconde el aviso sólo cuando
-el campo entra vacío, `sufijo_otra1` sigue verde, porque el caso sólo prueba la
-siguiente operación sin sufijo. El producto está bien (esconde sin condición); el
-hueco es del caso.
+Sacar `estudio is None` de `es_el_del_perfil` queda verde, pero no es un hueco:
+los dos usos de la marca miran antes si hay estudio, así que el cambio no tiene
+efecto. No hace falta caso.
 
-- **D242: (a), decidido por la PM.** El servidor vuelve a decir el motivo en el
-  próximo «Generar», y es reversible.
-- **Supuestos:** acepto los tres.
-- **Riesgos:** aceptados por la PM tal como los escribiste.
-- **Lo que se suma:** a `sufijo_otra1`, como dato del mismo caso, la siguiente
-  operación con su propio sufijo guardado: entra sin el aviso de la anterior y con su
-  sufijo en el campo. Va con la pieza de `sabotaje_sufijos1.sh` (punto 2 de abajo),
-  no dentro de CUIT-GENERAR. Su rojo: el tercer negativo de arriba.
+El adversario (Sonnet alto) no encontró un `CDDTAGR` inválido en el TXT. Lo único:
+con un estudio de `cuit=""` escrito a mano en la base y un perfil malo, el texto dice
+«Es el del estudio elegido…» cuando el malo es el del perfil. No se llega por la
+API (el alta valida): va como dato de D244, no como devolución.
 
-**Cómo sigue:** 1) CUIT-GENERAR (D235 a), producto con datos, con revisión fuerte
-(§3: suite completa, `/security-review` y `ataque_aislamiento.sh`); 2) los vencidos
-de `sabotajes-conocidos.txt`, uno por pieza, primero `sabotaje_subitems1.sh` y
-`sabotaje_sufijos1.sh` (este con lo que se suma de arriba). D239 sigue esperando a
-Emi; si dice que sí a (a), entra después de CUIT-GENERAR y lleva adentro, como datos
-de un caso, el de un código sin sigla con el nombre de otro país («434 BELGICA»
-guarda `BE` sin avisar). Si Emi dice que «Holanda» también es 423, es una pieza
-chica aparte.
+- **D243: (b), decidido por la PM.** Cambiás vos las cuatro anclas en
+  `estudio1.sh`, `estudio1b.sh` y `excel2.sh` con las líneas de tu tabla, en una
+  pieza chica. Se acepta con los tres guiones corridos **enteros** sobre el SHA
+  nuevo, cada sabotaje en `ROJO`, y `anclas_perdidas.py` de vuelta a 6. La Técnica
+  no tocó esos guiones desde `3dc9908`. Hasta entonces `29327d2` no se propone para
+  publicar.
+- **D244: (a), decidido por la PM**, como AVISOS-1: los avisos frenan lo mismo que
+  generar, con `_cuit_del_despachante` como única copia del orden, y un `cuit_agr`
+  en blanco o de guiones cuenta como ausente en los dos. Arranca con un rojo por
+  causa (los avisos callan un CUIT que no cierra; el en blanco cae distinto) y, como
+  dato del mismo caso, el estudio con `cuit=""` debe nombrar el lugar correcto o
+  dejarse documentado por qué no.
+- **Supuestos:** acepto los cinco.
+- **Riesgos:** aceptados por la PM tal como los escribiste. Al publicar, quien tenga
+  guardado un CUIT que no cierra queda frenado hasta corregirlo: va a Emi con el
+  «dale».
 
-**Próxima D: D243.**
+**Cómo sigue:** 1) D243 (b); 2) `sabotaje_subitems1.sh` y 3) `sabotaje_sufijos1.sh`
+(vencidos de `sabotajes-conocidos.txt`, uno por pieza); este lleva adentro, como dato
+de `sufijo_otra1`, la siguiente operación con su propio sufijo guardado: entra sin el
+aviso de la anterior y con su sufijo en el campo (el negativo que no distinguió en D238); 4) D244 (a); 5) los demás vencidos. D239 sigue
+esperando a Emi; si dice que sí a (a), entra después de D244 y lleva adentro, como datos
+de un caso, un código sin sigla con el nombre de otro país («434 BELGICA» guarda `BE`
+sin avisar). Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
+
+**Próxima D: D245.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
