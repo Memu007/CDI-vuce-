@@ -9,6 +9,8 @@
 Sintéticos con la forma de la factura del 24/10; los datos reales no entran
 al repositorio.
 """
+import re
+
 import pytest
 
 from proyecto_maria.core import maria_generator as mg
@@ -111,12 +113,14 @@ def test_un_sufijo_que_pide_numero_entero_sale_igual():
 
 # ------------------------------------------------------- 3. Ninguno vacío
 
-VACIOS = ["AA()-CA00-", "AA(   )-", "AA(DEMO)-AB()-", "AA(--)-"]
+# sufijo: el código que el error nombra, y no el sufijo entero
+VACIOS = {"AA()-CA00-": "AA()", "AA(   )-": "AA(   )", "AA(DEMO)-AB()-": "AB()", "AA(--)-": "AA(--)"}
 
 
 @pytest.mark.parametrize("vacio", VACIOS)
 def test_un_sufijo_vacio_no_se_genera(vacio):
-    with pytest.raises(ValueError, match=r"Sufijo de valor del ítem 2: «A[AB]\(.*está vacío.*no se genera"):
+    nombra = re.escape(VACIOS[vacio])
+    with pytest.raises(ValueError, match=rf"Sufijo de valor del ítem 2: «{nombra}» está vacío.*no se genera"):
         mg.limpiar_sufijo(vacio, " del ítem 2")
 
 

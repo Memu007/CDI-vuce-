@@ -112,6 +112,12 @@ sabotaje $G "sólo se mira el vacío como vino, no después de limpiar" \
   'if not limpio.strip():' 'if not uno[2]:' \
   "test_un_sufijo_vacio_no_se_genera[AA(   )-]" \
   "test_un_sufijo_vacio_no_se_genera[AA(--)-]"
+sabotaje $G "el error del vacío nombra el sufijo entero y no el código" \
+  '«{uno[0][:40]}» está vacío' '«{sufijo[:40]}» está vacío' \
+  "test_un_sufijo_vacio_no_se_genera[AA()-CA00-]" \
+  "test_un_sufijo_vacio_no_se_genera[AA(   )-]" \
+  "test_un_sufijo_vacio_no_se_genera[AA(DEMO)-AB()-]" \
+  "test_un_sufijo_vacio_no_se_genera[AA(--)-]"
 
 # 4. Un número que cambiaría de valor al limpiarlo no se genera.
 sabotaje $G "un número que cambiaría sale igual en un libre" \
