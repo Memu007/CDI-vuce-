@@ -360,11 +360,13 @@ SUCIO, LIMPIO = "AA(MARCA)-AI(620G-BLUE.010 150CMX50M)-", "AA(MARCA)-AI(620G BLU
 MISMO_SUFIJO = {
     "heredan": ((None, None, None), "AA(MARCA)-", "AA(MARCA)-"),
     "dos_renglones": ((None, None), "AA(MARCA)-", "AA(MARCA)-"),
+    "cuatro_renglones": ((None,) * 4, "AA(MARCA)-", "AA(MARCA)-"),
     "heredan_uno_que_se_limpia": ((None, None, None), SUCIO, LIMPIO),
     "uno_trae_el_limpio_y_el_resto_hereda": ((LIMPIO, None, None), SUCIO, LIMPIO),
     "propios_iguales": ((SUCIO, LIMPIO, SUCIO), "", LIMPIO),
     "largo": ((None, None, None), "AA(" + "X" * 100 + ")-", "AA(" + "X" * 77),
-    "propios_distintos": (("AA(A)-", "AA(B)-", "AA(A)-"), "AA(A)-", None),
+    "propios_iguales_sin_usar_el_de_la_operacion": (("AA(A)-",) * 3, "AA(OK)-AB(XXX", "AA(A)-"),
+    "solo_el_ultimo_distinto": (("AA(A)-", "AA(A)-", "AA(B)-"), "AA(A)-", None),
     "uno_propio_y_el_resto_hereda_otro": (("AA(A)-", None, None), "AA(B)-", None),
     "ninguno": ((None, None, None), "", None),
     "el_de_la_operacion_no_se_separa": ((None, None, None), "AA(OK)-AB(XXX", None),
@@ -378,7 +380,9 @@ def test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo(caso):
     for renglon, propio in zip(renglones, propios):
         if propio is not None:
             renglon["sufijo"] = propio
-    cuales = {2: "1 y 2 los 2", 3: "1, 2 y 3 los 3"}[len(propios)]
+    # El de otra posición lleva otro sufijo: el aviso mira sólo los renglones del ítem.
+    renglones.append(dict(LONA, pieza="39211390900F", sufijo="AA(OTRO)-"))
+    cuales = {2: "1 y 2 los 2", 3: "1, 2 y 3 los 3", 4: "1, 2, 3 y 4 los 4"}[len(propios)]
     avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor=de_la_operacion)
     assert [a for a in avisos if "llevan el mismo sufijo" in a] == ([] if muestra is None else [
         f"Sufijo de valor: en el ítem de los renglones {cuales} sub-ítems llevan el mismo sufijo "
