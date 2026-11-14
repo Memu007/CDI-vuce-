@@ -7,48 +7,39 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## Vencido `sabotajes/guardar2.sh`: aceptado sobre `aeb994f` (informe `279a685`) e integrado (2026-11-14 10:47 UTC)
+## D250 (a): aceptada sobre `450f4cb` (informe `01bc9df`) e integrada (2026-11-14 14:13 UTC)
 
-Acta `REPRODUCCION-SABOTAJE-GUARDAR2-2026-11-14.md`. No queda ningún vencido.
+Acta `REPRODUCCION-D250-2026-11-14.md`.
 
-- Con la copia de `aeb994f`: 11 `ROJO`, `sabotajes con falla: 0`, `rc=0`; chequeo-6 igual al
-  tuyo; anclas 0/0/0. A mano, `22 passed` sin cambio y `1 failed, 21 passed` con la condición
-  sacada, sólo su prueba.
-- Mis negativos: el guion viejo da `ROTO` y `rc=1`; con el reemplazo cambiado por una línea
-  equivalente da `VERDE … la prueba no lo vio` y `rc=1`.
-- **Riesgos 1 y 2:** aceptados, van a la cola. El 1 va como «pedir prueba o evidencia antes de
-  sacarlo»: el `.get` evita un `KeyError` si falta la clave, y que hoy siempre esté no lo
-  prueba ninguna prueba.
+- Con la copia de `450f4cb`: `61 passed`, 39 `ROJO`, `rc=0`; el guion de `5682f6e` sobre
+  `450f4cb`, 38 `ROJO`. Chequeo-6 igual al tuyo, anclas 0/0/0.
+- Mis cinco negativos dan rojo con el dato que corresponde (el sufijo cortado en 8, avisa sin
+  sufijo, avisa aunque difieran, el propio sin limpiar, avisa con uno que no se separa).
+- **Supuestos 1 a 4, riesgos 2, 4 y 5:** aceptados.
+- **Riesgo 1:** aceptado esta vez, decidido por la PM: después de `39fa7aa` sólo hay arnés y lo
+  leí. Desde hoy `/entregar` dice el SHA: `/code-review high` va hasta el SHA que entregás, y
+  un commit que nace de sus hallazgos pasa por el adversario.
+- **`.upper()`:** la cola lo tiene a propósito: «fuera de D249» no es «sin seguimiento».
+- **`SUCIO` y `LIMPIO`:** a la cola.
 
-## D249 (a): aceptada sobre `50dabfa` (informe `5682f6e`) e integrada (2026-11-14 11:44 UTC)
+## D251 (a) (2026-11-14 14:13 UTC)
 
-Acta `REPRODUCCION-D249-2026-11-14.md`.
+D251 (a), decidida por la PM. Tus cuatro verdes dan `61 passed` también en mi corrida, y el
+camino existe hoy: con los renglones A, B, A los avisos dicen «los renglones 1 y 3». La causa:
+el texto de los renglones y su cantidad salen de la lista del grupo, y las pruebas sólo usan
+renglones seguidos, dos grupos como mucho y cuatro renglones como mucho. Esa lista la usan los
+dos avisos, «van en un solo ítem» y «llevan el mismo sufijo».
 
-- Con la copia de `50dabfa`: 49 `ROJO`, `117 passed`, `rc=0`; sobre la base `279a685`, 16 sin
-  rojo (15 `VERDE` y el `ROJO?` de «pide», que la base ve con un solo dato). Mi sabotaje,
-  «cerca de» corrido en uno, da `ROJO` en `[no_se_separa_largo]`. `sabotaje_sufijos1.sh` en 46,
-  anclas 0/0/0, chequeo-6 igual al tuyo.
-- **Supuestos 1 y 2 y riesgos 1 y 3:** aceptados. El riesgo 2 (`AF(-2.5)`) va a la cola.
-- **`/code-review`:** esta vez pasa (sin producto y el SHA pasó por el adversario), decidido por
-  la PM. `/entregar` no lo exceptúa y «Ritmo y calidad» de Emi tampoco: desde D250 se corre
-  siempre, aunque sea sólo arnés.
+Criterio de D251:
+1. Los dos avisos, con su texto entero, en datos de los casos que ya existen: renglones
+   salteados, tres grupos o más y un grupo de cinco renglones o más.
+2. La tabla de renglones del caso del mismo sufijo no se escribe a mano: con cinco renglones
+   no da `KeyError`.
+3. Tus cuatro mutaciones van a `sabotaje_maria8.sh` y dan `ROJO` con un dato nombrado.
+4. El guion entero en `ROJO` con la cuenta exacta; las anclas no empeoran; `/code-review
+   high` hasta el SHA que entregás.
 
-## D250 (a) (2026-11-14 10:26 UTC)
-
-D250 (a), decidida por la PM. Medí tu mutación de `maria_generator.py:2235`: los 27
-archivos siguen en `1126 passed`, y `-k 'sufijo or maria'` sobre `tests/` también queda verde.
-Y cambia lo que se ve: con un sufijo de la operación que se limpia, el aviso muestra el sucio;
-si un renglón trae como propio el limpio y los otros heredan, el aviso no sale; con uno que no
-se separa, sale además del error. Va después de D249.
-
-Criterio de D250:
-1. La familia de entradas del aviso «los N sub-ítems llevan el mismo sufijo», como datos de un
-   solo caso: el texto que muestra, cuándo sale y cuándo no.
-2. Tu sabotaje de la línea 2235 en `sabotaje_maria8.sh` da `ROJO` con una prueba nombrada.
-3. `sabotaje_maria8.sh` entero en `ROJO`, con la cuenta exacta.
-4. Las anclas no empeoran.
-
-**Cómo sigue:** D250 (a).
+**Cómo sigue:** D251 (a).
 
 D244 y D239 esperan a Emi:
 - Si dice que sí a D244, te la escribo con su criterio.
@@ -56,7 +47,7 @@ D244 y D239 esperan a Emi:
   el nombre de otro país («434 BELGICA» guarda `BE` sin avisar).
 - Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
 
-**Próxima D: D251.**
+**Próxima D: D252.**
 
 ## Vencidos `sabotaje_valor1b.sh` y `sabotaje_doc1.py`: aceptados sobre `70eb5dc` y `d4c6b73` (informes `a926930` y `f3a7d29`) e integrados (2026-11-14 09:56 UTC)
 
