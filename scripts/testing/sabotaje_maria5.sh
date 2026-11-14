@@ -190,7 +190,7 @@ reemplazar $X "    if aviso:" "    if False:"
 caso lector_sin_aviso "${D}test_si_no_coinciden_gana_el_de_la_linea_con_aviso[pymupdf]"
 
 # 26. el aviso del lector no llega a la pantalla
-reemplazar $M "        avisos = operacion_data.pop('avisos_peso', []) if isinstance(operacion_data, dict) else []" "        avisos = []"
+reemplazar $M "operacion_data.pop('avisos_peso', [])" "[]"
 caso aviso_del_lector_perdido "${D}test_el_aviso_del_lector_llega_a_la_pantalla"
 
 # 27. Excel: el total le gana al neto
@@ -224,7 +224,7 @@ reemplazar $G "    if round(kilos, 3) <= 0:" "    if kilos < 0:"
 caso peso_sin_guarda "${D}test_un_peso_imposible_no_llega_al_txt["
 
 # 33. la guarda existe pero el TXT no la usa
-reemplazar $G 'QARTKGRNET={peso_valido(peso_kg, idx):.3f}' 'QARTKGRNET={peso_kg:.3f}'
+reemplazar $G 'peso_valido(peso_kg, lugar_en_el_pedido.get(id(item), idx))' 'peso_kg'
 caso guarda_sin_usar "${D}test_un_peso_imposible_no_llega_al_txt["
 
 # 34. sin tope en el peso
