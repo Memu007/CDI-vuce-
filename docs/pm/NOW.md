@@ -272,7 +272,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-14 11:44 UTC: D249 (a) aceptada sobre 50dabfa e integrada (acta REPRODUCCION-D249-2026-11-14); /code-review pasó esta vez; desde D250 se corre siempre, aunque sea sólo arnés. MARIA sigue con D250 (a) (ya subió 0c836bc). Después de compactar, MARIA arranca en ~124k (umbral 184k) y la Técnica en ~110k (umbral 144k, ~34k de margen): avanzan, no es bucle; el margen de la Técnica va a Emi desde las 12 UTC. used_tokens de get_session de MARIA puede estar viejo: medir con list_events. Técnica quieta, espera a Emi. run6 sigue.
+2026-11-14 11:44 UTC: D249 (a) aceptada sobre 50dabfa e integrada (acta REPRODUCCION-D249-2026-11-14); /code-review pasó esta vez; desde D250 se corre siempre, aunque sea sólo arnés. MARIA sigue con D250 (a) (ya subió 0c836bc; a las 11:56, sin entrega nueva y trabajando). Después de compactar, MARIA arranca en ~124k (umbral 184k) y la Técnica en ~110k (umbral 144k, ~34k de margen): avanzan, no es bucle; el margen de la Técnica va a Emi desde las 12 UTC. used_tokens de get_session de MARIA puede estar viejo: medir con list_events. Técnica quieta, espera a Emi. run6 sigue.
 
 ## /compact conservar de la PM principal
 
