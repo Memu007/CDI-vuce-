@@ -348,10 +348,53 @@ def test_kilos_de_un_renglon_que_al_centesimo_dan_cero_no_se_generan():
 # -------------------------------------------------------- avisos y pantalla
 
 
-def test_los_avisos_dicen_que_renglones_van_juntos():
-    renglones = _lonas()[:3] + [dict(LONA, pieza="39211390900F")]
+def _dichos(numeros):
+    """Los renglones como los dice un aviso: «1, 2 y 3»."""
+    *antes, ultimo = (str(n) for n in numeros)
+    return f"{', '.join(antes)} y {ultimo}"
+
+
+def _aviso_de_que_van_juntos(cuales, cuantos):
+    return (f"Sub-ítems: los renglones {cuales} van en un solo ítem con {cuantos} sub-ítems "
+            "(misma posición SIM, origen, procedencia y estado).")
+
+
+def _aviso_del_mismo_sufijo(cuales, cuantos, sufijo):
+    return (f"Sufijo de valor: en el ítem de los renglones {cuales} los {cuantos} sub-ítems llevan "
+            f"el mismo sufijo («{sufijo}»). Si cada renglón lleva el suyo (marca, modelo, color), cargalo en "
+            "«Sufijo de valor» de cada producto, en «Lo que decide el despachante».")
+
+
+def _de_los_items(avisos):
+    """Los dos avisos de cada ítem de varios renglones, en el orden en que salen."""
+    return [a for a in avisos if a.startswith("Sub-ítems:") or "llevan el mismo sufijo" in a]
+
+
+POSICIONES = {"A": LONA["pieza"], "B": "39211390900F", "C": "39211200900X"}
+# caso: (la posición de cada renglón, los renglones que los avisos dicen de cada ítem de varios,
+# las posiciones en las que cada renglón lleva su sufijo: de esas no sale el aviso del mismo sufijo)
+JUNTOS = {
+    "seguidos": ("AAAB", {"A": "1, 2 y 3"}, ""),
+    "salteados": ("ABA", {"A": "1 y 3"}, ""),
+    "tres_items": ("ABCCAB", {"A": "1 y 5", "B": "2 y 6", "C": "3 y 4"}, ""),
+    "doce_renglones": ("A" * 12, {"A": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 y 12"}, ""),
+    "cada_renglon_su_sufijo": ("ABAB", {"A": "1 y 3", "B": "2 y 4"}, "B"),
+}
+
+
+@pytest.mark.parametrize("caso", JUNTOS)
+def test_los_avisos_dicen_que_renglones_van_juntos(caso):
+    posiciones, juntos, con_el_suyo = JUNTOS[caso]
+    # Cada posición lleva su sufijo: el renglón de otro ítem que queda en el medio no cuenta.
+    renglones = [dict(LONA, pieza=POSICIONES[letra], sufijo=f"AA({letra}{n if letra in con_el_suyo else ''})-")
+                 for n, letra in enumerate(posiciones)]
     avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor="AA(X)-")
-    assert any("renglones 1, 2 y 3 van en un solo ítem con 3 sub-ítems" in a for a in avisos)
+    # De cada ítem sale el aviso de los sub-ítems y, pegado, el del sufijo si llevan todos el mismo.
+    assert _de_los_items(avisos) == [
+        aviso for letra, cuales in juntos.items() for aviso in (
+            _aviso_de_que_van_juntos(cuales, posiciones.count(letra)),
+            *([] if letra in con_el_suyo else [
+                _aviso_del_mismo_sufijo(cuales, posiciones.count(letra), f"AA({letra})-")]))]
 
 
 SUCIO, LIMPIO = "AA(MARCA)-AI(620G-BLUE.010 150CMX50M)-", "AA(MARCA)-AI(620G BLUE 010 150CMX50M)-"
@@ -361,7 +404,7 @@ MISMO_SUFIJO = {
     "heredan": ((None, None, None), "AA(MARCA)-", "AA(MARCA)-"),
     "propios_vacios_heredan": (("", " ", None), "AA(MARCA)-", "AA(MARCA)-"),
     "dos_renglones": ((None, None), "AA(MARCA)-", "AA(MARCA)-"),
-    "cuatro_renglones": ((None,) * 4, "AA(MARCA)-", "AA(MARCA)-"),
+    "cinco_renglones": ((None,) * 5, "AA(MARCA)-", "AA(MARCA)-"),
     "heredan_uno_que_se_limpia": ((None, None, None), SUCIO, LIMPIO),
     "uno_trae_el_limpio_y_el_resto_hereda": ((LIMPIO, None, None), SUCIO, LIMPIO),
     "propios_iguales": ((SUCIO, LIMPIO, SUCIO), "", LIMPIO),
@@ -369,6 +412,10 @@ MISMO_SUFIJO = {
     "largo": ((None, None, None), "AA(" + "X" * 100 + ")-", "AA(" + "X" * 77),
     "propios_iguales_sin_usar_el_de_la_operacion": (("AA(A)-",) * 3, "AA(OK)-AB(XXX", "AA(A)-"),
     "solo_el_ultimo_distinto": (("AA(A)-", "AA(A)-", "AA(B)-"), "AA(A)-", None),
+    # De doce renglones, uno solo distinto, en cada puesto: se comparan los doce.
+    **{f"de_doce_solo_el_{puesto}_distinto": (
+        ("AA(A)-",) * (puesto - 1) + ("AA(B)-",) + ("AA(A)-",) * (12 - puesto), "AA(A)-", None)
+       for puesto in range(1, 13)},
     "uno_propio_y_el_resto_hereda_otro": (("AA(A)-", None, None), "AA(B)-", None),
     "uno_propio_y_el_resto_ninguno": (("AA(A)-", None, None), "", None),
     "ninguno": ((None, None, None), "", None),
@@ -387,15 +434,15 @@ def test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo(caso):
     # Después va otro ítem, de tres renglones y un solo sufijo: su aviso sale siempre y
     # segundo, tenga o no el suyo el ítem de antes y aunque los dos lleven el mismo sufijo.
     renglones += [dict(LONA, pieza="39211390900F", sufijo="AA(MARCA)-") for _ in range(3)]
-    suyos, del_otro = {2: ("1 y 2", "3, 4 y 5"), 3: ("1, 2 y 3", "4, 5 y 6"),
-                       4: ("1, 2, 3 y 4", "5, 6 y 7")}[len(propios)]
-    esperados = ([] if muestra is None else [(suyos, len(propios), muestra)]) + [(del_otro, 3, "AA(MARCA)-")]
+    n = len(propios)
+    este, el_otro = _dichos(range(1, n + 1)), _dichos(range(n + 1, n + 4))
     avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor=de_la_operacion)
-    assert [a for a in avisos if "llevan el mismo sufijo" in a] == [
-        f"Sufijo de valor: en el ítem de los renglones {cuales} los {cuantos} sub-ítems llevan "
-        f"el mismo sufijo («{sufijo}»). Si cada renglón lleva el suyo (marca, modelo, color), cargalo en "
-        "«Sufijo de valor» de cada producto, en «Lo que decide el despachante»."
-        for cuales, cuantos, sufijo in esperados]
+    # El de los sub-ítems sale de los dos ítems y en su lugar, lleven el sufijo que lleven.
+    assert _de_los_items(avisos) == [
+        _aviso_de_que_van_juntos(este, n),
+        *([] if muestra is None else [_aviso_del_mismo_sufijo(este, n, muestra)]),
+        _aviso_de_que_van_juntos(el_otro, 3),
+        _aviso_del_mismo_sufijo(el_otro, 3, "AA(MARCA)-")]
 
 
 def test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon():

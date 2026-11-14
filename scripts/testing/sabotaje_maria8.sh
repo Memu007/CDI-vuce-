@@ -169,7 +169,8 @@ caso "negativos" "FAILED $T::test_kilos_que_al_restar_quedarian_negativos_no_se_
 reemplazar $F '    for ns in juntos:
         cuales' '    for ns in []:
         cuales'
-caso "sin_aviso_juntos" "FAILED $T::test_los_avisos_dicen_que_renglones_van_juntos"
+JUNTOS="FAILED $T::test_los_avisos_dicen_que_renglones_van_juntos"
+caso "sin_aviso_juntos" "$JUNTOS[seguidos]" "$JUNTOS[doce_renglones]"
 
 # 24. no avisa que todos los sub-ítems llevan el mismo sufijo
 reemplazar $F '        if len(de_cada_uno) == 1 and "" not in de_cada_uno:' '        if False:'
@@ -241,5 +242,21 @@ reemplazar $F '                or limpiar_sufijo(str(sbt_sufijo_valor or "").str
 caso "aviso_operacion_sin_limpiar" "$MISMO[heredan_uno_que_se_limpia]" \
   "$MISMO[uno_trae_el_limpio_y_el_resto_hereda]" "$MISMO[el_de_la_operacion_no_se_separa]"
 
+# 40. los avisos dicen los renglones de corrido, del primero al último del ítem
+reemplazar $F '        cuales = _enumerar([n + 1 for n in ns])' '        cuales = _enumerar(list(range(ns[0] + 1, ns[-1] + 2)))'
+caso "renglones_de_corrido" "$JUNTOS[salteados]" "$JUNTOS[tres_items]"
+
+# 41. el aviso del mismo sufijo cuenta del primer renglón al último del ítem
+reemplazar $F 'los {len(ns)} sub-ítems "' 'los {ns[-1] - ns[0] + 1} sub-ítems "'
+caso "cuenta_por_extremos" "$JUNTOS[salteados]" "$JUNTOS[tres_items]"
+
+# 42. los avisos salen sólo para los dos primeros ítems
+reemplazar $F '    for ns in juntos:' '    for ns in juntos[:2]:'
+caso "tope_dos_items" "$JUNTOS[tres_items]"
+
+# 43. los avisos nombran sólo los cuatro primeros renglones del ítem
+reemplazar $F '        cuales = _enumerar([n + 1 for n in ns])' '        cuales = _enumerar([n + 1 for n in ns[:4]])'
+caso "renglones_tope_4" "$JUNTOS[doce_renglones]" "$MISMO[cinco_renglones]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 39 sabotajes dan rojo por la razón esperada"
+echo "OK: los 43 sabotajes dan rojo por la razón esperada"
