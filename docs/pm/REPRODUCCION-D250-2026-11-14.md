@@ -6,7 +6,7 @@ Entrega `450f4cb` (informe `01bc9df`, canal `PARA-PM-2.md`). Base `5682f6e`. Só
 vecino de tres renglones) y `scripts/testing/sabotaje_maria8.sh` (de 38 a 39 sabotajes).
 Veredicto: **aceptada sobre `450f4cb`**.
 
-## Corrido por la PM (2026-11-14, entre 13:58 y 14:15 UTC)
+## Corrido por la PM (2026-11-14, entre 13:58 y 14:20 UTC)
 
 Las corridas se superpusieron con `run7` de fondo (suite entera sobre `fc5944fc`).
 
@@ -16,7 +16,7 @@ Las corridas se superpusieron con `run7` de fondo (suite entera sobre `fc5944fc`
 | unión `450f4cb..01bc9df` y `450f4cb..origin/claude/dev-maria` fuera de `docs/pm` | vacías |
 | copia del guion de `450f4cb` | `61 passed` sin sabotaje; `OK: los 39 sabotajes dan rojo por la razón esperada`, `rc=0` |
 | guion de `5682f6e` sobre `450f4cb` | `OK: los 38 sabotajes…`, `rc=0`: nada de lo viejo se rompió |
-| guion de `450f4cb` sobre la base `5682f6e` | ver «Guion nuevo sobre la base» |
+| guion de `450f4cb` sobre la base `5682f6e` | 37 `ROJO`, 2 `FALLA` (los dos de D250), `rc=1`: ver abajo |
 | `anclas_perdidas.py 450f4cb` | 103 guiones, 2510 anclas, 11 sin medir; 0, 0 y 0 |
 
 Negativos míos, en un worktree de `450f4cb`, sobre el archivo de la prueba (`61 passed` sin cambio):
@@ -31,7 +31,10 @@ Negativos míos, en un worktree de `450f4cb`, sobre el archivo de la prueba (`61
 
 ## Guion nuevo sobre la base
 
-El guion de `450f4cb` sobre `5682f6e` todavía corre; su cuenta entra en el commit siguiente.
+El guion de `450f4cb` sobre `5682f6e` (las pruebas viejas, `46 passed` sin sabotaje): 37 `ROJO`,
+2 `FALLA`, `rc=1`. Fallan justo los dos que D250 tocó: `sin_aviso_sufijo` da rojo pero sin los
+datos nombrados `[heredan]` y `[propios_iguales]`, y `aviso_operacion_sin_limpiar` queda verde.
+Lo que los atrapa es el arnés nuevo, no algo que ya estaba.
 
 ## D251: los cuatro verdes, reproducidos
 
