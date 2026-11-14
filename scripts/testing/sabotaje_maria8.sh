@@ -333,5 +333,9 @@ caso "items_solos_al_reves" "$LIMPIO[seguidos]"
 reemplazar $F 'usa_el_general = usa_el_sufijo_de_la_operacion(items)' 'usa_el_general = usa_el_sufijo_de_la_operacion(items[:-1])'
 caso "sin_mirar_el_ultimo_renglon" "$LIMPIO[el_ultimo_usa_el_de_la_operacion]"
 
+# 60. el último renglón del pedido, que va solo y trae su sufijo, se queda sin su aviso
+reemplazar $F '        for idx, item in enumerate(items or [], start=1):' '        for idx, item in enumerate((items or [])[:-1], start=1):'
+caso "sin_avisar_el_ultimo_renglon" "$LIMPIO[seguidos]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 59 sabotajes dan rojo por la razón esperada"
+echo "OK: los 60 sabotajes dan rojo por la razón esperada"

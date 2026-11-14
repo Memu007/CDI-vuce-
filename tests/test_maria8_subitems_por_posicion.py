@@ -458,10 +458,12 @@ def _aviso_de_que_falta_el_codigo(donde):
 # caso: (la posición de cada renglón, en minúscula si va en un grupo a mano; cómo nombran los
 # avisos a cada renglón, en su orden. Fuera de un grupo, el que no está no trae sufijo)
 SE_LIMPIO = {
-    # El 1 y el 2 van solos y se avisan en su orden; el 5 y el 6 usan el sufijo de la operación.
-    "seguidos": ("BCAAAA", {1: "ítem 1", 2: "ítem 2", 3: "renglón 3", 4: "renglón 4"}),
-    # Sólo el último renglón del pedido usa el sufijo de la operación.
-    "el_ultimo_usa_el_de_la_operacion": ("BC", {1: "ítem 1"}),
+    # El 3 y el 4 usan el sufijo de la operación; el 5 y el 6, los últimos, van solos y se avisan
+    # en su orden.
+    "seguidos": ("AAAABC", {5: "ítem 5", 6: "ítem 6", 1: "renglón 1", 2: "renglón 2"}),
+    # Sólo el último renglón del pedido usa el sufijo de la operación, que se avisa antes que el
+    # de un grupo.
+    "el_ultimo_usa_el_de_la_operacion": ("aC", {1: "grupo ga"}),
     # El ítem tiene seis renglones; el 3 y el 6, de otras posiciones, quedan en el medio, y el 6
     # usa el sufijo de la operación.
     "salteados": ("AABAACAA", {3: "ítem 3", 1: "renglón 1", 2: "renglón 2", 4: "renglón 4",
