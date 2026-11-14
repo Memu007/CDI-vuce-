@@ -25,8 +25,10 @@ comandos.
   quién los corre»). Lo que encuentren lo reproducís; el informe lleva la tabla de hallazgos con
   modelo y esfuerzo de cada uno.
 - **`/code-review`:** corré `/code-review high` sobre lo que cambió
-  la rama desde la base hasta el SHA que entregás, aunque sea sólo arnés. Un commit que nace
-  de sus hallazgos pasa por el adversario; el informe dice sobre qué SHA corrió cada uno. Lo confirmado, de acá o de los subagentes, se
+  la rama desde la base hasta el SHA que entregás, aunque sea sólo arnés: si después sumás
+  commits, otra vez hasta el nuevo. Un commit que nace de sus hallazgos pasa por el
+  adversario; el informe dice sobre qué SHA corrió cada uno. Lo confirmado, de acá o de los
+  subagentes, se
   arregla con su rojo antes si está dentro de la tarea y tiene camino de hoy
   («Código de producto sólo con camino de hoy» en `ONBOARDING-PM.md`). Lo
   demás va al informe como riesgo, con su severidad. Si la pieza toca

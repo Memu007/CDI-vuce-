@@ -7,39 +7,46 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## D250 (a): aceptada sobre `450f4cb` (informe `01bc9df`) e integrada (2026-11-14 14:13 UTC)
+## D251 (a): aceptada sobre `9d580db` (informe `7a3c594`) e integrada (2026-11-14 17:45 UTC)
 
-Acta `REPRODUCCION-D250-2026-11-14.md`.
+Acta `REPRODUCCION-D251-2026-11-14.md`.
 
-- Con la copia de `450f4cb`: `61 passed`, 39 `ROJO`, `rc=0`; el guion de `5682f6e` sobre
-  `450f4cb`, 38 `ROJO`. Chequeo-6 igual al tuyo, anclas 0/0/0.
-- Mis cinco negativos dan rojo con el dato que corresponde (el sufijo cortado en 8, avisa sin
-  sufijo, avisa aunque difieran, el propio sin limpiar, avisa con uno que no se separa).
-- **Supuestos 1 a 4, riesgos 2, 4 y 5:** aceptados.
-- **Riesgo 1:** aceptado esta vez, decidido por la PM: después de `39fa7aa` sólo hay arnés y lo
-  leí. Desde hoy `/entregar` dice el SHA: `/code-review high` va hasta el SHA que entregás, y
-  un commit que nace de sus hallazgos pasa por el adversario.
-- **`.upper()`:** la cola lo tiene a propósito: «fuera de D249» no es «sin seguimiento».
-- **`SUCIO` y `LIMPIO`:** a la cola.
+- Con la copia de `9d580db`: 43 `ROJO`, 0 `FALLA`, `rc=0`; el guion de `01bc9df` sobre `9d580db`,
+  39 `ROJO`, `rc=0`. Chequeo-6 igual al tuyo, anclas 0/0/0.
+- Mi negativo de la familia: `:2225` armado con el primero y la cantidad
+  (`range(ns[0] + 1, ns[0] + 1 + len(ns))`) da `3 failed` con tu prueba y `61 passed` con la
+  de `01bc9df`. Otros dos (los renglones al revés, el sufijo de la operación por encima del
+  propio) ya daban rojo con la prueba vieja.
+- **Supuestos 1 a 7 y riesgos 1 a 5:** aceptados. **Riesgo 6:** pregunta para el
+  despachante, queda en el acta; no es pieza.
+- **D253 (a)** y **D254 (a)**, decididas por la PM: quedan como límite escrito en el acta.
+- **`SKILL.md:28`:** ahora dice que `/code-review` corre otra vez si sumás commits. **Las dos
+  líneas de la cola** van como las propusiste. **`NOW.md`, la línea `conservar`:** corregida.
 
-## D251 (a) (2026-11-14 14:13 UTC)
+## D252 (a) (2026-11-14 17:45 UTC)
 
-D251 (a), decidida por la PM. Tus cuatro verdes dan `61 passed` también en mi corrida, y el
-camino existe hoy: con los renglones A, B, A los avisos dicen «los renglones 1 y 3». La causa:
-el texto de los renglones y su cantidad salen de la lista del grupo, y las pruebas sólo usan
-renglones seguidos, dos grupos como mucho y cuatro renglones como mucho. Esa lista la usan los
-dos avisos, «van en un solo ítem» y «llevan el mismo sufijo».
+D252 (a), decidida por la PM. El camino existe hoy y lo medí sobre `9d580db`: tus filas 22,
+34, 35, 36 y 37 dan `77 passed`. El aviso de cada renglón (`:2230-2231`) le dice al
+despachante qué producto corregir, y con `del renglón {ns.index(n) + 1}` diría otro número
+sin que ninguna prueba se entere. La causa es la misma de D251: las pruebas de esos avisos
+sólo usan dos renglones seguidos, y ningún renglón que va solo queda entre dos que van juntos.
 
-Criterio de D251:
-1. Los dos avisos, con su texto entero, en datos de los casos que ya existen: renglones
-   salteados, tres grupos o más y un grupo de cinco renglones o más.
-2. La tabla de renglones del caso del mismo sufijo no se escribe a mano: con cinco renglones
-   no da `KeyError`.
-3. Tus cuatro mutaciones van a `sabotaje_maria8.sh` y dan `ROJO` con un dato nombrado.
-4. El guion entero en `ROJO` con la cuenta exacta; las anclas no empeoran; `/code-review
-   high` hasta el SHA que entregás.
+Criterio de D252: la familia, no un ejemplo.
+1. El aviso de cada renglón de un ítem de renglones salteados, con su texto entero, desde el
+   primero, uno del medio y el último del ítem, en un ítem más largo que cualquier tope (cinco
+   renglones o más), y con un renglón que va solo entre medio y tiene su propio aviso.
+2. Un renglón que va solo, entre dos que van juntos, conserva sus avisos propios. Son dos
+   datos: uno sin grupo, con su sufijo mal escrito (su aviso nombra su ítem), y uno con grupo,
+   que en los avisos de sufijo y de arancel se nombra por su grupo. Un renglón con grupo nunca
+   entra en `renglones_por_posicion` (`:972`), así que puede quedar entre dos que van juntos:
+   es la entrada que distingue `:2187` y `:1953`. Si ninguna entrada distingue `:1953`, lo
+   decís con la medición y va como D.
+3. Datos de los casos que ya existen, no casos nuevos por cada fila.
+4. Tus filas 22, 34 a 37 y 52 a 54 van a `sabotaje_maria8.sh` y dan `ROJO` con un dato
+   nombrado; el guion entero en `ROJO` con la cuenta exacta; las anclas no empeoran;
+   `/code-review high` hasta el SHA que entregás.
 
-**Cómo sigue:** D251 (a).
+**Cómo sigue:** D252 (a).
 
 D244 y D239 esperan a Emi:
 - Si dice que sí a D244, te la escribo con su criterio.
@@ -47,7 +54,11 @@ D244 y D239 esperan a Emi:
   el nombre de otro país («434 BELGICA» guarda `BE` sin avisar).
 - Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
 
-**Próxima D: D252.**
+**Próxima D: D255.**
+
+## D250 (a): aceptada sobre `450f4cb` (informe `01bc9df`) e integrada (2026-11-14 14:13 UTC)
+
+Acta `REPRODUCCION-D250-2026-11-14.md`.
 
 ## Vencidos `sabotaje_valor1b.sh` y `sabotaje_doc1.py`: aceptados sobre `70eb5dc` y `d4c6b73` (informes `a926930` y `f3a7d29`) e integrados (2026-11-14 09:56 UTC)
 
