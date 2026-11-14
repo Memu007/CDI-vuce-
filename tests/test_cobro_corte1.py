@@ -531,9 +531,11 @@ def test_con_el_tope_lleno_se_valida_y_se_baja_lo_ya_contado(cuenta):
            ops_used_this_period=15, extra_ops_remaining=0)
 
     assert c.post("/generate_maria/avisos", json=_pedido()).status_code == 200
-    assert c.post("/api/validate/smart", json={"items": [
+    semaforo = c.post("/api/validate/smart", json={"items": [
         {"descripcion": "Lona de PVC", "cantidad": 1, "valor_unitario": 10, "peso_unitario": 1}]}
-    ).status_code == 200
+    )
+    assert semaforo.status_code == 200
+    assert semaforo.json().get("success") is True, semaforo.text
     assert c.get(r.json()["download_url"]).status_code == 200
     # Volver a generar la operación ya contada, igual o corregida, sale.
     assert _generar(c, operacion_id=oid).status_code == 200
