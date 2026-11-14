@@ -7,39 +7,39 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## D237 (a): aceptada sobre `346a1c9` (informe `73f8db7`) e integrada (2026-11-13 22:55 UTC)
+## D238 (a): aceptada sobre `80cd954` (informe `3dc9908`) e integrada (2026-11-13 23:50 UTC)
 
-Acta `REPRODUCCION-D237-2026-11-13.md`. Reproduje tu rojo de la base con tu forzador
-(avisos 401 a 648 ms de la salida), tu verde de `346a1c9`, el rojo sin la espera,
-`orden1b.sh` (30 ROJO, «sabotajes sin rojo: 0») y `orden1` entero (rc=0, 71 OK).
-chequeo-6 igual al tuyo. La unión con mi rama no cambia nada fuera de `docs/pm`.
+Acta `REPRODUCCION-D238-2026-11-13.md`. Reproduje `sufijo_otra1` verde en `80cd954` y
+rojo con `finalize.js` de la base, `sufijo_borrador1` y `maria9` verdes, los 13 pytest
+que leen `finalize.js` (`690 passed`; con la base, el rojo de `[sufijo]`) y
+`e2e_maria.sh` OK. chequeo-6 igual al tuyo; la unión no cambia nada fuera de `docs/pm`.
 
-Un negativo mío cubre tu segundo «no demostré»: tu mismo forzador sobre
-`**/api/validate/smart`. Con 1 s no distingue (la base termina antes de salir); con
-3 s, la base da rojo (`POST /api/validate/smart 401` a 125 ms de la salida) y
-`346a1c9` verde. La espera cubre las validaciones.
+Tres negativos míos: volver a «Validación» después de poner el aviso da 2 rojas
+(`maria9`, `sufijo_borrador1`); escuchar `change` en vez de `input` da rojo en
+`sufijo_otra1`. El tercero no distingue: si `pintarSufijo` esconde el aviso sólo cuando
+el campo entra vacío, `sufijo_otra1` sigue verde, porque el caso sólo prueba la
+siguiente operación sin sufijo. El producto está bien (esconde sin condición); el
+hueco es del caso.
 
-- **D241: (b), decidido por la PM.** Es espera del arnés, no control de producto.
-- **Supuestos:** acepto los seis. Del 4 comprobé que el campo lo siguen escribiendo
-  `generar()` (casos que leen el TXT) y `listaParaGenerar()` (z20, z23).
-- **«Lo que no demostré»:** las cantidades (1), lo frágil de las cantidades con una
-  quinta petición (3) y la barra de arriba (4) quedan como riesgos aceptados por la PM.
-  La mitad de las validaciones (2) ya no: la cubre mi negativo. El caso al revés (5)
-  queda sin prueba; en la base forzada, después del 401 la pestaña va al login y no
-  sale ningún `POST /generate_maria`.
-- Tus tres líneas de limpieza (un ayudante para los tres forzadores, el sufijo escrito
-  en tres lugares, dos formas de dejar lista una operación) van a `COLA-LIMPIEZA.md`.
+- **D242: (a), decidido por la PM.** El servidor vuelve a decir el motivo en el
+  próximo «Generar», y es reversible.
+- **Supuestos:** acepto los tres.
+- **Riesgos:** aceptados por la PM tal como los escribiste.
+- **Lo que se suma:** a `sufijo_otra1`, como dato del mismo caso, la siguiente
+  operación con su propio sufijo guardado: entra sin el aviso de la anterior y con su
+  sufijo en el campo. Va con la pieza de `sabotaje_sufijos1.sh` (punto 2 de abajo),
+  no dentro de CUIT-GENERAR. Su rojo: el tercer negativo de arriba.
 
-**Cómo sigue:** 1) D238 (a): el aviso del sufijo SBT no queda a la vista de una
-operación a otra; 2) CUIT-GENERAR (D235 a), producto con datos, con revisión fuerte
-(§3: suite completa, `/security-review` y `ataque_aislamiento.sh`); 3) los vencidos
+**Cómo sigue:** 1) CUIT-GENERAR (D235 a), producto con datos, con revisión fuerte
+(§3: suite completa, `/security-review` y `ataque_aislamiento.sh`); 2) los vencidos
 de `sabotajes-conocidos.txt`, uno por pieza, primero `sabotaje_subitems1.sh` y
-`sabotaje_sufijos1.sh`. D239 sigue esperando a Emi; si dice que sí a (a), entra
-después de D238 (a) y lleva adentro, como datos de un caso, el de un código sin
-sigla con el nombre de otro país («434 BELGICA» guarda `BE` sin avisar). Si Emi dice
-que «Holanda» también es 423, es una pieza chica aparte.
+`sabotaje_sufijos1.sh` (este con lo que se suma de arriba). D239 sigue esperando a
+Emi; si dice que sí a (a), entra después de CUIT-GENERAR y lleva adentro, como datos
+de un caso, el de un código sin sigla con el nombre de otro país («434 BELGICA»
+guarda `BE` sin avisar). Si Emi dice que «Holanda» también es 423, es una pieza
+chica aparte.
 
-**Próxima D: D242.**
+**Próxima D: D243.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
