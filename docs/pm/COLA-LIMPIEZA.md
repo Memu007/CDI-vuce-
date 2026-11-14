@@ -286,3 +286,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `scripts/testing/sabotaje_maria7.sh`: las anclas de los casos 16, 24 y 25 llevan un
   comentario del producto; el `25` del último `echo` está escrito a mano; el venv por
   defecto (`/tmp/cdi-dev2/venv`) es de otra máquina. Lo vio la Dev MARIA.
+- `proyecto_maria/main.py:10176`: `not del_proveedor.get("producto_key")` no lo distingue
+  ninguna prueba (sacarlo deja verde todo lo que usa la clave). El `.get` evita un `KeyError`
+  si falta la clave: pedir una prueba o evidencia antes de sacarlo. Lo vio la Dev MARIA.
+- `scripts/testing/sabotajes/guardar2.sh`: el final dice `sabotajes con falla: N` y no
+  cuántos corrieron; si se borra uno, sigue dando 0. Lo vio la Dev MARIA.

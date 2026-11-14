@@ -7,21 +7,26 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## Vencido `sabotaje_maria7.sh`: aceptado sobre `4477ae3` (informe `0260962`) e integrado; D250 (a) (2026-11-14 10:26 UTC)
+## Vencido `sabotajes/guardar2.sh`: aceptado sobre `aeb994f` (informe `279a685`) e integrado (2026-11-14 10:47 UTC)
 
-Acta `REPRODUCCION-SABOTAJE-MARIA7-2026-11-14.md`. El SHA final pasó por revisor: bien.
+Acta `REPRODUCCION-SABOTAJE-GUARDAR2-2026-11-14.md`. No queda ningún vencido.
 
-- Con la copia de `4477ae3`: 25 `ROJO`, 0 `FALLA`, `rc=0`; caso 6 con `1 failed, 122 passed`;
-  chequeo-6 igual al tuyo; anclas 1/0/0; queda 1 vencido.
-- Mis negativos: el guion viejo da `PATRON NO ENCONTRADO (0 veces)`; con el caso 6 cambiando
-  sólo el texto de `donde` (sigue limpiando) da `FALLA … quedó verde`.
-- **Riesgos 1 a 4:** aceptados; tu línea va a la cola de limpieza.
+- Con la copia de `aeb994f`: 11 `ROJO`, `sabotajes con falla: 0`, `rc=0`; chequeo-6 igual al
+  tuyo; anclas 0/0/0. A mano, `22 passed` sin cambio y `1 failed, 21 passed` con la condición
+  sacada, sólo su prueba.
+- Mis negativos: el guion viejo da `ROTO` y `rc=1`; con el reemplazo cambiado por una línea
+  equivalente da `VERDE … la prueba no lo vio` y `rc=1`.
+- **Riesgos 1 y 2:** aceptados, van a la cola. El 1 va como «pedir prueba o evidencia antes de
+  sacarlo»: el `.get` evita un `KeyError` si falta la clave, y que hoy siempre esté no lo
+  prueba ninguna prueba.
 
-**D250: (a), decidida por la PM.** Medí tu mutación de `maria_generator.py:2235`: los 27
+## D250 (a) (2026-11-14 10:26 UTC)
+
+D250 (a), decidida por la PM. Medí tu mutación de `maria_generator.py:2235`: los 27
 archivos siguen en `1126 passed`, y `-k 'sufijo or maria'` sobre `tests/` también queda verde.
 Y cambia lo que se ve: con un sufijo de la operación que se limpia, el aviso muestra el sucio;
 si un renglón trae como propio el limpio y los otros heredan, el aviso no sale; con uno que no
-se separa, sale además del error. Va después de `guardar2.sh` y D249.
+se separa, sale además del error. Va después de D249.
 
 Criterio de D250:
 1. La familia de entradas del aviso «los N sub-ítems llevan el mismo sufijo», como datos de un
@@ -31,9 +36,8 @@ Criterio de D250:
 4. Las anclas no empeoran.
 
 **Cómo sigue:**
-1. El último vencido, `guardar2.sh`.
-2. D249 (a), con el criterio de la sección D247 de abajo.
-3. D250 (a).
+1. D249 (a), con el criterio de la sección D247 de abajo.
+2. D250 (a).
 
 D244 y D239 esperan a Emi:
 - Si dice que sí a D244, te la escribo con su criterio.
