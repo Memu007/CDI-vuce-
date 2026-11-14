@@ -301,5 +301,12 @@ reemplazar $G '    if not math.isfinite(kilos):
         raise ValueError(f"Item {donde}: el peso «{str(peso)[:20]}» no es un número válido.")' '    pass'
 caso nan_sin_mensaje "${E}test_los_mensajes_del_peso_dicen_la_razon["
 
+# 50. los avisos antes de generar salen sin los supuestos: lo que falta en la
+# carátula sólo se avisa al generar
+reemplazar $M "
+    supuestos = _supuestos_maria(request, items, gastos)" "
+    supuestos = []"
+caso previos_sin_supuestos "${T}caratula_vacia.py::test_los_avisos_antes_de_generar_tambien["
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 49 sabotajes dan rojo por la razón esperada"
+echo "OK: los 50 sabotajes dan rojo por la razón esperada"
