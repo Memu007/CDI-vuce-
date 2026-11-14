@@ -7,6 +7,38 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
+## SABOTAJE-MARIA8: aceptada sobre `50320ff` (informe `87be8f1`) e integrada (2026-11-14 06:22 UTC)
+
+Acta `REPRODUCCION-SABOTAJE-MARIA8-2026-11-14.md`. Con la copia de `50320ff`: el guion
+`46 passed` sin sabotaje, 38 `ROJO`, 0 `FALLA`, `rc=0`; los casos 18, 19 y 20 con
+`4`, `2` y `2 failed`, como los tuyos. Las anclas en 5 y 1. Chequeo-6 igual al tuyo.
+Válidos son 37: el 20 es D248.
+
+Comprobé lo de maria9. Con su caso 1 aplicado salen `7 failed`, todas con el sufijo
+de la operación sucio. Con el caso 9 salen `2 failed`, por la API. Ninguno pone roja
+`test_con_todos_los_sufijos_propios_no_hace_falta_el_de_la_operacion`. Como no hay
+una línea que la sostenga, queda como riesgo aceptado y no como «cubierta».
+
+- **D248: (c), decidido por la PM. Va después de D247 (a).** Se acepta así:
+  - el 20 sale y en su lugar va el sabotaje «el renglón sin sufijo propio deja de
+    heredar el de la operación», en `ROJO` por
+    `test_sin_sufijo_propio_el_renglon_lleva_el_de_la_operacion`;
+  - el guion sigue en 38 `ROJO` y 0 `FALLA`, y las anclas no empeoran (5 y 1).
+  - Su ancla cuelga a la fuerza del final de la línea del 18. Está bien así, no
+    hace falta otro arreglo.
+  - **Sugerencia** (no es criterio): la misma herencia en el ítem entero y en el
+    sub-ítem, como datos del caso, si entran sin tocar otro guion.
+- **Riesgos:** aceptados (el del `{n}` y el del `.strip()` sin comprobar).
+- El criterio de anclas de D247 queda en 5 y 1, como dijiste.
+
+**Cómo sigue:** 1) D247 (a); 2) D248 (c); 3) los 6 vencidos, uno por pieza. D244 y
+D239 esperan a Emi. Si dice que sí a D244, te la escribo con su criterio. Si dice que
+sí a D239 (a), lleva adentro, como datos de un caso, un código sin sigla con el nombre
+de otro país («434 BELGICA» guarda `BE` sin avisar). Si Emi dice que «Holanda»
+también es 423, es una pieza chica aparte.
+
+**Próxima D: D249.**
+
 ## D246 (b): aceptada sobre `0224f01` (informe `b8571ff`) e integrada (2026-11-14 05:46 UTC)
 
 Acta `REPRODUCCION-D246-2026-11-14.md`. Con la copia de `0224f01`: las dos pruebas
@@ -23,18 +55,10 @@ afirmaba cada prueba. Quedó como escape de la PM en el acta.
   - con el cambio de `«{uno[0][:40]}»` por `«{sufijo[:40]}»`, la entrega da rojo en
     las cuatro formas de `VACIOS` y la base `0224f01` queda verde;
   - `sufijos2.sh` entero en `ROJO`, con un sabotaje más para ese cambio (33);
-  - `sabotaje_sufijos1.sh` sigue en 46, anclas en 6, las dos pruebas verdes.
+  - `sabotaje_sufijos1.sh` sigue en 46, anclas en 5 de una línea y 1 de varias, las dos pruebas verdes.
   - **Sugerencia** (no es criterio): `VACIOS` como pares (sufijo, código que nombra).
 - **Riesgos:** aceptados; el tuyo lo cierra D247.
 - Tus dos líneas para `COLA-LIMPIEZA.md` quedaron puestas.
-
-**Cómo sigue:** 1) D247 (a); 2) los 7 vencidos, primero `sabotaje_maria8.sh`.
-D244 y D239 esperan a Emi. Si dice que sí a D244, te la escribo con su criterio. Si
-dice que sí a D239 (a), lleva adentro, como datos de un caso, un código sin sigla con
-el nombre de otro país («434 BELGICA» guarda `BE` sin avisar). Si Emi dice que
-«Holanda» también es 423, es una pieza chica aparte.
-
-**Próxima D: D248.**
 
 ## D245 (a): aceptada sobre `e17c11e` (informe `a8d7f7b`) e integrada (2026-11-14 05:35 UTC)
 
@@ -49,18 +73,6 @@ Los guiones `punta_a_punta1`, `sabotaje_subitems1`, `destino1` y `avisos1`, con 
 - **Supuestos y riesgos:** aceptados. Las `xfail` que no distinguen quedan como
   riesgo bajo. El de la pantalla con `success: false` quedó en `NOW.md`.
 - Tu línea del ayudante único quedó en `COLA-LIMPIEZA.md`.
-
-## D243 (b): aceptada sobre `0dff850` (informe `4474108`) e integrada (2026-11-14 04:51 UTC)
-
-Acta `REPRODUCCION-D243-2026-11-14.md`. Los tres guiones enteros con la copia de
-`0dff850`: `estudio1` 37 `ROJO`, `estudio1b` 20, `excel2` 42, `rc=0` los tres, y cada
-ancla cambiada en `ROJO` por su prueba. `anclas_perdidas.py` de vuelta a 6. Integré
-`4474108`, no tu cabeza: SABOTAJE-SUFIJOS1 (`afeae84`) la estoy revisando. Tu línea
-de `excel2.sh:171` quedó en `COLA-LIMPIEZA.md`.
-
-CUIT-GENERAR quedó aceptada sobre `29327d2` (acta
-`REPRODUCCION-CUIT-GENERAR-2026-11-14.md`). **D244 espera a Emi**; hasta que conteste
-no la tocás.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
