@@ -2,170 +2,191 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## Vencido `sabotaje_doc1.py`: entregado en `d4c6b73`. Sus tres sabotajes vuelven a dar rojo, `rc=0`; quedan 2 `vencido`
+## Vencido `sabotaje_maria7.sh`: entregado en `4477ae3`. Sus 25 sabotajes dan rojo, `rc=0`; queda 1 `vencido`. Una decisión: D250
 
 | qué | SHA |
 |---|---|
-| base (informe de valor1b) | `a926930` |
-| pruebas: dos anclas reescritas y mi línea fuera de `sabotajes-conocidos.txt`. **Lo que se entrega** | `d4c6b73` |
+| base (informe de doc1) | `f3a7d29` |
+| pruebas: un ancla reescrita y mi línea fuera de `sabotajes-conocidos.txt`. **Lo que se entrega** | `4477ae3` |
+| merge de tu rama (`671c759`), sólo `docs/pm/` | `f433601` |
 | informe | el commit siguiente |
 
-`producto +0/−0`. `arnés +5/−4`: `scripts/testing/sabotaje_doc1.py` y una
+`producto +0/−0`. `arnés +1/−1`: `scripts/testing/sabotaje_maria7.sh` y una
 línea menos en `docs/pm/herramientas/sabotajes-conocidos.txt`.
 
 El SHA que entrego pasó por un adversario (abajo, «Revisión adversarial»).
 
-## Nada para decidir
+## Decisiones
 
-Antes de reescribir comprobé que las dos protecciones siguen existiendo
-(D195 (a)): no hay sabotaje para retirar ni D nueva. Sin supuestos: no
-agregué nada que la tarea no pida.
+### D250: el aviso «los N sub-ítems llevan el mismo sufijo» compara con el sufijo de la operación ya limpio, y ninguna prueba lo distingue
+
+No es de esta pieza ni del guion `maria7`: es de los avisos de MARIA-8
+(`maria_generator.py:2235`, dentro de `supuestos_declarados`). Lo encontró
+el adversario y lo medí yo.
+
+Con esa línea sin limpiar
+(`or limpiar_sufijo(str(sbt_sufijo_valor or "").strip())[0]` cambiado por
+`or str(sbt_sufijo_valor or "").strip()`), los 27 archivos de `tests/` que
+usan `sbt_sufijo_valor` dan `1126 passed, 2 xfailed`, igual que sin el cambio.
+
+Lo que cambia a la vista, con tres renglones de la misma posición:
+
+| caso | hoy | con el cambio |
+|---|---|---|
+| ninguno trae sufijo propio; el de la operación es `AA(MARCA-X)-` | el aviso nombra `«AA(MARCA X)-»`, lo que va al TXT | nombra `«AA(MARCA-X)-»`, que no es lo que va al TXT |
+| uno trae `AA(MARCA X)-` y dos heredan `AA(MARCA-X)-` | avisa que llevan el mismo | no avisa |
+| el de la operación no se puede separar (`TEXTO LIBRE`) | no avisa (lo dice el error) | avisa «llevan el mismo sufijo» además del error |
+
+Es un aviso: el TXT no cambia en ninguno de los tres.
+
+- **(a)** Pieza chica, después de `guardar2.sh` y de D249: esos tres datos
+  en el caso del aviso de `tests/test_maria8_subitems_por_posicion.py` y un
+  sabotaje más en `scripts/testing/sabotaje_maria8.sh`. Los dos son míos.
+- **(b)** No se hace: una línea en `COLA-LIMPIEZA.md`.
+
+**Recomiendo (a):** es barato y el aviso le muestra al despachante un texto
+que tiene que coincidir con el del TXT. Severidad baja: si decidís (b), no
+se rompe nada de lo que sale.
+
+Sin supuestos: no agregué nada que la tarea no pida.
 
 ## Lo que cambió
 
 ```diff
-     ("servidor", "proyecto_maria/main.py",
--     "    if (request.tipo_destinacion or \"\").strip().upper().startswith(\"EC\"):",
--     "    if False:", "test_ec_directa_nunca_entra_a_importacion"),
-+     "        return destinacion_del_txt(tipo_destinacion, exportacion)",
-+     "        return str(tipo_destinacion or \"\")", "test_ec_directa_nunca_entra_a_importacion"),
-     ("generador", "proyecto_maria/core/maria_generator.py",
--     "    if str(tipo_destinacion or \"\").strip().upper().startswith(\"EC\"):",
--     "    if False:", "test_generador_directo_rechaza_ec"),
-+     "    tipo_destinacion = destinacion_del_txt(tipo_destinacion)",
-+     "    tipo_destinacion = destinacion_del_txt(tipo_destinacion, es_exportacion(tipo_destinacion))",
-+     "test_generador_directo_rechaza_ec"),
+ # 6. el sufijo de la operación sale sin limpiar
+-reemplazar $F 'sufijo_sbt = limpiar_sufijo((sbt_sufijo_valor or "").strip(), " de la operación")[0]' 'sufijo_sbt = (sbt_sufijo_valor or "").strip()'
++reemplazar $F 'return limpiar_sufijo((sbt_sufijo_valor or "").strip(), " de la operación")[0]' 'return (sbt_sufijo_valor or "").strip()'
+ caso "sufijo_sucio" "FAILED $T::test_dentro_del_sufijo_solo_letras_numeros_y_espacios"
 ```
 
-Por qué se habían perdido: el control «una destinación de exportación (EC\*)
-no genera un TXT de importación» estaba escrito dos veces, una en el servidor
-y otra en el generador, y el guion apagaba cada una con `if False:`.
+Por qué se había perdido: `dfa636f` (devolución de MARIA-7) escribió la
+limpieza como una asignación, `sufijo_sbt = limpiar_sufijo(...)`. `4ab6a9b`
+(MARIA-9) la mudó a una función interna, `sufijo_de_la_operacion()`
+(`maria_generator.py:1520`), que hace `return limpiar_sufijo(...)` (`:1523`)
+y a la que llaman el ítem entero (`:1726`), el renglón (`:1701`) y el
+sub-ítem (`:1799`). El guion cortaba en el caso 6 y los 19 de después no
+corrían.
 
-- `7a2961f` (AVISOS-1) cambió la línea de `main.py` por una expresión
-  regular.
-- `d7345fa` (AVISOS-1) dejó un solo predicado, `es_exportacion`, y sacó la
-  línea de `maria_generator.py`.
-- `217c7cd` (AVISOS-2) lo metió en `destinacion_del_txt`, que el servidor
-  llama a través de `_destinacion_o_400` (`main.py:4947`) desde generar
-  (`:5065`) y desde los avisos (`:4978`), y el generador en
-  `maria_generator.py:1231`.
-
-Qué ataca cada una ahora:
-
-- **«servidor»:** el ayudante por el que pasan las dos rutas devuelve la
-  destinación sin mirarla. El generador sigue controlando.
-- **«generador»:** el generador acepta el tipo que venga (le dice a
-  `destinacion_del_txt` que es de exportación cuando lo es). El control de
-  forma del código queda; el servidor sigue controlando.
-
-La mutación «clasificacion» no cambió: su ancla está una vez
-(`pdf_extractor.py:2028`). Los nombres y las pruebas que espera cada una
-tampoco.
+Antes de reescribir comprobé que la protección sigue existiendo (D195 (a)):
+no hay sabotaje para retirar. El ancla nueva es código, está una vez en
+`maria_generator.py` y saca lo mismo que sacaba la vieja: la limpieza del
+sufijo de la operación.
 
 ## Resultado
 
-| qué | antes, guion de `a926930` | ahora, `d4c6b73` |
+| qué | antes, guion de `f3a7d29` | ahora, `4477ae3` |
 |---|---|---|
-| el guion | 1 `OK` y corta: `AssertionError: Patrón cambiado: servidor`; `rc=1` | 3 `OK` (`clasificacion`, `servidor`, `generador`); `rc=0` |
-| mi línea en `sabotajes-conocidos.txt` | estaba | no está; quedan 2 `vencido` |
+| el guion | `VERDE` (123 passed), 5 `ROJO` y corta: `PATRON NO ENCONTRADO (0 veces)`; `rc=1` | `VERDE` (123 passed), 25 `ROJO`, 0 `FALLA`, `OK: los 25 sabotajes dan rojo por la razón esperada`; `rc=0` |
+| caso 6, `sufijo_sucio` | no corría | `ROJO … 1 failed, 122 passed` |
+| mi línea en `sabotajes-conocidos.txt` | estaba | no está; queda 1 `vencido` (`guardar2.sh`) |
 
-El guion sólo dice `OK`. Que cada rojo es por el motivo que dice, medido a
-mano sobre el producto de `a926930` (el mismo de `d4c6b73`), en un worktree
-descartable, con `tests/test_doc1_documentos.py` entero:
+La mutación del caso 6 medida a mano, en un worktree descartable, con los
+cuatro `tests/test_maria7_*.py` del guion: `1 failed, 122 passed`. Sólo
+`test_dentro_del_sufijo_solo_letras_numeros_y_espacios`, por aserción:
 
-| mutación | resultado | pruebas en rojo |
-|---|---|---|
-| ninguna | `74 passed` | |
-| «servidor» | `38 failed, 36 passed` | sólo `test_ec_directa_nunca_entra_a_importacion`: los 19 datos de exportación en las dos rutas. Generar: `assert ('exportación' in 'No hay productos para generar: volvé a cargar la factura.') is True`. Avisos: `assert ('exportación' in 'None') is True`. Los dos datos `IC04` siguen verdes |
-| «generador» | `5 failed, 69 passed` | sólo `test_generador_directo_rechaza_ec`, sus 5 datos: 3 con `Failed: DID NOT RAISE ValueError` y los 2 con un invisible adelante con `AssertionError: Regex pattern did not match` (el error que llega es el de forma, `Destinación: va un código de 4 letras o números, como EC01.`, no el de exportación) |
+```
+At index 0 diff: 'AA(MARCA)-AI(620G-GREY.008 150CMX50M)-' != 'AA(MARCA)-AI(620G GREY 008 150CMX50M)-'
+```
 
-Cada mutación pone en rojo sólo su prueba, y la del otro lado sigue verde:
-son dos causas, no una repetida.
+Los casos 7 a 25 no corrían desde `4ab6a9b`. Ahora corrieron los 19 y dieron
+rojo nombrando su prueba; no medí a mano cada uno (no cambiaron).
 
 ## Revisión adversarial
 
-Pieza chica de arnés: un adversario Sonnet, esfuerzo medio, sobre `d4c6b73`,
-en un worktree propio que retiró al terminar. Corrió el guion (3 `OK`) y
-aplicó cada mutación a mano.
+Pieza chica de arnés: un adversario Sonnet, esfuerzo medio, sobre `4477ae3`,
+en un worktree propio que retiró al terminar.
 
-**Defectos del diff: ninguno.**
+**Defectos del diff: ninguno.** Confirmó el ancla (código, una vez, mutación
+mínima), el rojo del caso 6 (`1 failed, 122 passed`) y que la prueba
+distingue la limpieza: el producto de la prueba no trae sufijo propio.
 
-| qué probó | resultado | lo reproduje |
-|---|---|---|
-| «servidor» a mano | `38 failed, 2 passed` con `-k` del caso; rojo por `assert ('exportación' in 'None') is True`, no por un choque | sí, antes que él, con el archivo entero (tabla de arriba) |
-| «generador» a mano | `5 failed`: 3 `DID NOT RAISE` y 2 por el mensaje de forma | sí, ídem |
-| las dos anclas | cada una, una vez en su archivo, en código y en el control real | sí: `count == 1` en `main.py` y en `maria_generator.py` |
-| una mutación parecida o más chica que deje todo verde | no la encontró. Probó `exportacion or es_exportacion(...)` en el ayudante y `pass` en las dos llamadas (`:4978` y `:5065`): `38 failed` las dos | no las repetí: no cambian nada del guion. Una duda sobre la primera: `main.py` no importa `es_exportacion`, así que puesta ahí su rojo sería un `NameError` y no una aserción; su informe no dice en qué archivo la puso |
-| un choque a propósito (`destinacion_del_txt_roto`) | `NameError`; el segundo `assert` del guion lo rechaza | sí: con esa mutación en un worktree, el guion corta en `assert "DID NOT RAISE" in salida or "AssertionError" in salida`, `rc=1` |
-| lo que saqué de `sabotajes-conocidos.txt` | sólo la línea de `sabotaje_doc1.py` | sí, es el `diff` |
+Dijo que había cuatro huecos vecinos «que nadie prueba». Corrió sólo los
+cuatro archivos del guion; yo medí cada uno con los 27 archivos de `tests/`
+que usan `sbt_sufijo_valor` (sin mutación: `1126 passed, 2 xfailed`):
 
-Sus tres observaciones:
+| lo que dijo | su medición | la mía | queda |
+|---|---|---|---|
+| el renglón hereda el de la operación sin limpiar (`:1701`) | `123 passed` | `4 failed`: uno de `test_maria8_subitems_por_posicion.py` y tres de `test_maria9_sufijo_operacion.py` | no es un hueco |
+| ídem el sub-ítem (`:1799`) | `123 passed` | `4 failed`, los cuatro en `test_maria9_sufijo_operacion.py` | no es un hueco |
+| el aviso que anticipa el error (`:2219`) cambiado por `pass` | `123 passed` | `7 failed`: uno de `test_maria7_devolucion.py` y seis de `test_maria9_sufijo_operacion.py` | no es un hueco |
+| la comparación del aviso «mismo sufijo» (`:2235`) sin limpiar | `123 passed` | `1126 passed, 2 xfailed` | **sí: D250** |
 
-- **El control del guion es flojo** (previo): le alcanza con un dato en rojo
-  y con cualquier rojo por aserción. Va como riesgo 2.
-- **«servidor» apaga el ayudante entero**, también el lado de la exportación
-  (`main.py:5307`), que `test_doc1_documentos.py` no mira. Lo medí: con esa
-  mutación, `tests/test_avisos2.py` da `26 failed, 55 passed` en tres
-  pruebas. Va como riesgo 3.
-- **El mensaje del commit:** dijo que no comprobó «cada una pone en rojo
-  sólo su prueba». Yo sí, con el archivo entero (tabla de arriba). También
-  dijo que el pie del commit debería nombrar otro modelo: no es así, el pie
-  es el de esta sesión.
+Otras dos cosas de su informe:
+
+- Vio un worktree `sabotaje-maria7` parado en `f3a7d29` y lo tomó por un
+  resto de un `trap` que no limpió. Era yo, corriendo en ese momento el
+  guion de la base para el bloque de comandos. Al terminar,
+  `git worktree list` da el mío y el tuyo de `/tmp/cdi-pm`.
+- Contó 26 casos: `grep -c '^caso'` cuenta también la definición de la
+  función. Son 25.
 
 No corrí `/code-review`: el SHA que se entrega pasó por el adversario, que es
 una de las dos que pediste.
 
 ## Comandos
 
-El guion mide el `HEAD` del árbol donde corre: va en un worktree parado en el
-SHA.
-
 ```bash
 VENV=/ruta/a/tu/venv
-git diff a926930 d4c6b73 --stat -- scripts docs/pm/herramientas | tail -1    # 2 files changed, 5 insertions(+), 5 deletions(-)
-git worktree add -q --detach /tmp/doc1 d4c6b73 && cd /tmp/doc1
-$VENV/bin/python scripts/testing/sabotaje_doc1.py; echo $?
-#   DOC-1 negativo clasificacion: rojo por guarda desactivada (OK)
-#   DOC-1 negativo servidor: rojo por guarda desactivada (OK)
-#   DOC-1 negativo generador: rojo por guarda desactivada (OK)
+git diff f3a7d29 4477ae3 --stat -- scripts docs/pm/herramientas | tail -1    # 2 files changed, 1 insertion(+), 2 deletions(-)
+scripts/testing/sabotaje_maria7.sh 4477ae3 $VENV | tail -1; echo ${PIPESTATUS[0]}
+#   OK: los 25 sabotajes dan rojo por la razón esperada
 #   0
-grep -c sabotaje_doc1 docs/pm/herramientas/sabotajes-conocidos.txt    # 0
-grep -c '^vencido' docs/pm/herramientas/sabotajes-conocidos.txt       # 2
+grep -c sabotaje_maria7 docs/pm/herramientas/sabotajes-conocidos.txt    # 0
+grep -c '^vencido' docs/pm/herramientas/sabotajes-conocidos.txt         # 1
 
 # el rojo sin el arreglo: el guion de la base
-git checkout -q a926930
-$VENV/bin/python scripts/testing/sabotaje_doc1.py 2>&1 | tail -1; echo ${PIPESTATUS[0]}
-#   AssertionError: Patrón cambiado: servidor
+git show f3a7d29:scripts/testing/sabotaje_maria7.sh > /tmp/m7_base.sh
+bash /tmp/m7_base.sh f3a7d29 $VENV 2>&1 | tail -2; echo ${PIPESTATUS[0]}
+#   ROJO   kilos_es_cantidad: … 7 failed, 116 passed …
+#   PATRON NO ENCONTRADO (0 veces) en proyecto_maria/core/maria_generator.py: 'sufijo_sbt = limpiar_sufijo((sbt_sufijo_valor or "").strip(), " de la operación")[0]'
 #   1
+
+# D250: la mutación que queda verde
+git worktree add -q --detach /tmp/d250 4477ae3 && cd /tmp/d250
+$VENV/bin/python - <<'PY'
+p = "proyecto_maria/core/maria_generator.py"
+s = open(p, encoding="utf-8").read()
+v = '                or limpiar_sufijo(str(sbt_sufijo_valor or "").strip())[0]\n'
+assert s.count(v) == 1
+open(p, "w", encoding="utf-8").write(s.replace(v, '                or str(sbt_sufijo_valor or "").strip()\n'))
+PY
+DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
+  DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares $VENV/bin/python -m pytest -q --no-cov -p no:cacheprovider --timeout=120 \
+  $(grep -l sbt_sufijo_valor tests/*.py) | tail -1    # 1126 passed, 2 xfailed
+cd - >/dev/null; git worktree remove --force /tmp/d250
 ```
 
 Corrí cada uno una vez, con la salida a un archivo; esas son sus líneas. El
-guion lo corrí en mi árbol parado en cada SHA, no en `/tmp/doc1`.
+guion nuevo lo corrí con `HEAD` parado en `4477ae3` y la salida entera; el de
+la base, desde una copia en mi carpeta de trabajo, no en `/tmp`. El bloque
+de D250 lo corrí como está escrito, con el worktree en mi carpeta de trabajo
+en lugar de `/tmp/d250`: `1126 passed, 2 xfailed`, `rc=0`.
 
 ## Puertas
 
-Sobre `d4c6b73`, árbol limpio.
+Sobre `4477ae3`, árbol limpio.
 
 | puerta | salida |
 |---|---|
-| `sabotaje_doc1.py` | 3 `OK`; `rc=0` |
-| `tests/test_doc1_documentos.py` y `tests/test_anclas_perdidas.py` | `101 passed` (74 y 27) |
-| `anclas_perdidas.py d4c6b73` | `103 guiones, 2493 anclas medidas y 11 llamadas sin medir`; `perdida, una línea 2 guiones: 2`, `perdida, varias líneas 0`, `otra cantidad 0`; `rc=0`. No mide este guion: sólo lee los `.sh` (riesgo 1) |
-| `chequeo-6.py a926930 d4c6b73` | abajo, `avisos: 0` |
+| `sabotaje_maria7.sh 4477ae3` | `VERDE`, 25 `ROJO`, 0 `FALLA`; `rc=0` |
+| `tests/test_anclas_perdidas.py` | `27 passed` |
+| `anclas_perdidas.py 4477ae3` | `103 guiones, 2493 anclas medidas y 11 llamadas sin medir`; `perdida, una línea 1 guiones: 1` (`guardar2.sh:74`), `perdida, varias líneas 0`, `otra cantidad 0`; `rc=0` |
+| `chequeo-6.py f3a7d29 4477ae3` | abajo, `avisos: 0` |
+| `bash -n scripts/testing/sabotaje_maria7.sh` | sin errores |
 
 **No corrido:** la suite entera (cambió un guion, ningún producto ni prueba),
-`compileall`, las pantallas, `e2e_maria.sh`, `smoke_friccion.sh`,
-`ataque_aislamiento.sh`, Postgres, los demás guiones de sabotaje,
-`/code-review` y `/security-review` (el diff no toca producto; lo que el
-guion ataca sí es un control de qué se genera, y por eso medí cada mutación
-a mano).
+`compileall`, las pantallas (`pantalla_maria7.js` es de la Técnica),
+`e2e_maria.sh`, `smoke_friccion.sh`, `ataque_aislamiento.sh`, Postgres, los
+demás guiones de sabotaje, `/code-review` y `/security-review` (el diff no
+toca producto). Después del merge de tu rama (`f433601`, sólo `docs/pm/`) no
+volví a correr nada: no cambia ni el guion ni el producto.
 
 ## `chequeo-6`
 
 ```
-chequeo-6 a926930..d4c6b73: avisos para mirar, no un veredicto
+chequeo-6 f3a7d29..4477ae3: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +5/−4
+arnés +1/−1
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
@@ -173,30 +194,22 @@ avisos: 0
 
 ## Riesgos
 
-1. **`anclas_perdidas.py` no mide este guion.** Sólo lee los `.sh`, y este
-   es el único guion de sabotaje en Python. Si sus anclas se vuelven a
-   perder, lo avisa el propio guion al correr (`Patrón cambiado: <nombre>`,
-   `rc=1`), no la medición. Es previo; severidad baja.
-2. **El guion acepta un rojo sin mirar mucho la causa.** Le alcanza con que
-   falle un dato del caso, y con que la salida diga `DID NOT RAISE` o
-   `AssertionError`: un 500 que haga fallar el `assert` de la prueba pasaría.
-   Un `NameError` no pasa (medido). Tampoco corre la prueba sin sabotaje. Lo
-   cubrí a mano (`74 passed` en la base y las dos tablas de arriba). Es
-   previo; severidad baja.
-3. **«servidor» es más ancha que su prueba.** Apaga el ayudante entero: el
-   control de exportación, el de forma y el del lado de la exportación. No
-   debilita este guion (su prueba da rojo por lo suyo). La llamada de los
-   avisos y la de la exportación las ataca más fino `sabotajes/avisos2.sh`.
-   No la angosté porque `main.py` no importa `es_exportacion`: apagar ahí
-   sólo el control de exportación sería un `NameError`.
-4. **El guion mide el `HEAD` del árbol donde está**, no un SHA que se le
-   pase. Es previo.
+1. **Tres anclas del guion llevan un comentario adentro** (previas, no las
+   toqué): el caso 16 (`# «26/08/07»`), el 24 (`break  # «2015-02-30»`) y el
+   25 (`# %Y no rellena`). La regla dice que el ancla es código. Si alguien
+   edita esos comentarios, el guion corta con `PATRON NO ENCONTRADO`: hace
+   ruido, no queda verde en silencio. Severidad baja.
+2. **El `25` del último `echo` está escrito a mano.** Hoy coincide: 25
+   líneas `ROJO`. Previo.
+3. **El venv por defecto del guion es `/tmp/cdi-dev2/venv`**, que no existe
+   en una máquina nueva: hay que pasarlo como segundo argumento. Previo.
+4. **D250**, arriba: un hueco de pruebas en un aviso, fuera de este guion.
 
 ## Líneas para `COLA-LIMPIEZA.md`
 
-- `scripts/testing/sabotaje_doc1.py`: es el único guion de sabotaje en
-  Python y `anclas_perdidas.py` no lo lee; no recibe un SHA (mide `HEAD`); no
-  corre la prueba sin sabotaje y acepta cualquier rojo por aserción.
+- `scripts/testing/sabotaje_maria7.sh`: las anclas de los casos 16, 24 y 25
+  incluyen un comentario del producto; el `25` del último `echo` está escrito
+  a mano; el venv por defecto es una ruta de otra máquina.
 
 ## Archivos de producto que toqué
 
@@ -204,7 +217,8 @@ Ninguno.
 
 ## Sigo con
 
-El vencido `scripts/testing/sabotaje_maria7.sh` (1 ancla que no está, la de
-la línea 97). Primero miro si la protección sigue existiendo.
+El último vencido, `scripts/testing/sabotajes/guardar2.sh` (1 ancla que no
+está, la de la línea 74, en `main.py`). Primero miro si la protección sigue
+existiendo.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama `claude/dev-maria`, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `607272c`). Aceptadas: CUIT-GENERAR sobre `29327d2`, SABOTAJE-SUBITEMS1 sobre `bf6778e`, D243 (b) sobre `0dff850`, SABOTAJE-SUFIJOS1 sobre `afeae84`, D245 (a) sobre `e17c11e`, D246 (b) sobre `0224f01`, SABOTAJE-MARIA8 sobre `50320ff`, D247 (a) sobre `4a58c68`, D248 (c) sobre `3fcc9c4`, el vencido `sabotaje_maria1d.sh` sobre `6e4e658`, el vencido `sabotaje_maria5.sh` sobre `c0505cc`. Entregadas sin veredicto: **el vencido `sabotaje_valor1b.sh` sobre `70eb5dc`** (22 `ROJO`; el `echo` final pasó de 23 a 22 como supuesto reversible) y **el vencido `sabotaje_doc1.py` sobre `d4c6b73`** (base `a926930`; sólo `scripts/testing/sabotaje_doc1.py` y mi línea fuera de `sabotajes-conocidos.txt`, arnés +5/−4; 3 `OK`, `rc=0`; «servidor» ataca `_destinacion_o_400` en `main.py` y «generador» la llamada a `destinacion_del_txt` en `maria_generator.py`; a mano, 38 y 5 fallas, cada una sólo en su prueba; un adversario Sonnet medio revisó `d4c6b73`, sin defectos; `anclas_perdidas.py` no mide este guion). Si alguna vuelve con devolución, va primero. **Pieza activa: el vencido `scripts/testing/sabotaje_maria7.sh`** (1 ancla que no está, línea 97: `sufijo_sbt = limpiar_sufijo((sbt_sufijo_valor or "").strip(), " de la operación")[0]`; hoy el generador tiene `return limpiar_sufijo(…)[0]` en `maria_generator.py:1523`: falta comprobar que la prueba `test_dentro_del_sufijo_solo_letras_numeros_y_espacios` sigue distinguiéndolo); después guardar2 (74); al arreglar cada uno saco mi línea de `docs/pm/herramientas/sabotajes-conocidos.txt`. Después **D249 (a)**, decidida por la PM: sólo `tests/test_sufijos2.py` y `scripts/testing/sabotajes/sufijos2.sh`, criterio entero en `docs/pm/PARA-DEV-2.md`, sección D247 (la familia de fragmentos «…» de `limpiar_sufijo`, un sabotaje por cambio, `sufijos2.sh` entero en `ROJO` con la cuenta exacta, `sabotaje_sufijos1.sh` en 46, anclas que no empeoran: el criterio dice 5 y 1 y hoy son 2 y 0). D244, D239 y «Holanda» esperan a Emi: no se tocan. Próxima D: D250. Lecciones: antes de lanzar algo en segundo plano se borra su marca de fin; un texto de error que manda a corregir se prueba por cada origen del dato; una prueba que sólo mira el 200 de un endpoint que se traga sus errores no prueba nada; un dato nuevo de un caso no reusa un valor que otro control del mismo caso espera; antes de escribir el informe se trae la rama de la PM; antes de sacar una prueba por duplicada se compara lo que afirma cada una, no sólo sus entradas; antes de reescribir un sabotaje con el ancla perdida se mira si la protección que atacaba sigue existiendo: si no, es una D (D195 (a)); al ajustar una afirmación, la nueva tiene que seguir afirmando todo lo que afirmaba la vieja (el orden también), y una mutación que «mueve» una frase la tiene que sacar de donde estaba; una medición corre sobre el conjunto más angosto de pruebas que contesta la pregunta; antes de cambiar un número que la PM fijó como criterio se lee por qué lo fijó; un comentario o un mensaje de commit no afirma lo que el guion no obliga, y su porqué se comprueba con `git show`, no se supone; que «nadie cubría» algo se mide antes de escribirlo; `anclas_perdidas.py` mide un commit: el arreglo se commitea antes de medir; el SHA que se entrega pasa por subagente o `/code-review`, y si el gancho de parada ya subió el commit, lo que siga va en un commit nuevo; después de un commit nuevo o de corregir uno, las puertas corren otra vez sobre ese SHA; un ancla lleva sólo el texto que saca más lo mínimo que la ata a su lugar; la cuenta escrita a mano en el último `echo` de un guion se compara con sus líneas `ROJO`; una mutación se mide a mano con el archivo de pruebas entero, para ver que pone en rojo sólo lo suyo y por aserción; `anclas_perdidas.py` sólo lee los `.sh`; regla de la PM: en un vencido de sólo arnés, un último commit que cambia únicamente comentarios no necesita revisor si el informe lo dice, cualquier otro cambio sí. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica salvo lo que una D autoriza; subagentes hasta esfuerzo alto y sin consejero.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama `claude/dev-maria`, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `671c759`). Aceptadas: CUIT-GENERAR sobre `29327d2`, SABOTAJE-SUBITEMS1 sobre `bf6778e`, D243 (b) sobre `0dff850`, SABOTAJE-SUFIJOS1 sobre `afeae84`, D245 (a) sobre `e17c11e`, D246 (b) sobre `0224f01`, SABOTAJE-MARIA8 sobre `50320ff`, D247 (a) sobre `4a58c68`, D248 (c) sobre `3fcc9c4`, los vencidos `sabotaje_maria1d.sh` sobre `6e4e658`, `sabotaje_maria5.sh` sobre `c0505cc`, `sabotaje_valor1b.sh` sobre `70eb5dc` y `sabotaje_doc1.py` sobre `d4c6b73`. Entregada sin veredicto: **el vencido `sabotaje_maria7.sh` sobre `4477ae3`** (base `f3a7d29`; sólo el ancla del caso 6, que ahora es el `return limpiar_sufijo(…)[0]` de `sufijo_de_la_operacion()` en `maria_generator.py:1523`, y mi línea fuera de `sabotajes-conocidos.txt`; arnés +1/−1; 25 `ROJO`, `rc=0`; a mano, 1 failed y 122 passed, sólo su prueba; un adversario Sonnet medio revisó `4477ae3`, sin defectos del diff; **D250 abierta**: el aviso «llevan el mismo sufijo» de `maria_generator.py:2235` sin limpiar el de la operación deja verdes los 27 archivos que usan `sbt_sufijo_valor`; recomendé (a), datos en `test_maria8_subitems_por_posicion.py` y un sabotaje en `sabotaje_maria8.sh`, después de guardar2 y D249). Si vuelve con devolución, va primero. **Pieza activa: el vencido `scripts/testing/sabotajes/guardar2.sh`** (1 ancla que no está, línea 74, en `main.py`: `or del_proveedor["producto_key"] != catalog_svc._normalize(recordado.get("descripcion") or "")):`; primero se mira si la protección sigue existiendo); al arreglarlo saco mi línea de `docs/pm/herramientas/sabotajes-conocidos.txt`, que es la última `vencido`. Después **D249 (a)**, decidida por la PM: sólo `tests/test_sufijos2.py` y `scripts/testing/sabotajes/sufijos2.sh`, criterio entero en `docs/pm/PARA-DEV-2.md`, sección D247 (la familia de fragmentos «…» de `limpiar_sufijo`, un sabotaje por cambio, `sufijos2.sh` entero en `ROJO` con la cuenta exacta, `sabotaje_sufijos1.sh` en 46, anclas que no empeoran: el criterio dice 5 y 1 y hoy son 1 y 0). D244, D239 y «Holanda» esperan a Emi: no se tocan. Próxima D: D251. Lecciones: antes de lanzar algo en segundo plano se borra su marca de fin; un texto de error que manda a corregir se prueba por cada origen del dato; una prueba que sólo mira el 200 de un endpoint que se traga sus errores no prueba nada; un dato nuevo de un caso no reusa un valor que otro control del mismo caso espera; antes de escribir el informe se trae la rama de la PM; antes de sacar una prueba por duplicada se compara lo que afirma cada una, no sólo sus entradas; antes de reescribir un sabotaje con el ancla perdida se mira si la protección que atacaba sigue existiendo: si no, es una D (D195 (a)); al ajustar una afirmación, la nueva tiene que seguir afirmando todo lo que afirmaba la vieja (el orden también), y una mutación que «mueve» una frase la tiene que sacar de donde estaba; una medición corre sobre el conjunto más angosto de pruebas que contesta la pregunta; antes de cambiar un número que la PM fijó como criterio se lee por qué lo fijó; un comentario o un mensaje de commit no afirma lo que el guion no obliga, y su porqué se comprueba con `git show`, no se supone; que «nadie cubría» algo se mide antes de escribirlo, y con todas las pruebas que usan ese dato, no sólo las del guion (un adversario que corre cuatro archivos dice «hueco» donde otra prueba lo atrapa); `anclas_perdidas.py` mide un commit: el arreglo se commitea antes de medir; el SHA que se entrega pasa por subagente o `/code-review`, y si el gancho de parada ya subió el commit, lo que siga va en un commit nuevo; después de un commit nuevo o de corregir uno, las puertas corren otra vez sobre ese SHA; un ancla lleva sólo el texto que saca más lo mínimo que la ata a su lugar; la cuenta escrita a mano en el último `echo` de un guion se compara con sus líneas `ROJO`; una mutación se mide a mano con el archivo de pruebas entero, para ver que pone en rojo sólo lo suyo y por aserción; `anclas_perdidas.py` sólo lee los `.sh`; un worktree que aparece en `git worktree list` mientras corre un guion mío es de ese guion, no un resto; regla de la PM: en un vencido de sólo arnés, un último commit que cambia únicamente comentarios no necesita revisor si el informe lo dice, cualquier otro cambio sí. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica salvo lo que una D autoriza; subagentes hasta esfuerzo alto y sin consejero.
