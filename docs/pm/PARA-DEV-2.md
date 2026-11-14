@@ -7,28 +7,32 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## D248 (c): aceptada sobre `3fcc9c4` (informe `8f50af3`) e integrada (2026-11-14 07:57 UTC)
+## Vencido `sabotaje_maria1d.sh`: aceptado sobre `6e4e658` (informe `38a7ed2`) e integrado (2026-11-14 08:18 UTC)
 
-Acta `REPRODUCCION-D248-2026-11-14.md`. Con la copia de `3fcc9c4`: 38 `ROJO`, 0 `FALLA`,
-`rc=0`, `sin_herencia` con `4 failed`; chequeo-6 igual al tuyo; anclas en 5 y 1. El
-cambio de `caso` distingue: sin el `reemplazar` del sub-ítem da `FALLA` nombrándolo, y
-esperando una prueba que queda verde también. Tu riesgo 2 lo medí: con otro valor en
-el ítem entero o el sub-ítem, maria8 queda verde y lo agarran maria9 y sufijos2.
+Acta `REPRODUCCION-SABOTAJE-MARIA1D-2026-11-14.md`. Con la copia de `6e4e658`: 8 `ROJO`,
+0 `FALLA`, `rc=0`, casos 4 y 8 con 2 y 8 failed; chequeo-6 igual al tuyo; anclas en 4 y 0;
+quedan 5 `vencido`. Mis negativos: el guion viejo sobre `6e4e658` da `PATRON NO
+ENCONTRADO` y `rc=1`; el caso 8 sacando `kit_warnings` en vez de la procedencia da `FALLA`.
 
-- **Supuestos 1 y 2:** aceptados. Un caso, la cuenta en 38.
-- **Riesgos:** aceptados. Tu línea del `38` escrito a mano quedó en `COLA-LIMPIEZA.md`.
-- **Una línea:** es la tercera entrega seguida cuyo SHA final no pasó por subagente
-  ni `/code-review`. Que el SHA que entregás pase por uno de los dos, o que el informe
-  diga por qué no hace falta.
+- **Supuesto 1:** aceptado.
+- **Riesgos:** los tres son previos; aceptados.
+- El SHA final pasó por un adversario: la línea de D248 quedó cumplida.
+- Sin pedido nuevo. Una idea, no un criterio: al rehacer `sabotaje_maria5.sh`, mirá si
+  ahí puede quedar cubierto el camino de los avisos previos del caso 4.
 
-**Cómo sigue:** 1) los 6 vencidos, uno por pieza (vas por `sabotaje_maria1d.sh`);
-2) D249 (a), con el criterio de la sección D247 de abajo. D244 y D239 esperan a Emi.
-Si dice que sí a D244, te la escribo con su criterio. Si dice que sí a D239 (a), lleva
-adentro, como datos de un caso, un código sin sigla con el nombre de otro país
-(«434 BELGICA» guarda `BE` sin avisar). Si Emi dice que «Holanda» también es 423, es
-una pieza chica aparte.
+**Cómo sigue:** 1) los 5 vencidos que quedan, uno por pieza (vas por
+`sabotaje_maria5.sh`); 2) D249 (a), con el criterio de la sección D247 de abajo. D244 y
+D239 esperan a Emi. Si dice que sí a D244, te la escribo con su criterio. Si dice que sí
+a D239 (a), lleva adentro, como datos de un caso, un código sin sigla con el nombre de
+otro país («434 BELGICA» guarda `BE` sin avisar). Si Emi dice que «Holanda» también es
+423, es una pieza chica aparte.
 
 **Próxima D: D250.**
+
+## D248 (c): aceptada sobre `3fcc9c4` (informe `8f50af3`) e integrada (2026-11-14 07:57 UTC)
+
+Acta `REPRODUCCION-D248-2026-11-14.md`. Supuestos 1 y 2 y riesgos aceptados; el `38`
+escrito a mano quedó en `COLA-LIMPIEZA.md`.
 
 ## D247 (a): aceptada sobre `4a58c68` (informe `ee3ccfd`) e integrada (2026-11-14 07:03 UTC)
 
