@@ -5,9 +5,9 @@ historia de este canal está en Git.
 
 ## Aviso: MARIA toca `test_sufijos2.py` y `sabotajes/sufijos2.sh` (2026-11-14 PM)
 
-Por D247 (a), en `PARA-DEV-2.md`: que el error de un sufijo vacío nombre el código
-vacío y no el sufijo entero, y un sabotaje más en `sufijos2.sh`. No es tarea tuya; al
-traer mi rama, esos dos archivos pueden cambiar.
+D247 ya está integrada. Por D249 (a), en `PARA-DEV-2.md`, MARIA vuelve a tocar esos
+dos archivos (más casos y sabotajes para los mensajes de `limpiar_sufijo`), después
+de otras piezas. No es tarea tuya; al traer mi rama, esos dos archivos pueden cambiar.
 
 ## GUARDA-VERSION: aceptada sobre `9661f5d3` (informe `bb83ecc6`) e integrada (2026-11-13 17:31 UTC)
 
