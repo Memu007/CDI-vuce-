@@ -235,5 +235,11 @@ caso "declarada_en_kilos" "FAILED $T::test_declarada_en_kilos_la_cantidad_y_los_
 reemplazar $F '        clave = clave_de_posicion(item, n + 1, iva_por_defecto)' '        clave = clave_de_posicion(item, 1, iva_por_defecto)'
 caso "estado_renglon_fijo" "FAILED $T::test_el_estado_que_no_corresponde_en_el_tercer_renglon_dice_el_tres"
 
+# 39. el aviso del mismo sufijo compara el de la operación sin limpiar
+reemplazar $F '                or limpiar_sufijo(str(sbt_sufijo_valor or "").strip())[0]' '                or str(sbt_sufijo_valor or "").strip()'
+MISMO="FAILED $T::test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo"
+caso "aviso_operacion_sin_limpiar" "$MISMO[heredan_uno_que_se_limpia]" \
+  "$MISMO[uno_trae_el_limpio_y_el_resto_hereda]" "$MISMO[el_de_la_operacion_no_se_separa]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 38 sabotajes dan rojo por la razón esperada"
+echo "OK: los 39 sabotajes dan rojo por la razón esperada"

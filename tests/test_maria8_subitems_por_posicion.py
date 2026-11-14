@@ -354,10 +354,36 @@ def test_los_avisos_dicen_que_renglones_van_juntos():
     assert any("renglones 1, 2 y 3 van en un solo ítem con 3 sub-ítems" in a for a in avisos)
 
 
-def test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo():
-    renglones = [{k: v for k, v in r.items() if k != "sufijo"} for r in _lonas()[:3]]
-    avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor="AA(MARCA)-")
-    assert any("los 3 sub-ítems llevan el mismo sufijo" in a for a in avisos)
+SUCIO, LIMPIO = "AA(MARCA)-AI(620G-BLUE.010 150CMX50M)-", "AA(MARCA)-AI(620G BLUE 010 150CMX50M)-"
+# caso: (el sufijo propio de cada renglón, el de la operación, lo que el aviso
+# muestra entre «» o None si no sale). Se compara lo que sale en el TXT: limpio.
+MISMO_SUFIJO = {
+    "heredan": ((None, None, None), "AA(MARCA)-", "AA(MARCA)-"),
+    "dos_renglones": ((None, None), "AA(MARCA)-", "AA(MARCA)-"),
+    "heredan_uno_que_se_limpia": ((None, None, None), SUCIO, LIMPIO),
+    "uno_trae_el_limpio_y_el_resto_hereda": ((LIMPIO, None, None), SUCIO, LIMPIO),
+    "propios_iguales": ((SUCIO, LIMPIO, SUCIO), "", LIMPIO),
+    "largo": ((None, None, None), "AA(" + "X" * 100 + ")-", "AA(" + "X" * 77),
+    "propios_distintos": (("AA(A)-", "AA(B)-", "AA(A)-"), "AA(A)-", None),
+    "uno_propio_y_el_resto_hereda_otro": (("AA(A)-", None, None), "AA(B)-", None),
+    "ninguno": ((None, None, None), "", None),
+    "el_de_la_operacion_no_se_separa": ((None, None, None), "AA(OK)-AB(XXX", None),
+}
+
+
+@pytest.mark.parametrize("caso", MISMO_SUFIJO)
+def test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo(caso):
+    propios, de_la_operacion, muestra = MISMO_SUFIJO[caso]
+    renglones = [{k: v for k, v in r.items() if k != "sufijo"} for r in _lonas()[:len(propios)]]
+    for renglon, propio in zip(renglones, propios):
+        if propio is not None:
+            renglon["sufijo"] = propio
+    cuales = {2: "1 y 2 los 2", 3: "1, 2 y 3 los 3"}[len(propios)]
+    avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor=de_la_operacion)
+    assert [a for a in avisos if "llevan el mismo sufijo" in a] == ([] if muestra is None else [
+        f"Sufijo de valor: en el ítem de los renglones {cuales} sub-ítems llevan el mismo sufijo "
+        f"(«{muestra}»). Si cada renglón lleva el suyo (marca, modelo, color), cargalo en "
+        "«Sufijo de valor» de cada producto, en «Lo que decide el despachante»."])
 
 
 def test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon():
