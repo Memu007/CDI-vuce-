@@ -80,20 +80,27 @@ caso tres_decimales "${T}test_una_cantidad_con_mas_de_dos_decimales_no_sale_redo
 reemplazar $M '                    _sufijos.append((f"Item {_n}, sub-ítem {_m}: ", sub["sufijo"].strip()))' '                    _sufijos.append(("", sub["sufijo"].strip()))'
 caso sufijo_sin_subitem "${T}test_el_error_del_sufijo_dice_que_subitem["
 
-# 7. sub-ítems con otra forma vuelven a dar 500
+# 7. sub-ítems con otra forma vuelven a dar 500. El control está dos veces
+# en /generate_maria: con uno solo puesto, el pedido sigue dando 400.
+reemplazar $M "            if _subs is not None and not (isinstance(_subs, list) and all(isinstance(x, dict) for x in _subs)):" "            if False:"
 reemplazar $M "            if not isinstance(_subs, list) or not all(isinstance(_s, dict) for _s in _subs):" "            if False:"
 caso forma_500 "${T}test_un_pedido_mal_armado_da_400_y_no_500[subitems0]"
 
 # --- Devolución (puntos 7 y 10) ---
 C=proyecto_maria/core/controles_maria.py
 
-# 8. los controles de antes de generar revientan con subitems=5
+# 8. los controles de antes de generar revientan con subitems=5. Se ve en el
+# semáforo, que los corre sin control de forma antes.
 reemplazar $C "        for m, sub in enumerate(subitems if isinstance(subitems, list) else [], start=1):" "        for m, sub in enumerate(subitems or [], start=1):"
-caso controles_500 "${T}test_subitems_que_no_son_una_lista_dan_400_y_no_500[5]"
+caso controles_500 "${T}test_la_validacion_no_revienta_con_subitems_raros[5]"
 
 # 9. el error del sub-ítem dice la línea del TXT y no el producto de la pantalla
 reemplazar $G "            n_item = lugar_en_el_pedido.get(id(item), idx)" "            n_item = idx"
 caso numero_de_linea "${T}test_el_error_del_subitem_dice_el_numero_de_la_pantalla["
 
+# 10. un sufijo de sub-ítem que no es un texto vuelve a dar 500
+reemplazar $M '                if _s.get("sufijo") is not None and not isinstance(_s.get("sufijo"), str):' "                if False:"
+caso sufijo_no_texto "${T}test_un_pedido_mal_armado_da_400_y_no_500[subitems2]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 9 sabotajes dan rojo por la razón esperada"
+echo "OK: los 10 sabotajes dan rojo por la razón esperada"

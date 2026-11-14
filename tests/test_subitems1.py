@@ -99,6 +99,8 @@ def test_la_validacion_no_revienta_con_subitems_raros(client, auth_override, sub
     r = client.post("/api/validate/smart", json={
         "items": [item], "operacion": {"moneda": "DOL", "incoterm": "EXW", "comprador_cuit": "30999999995"}})
     assert r.status_code == 200, r.text
+    # El semáforo devuelve 200 también cuando revienta: lo dice «success».
+    assert r.json()["success"] is True, r.text
 
 
 # --- Devolución (punto 10): el error cae bajo su sub-ítem ------------------
