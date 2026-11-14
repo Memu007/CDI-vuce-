@@ -7,30 +7,29 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## Vencido `sabotaje_maria5.sh`: aceptado sobre `c0505cc` (informe `9153d23`) e integrado (2026-11-14 09:30 UTC)
+## Vencidos `sabotaje_valor1b.sh` y `sabotaje_doc1.py`: aceptados sobre `70eb5dc` y `d4c6b73` (informes `a926930` y `f3a7d29`) e integrados (2026-11-14 09:56 UTC)
 
-Acta `REPRODUCCION-SABOTAJE-MARIA5-2026-11-14.md`. Con la copia de `c0505cc` da 50 `ROJO`,
-0 `FALLA` y `rc=0`; los casos 26, 33 y 50 dan 1, 14 y 2 failed. chequeo-6 da igual que el
-tuyo, las anclas quedan en 2 y 0, y quedan 4 `vencido`.
+Actas `REPRODUCCION-SABOTAJE-VALOR1B-2026-11-14.md` y `REPRODUCCION-SABOTAJE-DOC1-2026-11-14.md`.
+Los dos SHA finales pasaron por revisor: bien.
 
-Mis negativos:
-- el guion viejo sobre `c0505cc` da `PATRON NO ENCONTRADO` en el 26;
-- con el caso 50 puesto en la llamada de generar (8 espacios) da `FALLA`: responde sólo por
-  los avisos previos.
+**valor1b:** con la copia de `70eb5dc` da 22 `ROJO`, 0 `FALLA`, `rc=0`; casos 8 y 10 con 1 y
+2 failed; chequeo-6 igual al tuyo; anclas 2/0/0.
+- Mis negativos: el guion viejo da `PATRON NO ENCONTRADO (2 veces)` en el 8; con el caso 8
+  sacando `cuentasViejas();` de `borrarSeguroCalculado` da `FALLA … quedó verde`.
+- **Supuesto (23→22):** aceptado; son 22 casos y 22 `ROJO`.
+- **Riesgos 1 a 3:** aceptados. El 2 lo miré: el 9 y el 10 son mutaciones distintas que
+  espera una sola prueba. El 1 y el `22` a mano van a la cola de limpieza.
 
-- **Supuestos 1 y 2:** aceptados.
-- **Riesgos 1 a 4:** aceptados.
-  - El 1 lo medí: con tu sabotaje, `test_los_avisos_previos_son_los_mismos_que_al_generar`
-    da rojo en sus dos variantes.
-  - El 3: no lo toques ahora; va a `COLA-LIMPIEZA.md`, junto con el `50` escrito a mano y
-    el venv por defecto.
-- **Regla nueva, decidida por la PM:** en un vencido de sólo arnés, un último commit que
-  cambia únicamente comentarios no necesita revisor si el informe lo dice. Cualquier otro
-  cambio, sí.
+**doc1.py:** con la copia de `d4c6b73`, en un worktree en ese SHA, da 3 `OK`, `rc=0`; a mano,
+38 y 5 failed, cada uno sólo en su prueba; chequeo-6 igual al tuyo.
+- Mis negativos: el guion viejo da `Patrón cambiado: servidor`; con «generador» neutro
+  (`destinacion_del_txt(tipo_destinacion, False)`) el guion corta con `5 passed`.
+- Miré por qué falla cada mutación: en las dos la EC pasa el control (el error siguiente o
+  `DID NOT RAISE`), ningún 500.
+- **Riesgos 1 a 4:** aceptados; tu línea va a la cola de limpieza.
 
 **Cómo sigue:**
-1. Los 4 vencidos que quedan, uno por pieza: vas por `sabotaje_valor1b.sh`, después
-   `sabotaje_doc1.py`, `sabotaje_maria7.sh` y `guardar2.sh`.
+1. Los 2 vencidos que quedan, uno por pieza: vas por `sabotaje_maria7.sh`, después `guardar2.sh`.
 2. D249 (a), con el criterio de la sección D247 de abajo.
 
 D244 y D239 esperan a Emi:
@@ -40,6 +39,11 @@ D244 y D239 esperan a Emi:
 - Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
 
 **Próxima D: D250.**
+
+## Vencido `sabotaje_maria5.sh`: aceptado sobre `c0505cc` (informe `9153d23`) e integrado (2026-11-14 09:30 UTC)
+
+Acta `REPRODUCCION-SABOTAJE-MARIA5-2026-11-14.md`. Regla nueva de la PM: en un vencido de sólo
+arnés, un último commit que cambia únicamente comentarios no necesita revisor si el informe lo dice.
 
 ## Vencido `sabotaje_maria1d.sh`: aceptado sobre `6e4e658` (informe `38a7ed2`) e integrado (2026-11-14 08:18 UTC)
 
