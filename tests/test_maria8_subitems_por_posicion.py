@@ -459,10 +459,11 @@ def _aviso_de_que_falta_el_codigo(donde):
 # avisos a cada renglón, en su orden. Fuera de un grupo, el que no está no trae sufijo)
 SE_LIMPIO = {
     "seguidos": ("AAA", {1: "renglón 1", 2: "renglón 2"}),
-    # El ítem tiene seis renglones; los renglones 3 y 6, de otras posiciones, quedan en el medio.
+    # El ítem tiene seis renglones y el 5 usa el sufijo de la operación; el 3 y el 6, de otras
+    # posiciones, quedan en el medio.
     "salteados": ("AABAACAA", {3: "ítem 3", 6: "ítem 6", 1: "renglón 1", 2: "renglón 2",
-                               4: "renglón 4", 5: "renglón 5", 7: "renglón 7", 8: "renglón 8"}),
-    # Un grupo no se junta con nadie y se nombra una vez, por su primer renglón.
+                               4: "renglón 4", 7: "renglón 7", 8: "renglón 8"}),
+    # Un grupo no se junta con nadie y se avisa una vez, con el sufijo de su primer renglón.
     "un_grupo_en_el_medio": ("AaaA", {2: "grupo ga", 1: "renglón 1", 4: "renglón 4"}),
     # Los renglones de cada ítem se nombran una vez, como renglones, sea el ítem que sea.
     "tres_items": ("ABCCAB", {1: "renglón 1", 5: "renglón 5", 2: "renglón 2", 6: "renglón 6",

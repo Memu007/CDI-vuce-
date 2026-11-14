@@ -271,25 +271,29 @@ caso "aviso_renglon_tope_4" "$LIMPIO[salteados]"
 reemplazar $F '        for n in ns:' '        for n in ns[:2]:'
 caso "aviso_renglon_tope_2" "$LIMPIO[salteados]"
 
-# 47. el aviso de cada renglón sale sólo para el segundo del ítem
+# 47. el aviso de cada renglón sale sólo para los cinco primeros del ítem
+reemplazar $F '        for n in ns:' '        for n in ns[:5]:'
+caso "aviso_renglon_tope_5" "$LIMPIO[salteados]"
+
+# 48. el aviso de cada renglón sale sólo para el segundo del ítem
 reemplazar $F '        for n in ns:' '        for n in ns[1:2]:'
 caso "aviso_renglon_solo_el_segundo" "$LIMPIO[seguidos]" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
 
-# 48. el aviso de cada renglón recorre del primero al último, también los que no son del ítem
+# 49. el aviso de cada renglón recorre del primero al último, también los que no son del ítem
 reemplazar $F '        for n in ns:' '        for n in range(ns[0], ns[-1] + 1):'
 caso "aviso_renglon_de_corrido" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
 
-# 49. el aviso de cada renglón recorre tantos renglones seguidos como tiene el ítem
+# 50. el aviso de cada renglón recorre tantos renglones seguidos como tiene el ítem
 reemplazar $F '        for n in ns:' '        for n in range(ns[0], ns[0] + len(ns)):'
 caso "aviso_renglon_seguidos" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
 
-# 50. el que va solo entre dos que van juntos cuenta como renglón y pierde el aviso de su sufijo
+# 51. el que va solo entre dos que van juntos cuenta como renglón y pierde el aviso de su sufijo
 reemplazar $F '    en_renglones = {n for ns in juntos for n in ns}
     if sbt_sufijo_valor is not None:' '    en_renglones = {n for ns in juntos for n in range(ns[0], ns[-1] + 1)}
     if sbt_sufijo_valor is not None:'
 caso "en_renglones_de_corrido" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]"
 
-# 51. en los avisos del arancel, el grupo que queda entre dos que van juntos se nombra como ítem
+# 52. en los avisos del arancel, el grupo que queda entre dos que van juntos se nombra como ítem
 reemplazar $F '        general = ""
     en_renglones = {n for ns in juntos for n in ns}
 ' '        general = ""
@@ -297,15 +301,11 @@ reemplazar $F '        general = ""
 '
 caso "arancel_en_renglones_de_corrido" "$LIMPIO[un_grupo_en_el_medio]"
 
-# 52. sólo los del primer ítem cuentan como renglones: los de los otros se avisan dos veces
+# 53. sólo los del primer ítem cuentan como renglones: los de los otros se avisan dos veces
 reemplazar $F '    en_renglones = {n for ns in juntos for n in ns}
     if sbt_sufijo_valor is not None:' '    en_renglones = {n for ns in juntos[:1] for n in ns}
     if sbt_sufijo_valor is not None:'
 caso "en_renglones_primer_item" "$LIMPIO[tres_items]"
-
-# 53. el aviso de cada renglón sale sólo para los cinco primeros del ítem
-reemplazar $F '        for n in ns:' '        for n in ns[:5]:'
-caso "aviso_renglon_tope_5" "$LIMPIO[salteados]"
 
 # 54. el renglón sin sufijo se avisa con el de la operación, que ya tiene su aviso
 reemplazar $F 'f" del renglón {n + 1}", items[n].get("sufijo")))' 'f" del renglón {n + 1}", items[n].get("sufijo") or sbt_sufijo_valor))'
@@ -323,7 +323,7 @@ caso "avisos_al_reves" "$LIMPIO[salteados]"
 
 # 57. el sufijo de la operación se avisa aunque ningún renglón lo use
 reemplazar $F 'sufijos = [("", sbt_sufijo_valor)] if usa_el_general else []' 'sufijos = [("", sbt_sufijo_valor)]'
-caso "aviso_de_la_operacion_sin_uso" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
+caso "aviso_de_la_operacion_sin_uso" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
 
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
 echo "OK: los 57 sabotajes dan rojo por la razón esperada"
