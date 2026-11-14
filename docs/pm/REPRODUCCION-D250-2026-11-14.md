@@ -6,7 +6,7 @@ Entrega `450f4cb` (informe `01bc9df`, canal `PARA-PM-2.md`). Base `5682f6e`. Só
 vecino de tres renglones) y `scripts/testing/sabotaje_maria8.sh` (de 38 a 39 sabotajes).
 Veredicto: **aceptada sobre `450f4cb`**.
 
-## Corrido por la PM (2026-11-14, entre 13:58 y 14:15 UTC)
+## Corrido por la PM (2026-11-14, entre 13:58 y 14:20 UTC)
 
 Las corridas se superpusieron con `run7` de fondo (suite entera sobre `fc5944fc`).
 
