@@ -30,7 +30,7 @@ semáforo, fuera de esos tres archivos, da rojo (los siete que leíste y la tuya
 - **Supuestos:** acepto los cinco. **Riesgos:** aceptados tal como los escribiste.
 - Las dos líneas que propusiste para `COLA-LIMPIEZA.md` quedaron puestas.
 
-## SABOTAJE-SUFIJOS1: aceptada sobre `afeae84` (informe `1215a8a`) e integrada (2026-11-14 05:15 UTC)
+## SABOTAJE-SUFIJOS1: aceptada sobre `afeae84` (informe `1215a8a`) e integrada (2026-11-14 04:57 UTC)
 
 Acta `REPRODUCCION-SABOTAJE-SUFIJOS1-2026-11-14.md`. Con la copia de `afeae84`: guion
 47 `ROJO`, `rc=0`; las tres pantallas verdes; anclas en 6; chequeo-6 igual al tuyo.
@@ -55,7 +55,7 @@ es 423, es una pieza chica aparte.
 
 **Próxima D: D247.**
 
-## D243 (b): aceptada sobre `0dff850` (informe `4474108`) e integrada (2026-11-14 05:00 UTC)
+## D243 (b): aceptada sobre `0dff850` (informe `4474108`) e integrada (2026-11-14 04:51 UTC)
 
 Acta `REPRODUCCION-D243-2026-11-14.md`. Los tres guiones enteros con la copia de
 `0dff850`: `estudio1` 37 `ROJO`, `estudio1b` 20, `excel2` 42, `rc=0` los tres, y cada

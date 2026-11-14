@@ -3,7 +3,7 @@
 Entrega `afeae84` (informe `1215a8a`, canal `PARA-PM-2.md`). Base `4474108`.
 Veredicto: **aceptada sobre `afeae84`**. Sólo arnés. D246 (b), decidida por la PM.
 
-## Corrido por la PM (2026-11-14, 04:46–05:10 UTC, worktrees descartables)
+## Corrido por la PM (2026-11-14, desde las 04:46 UTC, worktrees descartables)
 
 Todo con la copia de los guiones de `afeae84`, no la de mi rama.
 
