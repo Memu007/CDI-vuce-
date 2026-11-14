@@ -173,7 +173,8 @@ caso "sin_aviso_juntos" "FAILED $T::test_los_avisos_dicen_que_renglones_van_junt
 
 # 24. no avisa que todos los sub-ítems llevan el mismo sufijo
 reemplazar $F '        if len(de_cada_uno) == 1 and "" not in de_cada_uno:' '        if False:'
-caso "sin_aviso_sufijo" "FAILED $T::test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo"
+MISMO="FAILED $T::test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo"
+caso "sin_aviso_sufijo" "$MISMO[heredan]" "$MISMO[propios_iguales]"
 
 # 25. dos renglones sin posición se juntan
 reemplazar $F '        if clave[0]:
@@ -237,7 +238,6 @@ caso "estado_renglon_fijo" "FAILED $T::test_el_estado_que_no_corresponde_en_el_t
 
 # 39. el aviso del mismo sufijo compara el de la operación sin limpiar
 reemplazar $F '                or limpiar_sufijo(str(sbt_sufijo_valor or "").strip())[0]' '                or str(sbt_sufijo_valor or "").strip()'
-MISMO="FAILED $T::test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo"
 caso "aviso_operacion_sin_limpiar" "$MISMO[heredan_uno_que_se_limpia]" \
   "$MISMO[uno_trae_el_limpio_y_el_resto_hereda]" "$MISMO[el_de_la_operacion_no_se_separa]"
 
