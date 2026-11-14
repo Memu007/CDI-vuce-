@@ -348,10 +348,40 @@ def test_kilos_de_un_renglon_que_al_centesimo_dan_cero_no_se_generan():
 # -------------------------------------------------------- avisos y pantalla
 
 
-def test_los_avisos_dicen_que_renglones_van_juntos():
-    renglones = _lonas()[:3] + [dict(LONA, pieza="39211390900F")]
+def _dichos(numeros):
+    """Los renglones como los dice un aviso: «1, 2 y 3»."""
+    *antes, ultimo = (str(n) for n in numeros)
+    return f"{', '.join(antes)} y {ultimo}" if antes else ultimo
+
+
+def _aviso_del_mismo_sufijo(cuales, cuantos, sufijo):
+    return (f"Sufijo de valor: en el ítem de los renglones {cuales} los {cuantos} sub-ítems llevan "
+            f"el mismo sufijo («{sufijo}»). Si cada renglón lleva el suyo (marca, modelo, color), cargalo en "
+            "«Sufijo de valor» de cada producto, en «Lo que decide el despachante».")
+
+
+POSICIONES = {"A": LONA["pieza"], "B": "39211390900F", "C": "39211200900X"}
+# caso: (la posición de cada renglón, los renglones que los avisos dicen de cada ítem de varios)
+JUNTOS = {
+    "seguidos": ("AAAB", {"A": "1, 2 y 3"}),
+    "salteados": ("ABA", {"A": "1 y 3"}),
+    "tres_items": ("ABCCAB", {"A": "1 y 5", "B": "2 y 6", "C": "3 y 4"}),
+    "doce_renglones": ("A" * 12, {"A": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 y 12"}),
+}
+
+
+@pytest.mark.parametrize("caso", JUNTOS)
+def test_los_avisos_dicen_que_renglones_van_juntos(caso):
+    posiciones, juntos = JUNTOS[caso]
+    # Cada posición lleva su sufijo: el renglón de otro ítem que queda en el medio no cuenta.
+    renglones = [dict(LONA, pieza=POSICIONES[letra], sufijo=f"AA({letra})-") for letra in posiciones]
     avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor="AA(X)-")
-    assert any("renglones 1, 2 y 3 van en un solo ítem con 3 sub-ítems" in a for a in avisos)
+    assert [a for a in avisos if a.startswith("Sub-ítems:")] == [
+        f"Sub-ítems: los renglones {cuales} van en un solo ítem con {posiciones.count(letra)} sub-ítems "
+        "(misma posición SIM, origen, procedencia y estado)." for letra, cuales in juntos.items()]
+    assert [a for a in avisos if "llevan el mismo sufijo" in a] == [
+        _aviso_del_mismo_sufijo(cuales, posiciones.count(letra), f"AA({letra})-")
+        for letra, cuales in juntos.items()]
 
 
 SUCIO, LIMPIO = "AA(MARCA)-AI(620G-BLUE.010 150CMX50M)-", "AA(MARCA)-AI(620G BLUE 010 150CMX50M)-"
@@ -361,7 +391,7 @@ MISMO_SUFIJO = {
     "heredan": ((None, None, None), "AA(MARCA)-", "AA(MARCA)-"),
     "propios_vacios_heredan": (("", " ", None), "AA(MARCA)-", "AA(MARCA)-"),
     "dos_renglones": ((None, None), "AA(MARCA)-", "AA(MARCA)-"),
-    "cuatro_renglones": ((None,) * 4, "AA(MARCA)-", "AA(MARCA)-"),
+    "cinco_renglones": ((None,) * 5, "AA(MARCA)-", "AA(MARCA)-"),
     "heredan_uno_que_se_limpia": ((None, None, None), SUCIO, LIMPIO),
     "uno_trae_el_limpio_y_el_resto_hereda": ((LIMPIO, None, None), SUCIO, LIMPIO),
     "propios_iguales": ((SUCIO, LIMPIO, SUCIO), "", LIMPIO),
@@ -387,15 +417,12 @@ def test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo(caso):
     # Después va otro ítem, de tres renglones y un solo sufijo: su aviso sale siempre y
     # segundo, tenga o no el suyo el ítem de antes y aunque los dos lleven el mismo sufijo.
     renglones += [dict(LONA, pieza="39211390900F", sufijo="AA(MARCA)-") for _ in range(3)]
-    suyos, del_otro = {2: ("1 y 2", "3, 4 y 5"), 3: ("1, 2 y 3", "4, 5 y 6"),
-                       4: ("1, 2, 3 y 4", "5, 6 y 7")}[len(propios)]
-    esperados = ([] if muestra is None else [(suyos, len(propios), muestra)]) + [(del_otro, 3, "AA(MARCA)-")]
+    n = len(propios)
+    esperados = ([] if muestra is None else [(_dichos(range(1, n + 1)), n, muestra)]) + [
+        (_dichos(range(n + 1, n + 4)), 3, "AA(MARCA)-")]
     avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor=de_la_operacion)
     assert [a for a in avisos if "llevan el mismo sufijo" in a] == [
-        f"Sufijo de valor: en el ítem de los renglones {cuales} los {cuantos} sub-ítems llevan "
-        f"el mismo sufijo («{sufijo}»). Si cada renglón lleva el suyo (marca, modelo, color), cargalo en "
-        "«Sufijo de valor» de cada producto, en «Lo que decide el despachante»."
-        for cuales, cuantos, sufijo in esperados]
+        _aviso_del_mismo_sufijo(*esperado) for esperado in esperados]
 
 
 def test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon():
