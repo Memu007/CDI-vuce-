@@ -459,11 +459,11 @@ def _aviso_de_que_falta_el_codigo(donde):
 # avisos a cada renglón, en su orden. Fuera de un grupo, el que no está no trae sufijo)
 SE_LIMPIO = {
     "seguidos": ("AAA", {1: "renglón 1", 2: "renglón 2"}),
-    # El ítem tiene seis renglones y el 5 usa el sufijo de la operación; el 3 y el 6, de otras
-    # posiciones, quedan en el medio.
-    "salteados": ("AABAACAA", {3: "ítem 3", 6: "ítem 6", 1: "renglón 1", 2: "renglón 2",
-                               4: "renglón 4", 7: "renglón 7", 8: "renglón 8"}),
-    # Un grupo no se junta con nadie y se avisa una vez, con el sufijo de su primer renglón.
+    # El ítem tiene seis renglones; el 3 y el 6, de otras posiciones, quedan en el medio, y el 6
+    # usa el sufijo de la operación.
+    "salteados": ("AABAACAA", {3: "ítem 3", 1: "renglón 1", 2: "renglón 2", 4: "renglón 4",
+                               5: "renglón 5", 7: "renglón 7", 8: "renglón 8"}),
+    # Un grupo no se junta con nadie y se avisa una vez.
     "un_grupo_en_el_medio": ("AaaA", {2: "grupo ga", 1: "renglón 1", 4: "renglón 4"}),
     # Los renglones de cada ítem se nombran una vez, como renglones, sea el ítem que sea.
     "tres_items": ("ABCCAB", {1: "renglón 1", 5: "renglón 5", 2: "renglón 2", 6: "renglón 6",
@@ -474,14 +474,15 @@ SE_LIMPIO = {
 @pytest.mark.parametrize("caso", SE_LIMPIO)
 def test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon(caso):
     posiciones, nombres = SE_LIMPIO[caso]
-    # Cada sufijo está mal escrito (el punto sale como espacio) y es distinto de los otros. A los
-    # del grupo les falta el código de artículo que el arancel pide ahí; el de la operación lo trae.
+    # Cada sufijo está mal escrito (el punto sale como espacio) y es distinto de los otros. El de
+    # un grupo es uno solo, sin el código de artículo que el arancel pide; el de la operación lo trae.
     renglones = []
     for n, letra in enumerate(posiciones, start=1):
         grupo = {"grupo_id": f"g{letra}"} if letra.islower() else {}
-        sufijo = f"AA(M.{n})-" + ("" if grupo else f"AI(C{n})-")
+        sufijo = f"AA(M.{letra})-" if grupo else f"AA(M.{n})-AI(C{n})-"
         propio = {"sufijo": sufijo} if grupo or n in nombres else {}
         renglones.append(dict(LONA, pieza=POSICIONES[letra.upper()], **grupo, **propio))
+    _gen(renglones, sbt_sufijo_valor="AA(X.0)-AI(Y)-")  # los avisos son de un pedido que genera
     avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor="AA(X.0)-AI(Y)-")
     # El de la operación se avisa primero, una vez, y sólo si algún renglón lo usa.
     lo_usan = [renglon for renglon in renglones if "sufijo" not in renglon]
