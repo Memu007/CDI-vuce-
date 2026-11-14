@@ -294,3 +294,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `tests/test_sufijos2.py`: el camino donde el número que cambiaría sale de alrededor del
   valor (`AF(-2.5)`) sólo lo mira una prueba con comodín; falta un dato con el texto exacto en
   `test_el_error_nombra_el_codigo_que_falla_y_lo_corta`. Lo vio la Dev MARIA.
+- `proyecto_maria/core/maria_generator.py` (`limpiar_sufijo`): un `.upper()` de más en
+  `cambiaria[:20]` y el texto de la instrucción de los errores quedan verdes en
+  `test_sufijos2.py`: pedir una prueba. Lo vio el adversario de la Dev MARIA.

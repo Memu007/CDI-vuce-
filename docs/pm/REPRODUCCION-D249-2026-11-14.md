@@ -40,7 +40,7 @@ fue sobre `50dabfa`, con 13 cambios de la parte «cambiaría» y 0 en verde.
   «un dato más en el mismo caso».
 - Riesgo 3 (`.upper()`): previo, fuera de D249.
 - Sin `/code-review`: pasa esta vez, decidido por la PM (producto +0/−0 y el SHA entregado pasó
-  por el adversario). `/entregar` no lo exceptúa: en las próximas, se corre o se dice por qué no.
+  por el adversario). `/entregar` y «Ritmo y calidad» de Emi no lo exceptúan: desde D250 se corre siempre.
 - Sin D nueva: la próxima sigue siendo D251.
 
 ## No corrido
