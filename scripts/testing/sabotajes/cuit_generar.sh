@@ -24,21 +24,28 @@ DEL_PERFIL=("$MALO[guardado en el perfil]" "$MALO[guardado en el perfil, como lo
 DE_LA_OPERACION=("$MALO[en cuit_agr, con uno bueno en el perfil]"
                  "$MALO[en cuit_agr con guiones, sin CUIT en el perfil]")
 VACIO="$MALO[en cuit_agr de puros espacios, sin CUIT en el perfil]"
+DEL_ESTUDIO="$MALO[en el estudio elegido, con uno bueno en el perfil y en cuit_agr]"
 CON_ESPACIO="$BUENO[cuit_agr con verificador 9, guiones y un espacio]"
 MIRA='if crudo and not cuit_valido(cuit):'
+# Lo que muestra pytest cuando el error manda a recargar y el caso esperaba otro lugar.
+RECARGA="recargá la página.']} != {'errors': ['El CUIT del despachante «20999999998»"
 LLAMADA='        effective_cuit_agr, con_el_perfil = _cuit_del_despachante(estudio, request.cuit_agr, user)
 '
 
-# 1. No se genera con uno que no es un CUIT, venga del perfil o de la operación.
+# 1. No se genera con uno que no es un CUIT, venga del perfil, de la operación
+#    o del estudio elegido.
 sabotaje casos $M "sólo se cuentan los dígitos" \
   "$MIRA" 'if crudo and len(cuit) != 11:' \
-  "guardado en el perfil: 200" "${DEL_PERFIL[@]}" "${DE_LA_OPERACION[@]}"
+  "guardado en el perfil: 200" "${DEL_PERFIL[@]}" "${DE_LA_OPERACION[@]}" "$DEL_ESTUDIO"
 sabotaje casos $M "el del perfil no se mira" \
   "$MIRA" 'if crudo and not es_el_del_perfil and not cuit_valido(cuit):' \
   "guardado con guiones y un espacio: 200" "${DEL_PERFIL[@]}"
 sabotaje casos $M "el que manda la operación no se mira" \
-  "$MIRA" 'if crudo and es_el_del_perfil and not cuit_valido(cuit):' \
+  "$MIRA" 'if crudo and (es_el_del_perfil or estudio is not None) and not cuit_valido(cuit):' \
   "sin CUIT en el perfil: 200" "${DE_LA_OPERACION[@]}" "$VACIO"
+sabotaje casos $M "el del estudio elegido no se mira" \
+  "$MIRA" 'if crudo and estudio is None and not cuit_valido(cuit):' \
+  "en el estudio elegido, con uno bueno en el perfil y en cuit_agr: 200" "$DEL_ESTUDIO"
 sabotaje casos $M "uno de puros espacios cuenta como que falta" \
   "$MIRA" 'if cuit and not cuit_valido(cuit):' \
   "assert 'Falta el CUIT del despachante (CDDTAGR)" "$VACIO"
@@ -49,12 +56,17 @@ sabotaje casos $M "se rechaza después de contar la operación" \
             await _contar_maria(db, user["username"], request.operacion_id, "x", "x", 1, "MARIA_x")
             raise
 ' \
-  "lo que no se genera no queda contado ni guardado" "${DEL_PERFIL[@]}" "${DE_LA_OPERACION[@]}" "$VACIO"
+  "lo que no se genera no queda contado ni guardado" "${DEL_PERFIL[@]}" "${DE_LA_OPERACION[@]}" "$VACIO" "$DEL_ESTUDIO"
 
 # 2. El error dice dónde se corrige, según de dónde salió.
 sabotaje casos $M "dónde se corrige, al revés" \
-  '" if es_el_del_perfil' '" if not es_el_del_perfil' \
-  "corregilo ahí.']} != {'errors': ['El CUIT del despachante «20999999998»" "${DEL_PERFIL[@]}" "${DE_LA_OPERACION[@]}" "$VACIO"
+  'elif es_el_del_perfil:' 'elif not es_el_del_perfil:' \
+  "$RECARGA" "${DEL_PERFIL[@]}" "${DE_LA_OPERACION[@]}" "$VACIO"
+sabotaje casos $M "el del estudio elegido manda a corregir como si lo mandara la operación" \
+  '        if estudio is not None:
+            donde' '        if False:
+            donde' \
+  "$RECARGA" "$DEL_ESTUDIO"
 sabotaje casos $M "uno vacío cuenta como el del perfil" \
   'es_el_del_perfil = estudio is None and bool(cuit) and cuit == del_perfil' \
   'es_el_del_perfil = estudio is None and cuit == del_perfil' \
@@ -62,11 +74,11 @@ sabotaje casos $M "uno vacío cuenta como el del perfil" \
 sabotaje casos $M "el del perfil guardado con guiones no se reconoce como el del perfil" \
   'del_perfil = "".join(str((user or {}).get("cuit") or "").replace("-", "").split())' \
   'del_perfil = str((user or {}).get("cuit") or "")' \
-  "corregilo ahí.']} != {'errors': ['El CUIT del despachante «20999999998»" "$MALO[guardado con guiones y un espacio]"
+  "$RECARGA" "$MALO[guardado con guiones y un espacio]"
 sabotaje casos $M "el del perfil guardado con un espacio en el medio no se reconoce como el del perfil" \
   'del_perfil = "".join(str((user or {}).get("cuit") or "").replace("-", "").split())' \
   'del_perfil = str((user or {}).get("cuit") or "").replace("-", "").strip()' \
-  "corregilo ahí.']} != {'errors': ['El CUIT del despachante «20999999998»" "$MALO[guardado con guiones y un espacio]"
+  "$RECARGA" "$MALO[guardado con guiones y un espacio]"
 sabotaje casos $M "se nombra como llegó" \
   'cuit = "".join(str(crudo).replace("-", "").split())' 'cuit = str(crudo)' \
   "assert ['20-11111118 9'] == ['20111111189']" "$MALO[en cuit_agr con guiones, sin CUIT en el perfil]" "$VACIO" "$CON_ESPACIO"
@@ -83,7 +95,7 @@ sabotaje casos $M "el del perfil manda sobre cuit_agr" \
 sabotaje casos $M "el estudio elegido no manda" \
   'crudo = (estudio.cuit if estudio is not None else cuit_agr) or del_perfil' \
   'crudo = cuit_agr or del_perfil' \
-  "el estudio, aunque los otros dos sean malos: 400" "$BUENO[el estudio, aunque los otros dos sean malos]"
+  "el estudio, aunque los otros dos sean malos: 400" "$BUENO[el estudio, aunque los otros dos sean malos]" "$DEL_ESTUDIO"
 sabotaje casos $C "el verificador sale siempre de «11 − resto»" \
   'esperado = 0 if resto == 0 else 9 if resto == 1 else 11 - resto' 'esperado = 11 - resto' \
   "cuit_agr con verificador 0: 400" "$BUENO[cuit_agr con verificador 0]" "$CON_ESPACIO"
@@ -94,7 +106,7 @@ sabotaje pantalla $M "el servidor sólo cuenta los dígitos" \
   "$MIRA" 'if crudo and len(cuit) != 11:' \
   "FALLA: con 20999999998 guardado en el perfil se generó el TXT: CDDTAGR=20999999998"
 sabotaje pantalla $M "el error manda a corregirlo en la operación" \
-  '" if es_el_del_perfil' '" if not es_el_del_perfil' \
+  'elif es_el_del_perfil:' 'elif not es_el_del_perfil:' \
   "la pantalla no dice cuál es ni «Corregilo en «Mi perfil», campo «Mi CUIT (despachante)».»: error: El CUIT"
 sabotaje pantalla $F "la pantalla no muestra los errores del servidor" \
   "const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ') : detail;" 'const texto = detail;' \

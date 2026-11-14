@@ -9,7 +9,7 @@ import re
 import pytest
 from sqlalchemy import func, select
 
-from proyecto_maria.database.models import Operation
+from proyecto_maria.database.models import Estudio, Operation
 from tests.test_maria7_rechazos_24_10 import _pedido
 from tests.test_sesion1 import (  # noqa: F401  (las dos fixtures se usan solas)
     _bearer, _consulta, _http, _login, _poner, _sin_limites, _tablas, _usuario,
@@ -17,15 +17,18 @@ from tests.test_sesion1 import (  # noqa: F401  (las dos fixtures se usan solas)
 
 BUENO, OTRO_BUENO, MALO = "20111111112", "30712345671", "20999999998"
 EN_EL_PERFIL = "Corregilo en «Mi perfil», campo «Mi CUIT (despachante)»."
-EN_LA_OPERACION = "Es el que manda la operación, no el de tu perfil: corregilo ahí."
-# de dónde sale el malo → (guardado en el perfil, `cuit_agr`, el que se nombra, dónde se corrige)
+EN_LA_OPERACION = ("No es el de tu perfil: lo mandó la operación. Si ya lo corregiste en «Mi perfil», "
+                   "recargá la página.")
+EN_EL_ESTUDIO = "Es el del estudio elegido: en «Mi perfil», «Mis estudios», borralo y agregalo de nuevo."
+# de dónde sale el malo → (guardado en el perfil, `cuit_agr`, el del estudio elegido, el que se nombra, dónde se corrige)
 MALOS = {
-    "guardado en el perfil": (MALO, "", MALO, EN_EL_PERFIL),
-    "guardado en el perfil, como lo manda la pantalla": (MALO, MALO, MALO, EN_EL_PERFIL),
-    "guardado con guiones y un espacio": ("20-99999999 8", "", MALO, EN_EL_PERFIL),
-    "en cuit_agr, con uno bueno en el perfil": (BUENO, "30712345670", "30712345670", EN_LA_OPERACION),
-    "en cuit_agr con guiones, sin CUIT en el perfil": (None, "20-99999999-8", MALO, EN_LA_OPERACION),
-    "en cuit_agr de puros espacios, sin CUIT en el perfil": (None, "   ", "", EN_LA_OPERACION),
+    "guardado en el perfil": (MALO, "", None, MALO, EN_EL_PERFIL),
+    "guardado en el perfil, como lo manda la pantalla": (MALO, MALO, None, MALO, EN_EL_PERFIL),
+    "guardado con guiones y un espacio": ("20-99999999 8", "", None, MALO, EN_EL_PERFIL),
+    "en cuit_agr, con uno bueno en el perfil": (BUENO, "30712345670", None, "30712345670", EN_LA_OPERACION),
+    "en cuit_agr con guiones, sin CUIT en el perfil": (None, "20-99999999-8", None, MALO, EN_LA_OPERACION),
+    "en cuit_agr de puros espacios, sin CUIT en el perfil": (None, "   ", None, "", EN_LA_OPERACION),
+    "en el estudio elegido, con uno bueno en el perfil y en cuit_agr": (BUENO, BUENO, MALO, MALO, EN_EL_ESTUDIO),
 }
 # qué se usa → (guardado en el perfil, `cuit_agr`, con estudio elegido, CDDTAGR)
 BUENOS = {
@@ -46,6 +49,16 @@ def _cuenta(cuit):
     return u, _bearer(_login(u))
 
 
+def _estudio_en_la_base(u, cuit):
+    """El id de un estudio puesto directo en la base: el alta no guarda uno con un CUIT malo."""
+    async def _alta(s):
+        estudio = Estudio(owner_username=u, nombre="Estudio Inventado", cuit=cuit)
+        s.add(estudio)
+        await s.flush()
+        return estudio.id
+    return _consulta(_alta)
+
+
 def _operaciones(u):
     async def _contar(s):
         return (await s.execute(select(func.count()).select_from(Operation).where(Operation.owner_username == u))).scalar()
@@ -54,9 +67,12 @@ def _operaciones(u):
 
 @pytest.mark.parametrize("origen", MALOS)
 def test_con_un_cuit_del_despachante_malo_no_se_genera_y_dice_donde_corregirlo(origen):
-    perfil, cuit_agr, nombrado, donde = MALOS[origen]
+    perfil, cuit_agr, del_estudio, nombrado, donde = MALOS[origen]
     u, sesion = _cuenta(perfil)
-    r = _http().post("/generate_maria", json=_pedido(cuit_agr=cuit_agr), headers=sesion)
+    pedido = _pedido(cuit_agr=cuit_agr)
+    if del_estudio:
+        pedido["estudio_id"] = _estudio_en_la_base(u, del_estudio)
+    r = _http().post("/generate_maria", json=pedido, headers=sesion)
     assert r.status_code == 400, f"{origen}: {r.status_code} {r.text[:300]}"
     assert r.json()["detail"] == {"errors": [
         f"El CUIT del despachante «{nombrado}» no es válido: son 11 dígitos (0-9) y el último es el verificador. {donde}"]}
