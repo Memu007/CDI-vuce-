@@ -270,7 +270,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `'AA(DemoPouchs)-CA00-'` escrito tres veces; una constante.
 - `scripts/testing/pantalla_orden1.js`: `listaParaGenerar` y `enValidacionQuieta`
   dejan lista una operación de dos formas; una sola, con z20, z22 y z23.
-- `scripts/testing/sabotaje_maria8.sh`: el `38` del último `echo` está escrito a mano.
+- `scripts/testing/sabotaje_maria8.sh`: el número del último `echo` (hoy `43`) está escrito a mano.
   Si se agrega o se saca un caso y no se toca, el guion miente la cuenta. Contarlos.
   Lo vio la Dev MARIA.
 - `scripts/testing/sabotaje_maria5.sh`: el `50` del último `echo` está escrito a mano (como
@@ -297,6 +297,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `proyecto_maria/core/maria_generator.py` (`limpiar_sufijo`): un `.upper()` de más en
   `cambiaria[:20]` y el texto de la instrucción de los errores quedan verdes en
   `test_sufijos2.py`: pedir una prueba. Lo vio el adversario de la Dev MARIA.
-- `tests/test_maria8_subitems_por_posicion.py` (líneas 235, 237, 403 y 406): los textos que
-  ya están en `SUCIO` y `LIMPIO` se repiten como literales; usar las constantes. Lo vio la Dev
+- `tests/test_maria8_subitems_por_posicion.py` (`test_el_sufijo_del_renglon_se_limpia` y
+  `test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon`): los textos que ya están en
+  `SUCIO` y `LIMPIO` se repiten como literales; usar las constantes. Lo vio la Dev
   MARIA.
