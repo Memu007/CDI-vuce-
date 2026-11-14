@@ -273,3 +273,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `scripts/testing/sabotaje_maria8.sh`: el `38` del último `echo` está escrito a mano.
   Si se agrega o se saca un caso y no se toca, el guion miente la cuenta. Contarlos.
   Lo vio la Dev MARIA.
+- `scripts/testing/sabotaje_maria5.sh`: el `50` del último `echo` está escrito a mano (como
+  el de maria8), el venv por defecto `/tmp/cdi-dev2/venv` no existe en una sesión nueva, y el comentario
+  del caso 33 dice «el TXT no la usa» aunque `maria_generator.py:1098` llama a
+  `peso_valido`. Lo vio la Dev MARIA.
