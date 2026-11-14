@@ -18,7 +18,7 @@ const ITEM = { pieza: '39211390900F', descripcion: 'Lona de PVC gris', origen: '
                valor_unitario: 1.85, peso_unitario: 0.62 };
 // Escrito cuando la operación no tenía sufijo: la tarjeta sólo lo marca si compara con uno que no es el suyo.
 const ESCRITO = Object.assign({}, ITEM, { descripcion: 'Lona de PVC azul', sufijo: 'AI(Y7)-', sufijo_op: '' });
-const AJENO = 'AA(000123)', PROPIO = 'AA(000456)', FRENO = 'Ingresá el sufijo de valor SBT. Es obligatorio.';
+const AJENO = 'AA(000123)', PROPIO = 'AA(000456)', GUARDADO = 'AA(000789)', FRENO = 'Ingresá el sufijo de valor SBT. Es obligatorio.';
 const OTRO = 'Lo escribiste con otro sufijo de la operación';
 // cómo se llega a la otra operación: si antes se recarga, lo que trae guardado como sufijo, cómo se nombra
 const LLEGADAS = [
@@ -88,8 +88,8 @@ async function generar(page) {
 
   const aviso = () => page.evaluate(() => { const el = document.getElementById('sbtFieldError'); return el.hidden ? '' : el.textContent; });
   if (await aviso() !== FRENO) falla('la última llegada frenó y no dejó su aviso a la vista');
-  // Cada una entra después de un freno. La que trae su sufijo frena recién cuando se lo borran.
-  for (const [numero, suyo] of [['INV-2026/0733', PROPIO], ['INV-2026/0734', '']]) {
+  // Cada una entra después de un freno. A la que trae su sufijo se le borra, para que frene y le deje el aviso a la otra.
+  for (const [numero, suyo] of [['INV-2026/0733', GUARDADO], ['INV-2026/0734', '']]) {
     const cual = 'otra operación, ' + (suyo ? 'con su sufijo guardado' : 'sin sufijo');
     const entra = await entrar(page, Object.assign({}, ANTERIOR, { numero_factura: numero }, suyo ? { sbt_sufijo_valor: suyo } : {}), [ITEM]);
     if (await aviso()) falla(cual + ', entra con el aviso de la anterior a la vista: «' + await aviso() + '»');

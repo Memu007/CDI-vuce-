@@ -4,10 +4,11 @@
 # pasa como 2.º argumento.
 # Negativos discriminantes de SUFIJOS-1, uno por motivo: el producto entero
 # lleva su propio sufijo, un grupo exige uno solo (el «-» final no cuenta),
-# se avisan lo que la posición pide y falta (un código vacío no se genera), la
+# se avisan lo que la posición pide y falta, la
 # posición fuera del arancel y la letra de control equivocada, la unidad
 # estadística que no es la suya (con sub-ítems, el aviso propio) y el AI
-# repetido; la tabla rota es una tabla que falta y la posición se lee entera;
+# repetido; un código con el valor vacío no se genera; la tabla rota es una
+# tabla que falta y la posición se lee entera;
 # la estadística de la tabla va al pedido salvo con sub-ítems, el script
 # frena si el SHA del ZIP no es el del LEEME y la propuesta pide sesión, lee
 # la NCM primero, sanea y recorta el texto, dice si falta la tabla y la letra
