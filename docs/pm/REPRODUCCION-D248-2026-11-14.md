@@ -73,3 +73,5 @@ hereda algo y no qué; el valor lo sostienen maria9 y sufijos2.
 - e2e_maria.sh: la pieza no toca el recorrido MARIA, sólo un guion de sabotaje.
 - Suite entera: sin cambio de producto.
 - Subagentes adversariales de la PM: arnés sin dinero, sesión ni datos.
+- `test_maria9_bordes.py` con un sabotaje: sólo corrió sin cambio (`9 passed`). Que
+  bordes agarra el valor equivocado lo afirma la Dev.
