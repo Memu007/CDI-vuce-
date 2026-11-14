@@ -252,7 +252,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `cuit_valido` (`controles_maria.py:52`) acepta `00000000000`: no mira el
   prefijo. Lo usan clientes, estudio y perfil; cerrarlo es una regla nueva
   del CUIT, sin camino medido de daño hoy (adversario de CUIT-PERFIL).
-- `main.py` (`/generate_maria`): el control de forma de los sub-ítems está dos veces (5059, agregado con EXCEL-2 en 7e9c4e00, y 5088 sobre 7436c6e5); queda uno, y `sabotaje_subitems1.sh` ataca el que queda. Con `controles_maria.py:127` saboteado también queda verde `test_la_validacion_no_revienta_con_subitems_raros` (camino del semáforo, `/api/validate/smart`): falta ver qué lo frena antes.
+- `main.py` (`/generate_maria`): el control de forma de los sub-ítems está dos veces (`:5082` y `:5111` sobre `bf6778e`). El segundo es código muerto: el primero corre antes y frena todo lo que el segundo frenaría (adversario: 0 diferencias en 364 pedidos). Sale el segundo, y del caso 7 de `sabotaje_subitems1.sh` sale su línea.
+- El control de forma de los sub-ítems vive en `/generate_maria` y no en `controles_antes_de_generar`: el semáforo (`/api/validate/smart`) da OK con sub-ítems mal armados que generar rechaza con 400. Una sola copia, en la función que usan los dos (Dev MARIA, SABOTAJE-SUBITEMS1).
 - `maria_generator.py:2013` (`_avisos_del_arancel`): el filtro `if v.strip() or len(c) == 4` de los códigos con valor vacío; desde SUFIJOS-2 un valor vacío frena antes, ver si quedó muerto y sacarlo.
 - `paises_maria.js` repite a mano alias que el servidor tiene en `PAISES_INDEC` («NL» está en los dos; «NLD» sólo en la pantalla): una sola fuente para las siglas (MARIA, PAIS-NL).
 - `scripts/testing/ataque_aislamiento.sh`, `limpiar()`: como root `pg_ctl stop` falla («cannot be run as root») y el Postgres queda en 5434 hasta un minuto; una corrida pegada a otra no levanta el suyo. Pararlo con `correr` (PM, sabotajes 13/11).

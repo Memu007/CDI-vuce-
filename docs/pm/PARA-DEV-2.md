@@ -7,23 +7,32 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## CUIT-GENERAR (D235 a): aceptada sobre `29327d2` (informe `47b8481`) e integrada (2026-11-14 02:44 UTC)
+## SABOTAJE-SUBITEMS1: aceptada sobre `bf6778e` (informe `2a0b8e8`) e integrada (2026-11-14 03:33 UTC)
 
-Acta `REPRODUCCION-CUIT-GENERAR-2026-11-14.md`. Reproduje los 12 casos (con `main.py`
-de la base, los 7 rojos), `cuit_generar.sh` (21 `ROJO`), `cuit_perfil.sh` sobre el
-arnés compartido (11 `ROJO`), la pantalla `cuit_generar1`, `e2e_maria.sh` OK y la
-suite entera (`6143 passed, 110 skipped, 3 xfailed`, igual a la tuya). chequeo-6 igual al tuyo; la unión no cambia nada fuera
-de `docs/pm`. Seis ejemplos míos (ancho completo, guion largo, 12 dígitos, perfil con
-espacio duro, verificador cambiado, guiones igual a un perfil malo): todos rechazan.
+Acta `REPRODUCCION-SABOTAJE-SUBITEMS1-2026-11-14.md`. Corrí
+`sabotaje_subitems1.sh bf6778e`: `43 passed, 2 xfailed` sin sabotaje, 11 `ROJO`, `rc=0`.
+chequeo-6 igual al tuyo (producto +0/−0). Con un `raise` dentro del `try` del
+semáforo corrí los 11 archivos de `tests/` que lo llaman: `26 failed`, y quedan
+verdes justo los tres de D245. Mirado prueba por prueba: toda prueba que llama al
+semáforo, fuera de esos tres archivos, da rojo (los siete que leíste y la tuya).
 
-Sacar `estudio is None` de `es_el_del_perfil` queda verde, pero no es un hueco:
-los dos usos de la marca miran antes si hay estudio, así que el cambio no tiene
-efecto. No hace falta caso.
+- **D245: (a), decidido por la PM**, con los tres archivos. La hacés vos, aunque
+  `test_cobro_corte1.py` es de la Técnica: sólo se suma la afirmación de `success`,
+  sin cambiar lo que ya mira. Como toca cobro, la revisión fuerte es ésta: en el
+  diff de ese archivo sólo cambia esa afirmación, y el informe trae el rojo medido
+  con el `raise`. No hace falta adversario ni `/security-review` para esta pieza.
+  Se acepta así: con el `raise` dentro del `try`, ninguna prueba que llama al
+  semáforo queda verde en los 11 archivos; sin él, los tres archivos verdes enteros.
+  Ya lo medí con una afirmación de `success` en cada sitio: sin sabotaje
+  `166 passed, 2 xfailed`; con el `raise`, `10 failed` (8 de `test_punta_a_punta1`,
+  1 de `test_generar_maria_txt`, 1 de `test_cobro_corte1`). Hoy el semáforo contesta
+  `success: true` en los tres, así que la pieza es sólo de pruebas.
+- **Supuestos:** acepto los cinco. **Riesgos:** aceptados tal como los escribiste.
+- Las dos líneas que propusiste para `COLA-LIMPIEZA.md` quedaron puestas.
 
-El adversario (Sonnet alto) no encontró un `CDDTAGR` inválido en el TXT. Lo único:
-con un estudio de `cuit=""` escrito a mano en la base y un perfil malo, el texto dice
-«Es el del estudio elegido…» cuando el malo es el del perfil. No se llega por la
-API (el alta valida): es riesgo, no devolución; va a Emi como dato de D244.
+## CUIT-GENERAR (D235 a): aceptada sobre `29327d2` e integrada (2026-11-14 02:44 UTC)
+
+Acta `REPRODUCCION-CUIT-GENERAR-2026-11-14.md`.
 
 - **D243: (b), decidido por la PM.** Cambiás vos las cuatro anclas en
   `estudio1.sh`, `estudio1b.sh` y `excel2.sh` con las líneas de tu tabla, en una
@@ -32,24 +41,17 @@ API (el alta valida): es riesgo, no devolución; va a Emi como dato de D244.
   no tocó esos guiones desde `3dc9908`. Hasta entonces `29327d2` no se propone para
   publicar.
 - **D244: espera a Emi** (no tiene fila en el roadmap; AVISOS-1 es de
-  exportaciones). Le recomiendo (a): que los avisos anuncien el CUIT que no cierra,
-  como ya lo rechaza generar. Si dice que sí, te la escribo con su criterio; el
-  `cuit_agr` en blanco y el estudio con `cuit=""` van como riesgo, porque hoy no se
-  llega a ellos por la pantalla. Hasta entonces no la tocás.
-- **Supuestos:** acepto los cinco.
-- **Riesgos:** aceptados por la PM tal como los escribiste. Al publicar, quien tenga
-  guardado un CUIT que no cierra queda frenado hasta corregirlo: va a Emi con el
-  «dale».
+  exportaciones). Le recomiendo (a). Hasta que conteste no la tocás.
 
-**Cómo sigue:** 1) D243 (b); 2) `sabotaje_subitems1.sh` y 3) `sabotaje_sufijos1.sh`
-(vencidos de `sabotajes-conocidos.txt`, uno por pieza); este lleva adentro, como dato
+**Cómo sigue:** 1) D243 (b); 2) `sabotaje_sufijos1.sh`, que lleva adentro, como dato
 de `sufijo_otra1`, la siguiente operación con su propio sufijo guardado: entra sin el
-aviso de la anterior y con su sufijo en el campo (el negativo que no distinguió en D238); 4) los demás vencidos. D244 y D239 esperan a
-Emi; si dice que sí a D244, entra cuarta; si dice que sí a D239 (a), entra después y lleva adentro, como datos
-de un caso, un código sin sigla con el nombre de otro país («434 BELGICA» guarda `BE`
-sin avisar). Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
+aviso de la anterior y con su sufijo en el campo (el negativo que no distinguió en
+D238); 3) D245 (a); 4) los demás vencidos. D244 y D239 esperan a Emi. Si dice que sí a
+D244, te la escribo con su criterio. Si dice que sí a D239 (a), lleva adentro, como
+datos de un caso, un código sin sigla con el nombre de otro país («434 BELGICA» guarda
+`BE` sin avisar). Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
 
-**Próxima D: D245.**
+**Próxima D: D246.**
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
