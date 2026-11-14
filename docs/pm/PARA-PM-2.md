@@ -2,180 +2,182 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## D247 (a): entregada en `4a58c68`. Con «{sufijo[:40]}» el error del vacío da rojo en las cuatro formas. Queda la misma falta en «pide un número» y «cambiaría»: va como D249
+## D248 (c): entregada en `3fcc9c4`. El caso 20 de `sabotaje_maria8.sh` ahora ataca la herencia del sufijo de la operación; el guion sigue en 38 `ROJO` y 0 `FALLA`
 
 | qué | SHA |
 |---|---|
-| base (informe de SABOTAJE-MARIA8) | `87be8f1` |
-| pruebas: `VACIOS` dice qué código nombra el error; un sabotaje más en `sufijos2.sh` | `b597c31` |
-| pruebas: la afirmación vuelve a fijar el orden de las frases. **Lo que se entrega** | `4a58c68` |
-| tu rama, traída (`f13e5c7`: MARIA8 aceptada, D248 (c)) | `e5e1090` |
+| base (informe de D247 (a)) | `ee3ccfd` |
+| pruebas: sale el caso 20 viejo y entra `sin_herencia`. **Lo que se entrega** | `3fcc9c4` |
+| tu rama, traída (`3a6ae61`: D247 (a) aceptada, D249 (a)) | `a6e3bc8` |
 | informe | el commit siguiente |
 
-`producto +0/−0`. `arnés +12/−2`: `tests/test_sufijos2.py` y
-`scripts/testing/sabotajes/sufijos2.sh`, los dos que autorizaste. Nada más
-tocado.
+`producto +0/−0`. `arnés +17/−14`: sólo `scripts/testing/sabotaje_maria8.sh`.
 
-Leí la aceptación de SABOTAJE-MARIA8 y D248 (c): es lo que sigue.
+Leí la aceptación de D247 (a) y D249 (a) con la familia entera: va después de
+los 6 vencidos, y sólo toco `tests/test_sufijos2.py` y `sabotajes/sufijos2.sh`.
 
-## Decisiones
+## Nada para decidir
 
-**D249. Los otros dos errores de `limpiar_sufijo` tampoco fijan qué código nombran.**
+Dos supuestos reversibles:
 
-Es la misma falta que D247, en las pruebas de al lado
-(`tests/test_sufijos2.py`, de la Técnica; D247 no me autorizaba a tocarlas).
-Los tres mensajes usan `«{uno[0][:40]}»`. Sobre `4a58c68`, cambiando sólo esa
-parte del producto:
-
-| mensaje | cambio | resultado |
-|---|---|---|
-| «cambiaría de valor» | `«{sufijo[:40]}»` (el sufijo entero) | `171 passed` |
-| «pide un número» | `«{sufijo[pos:pos + 40]}»` (desde el código hasta el final) | `171 passed` |
-| «pide un número» | `«{sufijo[:40]}»` | `1 failed, 170 passed`: lo ve un solo dato, `AA(X)-ZB(16.384)-CA00-` |
-| «está vacío» | `«{uno[0]}»` (sin el recorte a 40) | `171 passed` |
-
-Qué le pasa a quien usa el sistema si eso se rompe: el error le muestra el
-sufijo entero y tiene que buscar a ojo cuál de los códigos está mal. No sale
-un TXT malo: el error se sigue dando.
-
-- (a) Me autorizás una pieza chica aparte: los datos de esos dos casos como
-  pares (sufijo, código que nombra), un código de más de 40 letras, y tres
-  sabotajes en `sufijos2.sh`.
-- (b) La hace la Técnica, que es la dueña del archivo.
-- (c) Queda así.
-
-**Recomiendo (a), después de los vencidos.** Es el mismo arreglo que ya
-decidiste para «está vacío» y ya tengo los tres cambios reproducidos. No es
-urgente: no cambia lo que sale en el TXT.
+1. **Seguí tu sugerencia: los tres lugares donde se hereda van como datos del
+   mismo caso.** Para eso `caso` acepta más de un texto esperado. Si no lo
+   querés: se deja sólo el `reemplazar` del renglón y un texto; `caso` con un
+   solo texto se comporta igual que antes.
+2. **Es un caso, no tres: la cuenta queda en 38.** Tu acta eligió (c) «sin
+   cambiar la cuenta». El costo está en «Riesgos», punto 1. Partirlo en tres
+   casos (40) son unas 6 líneas, si lo preferís.
 
 ## Lo que cambió
 
-`tests/test_sufijos2.py`. `VACIOS` pasó de lista a pares (tu sugerencia): el
-sufijo y el código que el error tiene que nombrar. Los nombres de los cuatro
-casos no cambian (`[AA()-CA00-]`, `[AA(   )-]`, `[AA(DEMO)-AB()-]`,
-`[AA(--)-]`), así que los sabotajes que ya los citaban siguen valiendo.
+Salió el caso 20 viejo (`pide_sufijo_operacion`), que atacaba un control que
+ya no existe. Entró este:
 
-```python
-# sufijo: el código que el error nombra, y no el sufijo entero
-VACIOS = {"AA()-CA00-": "AA()", "AA(   )-": "AA(   )", "AA(DEMO)-AB()-": "AB()", "AA(--)-": "AA(--)"}
-
-@pytest.mark.parametrize("vacio", VACIOS)
-def test_un_sufijo_vacio_no_se_genera(vacio):
-    nombra = re.escape(VACIOS[vacio])
-    with pytest.raises(ValueError, match=rf"Sufijo de valor del ítem 2: «{nombra}» está vacío.*no se genera"):
-        mg.limpiar_sufijo(vacio, " del ítem 2")
+```bash
+# 20. sin sufijo propio, el renglón, el ítem entero y el sub-ítem a mano dejan
+# de heredar el de la operación: una prueba por lugar
+reemplazar $F 'f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0] or sufijo_de_la_operacion()' 'f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0]'
+reemplazar $F '                          or sufijo_de_la_operacion())' '                          )'
+reemplazar $F 'f" del ítem {n_item}, sub-ítem {n}")[0] or sufijo_de_la_operacion()' 'f" del ítem {n_item}, sub-ítem {n}")[0]'
+caso "sin_herencia" "FAILED $T::test_sin_sufijo_propio_el_renglon_lleva_el_de_la_operacion" \
+  "FAILED $T::test_un_renglon_solo_sale_como_antes" \
+  "FAILED $T::test_un_grupo_a_mano_y_los_subitems_a_mano_no_se_mezclan"
 ```
 
-Antes la expresión era `«A[AB]\(.*está vacío.*no se genera`: el `.*` se comía
-el resto del sufijo.
+Son los tres únicos usos de `… or sufijo_de_la_operacion()` del producto
+(`maria_generator.py` 1701, 1726 y 1799). Las tres anclas son código y están
+una sola vez.
 
-`scripts/testing/sabotajes/sufijos2.sh`: un sabotaje más, «el error del vacío
-nombra el sufijo entero y no el código» (`«{uno[0][:40]}» está vacío` →
-`«{sufijo[:40]}» está vacío`), que tiene que dar rojo en los cuatro casos.
+`caso` cambió en tres puntos:
 
-**Un error mío, ya arreglado.** En `b597c31` partí la afirmación en dos
-(`match="no se genera"` y un `in` aparte). Así dejaba de fijar que «está
-vacío» va antes que «no se genera», que la expresión vieja sí fijaba. Lo
-marcaron el adversario y `/code-review`. `4a58c68` lo vuelve a una sola
-expresión. Con las frases del producto cambiadas de orden: `87be8f1`
-`4 failed`, `b597c31` `171 passed` (el hueco), `4a58c68` `4 failed`.
+- acepta varios textos esperados y exige todos;
+- si faltan, la `FALLA` nombra todos los que faltan, no sólo el primero;
+- llamado sin texto esperado corta con `falta el texto esperado` (antes
+  buscaba un texto vacío, que siempre está, y daba `ROJO`).
+
+Los otros 37 casos pasan un solo texto y dan lo mismo que antes.
 
 ## Resultado, contra tu criterio
 
-| criterio | resultado |
+| criterio | resultado sobre `3fcc9c4` |
 |---|---|
-| con `«{sufijo[:40]}»` la entrega da rojo en las cuatro formas | `4a58c68`: `4 failed, 167 passed`, los cuatro `test_un_sufijo_vacio_no_se_genera[...]` |
-| la base `0224f01` queda verde con ese cambio | `171 passed` |
-| `sufijos2.sh` entero en `ROJO`, con uno más (33) | `BASE \| 110 passed`; 33 `ROJO`; `sabotajes sin rojo: 0`; `rc=0` |
-| `sabotaje_sufijos1.sh` sigue en 46 | 46 `ROJO`, 0 `FALLA`; `OK: los 46 sabotajes dan rojo por la razón esperada`; `rc=0` |
-| anclas en 5 de una línea y 1 de varias | `perdida, una línea 5 guiones: 4`; `perdida, varias líneas 1 guiones: 1` |
-| las dos pruebas verdes | `tests/test_sufijos1.py tests/test_sufijos2.py`: `171 passed` |
+| el 20 sale y entra «el renglón sin sufijo propio deja de heredar el de la operación» | hecho; se llama `sin_herencia` |
+| `ROJO` por `test_sin_sufijo_propio_el_renglon_lleva_el_de_la_operacion` | `ROJO   sin_herencia: 4 failed, 42 passed`; el texto esperado incluye esa prueba |
+| el guion sigue en 38 `ROJO` y 0 `FALLA` | 38 `ROJO`, 0 `FALLA`; `OK: los 38 sabotajes dan rojo por la razón esperada`; `rc=0` |
+| las anclas no empeoran (5 y 1) | `perdida, una línea 5 guiones: 4`; `perdida, varias líneas 1 guiones: 1` |
+| sugerencia: ítem entero y sub-ítem como datos del caso | adentro, sin tocar otro guion |
+
+Cada lugar sacado solo, sobre `3fcc9c4`, corriendo el archivo del guion:
+
+| lugar (línea) | resultado | pruebas en rojo |
+|---|---|---|
+| renglón (1701) | `2 failed, 44 passed` | `test_sin_sufijo_propio_el_renglon_lleva_el_de_la_operacion`, `test_el_pedido_de_la_pantalla_sale_en_un_item` |
+| ítem entero (1726) | `1 failed, 45 passed` | `test_un_renglon_solo_sale_como_antes` |
+| sub-ítem a mano (1799) | `1 failed, 45 passed` | `test_un_grupo_a_mano_y_los_subitems_a_mano_no_se_mezclan` |
+
+Cada una de las tres pruebas esperadas da rojo sólo por su lugar.
+
+El guion mismo, en copias recortadas (caso 0 y caso 20), con cada falta
+provocada:
+
+| copia | salida |
+|---|---|
+| entera | `ROJO   sin_herencia: 4 failed, 42 passed`; `rc=0` |
+| sin el cambio del renglón | `FALLA  sin_herencia: rojo, pero sin «FAILED …::test_sin_sufijo_propio_el_renglon_lleva_el_de_la_operacion»`; `rc=1` |
+| sin el del ítem entero | `FALLA` sin «…::test_un_renglon_solo_sale_como_antes»; `rc=1` |
+| sin el del sub-ítem | `FALLA` sin «…::test_un_grupo_a_mano_y_los_subitems_a_mano_no_se_mezclan»; `rc=1` |
+| sin ítem ni sub-ítem | una `FALLA` que nombra las dos; `rc=1` |
+| `caso` sin texto esperado | `2: falta el texto esperado`; `rc=1` |
 
 ## Revisión adversarial
 
-Pieza chica de arnés: un adversario, Sonnet, esfuerzo medio, sobre `b597c31`,
-en un árbol descartable.
+Pieza chica de arnés: un adversario, Sonnet, esfuerzo medio, sobre `22ac41c`
+(la versión anterior al ajuste de abajo), en un árbol descartable.
 
 | qué probó | resultado |
 |---|---|
-| el mensaje del vacío con `{sufijo[:40]}`, `{codigo}`, `{valor}`, `{uno[0][:3]}`, `{uno[0][:2]}`, un espacio de más entre comillas | `4 failed, 167 passed` cada uno |
-| `{uno[0][:5]}` | `2 failed, 169 passed` |
-| sin tildes / sin `donde` | `9 failed` / `8 failed` |
-| los nombres de los cuatro casos | iguales que antes; ningún otro guion los cita |
-| el sabotaje nuevo | ancla de código, una sola vez; rojo por la afirmación; no repite otro |
-| **verde y no debería:** `{uno[0]}` sin recorte | `171 passed`. Ya estaba así: va en D249 |
-| **verde y no debería:** las frases en otro orden | era mi error; arreglado en `4a58c68` |
+| el guion entero | 38 `ROJO`, 0 `FALLA` |
+| cada lugar solo | 2 / 1 / 1 failed; cada prueba roja sólo por su lugar; el rojo es `ValueError … falta el sufijo de valor`, no un error de sintaxis |
+| los tres juntos | 4 failed: las tres esperadas y `test_el_pedido_de_la_pantalla_sale_en_un_item` |
+| anclas en las dos revisiones | 5 y 1 |
+| el `caso` nuevo sobre los otros 37 | no los afloja |
+| las anclas | código, una vez cada una; la del ítem entero comparte texto con `sabotaje_sufijos1.sh`, que trabaja en otro árbol: no se pisan |
+| una cuarta herencia sin atacar | no hay |
 
-No encontró defecto de la pieza fuera de esos dos.
+Sin defectos. Marcó un hueco de cobertura que ya aceptaste:
+`test_con_todos_los_sufijos_propios_no_hace_falta_el_de_la_operacion` queda
+sin sabotaje. No corrió la suite entera, otros guiones ni `chequeo-6`.
 
-## `/code-review high 87be8f1..b597c31`
+## `/code-review high ee3ccfd..22ac41c`
 
-Sin errores de corrección. Cuatro observaciones, las cuatro reproducidas por
-mí:
+Sin errores de corrección. Seis observaciones:
 
 | observación | qué hice |
 |---|---|
-| el orden de las frases dejó de fijarse | arreglado en `4a58c68` |
-| «cambiaría» acepta el sufijo entero | D249 |
-| «pide un número» no fija dónde termina el código | D249 |
-| ningún dato pasa de 40 letras: el recorte no se prueba | D249 |
+| el caso aplica los tres cambios juntos y no obliga a que cada lugar lo agarre su propia prueba | queda como riesgo 1. El comentario y el mensaje del commit decían que sí lo obligaba: corregidos |
+| las pruebas del ítem entero y del sub-ítem dan rojo porque la generación corta con «falta el sufijo», no porque miren el valor heredado | riesgo 2, medido |
+| `caso` sin texto esperado daba `ROJO` | arreglado |
+| `caso` cortaba en el primer texto que faltaba | arreglado: nombra todos |
+| el ancla del ítem entero es genérica (espacios y `or sufijo_de_la_operacion())`) | queda. Si deja de ser única, el guion corta con `PATRON NO ENCONTRADO`: falla a la vista |
+| `test_con_todos_los_sufijos_propios…` sin sabotaje | ya aceptado por vos |
 
-**`4a58c68` no volvió a pasar por subagente ni por `/code-review`.** Es el
-arreglo de lo que ellos marcaron (4 líneas de una prueba). Lo comprobé con
-las dos mutaciones de arriba (el cambio de tu criterio y el orden) y con
-todas las puertas corridas de nuevo sobre ese SHA.
+**`3fcc9c4` no volvió a pasar por subagente ni por `/code-review`.** Es
+`22ac41c` con esos arreglos: tres puntos de `caso` y la redacción del
+comentario. Lo comprobé con las copias recortadas de arriba y con todas las
+puertas corridas de nuevo sobre ese SHA.
 
 ## Comandos
 
 ```bash
 VENV=/ruta/a/tu/venv
-git diff 87be8f1 4a58c68 --stat | tail -1           # 2 files changed, 12 insertions(+), 2 deletions(-)
-PY=$VENV/bin/python bash scripts/testing/sabotajes/sufijos2.sh 4a58c68 | grep -c '^ROJO  |'     # 33
-PY=$VENV/bin/python bash scripts/testing/sabotajes/sufijos2.sh 4a58c68 | tail -1                # sabotajes sin rojo: 0
-bash scripts/testing/sabotaje_sufijos1.sh 4a58c68 $VENV | tail -1
-#   OK: los 46 sabotajes dan rojo por la razón esperada   (unos 8 min)
-$VENV/bin/python scripts/testing/anclas_perdidas.py 4a58c68 | sed -n 2,3p
+git diff ee3ccfd 3fcc9c4 --stat | tail -1           # 1 file changed, 17 insertions(+), 14 deletions(-)
+bash scripts/testing/sabotaje_maria8.sh 3fcc9c4 $VENV > /tmp/m8.log; echo $?    # 0   (unos 5 min)
+grep -c '^ROJO ' /tmp/m8.log                        # 38
+grep -c '^FALLA' /tmp/m8.log                        # 0
+grep sin_herencia /tmp/m8.log                       # ROJO   sin_herencia: … 4 failed, 42 passed …
+$VENV/bin/python scripts/testing/anclas_perdidas.py 3fcc9c4 | sed -n 2,3p
 #     perdida, una línea          5   guiones: 4
 #     perdida, varias líneas      1   guiones: 1
 
-# tu criterio: el cambio, sobre la entrega y sobre la base
+# cada lugar solo
 export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-for sha in 0224f01 4a58c68; do
-  git worktree add -q --detach /tmp/wt-d247 $sha && cd /tmp/wt-d247
-  sed -i 's|«{uno\[0\]\[:40\]}» está vacío|«{sufijo[:40]}» está vacío|' proyecto_maria/core/maria_generator.py
+git worktree add -q --detach /tmp/wt-d248 3fcc9c4 && cd /tmp/wt-d248
+for linea in 1701 1726 1799; do
+  sed -i "${linea}s/ or sufijo_de_la_operacion()//" proyecto_maria/core/maria_generator.py
   git diff --stat | tail -1                         # 1 file changed, 1 insertion(+), 1 deletion(-)
   env -u DATABASE_URL -u ENVIRONMENT $VENV/bin/python -m pytest -q --no-cov -p no:cacheprovider --timeout=120 \
-      tests/test_sufijos1.py tests/test_sufijos2.py | tail -1
-  cd - && git worktree remove --force /tmp/wt-d247
+      tests/test_maria8_subitems_por_posicion.py | grep -E '^FAILED|failed'
+  git checkout -q -- .
 done
-#   0224f01: 171 passed          4a58c68: 4 failed, 167 passed
+cd - && git worktree remove --force /tmp/wt-d248
+#   1701: 2 failed, 44 passed     1726: 1 failed, 45 passed     1799: 1 failed, 45 passed
 ```
 
 Corrí cada uno una vez, con la salida a un archivo; esas son sus líneas. El
-árbol descartable lo armé en mi carpeta de trabajo, no en `/tmp/wt-d247`.
+árbol descartable lo armé en mi carpeta de trabajo, no en `/tmp/wt-d248`.
 
 ## Puertas
 
-Sobre `4a58c68`, árbol limpio.
+Sobre `3fcc9c4`, árbol limpio.
 
 | puerta | salida |
 |---|---|
-| `sufijos2.sh 4a58c68` | `BASE \| 110 passed`; 33 `ROJO`, ningún `VERDE`, `ROTO` ni `ROJO?`; `sabotajes sin rojo: 0`; `rc=0` |
-| `sabotaje_sufijos1.sh 4a58c68` | 46 `ROJO`, 0 `FALLA`; `rc=0` |
-| `tests/test_sufijos1.py tests/test_sufijos2.py` | `171 passed` |
-| `anclas_perdidas.py 4a58c68` | `103 guiones, 2490 anclas medidas y 11 llamadas sin medir`; 5 y 1; `rc=0` |
-| `chequeo-6.py 87be8f1 4a58c68` | abajo, `avisos: 0` |
+| `sabotaje_maria8.sh 3fcc9c4` | `VERDE  sin sabotaje: 46 passed`; 38 `ROJO`, 0 `FALLA`; `OK: los 38 sabotajes dan rojo por la razón esperada`; `rc=0` |
+| `tests/test_anclas_perdidas.py tests/test_maria8_subitems_por_posicion.py tests/test_maria9_sufijo_operacion.py` | `100 passed` |
+| `anclas_perdidas.py 3fcc9c4` | `103 guiones, 2492 anclas medidas y 11 llamadas sin medir`; 5 y 1; `rc=0` |
+| `chequeo-6.py ee3ccfd 3fcc9c4` | abajo, `avisos: 0` |
 
-**No corrido:** la suite entera (cambiaron una prueba y un guion, ningún
-producto), `compileall`, las pantallas, `e2e_maria.sh`, `smoke_friccion.sh`,
-`ataque_aislamiento.sh`, Postgres y `/security-review`.
+**No corrido:** la suite entera (cambió un guion, ningún producto ni prueba),
+`compileall`, las pantallas, `e2e_maria.sh`, `smoke_friccion.sh`,
+`ataque_aislamiento.sh`, Postgres, los demás guiones de sabotaje y
+`/security-review`.
 
 ## `chequeo-6`
 
 ```
-chequeo-6 87be8f1..4a58c68: avisos para mirar, no un veredicto
+chequeo-6 ee3ccfd..3fcc9c4: avisos para mirar, no un veredicto
 producto +0/−0
-arnés +12/−2
+arnés +17/−14
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
 avisos: 0
@@ -183,16 +185,27 @@ avisos: 0
 
 ## Riesgos
 
-- Lo de D249: tres cambios del texto de error que hoy quedan en verde. No
-  afectan el TXT.
-- `4a58c68` sin segunda revisión independiente (arriba).
-- Toqué dos archivos de la Técnica. Si ella tiene cambios sin subir sobre
-  `VACIOS` o sobre el bloque «Ninguno vacío» de `sufijos2.sh`, va a haber
-  conflicto al unir.
+1. **Que cada prueba responde sólo por su lugar está medido, no obligado por
+   el guion.** El caso saca las tres herencias juntas y pide las tres pruebas
+   en rojo. Si mañana alguien cambia una de esas pruebas y pasa a dar rojo por
+   el lugar de otra, el guion sigue diciendo `ROJO`. Lo midieron de a uno el
+   adversario, el revisor y yo. Obligarlo son tres casos (40).
+2. **En el ítem entero y el sub-ítem, lo que se prueba es que se hereda algo,
+   no qué.** Haciendo que cada lugar herede un valor fijo equivocado en vez
+   del de la operación, el archivo que corre este guion ve sólo el del
+   renglón (2 pruebas en rojo); el del ítem entero y el del sub-ítem quedan
+   verdes ahí. Los agarra `tests/test_maria9_sufijo_operacion.py` (4 y 4 en
+   rojo) y, para el ítem entero, `tests/test_maria9_bordes.py` (5). No sale un
+   TXT malo sin que una prueba lo vea; no lo ve este guion.
+3. El ancla genérica del ítem entero (arriba): falla a la vista.
+4. `test_con_todos_los_sufijos_propios_no_hace_falta_el_de_la_operacion` sin
+   sabotaje: aceptado por vos.
+5. `3fcc9c4` sin segunda revisión independiente (arriba).
 
 ## Líneas para COLA-LIMPIEZA
 
-Ninguna.
+- `sabotaje_maria8.sh`: el `38` del último `echo` está escrito a mano. Si se
+  agrega o se saca un caso y no se toca, el guion miente la cuenta. Contarlos.
 
 ## Archivos de producto que toqué
 
@@ -200,8 +213,9 @@ Ninguno.
 
 ## Sigo con
 
-D248 (c): en `sabotaje_maria8.sh` sale el caso 20 y en su lugar va «el
-renglón sin sufijo propio deja de heredar el de la operación». Después los 6
-vencidos, uno por pieza, empezando por `sabotaje_maria1d.sh`.
+El primer vencido, `scripts/testing/sabotaje_maria1d.sh` (anclas perdidas en
+:97 y :117). Antes de reescribir miro si la protección que atacaba cada una
+sigue existiendo; si no, vuelve como D250. Después maria5, valor1b, doc1.py,
+maria7 y guardar2, uno por pieza; después D249 (a).
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama `claude/dev-maria`, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `f13e5c7`). Aceptadas: CUIT-GENERAR sobre `29327d2`, SABOTAJE-SUBITEMS1 sobre `bf6778e`, D243 (b) sobre `0dff850`, SABOTAJE-SUFIJOS1 sobre `afeae84`, D245 (a) sobre `e17c11e`, D246 (b) sobre `0224f01`, SABOTAJE-MARIA8 sobre `50320ff`. Entregada sin veredicto: **D247 (a) sobre `4a58c68`** (base `87be8f1`; sólo `tests/test_sufijos2.py` y `sabotajes/sufijos2.sh`, arnés +12/−2; 33 y 46 `ROJO`; anclas 5 y 1), con **D249 abierta**: «pide un número» y «cambiaría» tampoco fijan qué código nombran, ni el recorte a 40 (opciones: (a) pieza chica mía aparte, recomendada, después de los vencidos; (b) la Técnica; (c) queda). Si vuelve con devolución, va primero. **Pieza activa: D248 (c)**, decidida por la PM: en `scripts/testing/sabotaje_maria8.sh` sale el caso 20 y en su lugar va el sabotaje «el renglón sin sufijo propio deja de heredar el de la operación», en `ROJO` por `test_sin_sufijo_propio_el_renglon_lleva_el_de_la_operacion`; el guion sigue en 38 `ROJO` y 0 `FALLA`; anclas no empeoran (5 y 1); su ancla cuelga del final de la línea del 18 y está bien así; sugerencia suya, no criterio: la misma herencia en el ítem entero y en el sub-ítem, como datos del caso, si entran sin tocar otro guion. Después, uno por pieza: maria1d, maria5, valor1b, doc1.py, maria7, guardar2. D244, D239 y «Holanda» esperan a Emi: no se tocan. Próxima D: D250. Lecciones: antes de lanzar algo en segundo plano se borra su marca de fin; un texto de error que manda a corregir se prueba por cada origen del dato; una prueba que sólo mira el 200 de un endpoint que se traga sus errores no prueba nada; un dato nuevo de un caso no reusa un valor que otro control del mismo caso espera; antes de escribir el informe se trae la rama de la PM; antes de sacar una prueba por duplicada se compara lo que afirma cada una, no sólo sus entradas; antes de reescribir un sabotaje con el ancla perdida se mira si la protección que atacaba sigue existiendo: si no, es una D (D195 (a)); al ajustar una afirmación, la nueva tiene que seguir afirmando todo lo que afirmaba la vieja (el orden también), y una mutación que «mueve» una frase la tiene que sacar de donde estaba. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica salvo lo que una D autoriza; subagentes hasta esfuerzo alto y sin consejero.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama `claude/dev-maria`, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `3a6ae61`). Aceptadas: CUIT-GENERAR sobre `29327d2`, SABOTAJE-SUBITEMS1 sobre `bf6778e`, D243 (b) sobre `0dff850`, SABOTAJE-SUFIJOS1 sobre `afeae84`, D245 (a) sobre `e17c11e`, D246 (b) sobre `0224f01`, SABOTAJE-MARIA8 sobre `50320ff`, D247 (a) sobre `4a58c68`. Entregada sin veredicto: **D248 (c) sobre `3fcc9c4`** (base `ee3ccfd`; sólo `scripts/testing/sabotaje_maria8.sh`, arnés +17/−14; 38 `ROJO`, 0 `FALLA`; anclas 5 y 1; el caso 20 es `sin_herencia`, con los tres lugares como datos y `caso` aceptando varios textos esperados). Si vuelve con devolución, va primero. **Pieza activa: el vencido `scripts/testing/sabotaje_maria1d.sh`** (anclas perdidas en :97, de varias líneas, caso `endpoint_sin_caratula`, y :117, caso `procedencia_rara_sin_aviso`); después, uno por pieza: maria5 (193, 227), valor1b (102, 114 están dos veces), doc1.py, maria7 (97), guardar2 (74); al arreglar cada uno saco mi línea de `docs/pm/herramientas/sabotajes-conocidos.txt`. Después **D249 (a)**, decidida por la PM: sólo `tests/test_sufijos2.py` y `scripts/testing/sabotajes/sufijos2.sh`, criterio entero en `docs/pm/PARA-DEV-2.md` (la familia de fragmentos «…» de `limpiar_sufijo`, un sabotaje por cambio, `sufijos2.sh` entero en `ROJO` con la cuenta exacta, `sabotaje_sufijos1.sh` en 46, anclas 5 y 1). D244, D239 y «Holanda» esperan a Emi: no se tocan. Próxima D: D250. Lecciones: antes de lanzar algo en segundo plano se borra su marca de fin; un texto de error que manda a corregir se prueba por cada origen del dato; una prueba que sólo mira el 200 de un endpoint que se traga sus errores no prueba nada; un dato nuevo de un caso no reusa un valor que otro control del mismo caso espera; antes de escribir el informe se trae la rama de la PM; antes de sacar una prueba por duplicada se compara lo que afirma cada una, no sólo sus entradas; antes de reescribir un sabotaje con el ancla perdida se mira si la protección que atacaba sigue existiendo: si no, es una D (D195 (a)); al ajustar una afirmación, la nueva tiene que seguir afirmando todo lo que afirmaba la vieja (el orden también), y una mutación que «mueve» una frase la tiene que sacar de donde estaba; una medición corre sobre el conjunto más angosto de pruebas que contesta la pregunta; antes de cambiar un número que la PM fijó como criterio se lee por qué lo fijó; un comentario o un mensaje de commit no afirma lo que el guion no obliga. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica salvo lo que una D autoriza; subagentes hasta esfuerzo alto y sin consejero.
