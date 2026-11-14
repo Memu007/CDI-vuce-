@@ -3,4 +3,3 @@
 # Una línea por guion. Los dos primeros campos son fijos (el selector lee el segundo); el resto, libre:
 #   vencido <guion> <fecha> <dueño: la Dev que lo arregla> <salida: retirarlo o reescribirlo> <por qué; evidencia>
 # El selector de sabotajes antes de publicar no lo elige y lo nombra.
-vencido scripts/testing/sabotajes/guardar2.sh 2026-11-12 MARIA reescribirlo 1 ancla no está (74); anclas_perdidas.py f507763
