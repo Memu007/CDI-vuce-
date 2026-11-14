@@ -99,10 +99,12 @@ reemplazar $JS '        delete resto.operation_id;
 caso "firma_con_hora" "FAILED $T::test_la_firma_no_cambia_por_el_numero_de_operacion_y_si_por_lo_demas"
 
 # 8. después de calcular, el botón sigue con las cuentas de antes
-reemplazar $JS '        cuentasViejas();
-        refrescarAvisos();
-        if (CDI.semaforo' '        refrescarAvisos();
-        if (CDI.semaforo'
+reemplazar $JS '            op.campos_completados = Array.from(completados);
+        }
+        cuentasViejas();
+' '            op.campos_completados = Array.from(completados);
+        }
+'
 caso "calculado_cuentas_viejas" "FAILED $T::test_el_boton_del_seguro_pone_el_sugerido_y_pide_las_cuentas_de_nuevo"
 
 # 9. el seguro calculado se sigue avisando como no leído
@@ -112,7 +114,9 @@ caso "sigue_sin_leer" "FAILED $T::test_el_seguro_calculado_deja_de_avisarse_como
 
 # 10. el semáforo no se entera del seguro calculado
 reemplazar $JS '        if (CDI.semaforo && CDI.semaforo.refresh) CDI.semaforo.refresh();
-' ''
+    }
+' '    }
+'
 caso "semaforo_sin_refrescar" "FAILED $T::test_el_seguro_calculado_deja_de_avisarse_como_no_leido"
 
 # 11. el botón no avisa que la factura puede traer un seguro sin leer
@@ -161,4 +165,4 @@ reemplazar $M '        return {"error": "Hay un dato que no es un número: no se
 caso "tipo_crudo" "FAILED $T::test_un_error_de_tipo_que_se_escape_no_muestra_el_texto_de_python"
 
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
-echo "OK: los 23 sabotajes dan rojo por la razón esperada"
+echo "OK: los 22 sabotajes dan rojo por la razón esperada"
