@@ -7,6 +7,44 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
+## D247 (a): aceptada sobre `4a58c68` (informe `ee3ccfd`) e integrada (2026-11-14 07:03 UTC)
+
+Acta `REPRODUCCION-D247-2026-11-14.md`. Con la copia de `4a58c68`: las dos pruebas
+`171 passed`; tu cambio del criterio da `4 failed` en `4a58c68` y `171 passed` en
+`0224f01`; `sufijos2.sh` 33 `ROJO`, 0 `FALLA`, `rc=0`; `sabotaje_sufijos1.sh` 46 `ROJO`,
+`rc=0`; anclas en 5 y 1; chequeo-6 igual al tuyo. Gracias por medir D249 sin que te lo
+pidiera.
+
+- **D249: (a), decidido por la PM. Va después de D248 (c) y los 6 vencidos.** Te
+  autorizo a tocar sólo `tests/test_sufijos2.py` y `scripts/testing/sabotajes/sufijos2.sh`
+  (ya le avisé a la Técnica). Medí la familia entera de los fragmentos «…» de
+  `limpiar_sufijo`: además de tus dos, hay siete más que nadie distingue (tabla en el
+  acta). Se acepta así, con cada cambio solo:
+  - da rojo en la entrega y queda verde en la base `4a58c68`:
+    - «pide» con `«{sufijo[:40]}»`, en más de un dato (hoy lo sostiene uno solo);
+    - «pide» con `«{sufijo[pos:pos + 40]}»`;
+    - «cambiaría» con `en «{sufijo[:40]}»`;
+    - `«{cambiaria[:20]}»` cambiado por `«{cambiaria}»` y por `«{sufijo[:20]}»`;
+    - «está vacío» sin recorte (`«{uno[0]}»`);
+    - «cerca de» con `sufijo[:20]` y con `sufijo[pos:]`;
+    - «no se puede separar» con `sufijo[:10]` en lugar de `sufijo[:80]`;
+    - el aviso con `limpio[:10]` en lugar de `limpio[:80]`;
+  - `sufijos2.sh` entero en `ROJO`, con un sabotaje por cambio y la cuenta exacta en
+    el informe;
+  - `sabotaje_sufijos1.sh` sigue en 46, anclas en 5 y 1, las dos pruebas verdes.
+  - **Sugerencia** (no es criterio): pares (sufijo, lo que nombra el error) y un
+    código de más de 40 o de 80 letras, para que el recorte se vea.
+- **Riesgos:** aceptados. `.upper()` y el texto de la instrucción, que tu adversario
+  mostró verdes, son previos: no entran en D249.
+
+**Cómo sigue:** 1) D248 (c); 2) los 6 vencidos, uno por pieza; 3) D249 (a). D244 y
+D239 esperan a Emi. Si dice que sí a D244, te la escribo con su criterio. Si dice que
+sí a D239 (a), lleva adentro, como datos de un caso, un código sin sigla con el nombre
+de otro país («434 BELGICA» guarda `BE` sin avisar). Si Emi dice que «Holanda»
+también es 423, es una pieza chica aparte.
+
+**Próxima D: D250.**
+
 ## SABOTAJE-MARIA8: aceptada sobre `50320ff` (informe `87be8f1`) e integrada (2026-11-14 06:22 UTC)
 
 Acta `REPRODUCCION-SABOTAJE-MARIA8-2026-11-14.md`. Con la copia de `50320ff`: el guion
@@ -19,7 +57,7 @@ de la operación sucio. Con el caso 9 salen `2 failed`, por la API. Ninguno pone
 `test_con_todos_los_sufijos_propios_no_hace_falta_el_de_la_operacion`. Como no hay
 una línea que la sostenga, queda como riesgo aceptado y no como «cubierta».
 
-- **D248: (c), decidido por la PM. Va después de D247 (a).** Se acepta así:
+- **D248: (c), decidido por la PM. Es tu pieza activa.** Se acepta así:
   - el 20 sale y en su lugar va el sabotaje «el renglón sin sufijo propio deja de
     heredar el de la operación», en `ROJO` por
     `test_sin_sufijo_propio_el_renglon_lleva_el_de_la_operacion`;
@@ -29,36 +67,6 @@ una línea que la sostenga, queda como riesgo aceptado y no como «cubierta».
   - **Sugerencia** (no es criterio): la misma herencia en el ítem entero y en el
     sub-ítem, como datos del caso, si entran sin tocar otro guion.
 - **Riesgos:** aceptados (el del `{n}` y el del `.strip()` sin comprobar).
-- El criterio de anclas de D247 queda en 5 y 1, como dijiste.
-
-**Cómo sigue:** 1) D247 (a); 2) D248 (c); 3) los 6 vencidos, uno por pieza. D244 y
-D239 esperan a Emi. Si dice que sí a D244, te la escribo con su criterio. Si dice que
-sí a D239 (a), lleva adentro, como datos de un caso, un código sin sigla con el nombre
-de otro país («434 BELGICA» guarda `BE` sin avisar). Si Emi dice que «Holanda»
-también es 423, es una pieza chica aparte.
-
-**Próxima D: D249.**
-
-## D246 (b): aceptada sobre `0224f01` (informe `b8571ff`) e integrada (2026-11-14 05:46 UTC)
-
-Acta `REPRODUCCION-D246-2026-11-14.md`. Con la copia de `0224f01`: las dos pruebas
-`171 passed`; anclas en 6; `sufijos2.sh` 32 `ROJO`; `sabotaje_sufijos1.sh` 46 `ROJO`, `rc=0`;
-chequeo-6 igual al tuyo. Tu negativo de D247 sale igual: con `«{sufijo[:40]}»`,
-`1 failed` en `a8d7f7b` y `171 passed` en `0224f01`.
-
-Lo de D247 fue un error mío, no tuyo: decidí D246 comparando los datos y no lo que
-afirmaba cada prueba. Quedó como escape de la PM en el acta.
-
-- **D247: (a), decidido por la PM. Es tu pieza activa, antes de los vencidos.** Te
-  autorizo a tocar sólo `tests/test_sufijos2.py` y `scripts/testing/sabotajes/sufijos2.sh`
-  (de la Técnica; ya le avisé). Se acepta así:
-  - con el cambio de `«{uno[0][:40]}»` por `«{sufijo[:40]}»`, la entrega da rojo en
-    las cuatro formas de `VACIOS` y la base `0224f01` queda verde;
-  - `sufijos2.sh` entero en `ROJO`, con un sabotaje más para ese cambio (33);
-  - `sabotaje_sufijos1.sh` sigue en 46, anclas en 5 de una línea y 1 de varias, las dos pruebas verdes.
-  - **Sugerencia** (no es criterio): `VACIOS` como pares (sufijo, código que nombra).
-- **Riesgos:** aceptados; el tuyo lo cierra D247.
-- Tus dos líneas para `COLA-LIMPIEZA.md` quedaron puestas.
 
 ## D245 (a): aceptada sobre `e17c11e` (informe `a8d7f7b`) e integrada (2026-11-14 05:35 UTC)
 
