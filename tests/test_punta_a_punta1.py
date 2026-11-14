@@ -281,6 +281,7 @@ class _Pantalla:
         r = self._post("/api/validate/smart", json={
             "items": self._items_para_validar(), "operacion": self._cabecera()})
         assert r.status_code == 200, r.text[:400]
+        assert r.json().get("success") is True, r.text[:400]
         assert not r.json().get("errores"), r.json().get("errores")
 
     def _items_para_validar(self):
