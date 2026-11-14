@@ -283,3 +283,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `scripts/testing/sabotaje_doc1.py`: es el único guion de sabotaje en Python y
   `anclas_perdidas.py` no lo lee; no recibe un SHA (mide `HEAD`); no corre la prueba sin
   sabotaje y acepta cualquier rojo por aserción. Lo vio la Dev MARIA.
+- `scripts/testing/sabotaje_maria7.sh`: las anclas de los casos 16, 24 y 25 llevan un
+  comentario del producto; el `25` del último `echo` está escrito a mano; el venv por
+  defecto (`/tmp/cdi-dev2/venv`) es de otra máquina. Lo vio la Dev MARIA.
