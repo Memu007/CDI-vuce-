@@ -1,7 +1,8 @@
 # CUIT-GENERAR (D235 a): reproducción de la PM
 
 Entrega `29327d2` (informe `47b8481`, canal `PARA-PM-2.md`). Base `3dc9908`.
-Veredicto: **aceptada sobre `29327d2`**. D243 (b) y D244 (a), decididas por la PM.
+Veredicto: **aceptada sobre `29327d2`**. D243 (b), decidida por la PM. D244 va a Emi
+(recomiendo a).
 Revisión fuerte (§3: datos que van al TXT).
 
 ## Corrido por la PM (2026-11-14, ~01:50–02:44 UTC, worktrees descartables)
@@ -63,7 +64,8 @@ falso ni un 400 que guarde la operación. Dos hallazgos, ninguno alcanzable por 
    cuando el malo es el del perfil. Antes generaba con el `CDDTAGR` inválido.
 2. Ya estaba: un estudio con `cuit` de espacios da 400 con «».
 
-Van como dato de D244; no son devolución.
+Son riesgo, no pedido (no tienen camino de hoy): van como dato para Emi con D244; no
+son devolución.
 
 ## Lo que sale de la revisión
 
@@ -72,15 +74,25 @@ Van como dato de D244; no son devolución.
   corridos enteros sobre el SHA nuevo, cada sabotaje en `ROJO`, y
   `anclas_perdidas.py` de vuelta a las 6 de la base. La rama de la Técnica no
   tocó esos guiones desde `3dc9908`.
-- **D244 (a), decidido por la PM**, como AVISOS-1 (D123): los avisos frenan lo
-  mismo que generar. Va después de D243 (b), `subitems1` y `sufijos1`.
+- **D244 va a Emi, recomiendo (a):** que los avisos de antes de generar anuncien el
+  CUIT que no cierra (hoy no lo dicen; el 400 al generar sí). No tiene fila en
+  `ROADMAP.md` (AVISOS-1 es de exportaciones). Si dice que sí, entra cuarta en la
+  cola de MARIA, después de D243 (b), `subitems1` y `sufijos1`.
 - No se propone `29327d2` para publicar hasta que D243 (b) esté aceptada o esos
   tres guiones se corran a mano en `ROJO`.
+- `40de7018` es la última cabeza de mi rama sin CUIT-GENERAR: si Emi da el «dale» a
+  PAIS-NL antes de cerrar D243 (b), se publica desde ahí.
 - Publicar frena a quien tenga guardado un CUIT que no cierra, en el perfil o en un
   estudio viejo: va a Emi con el «dale».
 - CUIT-GENERAR no tiene fila en `ROADMAP.md` (es D235, sobre MARIA-7).
 - `CLAUDE.md` §5 dice que la CI deselecciona tests; `ci.yml:40-49` corre la suite
   entera: a `COLA-LIMPIEZA.md`.
+
+## Puertas de la Dev (medidas por ella sobre `29327d2`, no repetidas)
+
+`compileall` sin salida; 35 pantallas verdes; `smoke_friccion.sh` OK;
+`ataque_aislamiento.sh` con Postgres 16 local, `Bloqueado: 47 · Fugas: 0`;
+`/security-review` (Opus alto, sólo lectura): ningún hallazgo.
 
 ## No corrido por la PM
 

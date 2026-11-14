@@ -23,7 +23,7 @@ efecto. No hace falta caso.
 El adversario (Sonnet alto) no encontró un `CDDTAGR` inválido en el TXT. Lo único:
 con un estudio de `cuit=""` escrito a mano en la base y un perfil malo, el texto dice
 «Es el del estudio elegido…» cuando el malo es el del perfil. No se llega por la
-API (el alta valida): va como dato de D244, no como devolución.
+API (el alta valida): es riesgo, no devolución; va a Emi como dato de D244.
 
 - **D243: (b), decidido por la PM.** Cambiás vos las cuatro anclas en
   `estudio1.sh`, `estudio1b.sh` y `excel2.sh` con las líneas de tu tabla, en una
@@ -31,12 +31,11 @@ API (el alta valida): va como dato de D244, no como devolución.
   nuevo, cada sabotaje en `ROJO`, y `anclas_perdidas.py` de vuelta a 6. La Técnica
   no tocó esos guiones desde `3dc9908`. Hasta entonces `29327d2` no se propone para
   publicar.
-- **D244: (a), decidido por la PM**, como AVISOS-1: los avisos frenan lo mismo que
-  generar, con `_cuit_del_despachante` como única copia del orden, y un `cuit_agr`
-  en blanco o de guiones cuenta como ausente en los dos. Arranca con un rojo por
-  causa (los avisos callan un CUIT que no cierra; el en blanco cae distinto) y, como
-  dato del mismo caso, el estudio con `cuit=""` debe nombrar el lugar correcto o
-  dejarse documentado por qué no.
+- **D244: espera a Emi** (no tiene fila en el roadmap; AVISOS-1 es de
+  exportaciones). Le recomiendo (a): que los avisos anuncien el CUIT que no cierra,
+  como ya lo rechaza generar. Si dice que sí, te la escribo con su criterio; el
+  `cuit_agr` en blanco y el estudio con `cuit=""` van como riesgo, porque hoy no se
+  llega a ellos por la pantalla. Hasta entonces no la tocás.
 - **Supuestos:** acepto los cinco.
 - **Riesgos:** aceptados por la PM tal como los escribiste. Al publicar, quien tenga
   guardado un CUIT que no cierra queda frenado hasta corregirlo: va a Emi con el
@@ -45,8 +44,8 @@ API (el alta valida): va como dato de D244, no como devolución.
 **Cómo sigue:** 1) D243 (b); 2) `sabotaje_subitems1.sh` y 3) `sabotaje_sufijos1.sh`
 (vencidos de `sabotajes-conocidos.txt`, uno por pieza); este lleva adentro, como dato
 de `sufijo_otra1`, la siguiente operación con su propio sufijo guardado: entra sin el
-aviso de la anterior y con su sufijo en el campo (el negativo que no distinguió en D238); 4) D244 (a); 5) los demás vencidos. D239 sigue
-esperando a Emi; si dice que sí a (a), entra después de D244 y lleva adentro, como datos
+aviso de la anterior y con su sufijo en el campo (el negativo que no distinguió en D238); 4) los demás vencidos. D244 y D239 esperan a
+Emi; si dice que sí a D244, entra cuarta; si dice que sí a D239 (a), entra después y lleva adentro, como datos
 de un caso, un código sin sigla con el nombre de otro país («434 BELGICA» guarda `BE`
 sin avisar). Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
 
