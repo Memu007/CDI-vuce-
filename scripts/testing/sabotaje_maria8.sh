@@ -204,8 +204,9 @@ reemplazar $F '                        f"Item {lugar_en_el_pedido[id(renglon)]}:
 caso "sufijo_numero_del_txt" "FAILED $T::test_sin_ningun_sufijo_el_error_dice_el_numero_de_la_pantalla"
 
 # 31. no avisa que se limpió el sufijo de un renglón
+LIMPIO="FAILED $T::test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon"
 reemplazar $F '            avisos.extend(_aviso_de_sufijo(f" del renglón {n + 1}", items[n].get("sufijo")))' '            pass'
-caso "sin_aviso_limpieza" "FAILED $T::test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon"
+caso "sin_aviso_limpieza" "$LIMPIO[seguidos]" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
 
 # 32. el endpoint no valida el sufijo de un renglón
 reemplazar $M '                _sufijos.append((f"Item {_n}: ", it["sufijo"].strip()))' '                pass'
@@ -259,7 +260,6 @@ reemplazar $F '        cuales = _enumerar([n + 1 for n in ns])' '        cuales 
 caso "renglones_tope_4" "$JUNTOS[doce_renglones]" "$MISMO[cinco_renglones]"
 
 # 44. el aviso de cada renglón dice su puesto en el ítem y no su renglón
-LIMPIO="FAILED $T::test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon"
 reemplazar $F 'f" del renglón {n + 1}"' 'f" del renglón {ns.index(n) + 1}"'
 caso "aviso_renglon_por_puesto" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
 
@@ -279,7 +279,7 @@ caso "aviso_renglon_tope_2" "$LIMPIO[salteados]"
 reemplazar $F '        for n in ns:
             avisos.extend(_aviso_de_sufijo(f" del renglón' '        for n in ns[1:2]:
             avisos.extend(_aviso_de_sufijo(f" del renglón'
-caso "aviso_renglon_solo_el_segundo" "$LIMPIO[seguidos]" "$LIMPIO[salteados]"
+caso "aviso_renglon_solo_el_segundo" "$LIMPIO[seguidos]" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
 
 # 48. el aviso de cada renglón recorre del primero al último, también los que no son del ítem
 reemplazar $F '        for n in ns:
@@ -313,5 +313,15 @@ reemplazar $F '    en_renglones = {n for ns in juntos for n in ns}
     if sbt_sufijo_valor is not None:'
 caso "en_renglones_primer_item" "$LIMPIO[tres_items]"
 
+# 53. el aviso de cada renglón sale sólo para los cinco primeros del ítem
+reemplazar $F '        for n in ns:
+            avisos.extend(_aviso_de_sufijo(f" del renglón' '        for n in ns[:5]:
+            avisos.extend(_aviso_de_sufijo(f" del renglón'
+caso "aviso_renglon_tope_5" "$LIMPIO[salteados]"
+
+# 54. el renglón sin sufijo se avisa con el de la operación, que ya tiene su aviso
+reemplazar $F 'f" del renglón {n + 1}", items[n].get("sufijo")))' 'f" del renglón {n + 1}", items[n].get("sufijo") or sbt_sufijo_valor))'
+caso "aviso_renglon_con_el_de_la_operacion" "$LIMPIO[seguidos]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 52 sabotajes dan rojo por la razón esperada"
+echo "OK: los 54 sabotajes dan rojo por la razón esperada"
