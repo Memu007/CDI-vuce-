@@ -264,33 +264,23 @@ reemplazar $F 'f" del renglón {n + 1}"' 'f" del renglón {ns.index(n) + 1}"'
 caso "aviso_renglon_por_puesto" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
 
 # 45. el aviso de cada renglón sale sólo para los cuatro primeros del ítem
-reemplazar $F '        for n in ns:
-            avisos.extend(_aviso_de_sufijo(f" del renglón' '        for n in ns[:4]:
-            avisos.extend(_aviso_de_sufijo(f" del renglón'
+reemplazar $F '        for n in ns:' '        for n in ns[:4]:'
 caso "aviso_renglon_tope_4" "$LIMPIO[salteados]"
 
 # 46. el aviso de cada renglón sale sólo para los dos primeros del ítem
-reemplazar $F '        for n in ns:
-            avisos.extend(_aviso_de_sufijo(f" del renglón' '        for n in ns[:2]:
-            avisos.extend(_aviso_de_sufijo(f" del renglón'
+reemplazar $F '        for n in ns:' '        for n in ns[:2]:'
 caso "aviso_renglon_tope_2" "$LIMPIO[salteados]"
 
 # 47. el aviso de cada renglón sale sólo para el segundo del ítem
-reemplazar $F '        for n in ns:
-            avisos.extend(_aviso_de_sufijo(f" del renglón' '        for n in ns[1:2]:
-            avisos.extend(_aviso_de_sufijo(f" del renglón'
+reemplazar $F '        for n in ns:' '        for n in ns[1:2]:'
 caso "aviso_renglon_solo_el_segundo" "$LIMPIO[seguidos]" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
 
 # 48. el aviso de cada renglón recorre del primero al último, también los que no son del ítem
-reemplazar $F '        for n in ns:
-            avisos.extend(_aviso_de_sufijo(f" del renglón' '        for n in range(ns[0], ns[-1] + 1):
-            avisos.extend(_aviso_de_sufijo(f" del renglón'
+reemplazar $F '        for n in ns:' '        for n in range(ns[0], ns[-1] + 1):'
 caso "aviso_renglon_de_corrido" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
 
 # 49. el aviso de cada renglón recorre tantos renglones seguidos como tiene el ítem
-reemplazar $F '        for n in ns:
-            avisos.extend(_aviso_de_sufijo(f" del renglón' '        for n in range(ns[0], ns[0] + len(ns)):
-            avisos.extend(_aviso_de_sufijo(f" del renglón'
+reemplazar $F '        for n in ns:' '        for n in range(ns[0], ns[0] + len(ns)):'
 caso "aviso_renglon_seguidos" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
 
 # 50. el que va solo entre dos que van juntos cuenta como renglón y pierde el aviso de su sufijo
@@ -314,14 +304,26 @@ reemplazar $F '    en_renglones = {n for ns in juntos for n in ns}
 caso "en_renglones_primer_item" "$LIMPIO[tres_items]"
 
 # 53. el aviso de cada renglón sale sólo para los cinco primeros del ítem
-reemplazar $F '        for n in ns:
-            avisos.extend(_aviso_de_sufijo(f" del renglón' '        for n in ns[:5]:
-            avisos.extend(_aviso_de_sufijo(f" del renglón'
+reemplazar $F '        for n in ns:' '        for n in ns[:5]:'
 caso "aviso_renglon_tope_5" "$LIMPIO[salteados]"
 
 # 54. el renglón sin sufijo se avisa con el de la operación, que ya tiene su aviso
 reemplazar $F 'f" del renglón {n + 1}", items[n].get("sufijo")))' 'f" del renglón {n + 1}", items[n].get("sufijo") or sbt_sufijo_valor))'
 caso "aviso_renglon_con_el_de_la_operacion" "$LIMPIO[seguidos]"
 
+# 55. el sufijo de un grupo se avisa una vez por cada renglón suyo
+reemplazar $F '                    if nuevo:
+                        grupos.add(gid)' '                    if True:
+                        grupos.add(gid)'
+caso "aviso_de_grupo_por_renglon" "$LIMPIO[un_grupo_en_el_medio]"
+
+# 56. los avisos de los que van solos salen del último al primero
+reemplazar $F '        for donde, sufijo in sufijos:' '        for donde, sufijo in reversed(sufijos):'
+caso "avisos_al_reves" "$LIMPIO[salteados]"
+
+# 57. el sufijo de la operación se avisa aunque ningún renglón lo use
+reemplazar $F 'sufijos = [("", sbt_sufijo_valor)] if usa_el_general else []' 'sufijos = [("", sbt_sufijo_valor)]'
+caso "aviso_de_la_operacion_sin_uso" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 54 sabotajes dan rojo por la razón esperada"
+echo "OK: los 57 sabotajes dan rojo por la razón esperada"

@@ -445,8 +445,8 @@ def test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo(caso):
         _aviso_del_mismo_sufijo(el_otro, 3, "AA(MARCA)-")]
 
 
-def _aviso_de_que_se_limpio(donde, sale):
-    return (f"Sufijo de valor del {donde}: entre un código y otro va un guion y dentro de los "
+def _aviso_de_que_se_limpio(de_quien, sale):
+    return (f"Sufijo de valor{de_quien}: entre un código y otro va un guion y dentro de los "
             f"paréntesis van sólo letras, números, espacios y la coma de un número; sale «{sale}».")
 
 
@@ -455,15 +455,15 @@ def _aviso_de_que_falta_el_codigo(donde):
             "3921.90.19.900Z pide AI (CODIGO DE PRODUCTO O ARTICULO), y no está.")
 
 
-# caso: (la posición de cada renglón, en minúscula si va en un grupo a mano, que no se junta con
-# nadie; cómo nombran los avisos a cada renglón, en el orden en que salen. None: el renglón no
-# trae sufijo, usa el de la operación y ningún aviso lo nombra)
+# caso: (la posición de cada renglón, en minúscula si va en un grupo a mano; cómo nombran los
+# avisos a cada renglón, en su orden. Fuera de un grupo, el que no está no trae sufijo)
 SE_LIMPIO = {
-    "seguidos": ("AAA", {1: "renglón 1", 2: "renglón 2", 3: None}),
-    # El ítem tiene seis renglones y el renglón 2, de otra posición, queda en el medio.
-    "salteados": ("ABAAAAA", {2: "ítem 2", 1: "renglón 1", 3: "renglón 3", 4: "renglón 4",
-                              5: "renglón 5", 6: "renglón 6", 7: "renglón 7"}),
-    "un_grupo_en_el_medio": ("AaA", {2: "grupo g2", 1: "renglón 1", 3: "renglón 3"}),
+    "seguidos": ("AAA", {1: "renglón 1", 2: "renglón 2"}),
+    # El ítem tiene seis renglones; los renglones 3 y 6, de otras posiciones, quedan en el medio.
+    "salteados": ("AABAACAA", {3: "ítem 3", 6: "ítem 6", 1: "renglón 1", 2: "renglón 2",
+                               4: "renglón 4", 5: "renglón 5", 7: "renglón 7", 8: "renglón 8"}),
+    # Un grupo no se junta con nadie y se nombra una vez, por su primer renglón.
+    "un_grupo_en_el_medio": ("AaaA", {2: "grupo ga", 1: "renglón 1", 4: "renglón 4"}),
     # Los renglones de cada ítem se nombran una vez, como renglones, sea el ítem que sea.
     "tres_items": ("ABCCAB", {1: "renglón 1", 5: "renglón 5", 2: "renglón 2", 6: "renglón 6",
                               3: "renglón 3", 4: "renglón 4"}),
@@ -473,20 +473,23 @@ SE_LIMPIO = {
 @pytest.mark.parametrize("caso", SE_LIMPIO)
 def test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon(caso):
     posiciones, nombres = SE_LIMPIO[caso]
-    # Cada sufijo está mal escrito (el punto sale como espacio) y es distinto de los otros. Al
-    # del grupo le falta, además, el código de artículo que el arancel pide ahí; el de la
-    # operación lo trae.
+    # Cada sufijo está mal escrito (el punto sale como espacio) y es distinto de los otros. A los
+    # del grupo les falta el código de artículo que el arancel pide ahí; el de la operación lo trae.
     renglones = []
     for n, letra in enumerate(posiciones, start=1):
-        grupo = {"grupo_id": f"g{n}"} if letra.islower() else {}
-        propio = {"sufijo": f"AA(M.{n})-" + ("" if grupo else f"AI(C{n})-")} if nombres[n] else {}
+        grupo = {"grupo_id": f"g{letra}"} if letra.islower() else {}
+        sufijo = f"AA(M.{n})-" + ("" if grupo else f"AI(C{n})-")
+        propio = {"sufijo": sufijo} if grupo or n in nombres else {}
         renglones.append(dict(LONA, pieza=POSICIONES[letra.upper()], **grupo, **propio))
     avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor="AA(X.0)-AI(Y)-")
-    se_limpio = [_aviso_de_que_se_limpio(donde, renglones[n - 1]["sufijo"].replace(".", " "))
-                 for n, donde in nombres.items() if donde]
+    # El de la operación se avisa primero, una vez, y sólo si algún renglón lo usa.
+    lo_usan = [renglon for renglon in renglones if "sufijo" not in renglon]
+    se_limpio = [_aviso_de_que_se_limpio("", "AA(X 0)-AI(Y)-")] if lo_usan else []
+    se_limpio += [_aviso_de_que_se_limpio(f" del {donde}", renglones[n - 1]["sufijo"].replace(".", " "))
+                  for n, donde in nombres.items()]
     falta = [_aviso_de_que_falta_el_codigo(donde)
              for n, donde in nombres.items() if "grupo_id" in renglones[n - 1]]
-    assert [a for a in avisos if a.startswith("Sufijo de valor del ")] == se_limpio + falta
+    assert [a for a in avisos if a.startswith("Sufijo de valor")] == se_limpio + falta
 
 
 @pytest.mark.parametrize("caso, sufijo, dice", [
