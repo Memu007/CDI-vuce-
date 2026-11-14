@@ -111,13 +111,15 @@ def test_un_sufijo_que_pide_numero_entero_sale_igual():
 
 # ------------------------------------------------------- 3. Ninguno vacío
 
-VACIOS = ["AA()-CA00-", "AA(   )-", "AA(DEMO)-AB()-", "AA(--)-"]
+# sufijo: el código que el error nombra, y no el sufijo entero
+VACIOS = {"AA()-CA00-": "AA()", "AA(   )-": "AA(   )", "AA(DEMO)-AB()-": "AB()", "AA(--)-": "AA(--)"}
 
 
 @pytest.mark.parametrize("vacio", VACIOS)
 def test_un_sufijo_vacio_no_se_genera(vacio):
-    with pytest.raises(ValueError, match=r"Sufijo de valor del ítem 2: «A[AB]\(.*está vacío.*no se genera"):
+    with pytest.raises(ValueError, match="no se genera") as error:
         mg.limpiar_sufijo(vacio, " del ítem 2")
+    assert f"Sufijo de valor del ítem 2: «{VACIOS[vacio]}» está vacío" in str(error.value)
 
 
 @pytest.mark.parametrize("vacio", VACIOS)
