@@ -399,7 +399,10 @@ MISMO_SUFIJO = {
     "largo": ((None, None, None), "AA(" + "X" * 100 + ")-", "AA(" + "X" * 77),
     "propios_iguales_sin_usar_el_de_la_operacion": (("AA(A)-",) * 3, "AA(OK)-AB(XXX", "AA(A)-"),
     "solo_el_ultimo_distinto": (("AA(A)-", "AA(A)-", "AA(B)-"), "AA(A)-", None),
-    "solo_el_ultimo_de_doce_distinto": (("AA(A)-",) * 11 + ("AA(B)-",), "AA(A)-", None),
+    # De doce renglones, uno solo distinto, en cada puesto: se comparan los doce.
+    **{f"de_doce_solo_el_{puesto}_distinto": (
+        ("AA(A)-",) * (puesto - 1) + ("AA(B)-",) + ("AA(A)-",) * (12 - puesto), "AA(A)-", None)
+       for puesto in range(1, 13)},
     "uno_propio_y_el_resto_hereda_otro": (("AA(A)-", None, None), "AA(B)-", None),
     "uno_propio_y_el_resto_ninguno": (("AA(A)-", None, None), "", None),
     "ninguno": ((None, None, None), "", None),
