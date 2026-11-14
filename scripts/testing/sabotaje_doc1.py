@@ -15,11 +15,12 @@ MUTACIONES = [
      "    return {\"tipo\": \"factura_comercial\", \"operacion\": \"importacion\", \"destinacion\": \"IC04\"}\n    documento = result.get(\"documento\") if isinstance(result, dict) else None",
      "test_rechazo_no_reintenta_ni_cae_fallback"),
     ("servidor", "proyecto_maria/main.py",
-     "    if (request.tipo_destinacion or \"\").strip().upper().startswith(\"EC\"):",
-     "    if False:", "test_ec_directa_nunca_entra_a_importacion"),
+     "        return destinacion_del_txt(tipo_destinacion, exportacion)",
+     "        return str(tipo_destinacion or \"\")", "test_ec_directa_nunca_entra_a_importacion"),
     ("generador", "proyecto_maria/core/maria_generator.py",
-     "    if str(tipo_destinacion or \"\").strip().upper().startswith(\"EC\"):",
-     "    if False:", "test_generador_directo_rechaza_ec"),
+     "    tipo_destinacion = destinacion_del_txt(tipo_destinacion)",
+     "    tipo_destinacion = destinacion_del_txt(tipo_destinacion, es_exportacion(tipo_destinacion))",
+     "test_generador_directo_rechaza_ec"),
 ]
 archive = subprocess.check_output(["git", "archive", "HEAD"], cwd=ROOT)
 for nombre, archivo, original, cambio, caso in MUTACIONES:
