@@ -277,3 +277,9 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   el de maria8), el venv por defecto `/tmp/cdi-dev2/venv` no existe en una sesión nueva, y el comentario
   del caso 33 dice «el TXT no la usa» aunque `maria_generator.py:1098` llama a
   `peso_valido`. Lo vio la Dev MARIA.
+- `scripts/testing/sabotaje_valor1b.sh`: el `22` del último `echo` está escrito a mano, el
+  venv por defecto `/tmp/cdi-dev2/venv` no existe en una sesión nueva y no corre la prueba sin
+  sabotaje (no hay línea `VERDE`). Lo vio la Dev MARIA.
+- `scripts/testing/sabotaje_doc1.py`: es el único guion de sabotaje en Python y
+  `anclas_perdidas.py` no lo lee; no recibe un SHA (mide `HEAD`); no corre la prueba sin
+  sabotaje y acepta cualquier rojo por aserción. Lo vio la Dev MARIA.
