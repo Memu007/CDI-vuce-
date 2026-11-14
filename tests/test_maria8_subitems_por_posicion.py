@@ -359,6 +359,7 @@ SUCIO, LIMPIO = "AA(MARCA)-AI(620G-BLUE.010 150CMX50M)-", "AA(MARCA)-AI(620G BLU
 # muestra entre «» o None si no sale). Se compara lo que sale en el TXT: limpio.
 MISMO_SUFIJO = {
     "heredan": ((None, None, None), "AA(MARCA)-", "AA(MARCA)-"),
+    "propios_vacios_heredan": (("", " ", None), "AA(MARCA)-", "AA(MARCA)-"),
     "dos_renglones": ((None, None), "AA(MARCA)-", "AA(MARCA)-"),
     "cuatro_renglones": ((None,) * 4, "AA(MARCA)-", "AA(MARCA)-"),
     "heredan_uno_que_se_limpia": ((None, None, None), SUCIO, LIMPIO),
