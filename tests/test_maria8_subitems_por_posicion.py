@@ -376,12 +376,12 @@ def test_los_avisos_dicen_que_renglones_van_juntos(caso):
     # Cada posición lleva su sufijo: el renglón de otro ítem que queda en el medio no cuenta.
     renglones = [dict(LONA, pieza=POSICIONES[letra], sufijo=f"AA({letra})-") for letra in posiciones]
     avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor="AA(X)-")
-    assert [a for a in avisos if a.startswith("Sub-ítems:")] == [
-        f"Sub-ítems: los renglones {cuales} van en un solo ítem con {posiciones.count(letra)} sub-ítems "
-        "(misma posición SIM, origen, procedencia y estado)." for letra, cuales in juntos.items()]
-    assert [a for a in avisos if "llevan el mismo sufijo" in a] == [
-        _aviso_del_mismo_sufijo(cuales, posiciones.count(letra), f"AA({letra})-")
-        for letra, cuales in juntos.items()]
+    # De cada ítem salen los dos avisos seguidos: el de los sub-ítems y el del sufijo.
+    assert [a for a in avisos if a.startswith("Sub-ítems:") or "llevan el mismo sufijo" in a] == [
+        aviso for letra, cuales in juntos.items() for aviso in (
+            f"Sub-ítems: los renglones {cuales} van en un solo ítem con {posiciones.count(letra)} sub-ítems "
+            "(misma posición SIM, origen, procedencia y estado).",
+            _aviso_del_mismo_sufijo(cuales, posiciones.count(letra), f"AA({letra})-"))]
 
 
 SUCIO, LIMPIO = "AA(MARCA)-AI(620G-BLUE.010 150CMX50M)-", "AA(MARCA)-AI(620G BLUE 010 150CMX50M)-"
@@ -399,6 +399,7 @@ MISMO_SUFIJO = {
     "largo": ((None, None, None), "AA(" + "X" * 100 + ")-", "AA(" + "X" * 77),
     "propios_iguales_sin_usar_el_de_la_operacion": (("AA(A)-",) * 3, "AA(OK)-AB(XXX", "AA(A)-"),
     "solo_el_ultimo_distinto": (("AA(A)-", "AA(A)-", "AA(B)-"), "AA(A)-", None),
+    "solo_el_ultimo_de_doce_distinto": (("AA(A)-",) * 11 + ("AA(B)-",), "AA(A)-", None),
     "uno_propio_y_el_resto_hereda_otro": (("AA(A)-", None, None), "AA(B)-", None),
     "uno_propio_y_el_resto_ninguno": (("AA(A)-", None, None), "", None),
     "ninguno": ((None, None, None), "", None),
