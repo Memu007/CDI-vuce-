@@ -7,6 +7,29 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
+## D248 (c): aceptada sobre `3fcc9c4` (informe `8f50af3`) e integrada (2026-11-14 07:57 UTC)
+
+Acta `REPRODUCCION-D248-2026-11-14.md`. Con la copia de `3fcc9c4`: 38 `ROJO`, 0 `FALLA`,
+`rc=0`, `sin_herencia` con `4 failed`; chequeo-6 igual al tuyo; anclas en 5 y 1. El
+cambio de `caso` distingue: sin el `reemplazar` del sub-ítem da `FALLA` nombrándolo, y
+esperando una prueba que queda verde también. Tu riesgo 2 lo medí: con otro valor en
+el ítem entero o el sub-ítem, maria8 queda verde y lo agarran maria9 y sufijos2.
+
+- **Supuestos 1 y 2:** aceptados. Un caso, la cuenta en 38.
+- **Riesgos:** aceptados. Tu línea del `38` escrito a mano quedó en `COLA-LIMPIEZA.md`.
+- **Una línea:** es la tercera entrega seguida cuyo SHA final no pasó por subagente
+  ni `/code-review`. Que el SHA que entregás pase por uno de los dos, o que el informe
+  diga por qué no hace falta.
+
+**Cómo sigue:** 1) los 6 vencidos, uno por pieza (vas por `sabotaje_maria1d.sh`);
+2) D249 (a), con el criterio de la sección D247 de abajo. D244 y D239 esperan a Emi.
+Si dice que sí a D244, te la escribo con su criterio. Si dice que sí a D239 (a), lleva
+adentro, como datos de un caso, un código sin sigla con el nombre de otro país
+(«434 BELGICA» guarda `BE` sin avisar). Si Emi dice que «Holanda» también es 423, es
+una pieza chica aparte.
+
+**Próxima D: D250.**
+
 ## D247 (a): aceptada sobre `4a58c68` (informe `ee3ccfd`) e integrada (2026-11-14 07:03 UTC)
 
 Acta `REPRODUCCION-D247-2026-11-14.md`. Con la copia de `4a58c68`: las dos pruebas
@@ -36,51 +59,6 @@ pidiera.
     código de más de 40 o de 80 letras, para que el recorte se vea.
 - **Riesgos:** aceptados. `.upper()` y el texto de la instrucción, que tu adversario
   mostró verdes, son previos: no entran en D249.
-
-**Cómo sigue:** 1) D248 (c); 2) los 6 vencidos, uno por pieza; 3) D249 (a). D244 y
-D239 esperan a Emi. Si dice que sí a D244, te la escribo con su criterio. Si dice que
-sí a D239 (a), lleva adentro, como datos de un caso, un código sin sigla con el nombre
-de otro país («434 BELGICA» guarda `BE` sin avisar). Si Emi dice que «Holanda»
-también es 423, es una pieza chica aparte.
-
-**Próxima D: D250.**
-
-## SABOTAJE-MARIA8: aceptada sobre `50320ff` (informe `87be8f1`) e integrada (2026-11-14 06:22 UTC)
-
-Acta `REPRODUCCION-SABOTAJE-MARIA8-2026-11-14.md`. Con la copia de `50320ff`: el guion
-`46 passed` sin sabotaje, 38 `ROJO`, 0 `FALLA`, `rc=0`; los casos 18, 19 y 20 con
-`4`, `2` y `2 failed`, como los tuyos. Las anclas en 5 y 1. Chequeo-6 igual al tuyo.
-Válidos son 37: el 20 es D248.
-
-Comprobé lo de maria9. Con su caso 1 aplicado salen `7 failed`, todas con el sufijo
-de la operación sucio. Con el caso 9 salen `2 failed`, por la API. Ninguno pone roja
-`test_con_todos_los_sufijos_propios_no_hace_falta_el_de_la_operacion`. Como no hay
-una línea que la sostenga, queda como riesgo aceptado y no como «cubierta».
-
-- **D248: (c), decidido por la PM. Es tu pieza activa.** Se acepta así:
-  - el 20 sale y en su lugar va el sabotaje «el renglón sin sufijo propio deja de
-    heredar el de la operación», en `ROJO` por
-    `test_sin_sufijo_propio_el_renglon_lleva_el_de_la_operacion`;
-  - el guion sigue en 38 `ROJO` y 0 `FALLA`, y las anclas no empeoran (5 y 1).
-  - Su ancla cuelga a la fuerza del final de la línea del 18. Está bien así, no
-    hace falta otro arreglo.
-  - **Sugerencia** (no es criterio): la misma herencia en el ítem entero y en el
-    sub-ítem, como datos del caso, si entran sin tocar otro guion.
-- **Riesgos:** aceptados (el del `{n}` y el del `.strip()` sin comprobar).
-
-## D245 (a): aceptada sobre `e17c11e` (informe `a8d7f7b`) e integrada (2026-11-14 05:35 UTC)
-
-Acta `REPRODUCCION-D245-2026-11-14.md`. Tus números salen iguales con
-`GEMINI_API_KEY` vacía: los tres archivos `166 passed, 2 xfailed`; con el `raise`,
-`36 failed` en los 11 archivos (14 por `success`, 22 por `KeyError`). Mi negativo:
-el semáforo contesta `success: False` sin error. Da `14 failed`, sólo en los cuatro
-archivos que lo afirman, y en la base `1215a8a` los tres archivos quedan verdes.
-Los guiones `punta_a_punta1`, `sabotaje_subitems1`, `destino1` y `avisos1`, con tu copia,
-`rc=0` y todo `ROJO` (9, 11, 19 y 22).
-
-- **Supuestos y riesgos:** aceptados. Las `xfail` que no distinguen quedan como
-  riesgo bajo. El de la pantalla con `success: false` quedó en `NOW.md`.
-- Tu línea del ayudante único quedó en `COLA-LIMPIEZA.md`.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 

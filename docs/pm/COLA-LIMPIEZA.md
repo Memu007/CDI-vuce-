@@ -270,3 +270,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `'AA(DemoPouchs)-CA00-'` escrito tres veces; una constante.
 - `scripts/testing/pantalla_orden1.js`: `listaParaGenerar` y `enValidacionQuieta`
   dejan lista una operación de dos formas; una sola, con z20, z22 y z23.
+- `scripts/testing/sabotaje_maria8.sh`: el `38` del último `echo` está escrito a mano.
+  Si se agrega o se saca un caso y no se toca, el guion miente la cuenta. Contarlos.
+  Lo vio la Dev MARIA.
