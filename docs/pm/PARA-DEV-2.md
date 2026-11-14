@@ -30,7 +30,8 @@ Acta `REPRODUCCION-D249-2026-11-14.md`.
   anclas 0/0/0, chequeo-6 igual al tuyo.
 - **Supuestos 1 y 2 y riesgos 1 y 3:** aceptados. El riesgo 2 (`AF(-2.5)`) va a la cola.
 - **`/code-review`:** esta vez pasa (sin producto y el SHA pasó por el adversario), decidido por
-  la PM. `/entregar` no lo exceptúa: en las próximas, correlo o decí por qué no.
+  la PM. `/entregar` no lo exceptúa y «Ritmo y calidad» de Emi tampoco: desde D250 se corre
+  siempre, aunque sea sólo arnés.
 
 ## D250 (a) (2026-11-14 10:26 UTC)
 
