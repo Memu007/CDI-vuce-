@@ -258,5 +258,60 @@ caso "tope_dos_items" "$JUNTOS[tres_items]"
 reemplazar $F '        cuales = _enumerar([n + 1 for n in ns])' '        cuales = _enumerar([n + 1 for n in ns[:4]])'
 caso "renglones_tope_4" "$JUNTOS[doce_renglones]" "$MISMO[cinco_renglones]"
 
+# 44. el aviso de cada renglón dice su puesto en el ítem y no su renglón
+LIMPIO="FAILED $T::test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon"
+reemplazar $F 'f" del renglón {n + 1}"' 'f" del renglón {ns.index(n) + 1}"'
+caso "aviso_renglon_por_puesto" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
+
+# 45. el aviso de cada renglón sale sólo para los cuatro primeros del ítem
+reemplazar $F '        for n in ns:
+            avisos.extend(_aviso_de_sufijo(f" del renglón' '        for n in ns[:4]:
+            avisos.extend(_aviso_de_sufijo(f" del renglón'
+caso "aviso_renglon_tope_4" "$LIMPIO[salteados]"
+
+# 46. el aviso de cada renglón sale sólo para los dos primeros del ítem
+reemplazar $F '        for n in ns:
+            avisos.extend(_aviso_de_sufijo(f" del renglón' '        for n in ns[:2]:
+            avisos.extend(_aviso_de_sufijo(f" del renglón'
+caso "aviso_renglon_tope_2" "$LIMPIO[salteados]"
+
+# 47. el aviso de cada renglón sale sólo para el segundo del ítem
+reemplazar $F '        for n in ns:
+            avisos.extend(_aviso_de_sufijo(f" del renglón' '        for n in ns[1:2]:
+            avisos.extend(_aviso_de_sufijo(f" del renglón'
+caso "aviso_renglon_solo_el_segundo" "$LIMPIO[seguidos]" "$LIMPIO[salteados]"
+
+# 48. el aviso de cada renglón recorre del primero al último, también los que no son del ítem
+reemplazar $F '        for n in ns:
+            avisos.extend(_aviso_de_sufijo(f" del renglón' '        for n in range(ns[0], ns[-1] + 1):
+            avisos.extend(_aviso_de_sufijo(f" del renglón'
+caso "aviso_renglon_de_corrido" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
+
+# 49. el aviso de cada renglón recorre tantos renglones seguidos como tiene el ítem
+reemplazar $F '        for n in ns:
+            avisos.extend(_aviso_de_sufijo(f" del renglón' '        for n in range(ns[0], ns[0] + len(ns)):
+            avisos.extend(_aviso_de_sufijo(f" del renglón'
+caso "aviso_renglon_seguidos" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tres_items]"
+
+# 50. el que va solo entre dos que van juntos cuenta como renglón y pierde el aviso de su sufijo
+reemplazar $F '    en_renglones = {n for ns in juntos for n in ns}
+    if sbt_sufijo_valor is not None:' '    en_renglones = {n for ns in juntos for n in range(ns[0], ns[-1] + 1)}
+    if sbt_sufijo_valor is not None:'
+caso "en_renglones_de_corrido" "$LIMPIO[salteados]" "$LIMPIO[un_grupo_en_el_medio]"
+
+# 51. en los avisos del arancel, el grupo que queda entre dos que van juntos se nombra como ítem
+reemplazar $F '        general = ""
+    en_renglones = {n for ns in juntos for n in ns}
+' '        general = ""
+    en_renglones = {n for ns in juntos for n in range(ns[0], ns[-1] + 1)}
+'
+caso "arancel_en_renglones_de_corrido" "$LIMPIO[un_grupo_en_el_medio]"
+
+# 52. sólo los del primer ítem cuentan como renglones: los de los otros se avisan dos veces
+reemplazar $F '    en_renglones = {n for ns in juntos for n in ns}
+    if sbt_sufijo_valor is not None:' '    en_renglones = {n for ns in juntos[:1] for n in ns}
+    if sbt_sufijo_valor is not None:'
+caso "en_renglones_primer_item" "$LIMPIO[tres_items]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 43 sabotajes dan rojo por la razón esperada"
+echo "OK: los 52 sabotajes dan rojo por la razón esperada"
