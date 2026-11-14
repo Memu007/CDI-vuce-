@@ -319,7 +319,7 @@ caso "aviso_de_grupo_por_renglon" "$LIMPIO[un_grupo_en_el_medio]"
 
 # 56. los avisos de la operación y de los que no van juntos salen al revés
 reemplazar $F '        for donde, sufijo in sufijos:' '        for donde, sufijo in reversed(sufijos):'
-caso "avisos_al_reves" "$LIMPIO[salteados]"
+caso "avisos_al_reves" "$LIMPIO[seguidos]" "$LIMPIO[salteados]"
 
 # 57. el sufijo de la operación se avisa aunque ningún renglón lo use
 reemplazar $F 'sufijos = [("", sbt_sufijo_valor)] if usa_el_general else []' 'sufijos = [("", sbt_sufijo_valor)]'
@@ -329,5 +329,9 @@ caso "aviso_de_la_operacion_sin_uso" "$LIMPIO[un_grupo_en_el_medio]" "$LIMPIO[tr
 reemplazar $F '                    sufijos.append((f" del ítem {idx}", item["sufijo"]))' '                    sufijos.insert(1 if usa_el_general else 0, (f" del ítem {idx}", item["sufijo"]))'
 caso "items_solos_al_reves" "$LIMPIO[seguidos]"
 
+# 59. no se mira si el último renglón del pedido usa el sufijo de la operación
+reemplazar $F 'usa_el_general = usa_el_sufijo_de_la_operacion(items)' 'usa_el_general = usa_el_sufijo_de_la_operacion(items[:-1])'
+caso "sin_mirar_el_ultimo_renglon" "$LIMPIO[el_ultimo_usa_el_de_la_operacion]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 58 sabotajes dan rojo por la razón esperada"
+echo "OK: los 59 sabotajes dan rojo por la razón esperada"
