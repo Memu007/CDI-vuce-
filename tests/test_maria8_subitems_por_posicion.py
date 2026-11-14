@@ -384,11 +384,12 @@ def test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo(caso):
     for renglon, propio in zip(renglones, propios):
         if propio is not None:
             renglon["sufijo"] = propio
-    # Después va otro ítem, que lleva un solo sufijo: su aviso sale siempre, tenga o no
-    # el suyo el ítem de antes y aunque los dos lleven el mismo sufijo.
-    renglones += [dict(LONA, pieza="39211390900F", sufijo="AA(MARCA)-") for _ in range(2)]
-    suyos, del_otro = {2: ("1 y 2", "3 y 4"), 3: ("1, 2 y 3", "4 y 5"), 4: ("1, 2, 3 y 4", "5 y 6")}[len(propios)]
-    esperados = ([] if muestra is None else [(suyos, len(propios), muestra)]) + [(del_otro, 2, "AA(MARCA)-")]
+    # Después va otro ítem, de tres renglones y un solo sufijo: su aviso sale siempre y
+    # segundo, tenga o no el suyo el ítem de antes y aunque los dos lleven el mismo sufijo.
+    renglones += [dict(LONA, pieza="39211390900F", sufijo="AA(MARCA)-") for _ in range(3)]
+    suyos, del_otro = {2: ("1 y 2", "3, 4 y 5"), 3: ("1, 2 y 3", "4, 5 y 6"),
+                       4: ("1, 2, 3 y 4", "5, 6 y 7")}[len(propios)]
+    esperados = ([] if muestra is None else [(suyos, len(propios), muestra)]) + [(del_otro, 3, "AA(MARCA)-")]
     avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor=de_la_operacion)
     assert [a for a in avisos if "llevan el mismo sufijo" in a] == [
         f"Sufijo de valor: en el ítem de los renglones {cuales} los {cuantos} sub-ítems llevan "
