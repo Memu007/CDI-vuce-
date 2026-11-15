@@ -272,7 +272,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-15 16:20 UTC: sin entregas. Tanda sobre fc5944fc cerrada (acta REPRODUCCION-TANDA-FC5944FC-2026-11-15): ningún rojo del producto; anclas 0 perdidas; main fusionado da el mismo árbol. «dale fc5944fc» pedido a Emi. MARIA sin pieza hasta D244/D239. Técnica quieta.
+2026-11-15 17:56 UTC: sin entregas (MARIA sólo trajo mi rama, b60e3978; Técnica igual en de4d121e). «dale fc5944fc» pedido a Emi a las 16:20, sin respuesta; main sigue en f734fbb3. Contexto: MARIA 114k de 224k, Técnica 134k de 144k quieta. MARIA sin pieza hasta D244/D239.
 
 ## /compact conservar de la PM principal
 
