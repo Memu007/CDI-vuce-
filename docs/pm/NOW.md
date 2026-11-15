@@ -235,8 +235,8 @@ Ver «Última vuelta» y la línea `/compact conservar` de abajo.
 
 ## Publicado
 
-Una línea por publicación: fecha, SHA y qué verificó Emi. Las anteriores al
-2026-10-24 (`a771693`, `5cb03ab`, `6ea8ca9`, `a9b03cf`) están en la historia
+Una línea por publicación: fecha, SHA y qué verificó Emi. Las anteriores
+(`a771693`, `5cb03ab`, `6ea8ca9`, `a9b03cf`, `8b45207`) están en la historia
 de Git de este archivo y en sus `REPRODUCCION-*`.
 
 - `dddcf6d` (2026-10-24 18:40 UTC): EXCEL-2, «dale dddcf6d». CI verde. Emi
