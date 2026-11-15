@@ -272,7 +272,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-15 02:00 UTC: MARIA en bucle de compactación desde ~01:30 (terminadas 01:34, 01:39, 01:44, 01:49, otra desde 01:51; ~3 min cada una y ~2 min de trabajo entre ellas; arranca en ~130k, umbral 184k de 250k; ~10 en 2 h). Pausada a las 02:00: nota arriba de PARA-DEV-2, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP apagada, pedido de push de lo que tenga (remoto seguía en 993825b5). Para Emi desde las 12 UTC: sesión nueva para MARIA (repetir /autocompact no alcanza). run9c sobre fc5944fc: 24 por correr; despacho1b rc=124 (3600 s, por leer su salida). Técnica quieta (de4d121e).
+2026-11-15 02:00 UTC: MARIA en bucle de compactación desde ~01:30 (terminadas 01:34, 01:39, 01:44, 01:49, otra desde 01:51; ~3 min cada una y ~2 min de trabajo entre ellas; arranca en ~130k, umbral 184k de 250k; ~10 en 2 h). Pausada a las 02:00: nota arriba de PARA-DEV-2, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP apagada, acató a las 02:10: subió aec95f3 (pruebas en bd009cc, sin entregar) y nota de pausa arriba de PARA-PM-2; falta medir 22 de 115 cambios. Para Emi desde las 12 UTC: sesión nueva para MARIA (repetir /autocompact no alcanza). run9c sobre fc5944fc: 24 por correr; despacho1b rc=124 (3600 s, por leer su salida). Técnica quieta (de4d121e).
 
 ## /compact conservar de la PM principal
 
