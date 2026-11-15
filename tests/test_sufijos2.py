@@ -9,6 +9,8 @@
 Sintéticos con la forma de la factura del 24/10; los datos reales no entran
 al repositorio.
 """
+import re
+
 import pytest
 
 from proyecto_maria.core import maria_generator as mg
@@ -111,12 +113,14 @@ def test_un_sufijo_que_pide_numero_entero_sale_igual():
 
 # ------------------------------------------------------- 3. Ninguno vacío
 
-VACIOS = ["AA()-CA00-", "AA(   )-", "AA(DEMO)-AB()-", "AA(--)-"]
+# sufijo: el código que el error nombra, y no el sufijo entero
+VACIOS = {"AA()-CA00-": "AA()", "AA(   )-": "AA(   )", "AA(DEMO)-AB()-": "AB()", "AA(--)-": "AA(--)"}
 
 
 @pytest.mark.parametrize("vacio", VACIOS)
 def test_un_sufijo_vacio_no_se_genera(vacio):
-    with pytest.raises(ValueError, match=r"Sufijo de valor del ítem 2: «A[AB]\(.*está vacío.*no se genera"):
+    nombra = re.escape(VACIOS[vacio])
+    with pytest.raises(ValueError, match=rf"Sufijo de valor del ítem 2: «{nombra}» está vacío.*no se genera"):
         mg.limpiar_sufijo(vacio, " del ítem 2")
 
 
@@ -237,3 +241,34 @@ def test_cada_palabra_se_mira_una_vez(monkeypatch, largo):
         mg.limpiar_sufijo(f"AJ({largo})-")
     miradas, palabras = len(vistas), len(largo.split())
     assert miradas <= palabras
+
+
+# ------------------------ 6. Lo que el error y el aviso muestran entre «»
+# El código que falla, no el sufijo entero ni lo que le sigue, y cortado: un
+# sufijo largo no tiene que tapar la instrucción.
+
+LO_QUE_MUESTRA = {
+    "pide": ("AA(X)-ZB(16.384)-CA00-", "«ZB(16.384)» pide"),
+    "pide_largo": ("AA(X)-ZA(" + "9" * 50 + ",5)-CA00-", "«ZA(" + "9" * 37 + "» pide"),
+    "cambiaria": ("AA(X)-AJ(ROLLO 1.500 M)-CA00-", "en «AJ(ROLLO 1.500 M)», «1.500» cambiaría"),
+    "cambiaria_largo": ("AA(X)-AJ(" + "B" * 40 + "-1.500)-CA00-",
+                        "en «AJ(" + "B" * 37 + "», «" + "B" * 20 + "» cambiaría"),
+    "vacio_largo": ("AA(X)-AB(" + "-" * 50 + ")-CA00-", "«AB(" + "-" * 37 + "» está vacío"),
+    "no_se_separa_largo": ("AA(OK)-AB(" + "X" * 90,
+                           "«AA(OK)-AB(" + "X" * 70 + "» no se puede separar en códigos "
+                           "(cerca de «AB(" + "X" * 17 + "»)"),
+}
+
+
+@pytest.mark.parametrize("caso", LO_QUE_MUESTRA)
+def test_el_error_nombra_el_codigo_que_falla_y_lo_corta(caso):
+    sufijo, muestra = LO_QUE_MUESTRA[caso]
+    with pytest.raises(ValueError) as error:
+        mg.limpiar_sufijo(sufijo, " del ítem 3")
+    assert f"Sufijo de valor del ítem 3: {muestra}" in str(error.value)
+
+
+def test_el_aviso_corta_el_sufijo_que_muestra():
+    largo = "AF(2.5)-AA(" + "X" * 100 + ")-"
+    avisos = mg.supuestos_declarados([dict(LONA, sufijo=largo)], sbt_sufijo_valor="")
+    assert any("ítem 1" in a and "sale «AF(2,5)-AA(" + "X" * 69 + "»." in a for a in avisos), avisos

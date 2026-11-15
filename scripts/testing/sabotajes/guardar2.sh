@@ -72,7 +72,7 @@ sabotaje $M "gana el proveedor aunque el cliente no tenga 8 dígitos" \
   "FAILED $T::test_cual_gana[8471490010-84714900100D-8471490010]"
 
 sabotaje $M "gana la SIM de otro producto parecido del proveedor" \
-  '            or del_proveedor["producto_key"] != catalog_svc._normalize(recordado.get("descripcion") or "")):' \
+  '            or del_proveedor["producto_key"] != catalog_svc.clave_de_producto(recordado.get("descripcion") or "")):' \
   '            ):' \
   "FAILED $T::test_la_sim_de_otro_producto_parecido_no_gana"
 sabotaje $M "la SIM del proveedor sale tal como está guardada" \

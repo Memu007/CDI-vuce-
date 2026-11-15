@@ -94,7 +94,7 @@ reemplazar $F 'cantidad_est = kilos_al_centesimo(peso_neto)' 'cantidad_est = Dec
 caso "kilos_es_cantidad" "FAILED $T::test_estadistica_en_kilos_da_el_kilo_neto_al_centesimo"
 
 # 6. el sufijo de la operación sale sin limpiar
-reemplazar $F 'sufijo_sbt = limpiar_sufijo((sbt_sufijo_valor or "").strip(), " de la operación")[0]' 'sufijo_sbt = (sbt_sufijo_valor or "").strip()'
+reemplazar $F 'return limpiar_sufijo((sbt_sufijo_valor or "").strip(), " de la operación")[0]' 'return (sbt_sufijo_valor or "").strip()'
 caso "sufijo_sucio" "FAILED $T::test_dentro_del_sufijo_solo_letras_numeros_y_espacios"
 
 # 7. una cuenta del banco vuelve a salir como IDTRIB-PROVEEDOR

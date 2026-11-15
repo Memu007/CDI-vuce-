@@ -7,41 +7,82 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
-## SUFIJO-BORRADOR: aceptada sobre `52f13ca` (informe `6fbfefd`); se integra después de publicar (2026-11-13 19:19 UTC)
+## Vencido `sabotajes/guardar2.sh`: aceptado sobre `aeb994f` (informe `279a685`) e integrado (2026-11-14 10:47 UTC)
 
-Acta `REPRODUCCION-SUFIJO-BORRADOR-vuelta-2026-11-13.md`. Reproduje tu verde
-y tu rojo con `ee2ee3c`, `e2e_maria.sh` sobre `52f13ca` y chequeo-6 (igual al
-tuyo). Probé además un ejemplo que no te di: A **generada de verdad** con su
-sufijo, «Nueva operación» y B sin sufijo: frena y no sale ningún pedido; con
-`finalize.js` de `ee2ee3c`, B genera con el de A. Gracias por reconocer la
-objeción y por apartar CUIT-GENERAR con reversiones.
+Acta `REPRODUCCION-SABOTAJE-GUARDAR2-2026-11-14.md`. No queda ningún vencido.
 
-**No la integro todavía:** Emi dio el «dale» para `7436c6e5` y la PR publica
-la cabeza de mi rama. Entra apenas se publique; no cambia nada de tu lado.
+- Con la copia de `aeb994f`: 11 `ROJO`, `sabotajes con falla: 0`, `rc=0`; chequeo-6 igual al
+  tuyo; anclas 0/0/0. A mano, `22 passed` sin cambio y `1 failed, 21 passed` con la condición
+  sacada, sólo su prueba.
+- Mis negativos: el guion viejo da `ROTO` y `rc=1`; con el reemplazo cambiado por una línea
+  equivalente da `VERDE … la prueba no lo vio` y `rc=1`.
+- **Riesgos 1 y 2:** aceptados, van a la cola. El 1 va como «pedir prueba o evidencia antes de
+  sacarlo»: el `.get` evita un `KeyError` si falta la clave, y que hoy siempre esté no lo
+  prueba ninguna prueba.
 
-- **D238: (a), decidido por la PM**, como pieza chica aparte, después de D237 (a).
-- Lo del campo sin evento `input` queda así (frena: es la dirección segura).
-- Tu línea de `despachante.js` va a `COLA-LIMPIEZA.md`.
+## D249 (a): aceptada sobre `50dabfa` (informe `5682f6e`) e integrada (2026-11-14 11:44 UTC)
 
-**PAIS-NL (Emi, 13/11: «El código de país de países bajos es 423»).** Hoy la
-sigla «NL» y «NLD» dan 434 (HOLANDA) en el TXT, el catálogo y la pantalla:
-`PAISES_INDEC` repite la clave «NL» y gana la segunda, y `paises_maria.js`
-la manda a 434. Comportamiento pedido: toda sigla de Países Bajos da 423 en
-TXT, catálogo y pantalla, y la tabla queda sin claves repetidas. «PAISES
-BAJOS» ya da 423; «HOLANDA» escrito así queda en 434 (es otra entrada de la
-tabla oficial y Emi no la nombró). Ninguna otra entrada cambia de valor.
-`tests/test_catalogo3.py:291` y `:298` hoy fijan lo contrario: cambiarlas es
-tu rojo; las formas de escribirlo van como datos de un caso. En el informe,
-medido y no arreglado: qué queda guardado (operación, catálogo, memoria,
-`operation_items.origen`) cuando se carga «NL», y si algo ya guardado queda
-en 434 sin forma de distinguirlo de un «HOLANDA» puesto a propósito. Sin
-migración dentro de la pieza: eso va como riesgo.
+Acta `REPRODUCCION-D249-2026-11-14.md`.
 
-**Cómo sigue:** 1) PAIS-NL (ya); 2) D237 (a); 3) D238 (a); 4) CUIT-GENERAR
-(D235 a), producto con datos, con revisión fuerte (§3); 5) los vencidos de
-`sabotajes-conocidos.txt`, uno por pieza.
+- Con la copia de `50dabfa`: 49 `ROJO`, `117 passed`, `rc=0`; sobre la base `279a685`, 16 sin
+  rojo (15 `VERDE` y el `ROJO?` de «pide», que la base ve con un solo dato). Mi sabotaje,
+  «cerca de» corrido en uno, da `ROJO` en `[no_se_separa_largo]`. `sabotaje_sufijos1.sh` en 46,
+  anclas 0/0/0, chequeo-6 igual al tuyo.
+- **Supuestos 1 y 2 y riesgos 1 y 3:** aceptados. El riesgo 2 (`AF(-2.5)`) va a la cola.
+- **`/code-review`:** esta vez pasa (sin producto y el SHA pasó por el adversario), decidido por
+  la PM. `/entregar` no lo exceptúa y «Ritmo y calidad» de Emi tampoco: desde D250 se corre
+  siempre, aunque sea sólo arnés.
 
-**Próxima D: D239.**
+## D250 (a) (2026-11-14 10:26 UTC)
+
+D250 (a), decidida por la PM. Medí tu mutación de `maria_generator.py:2235`: los 27
+archivos siguen en `1126 passed`, y `-k 'sufijo or maria'` sobre `tests/` también queda verde.
+Y cambia lo que se ve: con un sufijo de la operación que se limpia, el aviso muestra el sucio;
+si un renglón trae como propio el limpio y los otros heredan, el aviso no sale; con uno que no
+se separa, sale además del error. Va después de D249.
+
+Criterio de D250:
+1. La familia de entradas del aviso «los N sub-ítems llevan el mismo sufijo», como datos de un
+   solo caso: el texto que muestra, cuándo sale y cuándo no.
+2. Tu sabotaje de la línea 2235 en `sabotaje_maria8.sh` da `ROJO` con una prueba nombrada.
+3. `sabotaje_maria8.sh` entero en `ROJO`, con la cuenta exacta.
+4. Las anclas no empeoran.
+
+**Cómo sigue:** D250 (a).
+
+D244 y D239 esperan a Emi:
+- Si dice que sí a D244, te la escribo con su criterio.
+- Si dice que sí a D239 (a), lleva adentro, como datos de un caso, un código sin sigla con
+  el nombre de otro país («434 BELGICA» guarda `BE` sin avisar).
+- Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
+
+**Próxima D: D251.**
+
+## Vencidos `sabotaje_valor1b.sh` y `sabotaje_doc1.py`: aceptados sobre `70eb5dc` y `d4c6b73` (informes `a926930` y `f3a7d29`) e integrados (2026-11-14 09:56 UTC)
+
+Actas `REPRODUCCION-SABOTAJE-VALOR1B-2026-11-14.md` y `REPRODUCCION-SABOTAJE-DOC1-2026-11-14.md`.
+
+## Vencido `sabotaje_maria5.sh`: aceptado sobre `c0505cc` (informe `9153d23`) e integrado (2026-11-14 09:30 UTC)
+
+Acta `REPRODUCCION-SABOTAJE-MARIA5-2026-11-14.md`. Regla nueva de la PM: en un vencido de sólo
+arnés, un último commit que cambia únicamente comentarios no necesita revisor si el informe lo dice.
+
+## Vencido `sabotaje_maria1d.sh`: aceptado sobre `6e4e658` (informe `38a7ed2`) e integrado (2026-11-14 08:18 UTC)
+
+Acta `REPRODUCCION-SABOTAJE-MARIA1D-2026-11-14.md`. Supuesto y riesgos aceptados.
+
+## D248 (c): aceptada sobre `3fcc9c4` (informe `8f50af3`) e integrada (2026-11-14 07:57 UTC)
+
+Acta `REPRODUCCION-D248-2026-11-14.md`. Supuestos 1 y 2 y riesgos aceptados; el `38`
+escrito a mano quedó en `COLA-LIMPIEZA.md`.
+
+## D247 (a): aceptada sobre `4a58c68` (informe `ee3ccfd`) e integrada (2026-11-14 07:03 UTC)
+
+Acta `REPRODUCCION-D247-2026-11-14.md`. Con la copia de `4a58c68`: las dos pruebas
+`171 passed`; tu cambio del criterio da `4 failed` en `4a58c68` y `171 passed` en
+`0224f01`; `sufijos2.sh` 33 `ROJO`, 0 `FALLA`, `rc=0`; `sabotaje_sufijos1.sh` 46 `ROJO`,
+`rc=0`; anclas en 5 y 1; chequeo-6 igual al tuyo. Gracias por medir D249 sin que te lo
+pidiera.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 

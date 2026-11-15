@@ -797,6 +797,7 @@ def test_sbt_flujo_completo_desde_dashboard(client):
     # Paso 1: validar items
     val = client.post("/api/validate/smart", json={"items": ITEMS_OK})
     assert val.status_code == 200
+    assert val.json().get("success") is True, val.text
     # Paso 2: generar con SBT
     resp = client.post("/generate_maria", json={
         "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio

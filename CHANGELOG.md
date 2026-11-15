@@ -6,6 +6,32 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-13 · fix: no se genera el TXT con un CUIT del despachante que no cierra con su verificador (CUIT-GENERAR)
+
+- Al generar, el CUIT del despachante se controla con su dígito verificador, también el que ya estaba guardado en el perfil: antes alcanzaba con que tuviera 11 dígitos y salía así en el TXT.
+- El error dice dónde corregirlo: en «Mi perfil», campo «Mi CUIT (despachante)»; si es el de un estudio elegido, en «Mis estudios» (borrarlo y agregarlo de nuevo); y si lo mandó la operación y no es el del perfil, avisa que hay que recargar la página si ya se corrigió.
+
+## 2026-11-13 · fix: el aviso «Ingresá el sufijo de valor SBT» no queda de una operación a otra
+
+- El aviso rojo bajo el campo del sufijo se va al escribir en el campo y no aparece al entrar a «Validación»: antes seguía a la vista en la operación siguiente, aunque ya tuviera su sufijo.
+- Si el servidor rechaza el sufijo al generar, el aviso sale como siempre.
+
+## 2026-11-13 · fix: «NL» y «NLD» son Países Bajos, código 423 (PAIS-NL)
+
+- La sigla «NL» y «NLD» dan 423 (PAISES BAJOS) en el TXT, el catálogo y la pantalla: antes daban 434 (HOLANDA). «HOLANDA» escrito así sigue en 434.
+- Lo que ya estaba guardado como «NL» pasa a 423 sin tocarlo. Lo que se escribió como «NL» en el campo de origen de la pantalla antes de este cambio quedó guardado como «434» y sigue en 434: se corrige a mano.
+- Los lectores de facturas y de despachos guardan «NL» cuando leen «Países Bajos» o «423», y ya no cuando leen «Holanda» o «434», que quedan como están escritos (434). Un «NL» guardado antes pudo venir de un documento que decía «Holanda»: también pasa a 423. Un despacho que trae «434» solo, sin el nombre, queda sin origen y avisa. En un grupo, «NL» ya no va junto con «Holanda» ni «434»: son orígenes distintos.
+
+## 2026-11-13 · fix: una operación sin sufijo de valor ya no genera con el de la operación anterior (SUFIJO-BORRADOR)
+
+- Al entrar a «Validación», el campo «Sufijo de valor SBT» muestra el de la operación en curso y queda vacío si no tiene: antes conservaba el de la operación anterior y «Generar» lo mandaba al TXT.
+- Quien carga varias operaciones seguidas escribe el sufijo en cada una.
+
+## 2026-11-13 · fix: el sufijo de valor de la operación vuelve a su campo después de recargar (SUFIJO-BORRADOR)
+
+- El sufijo de valor de la operación se guarda con ella apenas se escribe, y al recuperar la operación el campo lo muestra: antes aparecía vacío aunque la operación lo tuviera guardado, y lo escrito sin generar se perdía.
+- Mientras se escribe el sufijo, «Calcular seguro» se esconde hasta que vuelven las cuentas, igual que al escribir un ajuste.
+
 ## 2026-11-13 · fix: «Mi perfil» no guarda un CUIT con el dígito verificador equivocado (CUIT-PERFIL)
 
 - Al guardar el perfil, un CUIT que no cierra con su verificador se rechaza y el error queda junto al campo: antes alcanzaba con que tuviera 11 dígitos, y de ahí sale el CUIT del despachante en el TXT.

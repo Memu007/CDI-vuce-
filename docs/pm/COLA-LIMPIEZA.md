@@ -234,6 +234,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   que la usa, culpándolo a él. Hoy no hay ninguna (FUGA-HILOS-GUARDA).
 - `despachante.js:255`, `sufijoDeLaOperacion()` lee el sufijo del campo del
   DOM; que lea la operación, como «Generar» y los avisos.
+- `sabotajes/excel2.sh:171`: el comentario habla de «ese mismo bucle», donde ya
+  no está el control del CUIT del despachante (Técnica).
 
 ## Riesgos que esperan a Emi (no son tareas: no se toman de esta cola)
 
@@ -252,3 +254,46 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `cuit_valido` (`controles_maria.py:52`) acepta `00000000000`: no mira el
   prefijo. Lo usan clientes, estudio y perfil; cerrarlo es una regla nueva
   del CUIT, sin camino medido de daño hoy (adversario de CUIT-PERFIL).
+- `main.py` (`/generate_maria`): el control de forma de los sub-ítems está dos veces (`:5082` y `:5111` sobre `bf6778e`). El segundo es código muerto: el primero corre antes y frena todo lo que el segundo frenaría (adversario: 0 diferencias en 364 pedidos). Sale el segundo, y del caso 7 de `sabotaje_subitems1.sh` sale su línea.
+- El control de forma de los sub-ítems vive en `/generate_maria` y no en `controles_antes_de_generar`: el semáforo (`/api/validate/smart`) da OK con sub-ítems mal armados que generar rechaza con 400. Una sola copia, en la función que usan los dos (Dev MARIA, SABOTAJE-SUBITEMS1).
+- Pruebas del semáforo: un solo ayudante que llame a `/api/validate/smart` y afirme 200 y `success`. Hoy la afirmación está copiada en cuatro archivos (`test_subitems1.py:103`, `test_cobro_corte1.py:538`, `test_generar_maria_txt.py:800`, `test_punta_a_punta1.py:284`) y otras 22 pruebas de siete archivos dan rojo ante un error tragado sólo por `KeyError`. Medido en D245 (a) (Dev MARIA).
+- `scripts/testing/sabotaje_sufijos1.sh`: sacar el número de los comentarios de cada caso. Cada uno ya se llama por su `caso` y los cuenta `CASOS`; con números, sacar o agregar uno en el medio obliga a renumerar los que siguen y «el caso N» escrito en otro lado queda apuntando a otro (Dev MARIA, D246 (b)).
+- `tests/test_sufijos1.py:23`: el import de `_bloques` no se usa (Dev MARIA, D246 (b)).
+- `maria_generator.py:2013` (`_avisos_del_arancel`): el filtro `if v.strip() or len(c) == 4` de los códigos con valor vacío está muerto: lo que llega ya pasó por `limpiar_sufijo` (`:1947`), que frena el vacío (`:417`); sin el filtro, `test_sufijos1.py` verde (medido por la Dev MARIA en SABOTAJE-SUFIJOS1). Sacarlo.
+- `paises_maria.js` repite a mano alias que el servidor tiene en `PAISES_INDEC` («NL» está en los dos; «NLD» sólo en la pantalla): una sola fuente para las siglas (MARIA, PAIS-NL).
+- `scripts/testing/ataque_aislamiento.sh`, `limpiar()`: como root `pg_ctl stop` falla («cannot be run as root») y el Postgres queda en 5434 hasta un minuto; una corrida pegada a otra no levanta el suyo. Pararlo con `correr` (PM, sabotajes 13/11).
+- `scripts/testing/forzar_orden1.js` y `forzar_avisos_orden1.js` (y uno más que
+  venga): un ayudante común para cargarlos; uno pide `require('playwright')` y
+  otro `/opt/node-tools/node_modules/playwright` (`pantalla_orden1.js:78`), y
+  `forzar_orden1.js:66` dice «activo» aunque no demore nada. Lo vio la Dev MARIA.
+- `scripts/testing/pantalla_orden1.js:174`, `:335`, `:1429`: el sufijo
+  `'AA(DemoPouchs)-CA00-'` escrito tres veces; una constante.
+- `scripts/testing/pantalla_orden1.js`: `listaParaGenerar` y `enValidacionQuieta`
+  dejan lista una operación de dos formas; una sola, con z20, z22 y z23.
+- `scripts/testing/sabotaje_maria8.sh`: el `38` del último `echo` está escrito a mano.
+  Si se agrega o se saca un caso y no se toca, el guion miente la cuenta. Contarlos.
+  Lo vio la Dev MARIA.
+- `scripts/testing/sabotaje_maria5.sh`: el `50` del último `echo` está escrito a mano (como
+  el de maria8), el venv por defecto `/tmp/cdi-dev2/venv` no existe en una sesión nueva, y el comentario
+  del caso 33 dice «el TXT no la usa» aunque `maria_generator.py:1098` llama a
+  `peso_valido`. Lo vio la Dev MARIA.
+- `scripts/testing/sabotaje_valor1b.sh`: el `22` del último `echo` está escrito a mano, el
+  venv por defecto `/tmp/cdi-dev2/venv` no existe en una sesión nueva y no corre la prueba sin
+  sabotaje (no hay línea `VERDE`). Lo vio la Dev MARIA.
+- `scripts/testing/sabotaje_doc1.py`: es el único guion de sabotaje en Python y
+  `anclas_perdidas.py` no lo lee; no recibe un SHA (mide `HEAD`); no corre la prueba sin
+  sabotaje y acepta cualquier rojo por aserción. Lo vio la Dev MARIA.
+- `scripts/testing/sabotaje_maria7.sh`: las anclas de los casos 16, 24 y 25 llevan un
+  comentario del producto; el `25` del último `echo` está escrito a mano; el venv por
+  defecto (`/tmp/cdi-dev2/venv`) es de otra máquina. Lo vio la Dev MARIA.
+- `proyecto_maria/main.py:10176`: `not del_proveedor.get("producto_key")` no lo distingue
+  ninguna prueba (sacarlo deja verde todo lo que usa la clave). El `.get` evita un `KeyError`
+  si falta la clave: pedir una prueba o evidencia antes de sacarlo. Lo vio la Dev MARIA.
+- `scripts/testing/sabotajes/guardar2.sh`: el final dice `sabotajes con falla: N` y no
+  cuántos corrieron; si se borra uno, sigue dando 0. Lo vio la Dev MARIA.
+- `tests/test_sufijos2.py`: el camino donde el número que cambiaría sale de alrededor del
+  valor (`AF(-2.5)`) sólo lo mira una prueba con comodín; falta un dato con el texto exacto en
+  `test_el_error_nombra_el_codigo_que_falla_y_lo_corta`. Lo vio la Dev MARIA.
+- `proyecto_maria/core/maria_generator.py` (`limpiar_sufijo`): un `.upper()` de más en
+  `cambiaria[:20]` y el texto de la instrucción de los errores quedan verdes en
+  `test_sufijos2.py`: pedir una prueba. Lo vio el adversario de la Dev MARIA.

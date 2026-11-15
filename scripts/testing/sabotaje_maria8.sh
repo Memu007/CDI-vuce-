@@ -42,19 +42,21 @@ PY
 }
 
 FALLAS=0
-caso() {  # caso <nombre> <texto que el rojo tiene que mostrar>
-  local nombre="$1" espera="$2" salida
+caso() {  # caso <nombre> <texto que el rojo tiene que mostrar>...
+  local nombre="$1" espera="${2:?falta el texto esperado}" salida faltan=""
   salida="$(correr)"
   git checkout -q -- .
   if grep -q "passed" <<<"$salida" && ! grep -q "failed" <<<"$salida"; then
     echo "FALLA  $nombre: quedó verde"; FALLAS=$((FALLAS+1)); return
   fi
-  if grep -qF -- "$espera" <<<"$salida"; then
-    echo "ROJO   $nombre: $(grep -E '[0-9]+ failed' <<<"$salida" | tail -1)"
-  else
-    echo "FALLA  $nombre: rojo, pero sin «$espera»"; FALLAS=$((FALLAS+1))
-    tail -15 <<<"$salida"
+  for espera in "${@:2}"; do
+    grep -qF -- "$espera" <<<"$salida" || faltan+=" «$espera»"
+  done
+  if [ -n "$faltan" ]; then
+    echo "FALLA  $nombre: rojo, pero sin$faltan"; FALLAS=$((FALLAS+1))
+    tail -15 <<<"$salida"; return
   fi
+  echo "ROJO   $nombre: $(grep -E '[0-9]+ failed' <<<"$salida" | tail -1)"
 }
 
 # 0. sin sabotaje: verde
@@ -138,17 +140,22 @@ caso "unitario_promedio" "FAILED $T::test_cada_subitem_lleva_lo_de_su_renglon"
 
 # 18. el renglón pierde su sufijo y lleva el de la operación
 reemplazar $F '                sufijo = limpiar_sufijo(str(renglon.get("sufijo") or "").strip(),
-                                        f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0] or sufijo_sbt' '                sufijo = sufijo_sbt'
+                                        f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0] or sufijo_de_la_operacion()' '                sufijo = sufijo_de_la_operacion()'
 caso "sufijo_de_la_operacion" "FAILED $T::test_cada_subitem_lleva_lo_de_su_renglon"
 
 # 19. el sufijo del renglón sale sin limpiar
 reemplazar $F '                sufijo = limpiar_sufijo(str(renglon.get("sufijo") or "").strip(),
-                                        f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0] or sufijo_sbt' '                sufijo = str(renglon.get("sufijo") or "").strip() or sufijo_sbt'
+                                        f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0]' '                sufijo = str(renglon.get("sufijo") or "").strip()'
 caso "sufijo_sucio" "FAILED $T::test_el_sufijo_del_renglon_se_limpia"
 
-# 20. vuelve a pedir el sufijo de la operación aunque cada renglón tenga el suyo
-reemplazar $F '        if not subitems and not renglones and not sufijo_sbt:' '        if not subitems and not sufijo_sbt:'
-caso "pide_sufijo_operacion" "FAILED $T::test_con_todos_los_sufijos_propios_no_hace_falta_el_de_la_operacion"
+# 20. sin sufijo propio, el renglón, el ítem entero y el sub-ítem a mano dejan
+# de heredar el de la operación: una prueba por lugar
+reemplazar $F 'f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0] or sufijo_de_la_operacion()' 'f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0]'
+reemplazar $F '                          or sufijo_de_la_operacion())' '                          )'
+reemplazar $F 'f" del ítem {n_item}, sub-ítem {n}")[0] or sufijo_de_la_operacion()' 'f" del ítem {n_item}, sub-ítem {n}")[0]'
+caso "sin_herencia" "FAILED $T::test_sin_sufijo_propio_el_renglon_lleva_el_de_la_operacion" \
+  "FAILED $T::test_un_renglon_solo_sale_como_antes" \
+  "FAILED $T::test_un_grupo_a_mano_y_los_subitems_a_mano_no_se_mezclan"
 
 # 21. el error del peso no dice el renglón de la pantalla
 reemplazar $F '    kilos = [Decimal(f"{peso_valido(peso_de_la_linea(r), lugar[id(r)]):.3f}") for r in renglones]' '    kilos = [Decimal(f"{peso_valido(peso_de_la_linea(r), 1):.3f}") for r in renglones]'

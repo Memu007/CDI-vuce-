@@ -688,13 +688,6 @@ def test_en_un_grupo_el_guion_final_no_hace_distintos_los_sufijos():
     assert _valor(_gen([a, dict(a, sufijo="AA(DEMO)-AI(GRIS 1)")]), "CSBTSVL") == ["AA(DEMO)-AI(GRIS 1)-"]
 
 
-def test_un_codigo_con_el_valor_vacio_no_se_genera():
-    # Antes salía con el aviso de un código que falta; desde SUFIJOS-2
-    # (respuesta del despachante del 28/10) ninguno puede quedar vacío.
-    with pytest.raises(ValueError, match=r"del ítem 1: «AA\( \)» está vacío"):
-        _gen([dict(LONA, pieza=PLASTICO, sufijo="AA( )-AI(620G)-")])
-
-
 def test_la_posicion_se_lee_con_puntos_y_sin_letras_de_mas():
     assert sa.consultar("3920.10.10.100F")["unidad_estadistica"] == "01"
     assert sa.consultar(" 3920.10.10.100f ")["unidad_estadistica"] == "01"

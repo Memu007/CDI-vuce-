@@ -463,8 +463,16 @@ def test_sin_operacion_todavia_el_boton_igual_pone_el_seguro():
 def test_al_escribir_un_ajuste_el_boton_se_esconde_hasta_que_vuelvan_las_cuentas():
     r = _pantalla({}, "", VALOR)
     assert r["els"]["valorCalcularSeguro"]["hidden"] is False
-    r = _pantalla({}, "enlazarValor(); els.valorDeducir.value = '500'; els.valorDeducir.listeners.input();", VALOR)
-    assert r["els"]["valorCalcularSeguro"]["hidden"] is True
+    # El sufijo de la operación no es un ajuste, pero cambia el pedido con el que se hicieron las cuentas.
+    campos = {"valorIncluir": "ajustes_incluir", "valorDeducir": "ajustes_deducir",
+              "sbtSufijoValor": "sbt_sufijo_valor"}
+    vistos = {}
+    for campo in campos:
+        # El pedido de las cuentas nuevas sale con un reloj: acá corre en el acto.
+        r = _pantalla({}, f"globalThis.setTimeout = f => f(); enlazarValor(); const c = el('{campo}');"
+                          " c.value = '500'; (c.listeners.input || (() => 0))();", VALOR)
+        vistos[campo] = (r["op"], r["els"]["valorCalcularSeguro"]["hidden"], r["refrescos"])
+    assert vistos == {campo: ({atributo: "500"}, True, 1) for campo, atributo in campos.items()}
 
 
 def test_mientras_se_rehacen_las_cuentas_no_se_calcula_con_las_viejas():
@@ -486,9 +494,13 @@ def test_un_numero_que_el_campo_no_entiende_queda_marcado_y_a_la_vista():
 
 
 def test_lo_que_se_esta_escribiendo_no_se_pisa():
-    r = _pantalla({}, "els.valorDeducir.value = '12'; document.activeElement = els.valorDeducir;"
-                      " CDI.state.operacion.ajustes_deducir = '99'; pintarValor(VALOR);", VALOR)
-    assert r["els"]["valorDeducir"]["value"] == "12"
+    # En el campo en foco está lo que la persona escribe: lo guardado no lo pisa.
+    campos = {"valorIncluir": "ajustes_incluir", "valorDeducir": "ajustes_deducir"}
+    vistos = {campo: _pantalla(
+        {}, f"els.{campo}.value = '12'; document.activeElement = els.{campo};"
+            f" CDI.state.operacion.{atributo} = '99'; pintarValor(VALOR);", VALOR
+    )["els"][campo]["value"] for campo, atributo in campos.items()}
+    assert vistos == {"valorIncluir": "12", "valorDeducir": "12"}
 
 
 def test_un_ajuste_mal_escrito_se_ve_en_el_campo_que_llega_vacio():

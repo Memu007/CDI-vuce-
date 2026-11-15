@@ -66,6 +66,8 @@
         if (vGenerate) vGenerate.addEventListener('click', onGenerate);
         if (rDownload) rDownload.addEventListener('click', onDownload);
         if (rCopy)     rCopy.addEventListener('click', onCopy);
+        // El aviso habla de lo que había en el campo al tocar «Generar».
+        if (sbtInput)  sbtInput.addEventListener('input', () => hide(sbtError));
 
         initialized = true;
     }
@@ -80,6 +82,8 @@
         // Hasta que llegue la respuesta, nada de los avisos de otra operación.
         const avisosPanel = document.getElementById('validatingAvisosPanel');
         if (avisosPanel) avisosPanel.hidden = true;
+        // Antes que la tarjeta del despachante, que lee el sufijo del campo.
+        pintarSufijo();
         // ESTUDIO-1: el estudio elegido también cambia los avisos.
         Promise.all([
             Promise.resolve(CDI.despachante ? CDI.despachante.render() : null).catch(() => null),
@@ -185,11 +189,18 @@
         };
         wrap.addEventListener('change', programar);
         wrap.addEventListener('input', programar);
-        // El sufijo de la operación cambia lo que viaja por producto.
-        const sbt = document.getElementById('sbtSufijoValor');
-        if (sbt) sbt.addEventListener('input', programar);
         const estudio = document.getElementById('estudioWrap');
         if (estudio) estudio.addEventListener('change', programar);
+    }
+
+    // El campo muestra el sufijo de la operación en curso, vacío si no tiene:
+    // la tarjeta del despachante lo toma de ahí.
+    function pintarSufijo() {
+        const campo = document.getElementById('sbtSufijoValor');
+        if (campo) campo.value = ((CDI.state || {}).operacion || {}).sbt_sufijo_valor || '';
+        // El aviso es de un «Generar» que ya pasó: no entra con la pantalla.
+        const aviso = document.getElementById('sbtFieldError');
+        if (aviso) aviso.hidden = true;
     }
 
     // SEPARADORES-1d (D25): el flete y el seguro van al TXT con dos
@@ -334,7 +345,10 @@
             clearTimeout(avisosTimer);
             avisosTimer = setTimeout(refrescarAvisos, 400);
         };
-        const campos = { valorIncluir: 'ajustes_incluir', valorDeducir: 'ajustes_deducir' };
+        // El sufijo no entra en las cuentas, pero viaja en el pedido con el
+        // que se hicieron; guardado al escribirlo, vuelve con el borrador.
+        const campos = { valorIncluir: 'ajustes_incluir', valorDeducir: 'ajustes_deducir',
+                         sbtSufijoValor: 'sbt_sufijo_valor' };
         Object.keys(campos).forEach(function (id) {
             const input = document.getElementById(id);
             if (!input) return;
@@ -664,18 +678,13 @@
     async function onGenerate() {
         if (lastValidation && (lastValidation.errores || []).length > 0) return;
 
-        // Guardar SBT del input al estado antes de generar
-        CDI.state = CDI.state || {};
-        CDI.state.operacion = CDI.state.operacion || {};
-        if (sbtInput) {
-            CDI.state.operacion.sbt_sufijo_valor = sbtInput.value.trim();
-        }
         // Validación frontend: si está vacío, mostrar error junto al campo.
         // No hace falta si todos los productos llevan sufijo propio, en sus
         // subítems (SUBITEMS-1) o en «Lo que decide el despachante»
         // (SUFIJOS-1); el servidor tampoco lo pide.
         const todosConSufijoPropio = Boolean(CDI.despachante && CDI.despachante.todosConPropio());
-        if (!CDI.state.operacion.sbt_sufijo_valor && !todosConSufijoPropio) {
+        const sufijo = String(((CDI.state || {}).operacion || {}).sbt_sufijo_valor || '').trim();
+        if (!sufijo && !todosConSufijoPropio) {
             if (sbtError) {
                 sbtError.textContent = 'Ingresá el sufijo de valor SBT. Es obligatorio.';
                 sbtError.hidden = false;
@@ -743,11 +752,12 @@
                 // junto al campo y volver a validación
                 if (typeof detail === 'string' && (detail.toLowerCase().includes('sbt') ||
                         detail.startsWith('Sufijo de valor de la operación: '))) {
+                    // Después de volver: la pantalla entra sin aviso.
+                    CDI.goTo('validating');
                     if (sbtError) {
                         sbtError.textContent = detail;
                         sbtError.hidden = false;
                     }
-                    CDI.goTo('validating');
                     throw new Error(detail);
                 }
                 // El seguro calculado con otros importes se resuelve en

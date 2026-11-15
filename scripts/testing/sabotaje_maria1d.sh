@@ -93,12 +93,13 @@ caso inventa_moneda "${T}test_moneda_e_incoterm_ausentes_no_se_inventan[moneda-p
 reemplazar $G "    if items and any(v is not None for v in caratula):" "    if False:"
 caso sin_aviso_caratula "${T}test_avisa_lo_que_falta_de_la_caratula"
 
-# 4. el endpoint no pasa la carátula a los avisos
+# 4. al generar, la carátula no llega a los supuestos. La misma función arma
+# los avisos previos, que este guion no mira
 reemplazar $M "        vendedor_nombre=request.vendedor_nombre,
         comprador_nombre=request.comprador_nombre,
         comprador_cuit=request.comprador_cuit,
         moneda=request.moneda,
-    )" "    )"
+" ""
 caso endpoint_sin_caratula "${T}test_ningun_none_en_el_txt_de_una_factura_vacia[pdf_directo]"
 
 # 5. lo leído llega con espacios
@@ -114,8 +115,7 @@ reemplazar $X "    descripcion = _texto(item_data.get('descripcion'))" "    desc
 caso descripcion_numero "${T}test_una_descripcion_que_no_es_texto_no_tira_el_producto[pymupdf]"
 
 # 8. los avisos previos no dicen la procedencia rara de un producto
-reemplazar $M '    return {"avisos": errores_de_procedencia(items) + kit_warnings + avisos_ncm + supuestos, "supuestos": supuestos}' \
-  '    return {"avisos": kit_warnings + avisos_ncm + supuestos, "supuestos": supuestos}'
+reemplazar $M '"avisos": errores_de_procedencia(items) + ' '"avisos": '
 caso procedencia_rara_sin_aviso "${T}test_procedencia_rara_de_un_producto_avisa_igual_antes_y_al_generar["
 
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
