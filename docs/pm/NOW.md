@@ -272,7 +272,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-15 17:56 UTC: sin entregas (MARIA sólo trajo mi rama, b60e3978; Técnica igual en de4d121e). «dale fc5944fc» pedido a Emi a las 16:20, sin respuesta; main sigue en f734fbb3. Contexto: MARIA 114k de 224k, Técnica 134k de 144k quieta. MARIA sin pieza hasta D244/D239.
+2026-11-15 19:56 UTC: sin entregas (MARIA sólo trajo mi rama, 70f72b48; Técnica igual en de4d121e). «dale fc5944fc» pedido a Emi a las 16:20, sin respuesta; main sigue en f734fbb3. Contexto: MARIA 118k de 224k, Técnica 134k de 144k quieta. MARIA sin pieza hasta D244/D239.
 
 ## /compact conservar de la PM principal
 
