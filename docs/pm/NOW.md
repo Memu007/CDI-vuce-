@@ -273,7 +273,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-15 20:18 UTC: publicado fc5944fc (PR 7, main 1cc0a500, árbol idéntico, CI verde). Falta que Emi revise Railway. Sin entregas de las Devs.
+2026-11-15 21:56 UTC: sin entregas (MARIA sólo trajo mi rama, 11a2d9dc; Técnica igual en de4d121e). fc5944fc publicado a las 20:17 (main 1cc0a500); falta que Emi revise Railway. MARIA 121k de 224k, sin pieza hasta D244/D239.
 
 ## /compact conservar de la PM principal
 
