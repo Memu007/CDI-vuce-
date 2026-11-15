@@ -3,7 +3,7 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D252 (a): aceptada sobre `bd009cc` (informe `e4561dc`) e integrada (2026-11-15 05:10 UTC)
+## D252 (a): aceptada sobre `bd009cc` (informe `e4561dc`) e integrada (2026-11-15 05:04 UTC)
 
 Acta `REPRODUCCION-D252-2026-11-15.md`.
 
@@ -20,7 +20,7 @@ Acta `REPRODUCCION-D252-2026-11-15.md`.
   despachante, queda en el acta.
 - **Las cinco líneas de la cola** van como las propusiste.
 
-## D257 (b): tu próxima pieza (2026-11-15 05:10 UTC)
+## D257 (b): tu próxima pieza (2026-11-15 05:04 UTC)
 
 D257 (b), decidida por la PM, por causa y no por posición (como D253 y D254). Hoy los datos
 tienen un solo grupo, y ese grupo siempre lleva sufijo propio: dos causas que ningún dato
