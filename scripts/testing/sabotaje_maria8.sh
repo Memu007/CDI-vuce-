@@ -337,5 +337,18 @@ caso "sin_mirar_el_ultimo_renglon" "$LIMPIO[el_ultimo_usa_el_de_la_operacion]"
 reemplazar $F '        for idx, item in enumerate(items or [], start=1):' '        for idx, item in enumerate((items or [])[:-1], start=1):'
 caso "sin_avisar_el_ultimo_renglon" "$LIMPIO[seguidos]"
 
+# 61. el que va solo antes del primer renglón de un ítem se queda sin su aviso
+reemplazar $F 'and idx - 1 not in en_renglones' 'and idx - 1 not in en_renglones and idx - 1 > min(en_renglones, default=-1)'
+caso "sin_avisar_el_de_antes_del_item" "$LIMPIO[uno_solo_antes_del_item]"
+
+# 62. sólo se mira si los tres últimos renglones del pedido usan el sufijo de la operación
+reemplazar $F 'usa_el_general = usa_el_sufijo_de_la_operacion(items)' 'usa_el_general = usa_el_sufijo_de_la_operacion(items[-3:])'
+caso "solo_se_miran_los_tres_ultimos" "$LIMPIO[uno_solo_antes_del_item]"
+
+# 63. el que va solo se avisa sólo si en el pedido hay renglones que van juntos
+reemplazar $F '                    sufijos.append((f" del ítem {idx}", item["sufijo"]))' '                    if en_renglones:
+                        sufijos.append((f" del ítem {idx}", item["sufijo"]))'
+caso "solo_sin_aviso_si_nadie_va_junto" "$LIMPIO[ninguno_va_junto]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 60 sabotajes dan rojo por la razón esperada"
+echo "OK: los 63 sabotajes dan rojo por la razón esperada"
