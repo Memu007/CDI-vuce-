@@ -262,6 +262,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `maria_generator.py:2013` (`_avisos_del_arancel`): el filtro `if v.strip() or len(c) == 4` de los códigos con valor vacío está muerto: lo que llega ya pasó por `limpiar_sufijo` (`:1947`), que frena el vacío (`:417`); sin el filtro, `test_sufijos1.py` verde (medido por la Dev MARIA en SABOTAJE-SUFIJOS1). Sacarlo.
 - `paises_maria.js` repite a mano alias que el servidor tiene en `PAISES_INDEC` («NL» está en los dos; «NLD» sólo en la pantalla): una sola fuente para las siglas (MARIA, PAIS-NL).
 - `scripts/testing/ataque_aislamiento.sh`, `limpiar()`: como root `pg_ctl stop` falla («cannot be run as root») y el Postgres queda en 5434 hasta un minuto; una corrida pegada a otra no levanta el suyo. Pararlo con `correr` (PM, sabotajes 13/11).
+- `tests/test_org1.py:404` (`_carrera`): la barrera alinea los dos registros después del hash, no entre contar y gastar; el sabotaje `contar_antes` de `sabotaje_org1.sh` quedó verde una vez en la tanda sobre `fc5944fc` (repetido después, 12 de 12 en rojo). Poner la barrera entre el conteo y el gasto (PM, tanda del 15/11).
 - `scripts/testing/forzar_orden1.js` y `forzar_avisos_orden1.js` (y uno más que
   venga): un ayudante común para cargarlos; uno pide `require('playwright')` y
   otro `/opt/node-tools/node_modules/playwright` (`pantalla_orden1.js:78`), y
