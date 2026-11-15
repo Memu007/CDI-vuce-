@@ -3,6 +3,10 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
+## PAUSA (2026-11-15 02:00 UTC), no es devolución
+
+Estás compactando cada 2 a 5 min. D252 (a) sigue siendo tuya. Subí lo que tengas como trabajo en curso (sin /entregar), dejá 5 líneas «PAUSA, no es entrega» arriba de `PARA-PM-2.md` (SHA local, qué quedó probado, qué falta, rutas de salidas) y frená. Tu rutina queda apagada; seguís cuando escriba la PM.
+
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 
 Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
