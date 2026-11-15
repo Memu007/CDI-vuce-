@@ -197,7 +197,7 @@ Desde el 2026-10-24 (Emi: Codex deja CDI; dos Devs nuevas en Claude).
 | Rol | Sesión | Rutina | Rama | Esfuerzo |
 |---|---|---|---|---|
 | PM principal | session_01B7FVQspcEHF7PqNv797wNM | trig_01TvMmGfSLDfbcJrf66ZZ7YK (min 55) | claude/practical-shannon-szpwkn | — |
-| Dev MARIA (Dev 2) | session_01YFuo2B43UZtRiDadG17zU5 (nueva 15/11; vieja _01C8gC… apagada) | trig_01Ukttby1fc4sGVQfSn1jC9U (min 35; la vieja trig_01WmrC… apagada) | claude/dev-maria | alto; Fable desde PRESUPUESTO-CLIENTE-1; 250k por Emi (11/11, umbral 184k) |
+| Dev MARIA (Dev 2) | session_01YFuo2B43UZtRiDadG17zU5 (nueva 15/11; vieja _01C8gC… apagada) | trig_01Ukttby1fc4sGVQfSn1jC9U (min 35; la vieja trig_01WmrC… apagada) | claude/dev-maria | alto; Fable desde PRESUPUESTO-CLIENTE-1; sesión nueva: 300k, umbral 224k |
 | Dev técnica (Dev 1) | session_018yxeKHYQKFA3qJ2WJmQru7 | trig_011UpBfwEu9TUzoNUrviqoP5 (min 15, apagada: espera a Emi) | claude/dev-tecnica | medio |
 
 Rutinas: cada 2 h de 8 a 22 y a las 2 y a las 5, hora de Argentina (`ONBOARDING-PM.md`, «Modo automático»).
@@ -272,7 +272,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-15 02:14 UTC: Emi aprobó sesión nueva para MARIA (bucle de compactación desde ~01:30; la vieja pausó y subió aec95f3). Nueva session_01YFuo2B43UZtRiDadG17zU5, rutina trig_01Ukttby1fc4sGVQfSn1jC9U; sigue D252 (a) desde aec95f3. Falta que Emi escriba /autocompact 250k en ese chat. Canal PARA-DEV-2 podado. run9c sobre fc5944fc: 24 por correr; despacho1b corrió 67/132 sabotajes, todos ROJO: repetirlo solo antes del «dale». Técnica quieta (de4d121e).
+2026-11-15 02:14 UTC: Emi aprobó sesión nueva para MARIA (bucle de compactación desde ~01:30; la vieja pausó y subió aec95f3). Nueva session_01YFuo2B43UZtRiDadG17zU5, rutina trig_01Ukttby1fc4sGVQfSn1jC9U; sigue D252 (a) desde aec95f3. Arrancó Fable alto, 300k con umbral 224k (de fábrica) y 73k usados. Canal PARA-DEV-2 podado. run9c sobre fc5944fc: 24 por correr; despacho1b corrió 67/132 sabotajes, todos ROJO: repetirlo solo antes del «dale». Técnica quieta (de4d121e).
 
 ## /compact conservar de la PM principal
 
