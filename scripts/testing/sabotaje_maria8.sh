@@ -350,5 +350,31 @@ reemplazar $F '                    sufijos.append((f" del ítem {idx}", item["su
                         sufijos.append((f" del ítem {idx}", item["sufijo"]))'
 caso "solo_sin_aviso_si_nadie_va_junto" "$LIMPIO[ninguno_va_junto]"
 
+# 64. el arancel mira sólo el primer grupo
+reemplazar $F '                if item["grupo_id"] not in grupos:' '                if not grupos:'
+caso "arancel_solo_el_primer_grupo" "$LIMPIO[dos_grupos]"
+
+# 65. sólo el primer grupo se avisa
+reemplazar $F 'nuevo = gid not in grupos' 'nuevo = not grupos'
+caso "dos_grupos_el_segundo_sin_aviso" "$LIMPIO[dos_grupos]"
+
+# 66. el grupo sin sufijo no toma el de la operación para el arancel
+reemplazar $F 'limpio(item.get("sufijo")) or general))
+            else:' 'limpio(item.get("sufijo"))))
+            else:'
+caso "grupo_sin_el_de_la_operacion_arancel" "$LIMPIO[un_grupo_sin_el_suyo]"
+
+# 67. el grupo sin sufijo no cuenta como uno que usa el de la operación
+reemplazar $F '        elif sin_propio(item.get("sufijo")):' '        elif item.get("grupo_id") is None and sin_propio(item.get("sufijo")):'
+caso "grupo_no_cuenta_para_la_operacion" "$LIMPIO[un_grupo_sin_el_suyo]"
+
+# 68-70. los grupos se avisan del último al primero, después o antes de los ítems
+reemplazar $F 'sufijos.append((f" del grupo {gid}", item["sufijo"]))' 'sufijos.insert(1 if usa_el_general else 0, (f" del grupo {gid}", item["sufijo"]))'
+caso "grupos_del_ultimo_al_primero" "$LIMPIO[dos_grupos]"
+reemplazar $F '        for donde, sufijo in sufijos:' '        for donde, sufijo in sorted(sufijos, key=lambda par: par[0].startswith(" del grupo")):'
+caso "grupos_despues_de_los_items" "$LIMPIO[dos_grupos]"
+reemplazar $F '        for donde, sufijo in sufijos:' '        for donde, sufijo in sorted(sufijos, key=lambda par: (par[0] != "", not par[0].startswith(" del grupo"))):'
+caso "grupos_antes_de_los_items" "$LIMPIO[dos_grupos]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 63 sabotajes dan rojo por la razón esperada"
+echo "OK: los 70 sabotajes dan rojo por la razón esperada"

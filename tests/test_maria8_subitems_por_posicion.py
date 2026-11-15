@@ -463,8 +463,9 @@ def _mal_y_bien(n, letra):
     return f"{SUCIO[:-2]} {n})-", f"{LIMPIO[:-2]} {n})-"
 
 
-# caso: (la posición de cada renglón, en minúscula si va en un grupo a mano; cómo nombran los
-# avisos a cada renglón, en su orden. Fuera de un grupo, el que no está no trae sufijo)
+# caso: (la posición de cada renglón; cómo nombran los avisos a cada renglón, en su orden; y, si
+# no es el de siempre, el sufijo de la operación como lo escribieron y como sale). Una minúscula es
+# un grupo a mano, en la A, que se nombra por su primer renglón. El que no se nombra no trae sufijo.
 SE_LIMPIO = {
     # El 3 y el 4 usan el sufijo de la operación; el 5 y el 6, los últimos, van solos y se avisan
     # en su orden.
@@ -487,26 +488,36 @@ SE_LIMPIO = {
                                            5: "renglón 5", 6: "renglón 6"}),
     # Ningún renglón va junto con otro ni en un grupo.
     "ninguno_va_junto": ("BC", {1: "ítem 1"}),
+    # Cada grupo se avisa una vez y en su lugar, aunque otro quede en el medio; el 4 usa el sufijo
+    # de la operación.
+    "dos_grupos": ("aCbBa", {1: "grupo ga", 2: "ítem 2", 3: "grupo gb"}),
+    # El grupo sin sufijo es el único que usa el de la operación, que no trae el código de artículo.
+    "un_grupo_sin_el_suyo": ("aB", {2: "ítem 2"}, ("AA(X.0)-", "AA(X 0)-")),
 }
 
 
 @pytest.mark.parametrize("caso", SE_LIMPIO)
 def test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon(caso):
-    posiciones, nombres = SE_LIMPIO[caso]
-    renglones, sale = [], {}
+    posiciones, nombres, *otro = SE_LIMPIO[caso]
+    mal_el_general, el_general = otro[0] if otro else ("AA(X.0)-AI(Y)-", "AA(X 0)-AI(Y)-")
+    renglones, sale, grupos = [], {}, []
     for n, letra in enumerate(posiciones, start=1):
         grupo = {"grupo_id": f"g{letra}"} if letra.islower() else {}
         mal, sale[n] = _mal_y_bien(n, letra)
-        propio = {"sufijo": mal} if grupo or n in nombres else {}
-        renglones.append(dict(LONA, pieza=POSICIONES[letra.upper()], **grupo, **propio))
-    _gen(renglones, sbt_sufijo_valor="AA(X.0)-AI(Y)-")  # los avisos son de un pedido que genera
-    avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor="AA(X.0)-AI(Y)-")
+        primero = posiciones.index(letra) + 1 if grupo else n
+        propio = {"sufijo": mal} if primero in nombres else {}
+        renglones.append(dict(LONA, pieza=POSICIONES["A" if grupo else letra], **grupo, **propio))
+        if grupo and primero == n:
+            grupos.append(renglones[-1])
+    _gen(renglones, sbt_sufijo_valor=mal_el_general)  # los avisos son de un pedido que genera
+    avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor=mal_el_general)
     # El de la operación se avisa primero, una vez, y sólo si algún renglón lo usa.
     lo_usan = [renglon for renglon in renglones if "sufijo" not in renglon]
-    se_limpio = [_aviso_de_que_se_limpio("", "AA(X 0)-AI(Y)-")] if lo_usan else []
+    se_limpio = [_aviso_de_que_se_limpio("", el_general)] if lo_usan else []
     se_limpio += [_aviso_de_que_se_limpio(f" del {donde}", sale[n]) for n, donde in nombres.items()]
-    falta = [_aviso_de_que_falta_el_codigo(donde)
-             for n, donde in nombres.items() if "grupo_id" in renglones[n - 1]]
+    # La A pide el código de artículo; en estos datos, sólo un grupo puede no traerlo.
+    falta = [_aviso_de_que_falta_el_codigo(f"grupo {grupo['grupo_id']}")
+             for grupo in grupos if "AI(" not in grupo.get("sufijo", el_general)]
     assert [a for a in avisos if a.startswith("Sufijo de valor")] == se_limpio + falta
 
 
