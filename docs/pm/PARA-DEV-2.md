@@ -3,50 +3,37 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D252 (a): aceptada sobre `bd009cc` (informe `e4561dc`) e integrada (2026-11-15 05:04 UTC)
+## D257 (b): aceptada sobre `3c7eb14` (informe `38cb92f`) e integrada (2026-11-15 05:57 UTC)
 
-Acta `REPRODUCCION-D252-2026-11-15.md`.
+Acta `REPRODUCCION-D257-2026-11-15.md`.
 
-- Con la copia de `bd009cc`: 63 `ROJO`, 0 `FALLA`, `rc=0`; tus 8 filas pedidas dan las cuentas
-  del informe. El guion de `993825b` sobre `bd009cc`: 43 `ROJO`, `rc=0`. Chequeo-6 igual al
-  tuyo, anclas 0/0/0, tu bloque 3 igual.
-- Mis tres negativos del punto 2 (`idx not in en_renglones`, `del grupo {idx}` y, en el
-  arancel, `grupo {n + 1}`) dan rojo con tu prueba y `77 passed` con la de `993825b`.
-- **D255 (a)** y **D256 (a)**, decididas por la PM: la línea de la cola (con el sabotaje 52) y
-  un límite escrito.
-- **Supuesto 1:** aceptado. Recortar sabotajes es opcional dentro de D257 (b); los más débiles
-  frente a «un caso por causa» son 59 a 63. **Supuestos 2 a 8 y riesgos 1 y 4 a 9:**
-  aceptados. **Riesgo 2:** sigue abierto (abajo). **Riesgo 3:** pregunta para el
-  despachante, queda en el acta.
-- **Las cinco líneas de la cola** van como las propusiste.
+- Con la copia de `3c7eb14`: 70 `ROJO`, 0 `FALLA`, `rc=0`; los siete nuevos, `1 failed, 84
+  passed`. Chequeo-6 igual al tuyo, anclas 2541 con 0/0/0.
+- Mis dos negativos (en los sufijos, `grupos.clear(); grupos.add(gid)`; en el arancel, el `elif`
+  del grupo pidiendo además `item.get("sufijo")`) dan rojo con tu prueba, cada uno en su dato, y
+  `83 passed` con la de `e1bd17a`.
+- **La premisa del punto 2** estaba mal en mi criterio; tu corrección (un sufijo de operación sin
+  AI en `un_grupo_sin_el_suyo`) es la correcta.
+- **D258 (a)**, decidida por la PM: va a la cola de limpieza.
+- **Supuestos 1 a 4 y riesgos 1, 3 y 4:** aceptados. **Riesgo 2:** riesgo escrito. Con tu
+  sabotaje 67, `test_maria9_sufijo_operacion.py` da `27 passed`, pero el generador igual corta
+  con «Falta el sufijo de valor SBT» sin pasar por `usa_el_sufijo_de_la_operacion`: se pierde
+  un 400 claro, no sale un TXT sin sufijo. No abre pieza.
 
-## D257 (b): tu próxima pieza (2026-11-15 05:04 UTC)
+## Tu próxima pieza: ninguna por ahora (2026-11-15 05:57 UTC)
 
-D257 (b), decidida por la PM, por causa y no por posición (como D253 y D254). Hoy los datos
-tienen un solo grupo, y ese grupo siempre lleva sufijo propio: dos causas que ningún dato
-distingue.
-
-1. **Un segundo grupo.** Con dos grupos sin el código AI, cada uno tiene su aviso de arancel; con
-   dos grupos, cada uno tiene su «se limpió». Tus filas 88 y 53 dan `ROJO` con un dato nombrado.
-   Si ese dato también pone en rojo las filas 64, 90 y 91 (el orden), mejor; no se piden aparte.
-2. **Un grupo sin sufijo propio**, con el de la operación mal escrito: su aviso de arancel y el
-   de la operación salen. Tus filas 55 y 72 dan `ROJO` con un dato nombrado.
-3. Datos de los casos que ya existen, no casos nuevos.
-4. Quedan como límite escrito, sin dato nuevo: la familia A, la posición del grupo (filas 106 y
-   104), las filas 60, 39 y 54, y la familia C.
-5. El guion entero en `ROJO` con la cuenta exacta; las anclas no empeoran; `/code-review high`
-   hasta el SHA que entregás.
-
-**`test_despacho1b` (riesgo 2):** no lo midas vos. En mi tanda sobre `fc5944fc` el guion
-`sabotajes/despacho1b.sh` también cortó (`rc=124`): lo mido yo sola, sin carga, cuando termine.
-
-D244 y D239 esperan a Emi:
+No tenés pieza activa. D244 y D239 esperan a Emi:
 - Si dice que sí a D244, te la escribo con su criterio.
 - Si dice que sí a D239 (a), lleva adentro, como datos de un caso, un código sin sigla con
   el nombre de otro país («434 BELGICA» guarda `BE` sin avisar).
 - Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
 
-**Próxima D: D258.**
+La cola de limpieza es para después del lanzamiento: no la tomes. Tu rutina sigue; si al
+despertar no hay nada nuevo acá, terminá la vuelta sin arrancar nada.
+
+**`test_despacho1b`:** lo sigo midiendo yo.
+
+**Próxima D: D259.**
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 
