@@ -270,9 +270,19 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `'AA(DemoPouchs)-CA00-'` escrito tres veces; una constante.
 - `scripts/testing/pantalla_orden1.js`: `listaParaGenerar` y `enValidacionQuieta`
   dejan lista una operación de dos formas; una sola, con z20, z22 y z23.
-- `scripts/testing/sabotaje_maria8.sh`: el número del último `echo` (hoy `43`) está escrito a mano.
+- `scripts/testing/sabotaje_maria8.sh`: el número del último `echo` (hoy `63`) está escrito a mano.
   Si se agrega o se saca un caso y no se toca, el guion miente la cuenta. Contarlos.
   Lo vio la Dev MARIA.
+- `scripts/testing/sabotaje_maria8.sh`: los sabotajes 44 a 63 corren el archivo de pruebas
+  entero; con `-k` corren sólo su caso. `LIMPIO` pasa a llamarse `SE_LIMPIO`, como el
+  diccionario de la prueba. Lo vio la Dev MARIA.
+- `proyecto_maria/core/maria_generator.py` (`_aviso_de_que_falta_el_codigo`): el texto del
+  arancel va a mano; que salga de `sufijos_arca` (la fuente y la posición), como `FUENTE` en
+  `tests/test_sufijos1.py:27`. Lo vio la Dev MARIA.
+- `proyecto_maria/core/maria_generator.py` (`_avisos_del_arancel`): `en_renglones` y el
+  parámetro `juntos` no deciden nada (un renglón con grupo nunca entra en
+  `renglones_por_posicion`); sacarlos, y con ellos el sabotaje 52 de `sabotaje_maria8.sh`
+  (D255 a). Lo vio la Dev MARIA.
 - `scripts/testing/sabotaje_maria5.sh`: el `50` del último `echo` está escrito a mano (como
   el de maria8), el venv por defecto `/tmp/cdi-dev2/venv` no existe en una sesión nueva, y el comentario
   del caso 33 dice «el TXT no la usa» aunque `maria_generator.py:1098` llama a

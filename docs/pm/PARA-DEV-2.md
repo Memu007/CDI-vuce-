@@ -3,61 +3,42 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Retomá D252 (a) en la sesión nueva (2026-11-15 02:14 UTC)
+## D252 (a): aceptada sobre `bd009cc` (informe `e4561dc`) e integrada (2026-11-15 05:10 UTC)
 
-Emi abrió esta sesión nueva por el bucle de compactación; la pausa se levanta. Partís de `aec95f3`
-(pruebas en `bd009cc`) y de tu nota «PAUSA» y el borrador arriba de `PARA-PM-2.md`: falta medir
-contra «el resto» los 22 `SIN MEDIR`, cerrar D257 y el riesgo 2, completar los `(pendiente)` y `/entregar`.
-El rojo de `test_despacho1b` (punto 4) se vuelve a medir solo, sin carga, y se informa con causa.
-**Evidencia:** las salidas de la sesión vieja quedaron en su contenedor. Lo que vaya al informe se
-vuelve a correr acá, o se marca «medido en la sesión anterior, salida no conservada». `mut*.py`,
-`medir_resto.sh` y `tabla.py` no están: se rehacen desde el borrador. No pongas pruebas nuevas
-en el repo. Nada de subagentes que queden vivos después de su informe: frenalos por PID o `TaskStop`.
+Acta `REPRODUCCION-D252-2026-11-15.md`.
 
-## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
+- Con la copia de `bd009cc`: 63 `ROJO`, 0 `FALLA`, `rc=0`; tus 8 filas pedidas dan las cuentas
+  del informe. El guion de `993825b` sobre `bd009cc`: 43 `ROJO`, `rc=0`. Chequeo-6 igual al
+  tuyo, anclas 0/0/0, tu bloque 3 igual.
+- Mis tres negativos del punto 2 (`idx not in en_renglones`, `del grupo {idx}` y, en el
+  arancel, `grupo {n + 1}`) dan rojo con tu prueba y `77 passed` con la de `993825b`.
+- **D255 (a)** y **D256 (a)**, decididas por la PM: la línea de la cola (con el sabotaje 52) y
+  un límite escrito.
+- **Supuesto 1:** aceptado. Recortar sabotajes es opcional dentro de D257 (b); los más débiles
+  frente a «un caso por causa» son 59 a 63. **Supuestos 2 a 8 y riesgos 1 y 4 a 9:**
+  aceptados. **Riesgo 2:** sigue abierto (abajo). **Riesgo 3:** pregunta para el
+  despachante, queda en el acta.
+- **Las cinco líneas de la cola** van como las propusiste.
 
-Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
+## D257 (b): tu próxima pieza (2026-11-15 05:10 UTC)
 
-## D251 (a): aceptada sobre `9d580db` (informe `7a3c594`) e integrada (2026-11-14 17:45 UTC)
+D257 (b), decidida por la PM, por causa y no por posición (como D253 y D254). Hoy los datos
+tienen un solo grupo, y ese grupo siempre lleva sufijo propio: dos causas que ningún dato
+distingue.
 
-Acta `REPRODUCCION-D251-2026-11-14.md`.
+1. **Un segundo grupo.** Con dos grupos sin el código AI, cada uno tiene su aviso de arancel; con
+   dos grupos, cada uno tiene su «se limpió». Tus filas 88 y 53 dan `ROJO` con un dato nombrado.
+   Si ese dato también pone en rojo las filas 64, 90 y 91 (el orden), mejor; no se piden aparte.
+2. **Un grupo sin sufijo propio**, con el de la operación mal escrito: su aviso de arancel y el
+   de la operación salen. Tus filas 55 y 72 dan `ROJO` con un dato nombrado.
+3. Datos de los casos que ya existen, no casos nuevos.
+4. Quedan como límite escrito, sin dato nuevo: la familia A, la posición del grupo (filas 106 y
+   104), las filas 60, 39 y 54, y la familia C.
+5. El guion entero en `ROJO` con la cuenta exacta; las anclas no empeoran; `/code-review high`
+   hasta el SHA que entregás.
 
-- Con la copia de `9d580db`: 43 `ROJO`, 0 `FALLA`, `rc=0`; el guion de `01bc9df` sobre `9d580db`,
-  39 `ROJO`, `rc=0`. Chequeo-6 igual al tuyo, anclas 0/0/0.
-- Mi negativo de la familia: `:2225` armado con el primero y la cantidad
-  (`range(ns[0] + 1, ns[0] + 1 + len(ns))`) da `3 failed` con tu prueba y `61 passed` con la
-  de `01bc9df`. Otros dos (los renglones al revés, el sufijo de la operación por encima del
-  propio) ya daban rojo con la prueba vieja.
-- **Supuestos 1 a 7 y riesgos 1 a 5:** aceptados. **Riesgo 6:** pregunta para el
-  despachante, queda en el acta; no es pieza.
-- **D253 (a)** y **D254 (a)**, decididas por la PM: quedan como límite escrito en el acta.
-- **`SKILL.md:28`:** ahora dice que `/code-review` corre otra vez si sumás commits. **Las dos
-  líneas de la cola** van como las propusiste. **`NOW.md`, la línea `conservar`:** corregida.
-
-## D252 (a) (2026-11-14 17:45 UTC)
-
-D252 (a), decidida por la PM. El camino existe hoy y lo medí sobre `9d580db`: tus filas 22,
-34, 35, 36 y 37 dan `77 passed`. El aviso de cada renglón (`:2230-2231`) le dice al
-despachante qué producto corregir, y con `del renglón {ns.index(n) + 1}` diría otro número
-sin que ninguna prueba se entere. La causa es la misma de D251: las pruebas de esos avisos
-sólo usan dos renglones seguidos, y ningún renglón que va solo queda entre dos que van juntos.
-
-Criterio de D252: la familia, no un ejemplo.
-1. El aviso de cada renglón de un ítem de renglones salteados, con su texto entero, desde el
-   primero, uno del medio y el último del ítem, en un ítem más largo que cualquier tope (cinco
-   renglones o más), y con un renglón que va solo entre medio y tiene su propio aviso.
-2. Un renglón que va solo, entre dos que van juntos, conserva sus avisos propios. Son dos
-   datos: uno sin grupo, con su sufijo mal escrito (su aviso nombra su ítem), y uno con grupo,
-   que en los avisos de sufijo y de arancel se nombra por su grupo. Un renglón con grupo nunca
-   entra en `renglones_por_posicion` (`:972`), así que puede quedar entre dos que van juntos:
-   es la entrada que distingue `:2187` y `:1953`. Si ninguna entrada distingue `:1953`, lo
-   decís con la medición y va como D.
-3. Datos de los casos que ya existen, no casos nuevos por cada fila.
-4. Tus filas 22, 34 a 37 y 52 a 54 van a `sabotaje_maria8.sh` y dan `ROJO` con un dato
-   nombrado; el guion entero en `ROJO` con la cuenta exacta; las anclas no empeoran;
-   `/code-review high` hasta el SHA que entregás.
-
-**Cómo sigue:** D252 (a).
+**`test_despacho1b` (riesgo 2):** no lo midas vos. En mi tanda sobre `fc5944fc` el guion
+`sabotajes/despacho1b.sh` también cortó (`rc=124`): lo mido yo sola, sin carga, cuando termine.
 
 D244 y D239 esperan a Emi:
 - Si dice que sí a D244, te la escribo con su criterio.
@@ -65,7 +46,11 @@ D244 y D239 esperan a Emi:
   el nombre de otro país («434 BELGICA» guarda `BE` sin avisar).
 - Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
 
-**Próxima D: D255.**
+**Próxima D: D258.**
+
+## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
+
+Llega con tu próximo merge de mi rama. Un error de teardown «… dejó N conexión(es) de aiosqlite abiertas…» es la guarda funcionando: un test o ayudante deja una conexión viva; se arregla cerrándola, no se saltea. Tu pytest entero sobre `ee2ee3c` corrió sin ella: el de SUFIJO-BORRADOR va después del merge. Desde hoy también corta al arrancar: un `rc=4` con «La guarda de conexiones no ve una conexión abierta de aiosqlite…» es un venv con aiosqlite viejo (antes de 0.22), no un rojo tuyo; instalá el de `requirements.txt` y volvé a correr.
 
 ## Vencido `sabotaje_maria5.sh`: aceptado sobre `c0505cc` (informe `9153d23`) e integrado (2026-11-14 09:30 UTC)
 
