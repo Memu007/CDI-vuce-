@@ -831,3 +831,18 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   «434 HOLANDA», un producto guardado). Se le pregunta a Emi; las dos piezas
   esperan esa respuesta, Holanda antes que D239. Ninguna migra lo guardado:
   se mide y se informa, como en PAIS-NL.
+
+## 2026-11-16 19:39 UTC — el número 434 escrito sale 423 (Emi delegó; PM con el consejero)
+
+- Pregunta: cuando algo ya trae 434 (un despacho «434» o «434 HOLANDA», un
+  producto guardado), ¿el TXT dice 434 o 423? Emi: «Cómo piense el advisor
+  q es mejor».
+- Decidido: 423. Es lo que dicen sus dos respuestas (Países Bajos es 423 y
+  «Holanda» también) y saca el choque entre código y nombre en lugar de
+  sumar una regla. Para el 434 reemplaza «ningún código cambia de valor»
+  (2026-11-09 21:00).
+- Sin migración: lo guardado no se reescribe; la pieza mide qué hay y lo
+  informa. Sin verificar: si el despachante todavía usa 434 para algo; va
+  en una línea con el pedido del próximo «dale».
+- Orden: Holanda→423 y después D239 (a), que cubre los códigos que siguen
+  sin sigla.

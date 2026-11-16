@@ -22,9 +22,9 @@ Acta `REPRODUCCION-D257-2026-11-15.md`.
 
 ## Tu próxima pieza: D244 (a), con el sí de Emi (2026-11-16 18:42 UTC)
 
-Emi contestó: D244 sí, «Holanda» sí y D239 sí. Arrancás por D244; las otras
-dos esperan una pregunta más a Emi (qué hace el número 434 escrito solo) y te
-las escribo al activarlas. No las toques.
+Emi contestó: D244 sí, «Holanda» sí y D239 sí. Tu cola: D244 → Holanda→423
+(también el número 434 escrito: sale 423) → D239 (a). Las dos últimas te las
+escribo al activarlas; no las toques antes.
 
 **Criterio (comportamiento y prueba):**
 1. Con un CUIT del despachante que no cierra con su dígito verificador,
