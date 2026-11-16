@@ -686,7 +686,7 @@ _PAISES_PANTALLA = Path(__file__).resolve().parents[1] / "static" / "v2" / "pais
 @lru_cache(maxsize=1)
 def _tabla_oficial() -> dict:
     """Código -> nombre normalizado de la tabla oficial MARIA (TABLA PAISES V.0
-    25082010.xlsx, 308 países: 434 es alias de 423). Una sola copia: la que usa la pantalla."""
+    25082010.xlsx, 308 países: 434 sale como 423). Una sola copia: la que usa la pantalla."""
     js = _PAISES_PANTALLA.read_text(encoding="utf-8")
     m = re.search(r"const COUNTRIES = (\[.*?\]);", js)
     if not m:
@@ -708,6 +708,15 @@ def _nombres_de_pais() -> dict:
     return {**{k: int(v) for k, v in json.loads(m.group(1)).items()}, **_PAISES_NORM}
 
 
+@lru_cache(maxsize=1)
+def _reemplazos() -> dict:
+    """Código de la tabla -> el que sale en su lugar, los mismos que la pantalla."""
+    m = re.search(r"const REEMPLAZOS = (\{.*?\});", _PAISES_PANTALLA.read_text(encoding="utf-8"))
+    if not m:
+        raise RuntimeError(f"No se encontró const REEMPLAZOS en {_PAISES_PANTALLA}")
+    return {int(k): int(v) for k, v in json.loads(m.group(1)).items()}
+
+
 def codigo_de_pais(texto) -> int | None:
     """El código del país si se reconoce con certeza; si no, None. Mismo criterio
     que `resolve` en paises_maria.js; dos letras tienen que ser ASCII («ＢＲ», «ÉS»)."""
@@ -718,10 +727,9 @@ def codigo_de_pais(texto) -> int | None:
     if not m:
         return _nombres_de_pais().get(_normalizar_pais(escrito))
     codigo, nombre = int(m.group(1)), m.group(2)
-    if codigo not in _tabla_oficial():
-        codigo = _nombres_de_pais().get(m.group(1))   # un código viejo con alias: 434 es 423
+    codigo = _reemplazos().get(codigo, codigo)
     # «310 - Vietnam» o «203-ARG»: el nombre que contradice el código no se adivina.
-    if codigo is not None and (nombre is None or _normalizar_pais(nombre) == _tabla_oficial()[codigo]
+    if codigo in _tabla_oficial() and (nombre is None or _normalizar_pais(nombre) == _tabla_oficial()[codigo]
                                        or _nombres_de_pais().get(_normalizar_pais(nombre)) == codigo):
         return codigo
     return None
@@ -799,7 +807,7 @@ def clave_de_origen(origen) -> str:
 
 def pais_de_la_tabla(pais) -> bool:
     """Como `pais_reconocido`, pero un código numérico tiene que estar en la
-    tabla oficial de la pantalla (MARIA-3, procedencia: «99999» no es un país)."""
+    tabla oficial de la pantalla o en sus reemplazos (procedencia: «99999» no es un país)."""
     return pais_reconocido(pais)
 
 
