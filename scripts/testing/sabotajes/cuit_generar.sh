@@ -26,8 +26,10 @@ DE_LA_OPERACION=("$MALO[en cuit_agr, con uno bueno en el perfil]"
                  "$MALO[en cuit_agr con guiones, sin CUIT en el perfil]")
 DEL_ESTUDIO="$MALO[en el estudio elegido, con uno bueno en el perfil y en cuit_agr]"
 CON_ESPACIO="$BUENO[cuit_agr con verificador 9, guiones y un espacio]"
-AVISA_EL_MALO=("$AVISOS[malo en el perfil]" "$AVISOS[malo en cuit_agr]" "$AVISOS[malo en el estudio elegido]")
-EN_BLANCO=("$AVISOS[cuit_agr en blanco, con uno bueno en el perfil]" "$AVISOS[cuit_agr en blanco, sin CUIT en el perfil]")
+BLANCO_Y_MALO="$AVISOS[cuit_agr en blanco, con uno malo en el perfil]"
+AVISA_EL_MALO=("$AVISOS[malo en el perfil]" "$AVISOS[malo en cuit_agr]" "$AVISOS[malo en el estudio elegido]" "$BLANCO_Y_MALO")
+EN_BLANCO=("$AVISOS[cuit_agr en blanco, con uno bueno en el perfil]" "$BLANCO_Y_MALO"
+           "$AVISOS[cuit_agr en blanco, sin CUIT en el perfil]")
 MIRA='if cuit and not cuit_valido(cuit):'
 L2='cuit = sin_separadores(estudio.cuit if estudio is not None else cuit_agr) or del_perfil'
 SEPARADORES='        return "".join(str(valor or "").replace("-", "").split())'
@@ -44,7 +46,7 @@ sabotaje casos $M "sólo se cuentan los dígitos" \
   "guardado en el perfil: 200" "${DEL_PERFIL[@]}" "${DE_LA_OPERACION[@]}" "$DEL_ESTUDIO" "${AVISA_EL_MALO[@]}"
 sabotaje casos $M "el del perfil no se mira" \
   "$MIRA" 'if cuit and not es_el_del_perfil and not cuit_valido(cuit):' \
-  "guardado con guiones y un espacio: 200" "${DEL_PERFIL[@]}" "$AVISOS[malo en el perfil]"
+  "guardado con guiones y un espacio: 200" "${DEL_PERFIL[@]}" "$AVISOS[malo en el perfil]" "$BLANCO_Y_MALO"
 sabotaje casos $M "el que manda la operación no se mira" \
   "$MIRA" 'if cuit and (es_el_del_perfil or estudio is not None) and not cuit_valido(cuit):' \
   "sin CUIT en el perfil: 200" "${DE_LA_OPERACION[@]}" "$AVISOS[malo en cuit_agr]"
@@ -63,7 +65,8 @@ sabotaje casos $M "se rechaza después de contar la operación" \
 # 2. El error dice dónde se corrige, según de dónde salió.
 sabotaje casos $M "dónde se corrige, al revés" \
   'elif es_el_del_perfil:' 'elif not es_el_del_perfil:' \
-  "$RECARGA" "${DEL_PERFIL[@]}" "${DE_LA_OPERACION[@]}" "$AVISOS[malo en el perfil]" "$AVISOS[malo en cuit_agr]"
+  "$RECARGA" "${DEL_PERFIL[@]}" "${DE_LA_OPERACION[@]}" "$AVISOS[malo en el perfil]" "$AVISOS[malo en cuit_agr]" \
+  "$BLANCO_Y_MALO"
 sabotaje casos $M "el del estudio elegido manda a corregir como si lo mandara la operación" \
   '        if estudio is not None:
             donde' '        if False:
@@ -95,7 +98,7 @@ sabotaje casos $M "el estudio elegido no manda" \
 sabotaje casos $M "un cuit_agr en blanco tapa el del perfil" \
   "$L2" 'cuit = sin_separadores((estudio.cuit if estudio is not None else cuit_agr) or del_perfil)' \
   "AssertionError: cuit_agr en blanco, con uno bueno en el perfil: avisan ['Falta el CUIT" \
-  "$AVISOS[cuit_agr en blanco, con uno bueno en el perfil]"
+  "$AVISOS[cuit_agr en blanco, con uno bueno en el perfil]" "$BLANCO_Y_MALO"
 sabotaje casos $M "los avisos no dicen que no cierra" \
   '        supuestos = [*e.detail["errors"], *supuestos]' '        pass' \
   "AssertionError: malo en el perfil: avisan [], sale ['El CUIT del despachante «20999999998»" "${AVISA_EL_MALO[@]}"
