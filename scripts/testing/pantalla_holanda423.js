@@ -143,9 +143,10 @@ async function procedencia(page) {
     await page.locator('#f_procedencia').blur();
     if (await page.inputValue('#f_procedencia') !== esperado(o)) falla('procedencia «' + o + '» escrita se ve «' + await page.inputValue('#f_procedencia') + '»');
   }
-  await page.fill('#f_numero_factura', '434');
+  // Distinta de la del borrador: con el mismo valor no hay «change».
+  await page.fill('#f_numero_factura', '0434');
   await page.locator('#f_numero_factura').blur();
-  if (await page.inputValue('#f_numero_factura') !== '434') falla('la factura «434» escrita se ve «' + await page.inputValue('#f_numero_factura') + '»');
+  if (await page.inputValue('#f_numero_factura') !== '0434') falla('la factura «0434» escrita se ve «' + await page.inputValue('#f_numero_factura') + '»');
   // Tecla por tecla, «434» es el comienzo de «4340»: no se toca hasta salir del campo.
   await page.fill('#f_procedencia', '');
   await page.locator('#f_procedencia').pressSequentially('4340');

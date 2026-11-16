@@ -64,7 +64,7 @@ sabotaje pantalla $REV "el borrador muestra cada campo con mostrar" \
   "FALLA: la factura «434» del borrador se ve «423»"
 sabotaje pantalla $REV "lo escrito en cualquier campo pasa por mostrar" \
   "if (el.name === 'procedencia' && ev.type === 'change') el.value" "if (ev.type === 'change') el.value" \
-  "FALLA: la factura «434» escrita se ve «423»"
+  "FALLA: la factura «0434» escrita se ve «423»"
 sabotaje pantalla $CLI "el catálogo del cliente muestra el código de lo escrito" \
   "input.value = CDI.paisesMaria.mostrar(value);" "input.value = CDI.paisesMaria.resolve(value) || value;" \
   "FALLA: «nl» escrito en origen del catálogo del cliente se ve «423»"
