@@ -1464,7 +1464,8 @@
                 method: 'PUT', body: JSON.stringify({ [field]: value }),
             });
             if (!res || !res.ok) throw new Error('No se pudo guardar');
-            if (field === 'origen') input.value = CDI.paisesMaria.mostrar(value);
+            // Si se siguió escribiendo mientras se guardaba, no se pisa.
+            if (field === 'origen' && input.value.trim() === value) input.value = CDI.paisesMaria.mostrar(value);
             CDI.toast && CDI.toast.success('Producto actualizado');
             CDI.track && CDI.track('catalogo_producto_updated', { cliente_id: detailClienteId, producto_id: productoId, field });
         } catch (err) {

@@ -306,16 +306,17 @@
     async function saveProduct(row, productKey) {
         if (!detailVendorId) return;
         const ncmRaw = (row.querySelector('input[data-field="ncm"]').value || '').trim();
-        const origen = (row.querySelector('input[data-field="origen"]').value || '').trim().toUpperCase();
-        // Normalizamos NCM quitando puntos (lo que guardamos en server).
-        const ncmClean = ncmRaw.replace(/\./g, '');
+        const campoOrigen = row.querySelector('input[data-field="origen"]');
+        // Sin tocar no se manda: lo que se ve puede no ser lo guardado.
+        const cambios = { ncm: ncmRaw.replace(/\./g, '') };
+        if (campoOrigen.value !== campoOrigen.defaultValue) cambios.origen = campoOrigen.value.trim().toUpperCase();
         try {
             const res = await CDI.api(
                 '/api/catalog/' + encodeURIComponent(detailVendorId) +
                 '/productos/' + encodeURIComponent(productKey),
                 {
                     method: 'PUT',
-                    body: JSON.stringify({ ncm: ncmClean, origen: origen }),
+                    body: JSON.stringify(cambios),
                 }
             );
             const data = await res.json().catch(() => ({}));
