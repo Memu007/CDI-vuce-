@@ -215,6 +215,21 @@ sabotaje $J "la pantalla no lee el código 434" \
 sabotaje $J "la pantalla compara el nombre con el código escrito" \
   'ALIASES[nombre] === numero ? numero' 'ALIASES[nombre] === code[1] ? numero' \
   "item: ('434 · HOLANDA', '', '423')"
+sabotaje $J "la pantalla muestra Holanda como 434 · HOLANDA" \
+  "return country ? country.code + ' · ' + country.name : '';" \
+  "if (/^(0?434|HOLANDA)/i.test(String(value).trim())) return '434 · HOLANDA'; return country ? country.code + ' · ' + country.name : '';" \
+  "FAILED $H"
+sabotaje $J "el selector ofrece 434 · HOLANDA aparte de la tabla" \
+  'return COUNTRIES.map(' $'return \'<option value="434 · HOLANDA"></option>\' + COUNTRIES.map(' \
+  "FAILED $H"
+sabotaje $G "el servidor da 423 para 434 con el nombre de otro país" \
+  '    codigo = _reemplazos().get(codigo, codigo)' \
+  $'    if codigo in _reemplazos() and (nombre is None or _nombres_de_pais().get(_normalizar_pais(nombre))):\n        return _reemplazos()[codigo]\n    codigo = _reemplazos().get(codigo, codigo)' \
+  "FAILED $H"
+sabotaje $J "la pantalla da 423 para 434 con el nombre de otro país" \
+  "|| ALIASES[nombre] === numero ? numero : '';" \
+  "|| ALIASES[nombre] === numero || (code[1] !== numero && ALIASES[nombre]) ? numero : '';" \
+  "item: ('434 · BELGICA', '423', '')"
 sabotaje proyecto_maria/core/despacho_lector.py "el despacho con 434 vuelve a quedar sin origen" \
   'por_codigo = _iso2_por_codigo_maria().get(codigo_de_pais(codigo))' \
   'por_codigo = _iso2_por_codigo_maria().get(int(codigo))' \

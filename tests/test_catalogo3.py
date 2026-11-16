@@ -296,7 +296,7 @@ PAISES_BAJOS = ("NL", "nl", "NLD", "nld", "PAISES BAJOS", "Países Bajos", "423"
                 "HOLANDA", "Holanda", "434", "0434", "434 · HOLANDA", "434 - Holanda", "423 · HOLANDA",
                 "434 · PAISES BAJOS")
 # El 434 se lee sólo como código: escrito como nombre o con cifras de otro alfabeto no es un país, como «423.».
-NO_SON_HOLANDA = ("434.", "４３４", "423 · 434", "434 · 434", "4340", "00434")
+NO_SON_HOLANDA = ("434.", "４３４", "423 · 434", "434 · 434", "4340", "00434", "434 · BELGICA", "434 - Vietnam")
 # Dos orígenes en un mismo grupo: el código que sale, o None si son dos países. «434 HOLANDA» es como
 # lo trae un despacho: llega al grupo lo que guarda su lector.
 GRUPOS = {("NL", "HOLANDA"): 423, ("NL", "434"): 423, ("Países Bajos", origen_iso2("434 HOLANDA")): 423,
@@ -314,8 +314,10 @@ def test_holanda_y_paises_bajos_son_423():
         assert {maria_generator.codigo_de_pais(lector(p)) for p in formas} == {423}, lector.__name__
     assert {maria_generator.codigo_de_pais(p) for p in NO_SON_HOLANDA} == {None}
     assert origen_iso2("４３４") is None
-    # El selector de la pantalla sale de esta misma tabla.
+    # El selector de la pantalla sale de esta misma tabla, y lo que muestra es 423.
     assert 434 not in maria_generator.codigos_tabla_oficial()
+    assert set(_de_la_pantalla(PAISES_BAJOS, "label")) == {"423 · PAISES BAJOS"}
+    assert [o for o in _de_la_pantalla([None], "optionMarkup")[0].split("<option") if "434" in o or "HOLANDA" in o] == []
     formas = (*PAISES_BAJOS, 434)
     items = [{"pieza": "84713000", "descripcion": f"Producto {i}", "cantidad": 1, "valor_unitario": 10,
               "peso_unitario": 1, "origen": o, "procedencia": o, "unidad": "07", "grupo_id": i}
@@ -333,8 +335,8 @@ def test_holanda_y_paises_bajos_son_423():
 
 
 def test_holanda_guardada_genera_423(client):
-    """La memoria del cliente y el catálogo del proveedor devuelven el origen como se guardó, y la
-    pantalla lo pone en el producto: lo guardado con 434 antes de este cambio genera 423."""
+    """La memoria del cliente y el catálogo del proveedor devuelven el origen como se guardó, y eso,
+    como origen y procedencia, genera 423."""
     cid = _cliente(client)
     owner = _dueno(cid)
     guardados = ("434", "0434", "HOLANDA", "Holanda", "434 · HOLANDA")
@@ -354,9 +356,9 @@ def test_holanda_guardada_genera_423(client):
             item = r.json()["items"][0]
             devueltos.append((item["source"], item["origen"]))
         assert devueltos == [("cliente", guardado), ("proveedor", guardado)], devueltos
+        devuelto = devueltos[0][1]
         txt = _gen("OP123456", [{"pieza": "84713000", "descripcion": desc, "cantidad": 1, "valor_unitario": 10,
-                                 "peso_unitario": 1, "origen": guardado.upper(), "procedencia": guardado,
-                                 "unidad": "07"}])
+                                 "peso_unitario": 1, "origen": devuelto, "procedencia": devuelto, "unidad": "07"}])
         assert re.findall(r"CARTPAY(?:ORI|PRC)=(\d+)", txt) == ["423", "423"], guardado
 
 
@@ -487,10 +489,10 @@ ESPACIOS_RAROS = ["𝐁𝐑", "\ufeffCHINA", "CHINA\ufeff", "CHINA\x85", "\x1cBR
                   "302\u2028·\u2028ARABIA\u2028SAUDITA"]
 
 
-def _resolve_de_la_pantalla(valores):
+def _de_la_pantalla(valores, funcion="resolve"):
     js = maria_generator._PAISES_PANTALLA
     codigo = (f"global.window = {{}}; require({str(js)!r}); const v = JSON.parse(require('fs')"
-              ".readFileSync(0, 'utf8')); console.log(JSON.stringify(v.map(window.CDI.paisesMaria.resolve)));")
+              f".readFileSync(0, 'utf8')); console.log(JSON.stringify(v.map(window.CDI.paisesMaria.{funcion})));")
     return json.loads(subprocess.run(["node", "-e", codigo], input=json.dumps(valores), check=True,
                                      capture_output=True, text=True).stdout)
 
@@ -504,7 +506,7 @@ def test_la_pantalla_y_el_servidor_reconocen_los_mismos_paises():
                *ESPACIOS_RAROS, *PAISES_BAJOS, *NO_SON_HOLANDA,
                *LECTURA_PAIS, *NO_SON_PAISES]
     servidor = [str(maria_generator.codigo_de_pais(v) or "") for v in valores]
-    distintos = [(v, p, s) for v, p, s in zip(valores, _resolve_de_la_pantalla(valores), servidor) if p != s]
+    distintos = [(v, p, s) for v, p, s in zip(valores, _de_la_pantalla(valores), servidor) if p != s]
     assert distintos == []
     assert [s for v, s in zip(valores, servidor) if v in NO_SON_PAISES] == [""] * len(NO_SON_PAISES)
 
