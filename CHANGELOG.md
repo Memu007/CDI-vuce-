@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-16 · fix: los avisos de antes de generar dicen que el CUIT del despachante no cierra (D244)
+
+- Los avisos de antes de generar anuncian el CUIT del despachante que no cierra con su verificador, venga del perfil, de la operación o del estudio elegido, con el mismo texto que el error al generar.
+- Un CUIT del despachante de puros espacios o guiones que manda la operación cuenta como que no vino: se usa el del perfil, y sin perfil se avisa que falta (antes no se generaba y el error nombraba «»).
+
 ## 2026-11-13 · fix: no se genera el TXT con un CUIT del despachante que no cierra con su verificador (CUIT-GENERAR)
 
 - Al generar, el CUIT del despachante se controla con su dígito verificador, también el que ya estaba guardado en el perfil: antes alcanzaba con que tuviera 11 dígitos y salía así en el TXT.

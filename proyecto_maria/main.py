@@ -4739,14 +4739,17 @@ async def _estudio_elegido(db: AsyncSession, estudio_id, username: str):
 
 def _cuit_del_despachante(estudio, cuit_agr: str, user) -> tuple[str, bool]:
     """El CUIT que va al CDDTAGR, sin guiones ni espacios, y si es el del perfil: manda el estudio
-    elegido, después `cuit_agr` (la pantalla manda ahí el del perfil) y después el perfil."""
+    elegido, después `cuit_agr` (la pantalla manda ahí el del perfil) y después el perfil. Uno de
+    puros guiones o espacios es como si no viniera."""
     from proyecto_maria.core.controles_maria import cuit_valido
 
-    del_perfil = "".join(str((user or {}).get("cuit") or "").replace("-", "").split())
-    crudo = (estudio.cuit if estudio is not None else cuit_agr) or del_perfil
-    cuit = "".join(str(crudo).replace("-", "").split())
+    def sin_separadores(valor):
+        return "".join(str(valor or "").replace("-", "").split())
+
+    del_perfil = sin_separadores((user or {}).get("cuit"))
+    cuit = sin_separadores(estudio.cuit if estudio is not None else cuit_agr) or del_perfil
     es_el_del_perfil = estudio is None and bool(cuit) and cuit == del_perfil
-    if crudo and not cuit_valido(cuit):
+    if cuit and not cuit_valido(cuit):
         if estudio is not None:
             donde = "Es el del estudio elegido: en «Mi perfil», «Mis estudios», borralo y agregalo de nuevo."
         elif es_el_del_perfil:
@@ -4990,9 +4993,14 @@ async def avisos_maria_endpoint(
         # Productos mal formados: el error sale al generar.
         kit_warnings = []
     supuestos = _supuestos_maria(request, items, gastos)
-    # Sin CUIT del despachante no se genera (MARIA-7): se avisa antes.
-    if estudio is None and not str(request.cuit_agr or "").strip() and not str((user or {}).get("cuit") or "").strip():
-        supuestos = [FALTA_CUIT_DONDE_CARGARLO, *supuestos]
+    # Sin CUIT del despachante, o con uno que no cierra, no se genera: se avisa antes con el mismo texto.
+    try:
+        cuit, _ = _cuit_del_despachante(estudio, request.cuit_agr, user)
+    except HTTPException as e:
+        supuestos = [*e.detail["errors"], *supuestos]
+    else:
+        if not cuit:
+            supuestos = [FALTA_CUIT_DONDE_CARGARLO, *supuestos]
     # Lo que al generar es un error de procedencia, acá se avisa con el mismo texto.
     # La NCM dada de baja o que no está en el vigente, como en la validación
     # (CATALOGO-NCM-1): aviso, no freno.
