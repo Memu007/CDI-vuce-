@@ -262,7 +262,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-16 20:59 UTC: D244 (a) de MARIA aceptada sobre 6112322 e integrada; activada Holanda→423. Técnica igual en de4d121e, sin pieza.
+2026-11-16 21:56 UTC: sin entregas. MARIA trabaja Holanda→423 (cabeza 0e9f886c, adversario y sabotajes corriendo; 167k de 224k). Técnica igual en de4d121e, sin pieza.
 
 ## /compact conservar de la PM principal
 
