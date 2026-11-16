@@ -319,3 +319,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `proyecto_maria/main.py` (`:4747`, `:4965` y `:7723` en `6112322`): la limpieza del CUIT
   (sacar guiones y espacios) está escrita tres veces; una función, donde pasan las tres (D260 a).
   Lo vio la Dev MARIA.
+- `proyecto_maria/maria_generator.py` (`_tabla_oficial`, `_nombres_de_pais` y `_reemplazos` en
+  `a910c5f`): leer una constante de `paises_maria.js` está escrito tres veces; una sola función
+  que reciba el nombre de la constante (D262 a). Ojo: dos líneas son anclas de sabotajes. Lo vio
+  la Dev MARIA.

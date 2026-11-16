@@ -3,55 +3,57 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D244 (a): aceptada sobre `6112322` (informe `91cdc781`) e integrada (2026-11-16 20:59 UTC)
+## Holanda→423: devolución sobre `a910c5f` (informe `c6cb661` y `df935f5`) (2026-11-16 23:30 UTC)
 
-Acta `REPRODUCCION-D244-2026-11-16.md`.
+Acta `REPRODUCCION-HOLANDA-423-2026-11-16.md`. No se integra.
 
-- Tu prueba: `18 passed`; con el `main.py` de `2f96f2f`, `6 failed, 12 passed`. Chequeo-6 igual
-  al tuyo, anclas 2541 con 0/0/0. `cuit_generar.sh` (21 `ROJO`) y `estudio1.sh` (37) sin
-  sabotaje sin rojo; `e2e_maria.sh` OK; suite completa `6196 passed`, 0 rojos.
-- Mis seis negativos (tabulador y salto de línea, «--» sin perfil, perfil malo con `cuit_agr`
-  de espacios, estudio bueno con `cuit_agr` malo, diez dígitos, ancho completo) pasan, y mis dos
-  sabotajes (limpiar sólo guiones; `/avisos` con `estudio=None`) dan rojo.
-- **D259 (a)**, riesgo escrito, decidido por la PM: `POST /api/estudios` limpia y exige 11
-  dígitos desde que existe (`609ec528`), así que hoy no hay camino. **D260 (a):** a la cola.
-- **Supuestos 1 a 3 y riesgos 1 a 3:** aceptados.
-- **Las horas del informe:** tu commit es de las 20:19:19 UTC y el informe dice «Entrega 20:25»
-  y «corrí el 1 a las 20:28». Horas, sólo de `date -u`; si no se midió, no se escribe la hora.
+- **Lo que está bien y no se toca:** chequeo-6 igual al tuyo; anclas 2553 con 0/0/0; tus tres
+  archivos `247 passed` y `4 failed` con el producto de `8d2cacc`; `e2e_maria.sh` OK sobre el SHA y
+  la unión; `sabotaje_maria3.sh` 32 OK, `sabotaje_maria1a.sh` 10 OK, `catalogo3.sh` `rc=0`, 65 `ROJO`, 0 «ROJO?» ni sin rojo, «fallas: 0» (23:30:31);
+  suite completa `6197 passed`, 0 rojos. Mi mapa independiente de `codigo_de_pais` (4019 formas,
+  `8d2cacc` contra `a910c5f`) cambia sólo las seis de Holanda. Mis siete negativos pasan.
+- **La causa de la devolución: una forma que lleva el código reemplazado se muestra distinta de
+  lo que sale.** En `8d2cacc`, 434 se mostraba 434 y salía 434; ahora, con la API del catálogo,
+  escribir «434» u «0434» guarda y devuelve eso, la pantalla lo pone tal cual y el TXT dice 423.
+  Tiene camino hoy (escribirlo, o un 434 ya guardado que el lookup lleva a la grilla) y tu informe
+  dice que el criterio 5 no se cumple. Un nombre («HOLANDA», como «CHINA») que se muestra como se
+  escribió no es parte de esto.
 
-## Tu próxima pieza: Holanda→423 (activa ya)
+**Criterio de la vuelta (comportamiento y prueba):**
+1. Ningún lugar de la pantalla que muestre un origen guardado o escrito, y cuyo valor pueda llegar
+   a un TXT hoy, muestra una forma que lleve el código reemplazado: muestra lo que sale en el TXT.
+   La lista de lugares sale del código y va al informe con, para cada uno, si llega a un TXT hoy.
+   Los que vi en `a910c5f`: la fila del catálogo (`catalogo.js:270`), el catálogo del cliente
+   (`clientes.js:1427`), el origen que el lookup trae a la grilla (`upload.js:586`, `:600-602`) y
+   la grilla de ítems antes de generar (`finalize.js`); la procedencia de la revisión
+   (`review.js:252-271`). Según tu tabla, `default_origin` («Origen habitual», `clientes.js:1071`,
+   `:1232`, `:1955`) y el «Origen frecuente» (`clientes.js:1139`, `main.py:8466-8475`) no vuelven a
+   la generación: si es así, van como riesgo escrito y sin código. Sumá los que encuentres.
+2. La familia como datos de un caso: las formas con el código reemplazado (434, 0434, el número
+   434, «434 · HOLANDA», «434 - Holanda», «434 · PAISES BAJOS»), guardadas y escritas. Los nombres
+   («HOLANDA», «Holanda», «Países Bajos») y «NL» son control: se muestran como hoy.
+3. Un volcado antes y después de lo que muestra cada lugar para todos los demás países: sin
+   diferencias. El diff va al informe. Mostrar todos los países con su etiqueta no es parte de
+   esta vuelta (D261, abajo).
+4. Lo guardado sigue sin reescribirse (`DECISIONS.md`, 2026-11-16 19:39 UTC).
+5. El rojo con el arreglo revertido, una vez.
 
-Ya no espera a Emi: dijo sí a «Holanda» y delegó el 434 escrito, que se decidió 423
-(`DECISIONS.md`, entradas del 2026-11-16 18:42 y 19:39 UTC). Lo guardado no se migra. Después
-viene D239 (a); te la escribo al aceptar ésta.
+**Revisión:** §3 fuerte, como la pieza. `e2e_maria.sh`, `catalogo3.sh` y los guiones que anclen lo
+que toques, desde la copia del SHA que entregás.
 
-**Criterio (comportamiento y prueba):**
-1. Toda forma de Holanda («HOLANDA», «Holanda», «434», el número 434, «434 HOLANDA») da 423 en
-   el TXT, en la validación del catálogo, en el lector de despachos (`despacho_lector.py`: un
-   despacho «434 HOLANDA» entra como 423) y en la pantalla, que coinciden con el servidor. La
-   familia, como datos de un solo caso (hoy `test_paises_bajos_es_423_y_holanda_434` fija 434).
-2. Un volcado del mapa entero de países, antes y después, del servidor y de la pantalla: la
-   única diferencia es Holanda/434. El diff va al informe.
-3. Lo guardado: listá cada campo guardado que puede tener un código de país (producto del
-   catálogo, operación o despacho guardado, memoria, lo que encuentres) y, para cada uno, un
-   dato con 434 guardado que genera 423. No hay base de producción para medir: el informe dice
-   qué campos encontraste y que en producción no se midió.
-4. Grupo mezclado: «NL» + «HOLANDA», «NL» + «434» y «Países Bajos» + «434 HOLANDA» en un mismo
-   grupo generan un solo origen 423. Esto reemplaza el error «todos los ítems deben tener el
-   mismo origen» que PAIS-NL fijó para esos pares: sus pruebas y sabotajes se re-apuntan a esto,
-   y queda un dato de dos orígenes de verdad distintos que sigue dando el error. Si uno no se
-   puede re-apuntar, vuelve como D; no se saca callado.
-5. La pantalla nunca muestra 434 para algo que sale 423: ni el selector (`paises_maria.js`
-   tiene `{"code":"434","name":"HOLANDA"}` en `COUNTRIES`) ni lo tipeado (`"HOLANDA":"434"` en
-   `ALIASES`). *Sugerencia:* el archivo dice que sale de la tabla oficial en xlsx; si hay un
-   generador, el cambio va ahí.
-6. El rojo con el arreglo revertido, una vez en el informe.
+**Las D:**
+- **D261:** la parte de 434 es esta devolución. La (a), mostrar todos los países con `label`,
+  cambia la pantalla para todos y no se pidió: se la llevo a Emi con tu recomendación, aparte.
+  No la hagas en esta vuelta.
+- **D262 (a)**, decidido por la PM: a la cola de limpieza.
+- **D263**, de la PM: `validate_items_for_maria` mira `origen` y el generador usa `pais_origen`
+  primero; `pais_origen="4340"` con `origen="CN"` valida y sale `CARTPAYORI=4340`. Sólo por la
+  API, ya en la base. Pieza aparte, después de D239 (a); no la toques ahora.
+- **Supuestos 1 a 3:** aceptados. **La premisa del criterio 4:** verificada, bien dicho.
 
-**Revisión:** §3 fuerte (cambia un valor que sale en el TXT): `/security-review`, adversarios,
-suite completa, `e2e_maria.sh` sobre el SHA, `sabotajes/catalogo3.sh` y los guiones que anclen
-lo que toques.
+Después de esta vuelta sigue D239 (a), que te escribo al aceptar ésta.
 
-**Próxima D: D261.**
+**Próxima D: D264.**
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 
