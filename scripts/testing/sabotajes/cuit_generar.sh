@@ -69,12 +69,12 @@ sabotaje casos $M "el del estudio elegido manda a corregir como si lo mandara la
             donde' '        if False:
             donde' \
   "$RECARGA" "$DEL_ESTUDIO" "$AVISOS[malo en el estudio elegido]"
-sabotaje casos $M "el del perfil guardado con guiones no se reconoce como el del perfil" \
+sabotaje casos $M "el del perfil guardado con guiones se nombra como está guardado" \
   "$DEL_PERFIL_LIMPIO" 'del_perfil = str((user or {}).get("cuit") or "")' \
-  "$RECARGA" "$MALO[guardado con guiones y un espacio]"
-sabotaje casos $M "el del perfil guardado con un espacio en el medio no se reconoce como el del perfil" \
+  "{'errors': ['El CUIT del despachante «20-99999999 8»" "$MALO[guardado con guiones y un espacio]"
+sabotaje casos $M "el del perfil guardado con un espacio en el medio se nombra con el espacio" \
   "$DEL_PERFIL_LIMPIO" 'del_perfil = str((user or {}).get("cuit") or "").replace("-", "").strip()' \
-  "$RECARGA" "$MALO[guardado con guiones y un espacio]"
+  "{'errors': ['El CUIT del despachante «2099999999 8»" "$MALO[guardado con guiones y un espacio]"
 sabotaje casos $M "se nombra como llegó" \
   "$SEPARADORES" '        return str(valor or "")' \
   "assert ['20-11111118 9'] == ['20111111189']" "$MALO[guardado con guiones y un espacio]" \
