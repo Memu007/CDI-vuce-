@@ -1,9 +1,10 @@
 """Con un CUIT del despachante que no es un CUIT no se genera el TXT: iría al
 CDDTAGR. Vale para el que ya estaba guardado en el perfil y para el que manda
-la operación en `cuit_agr`, y el error dice dónde se corrige. Los avisos de
-antes de generar lo dicen con el mismo texto.
+la operación en `cuit_agr`, y el error dice dónde se corrige.
 
-Lo mismo en el navegador: `scripts/testing/pantalla_cuit_generar1.js`.
+Lo mismo en el navegador: `scripts/testing/pantalla_cuit_generar1.js`. Los
+avisos de antes de generar lo dicen con el mismo texto (sólo acá, no en el
+navegador).
 """
 import re
 
@@ -53,6 +54,7 @@ ANTES_DE_GENERAR = {
     "malo en el estudio elegido": (BUENO, BUENO, MALO, _no_cierra(MALO, EN_EL_ESTUDIO)),
     # Un cuit_agr de puros espacios o guiones es como si no viniera.
     "cuit_agr en blanco, con uno bueno en el perfil": (BUENO, " - -", None, BUENO),
+    "cuit_agr en blanco, con uno malo en el perfil": (MALO, " - ", None, _no_cierra(MALO, EN_EL_PERFIL)),
     "cuit_agr en blanco, sin CUIT en el perfil": (None, "   ", None, FALTA_CUIT_DONDE_CARGARLO),
     "uno bueno": (MALO, OTRO_BUENO, None, OTRO_BUENO),
 }
