@@ -846,3 +846,13 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   en una línea con el pedido del próximo «dale».
 - Orden: Holanda→423 y después D239 (a), que cubre los códigos que siguen
   sin sigla.
+
+## 2026-11-16 20:59 UTC — D244 (a) de MARIA aceptada sobre `6112322`
+
+- `/generate_maria/avisos` anuncia el CUIT del despachante que no cierra, con el texto del 400,
+  y un `cuit_agr` en blanco cuenta como ausente. Acta `REPRODUCCION-D244-2026-11-16.md`.
+- D259 (a), decidido por la PM: riesgo escrito. Un estudio con CUIT de sólo espacios o guiones
+  caería al del perfil, pero `POST /api/estudios` limpia y exige 11 dígitos desde que existe:
+  hoy no hay camino. Lo nuevo es sólo eso; un `""` ya caía al perfil en `fc5944fc`.
+- D260 (a), decidido por la PM: la limpieza del CUIT escrita tres veces en `main.py`, a la cola.
+- Sigue Holanda→423 (activada en `PARA-DEV-2.md`), después D239 (a).

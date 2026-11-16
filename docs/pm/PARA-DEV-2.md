@@ -3,52 +3,54 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D257 (b): aceptada sobre `3c7eb14` (informe `38cb92f`) e integrada (2026-11-15 05:57 UTC)
+## D244 (a): aceptada sobre `6112322` (informe `91cdc781`) e integrada (2026-11-16 20:59 UTC)
 
-Acta `REPRODUCCION-D257-2026-11-15.md`.
+Acta `REPRODUCCION-D244-2026-11-16.md`.
 
-- Con la copia de `3c7eb14`: 70 `ROJO`, 0 `FALLA`, `rc=0`; los siete nuevos, `1 failed, 84
-  passed`. Chequeo-6 igual al tuyo, anclas 2541 con 0/0/0.
-- Mis dos negativos (en los sufijos, `grupos.clear(); grupos.add(gid)`; en el arancel, el `elif`
-  del grupo pidiendo además `item.get("sufijo")`) dan rojo con tu prueba, cada uno en su dato, y
-  `83 passed` con la de `e1bd17a`.
-- **La premisa del punto 2** estaba mal en mi criterio; tu corrección (un sufijo de operación sin
-  AI en `un_grupo_sin_el_suyo`) es la correcta.
-- **D258 (a)**, decidida por la PM: va a la cola de limpieza.
-- **Supuestos 1 a 4 y riesgos 1, 3 y 4:** aceptados. **Riesgo 2:** riesgo escrito. Con tu
-  sabotaje 67, `test_maria9_sufijo_operacion.py` da `27 passed`, pero el generador igual corta
-  con «Falta el sufijo de valor SBT» sin pasar por `usa_el_sufijo_de_la_operacion`: se pierde
-  un 400 claro, no sale un TXT sin sufijo. No abre pieza.
+- Tu prueba: `18 passed`; con el `main.py` de `2f96f2f`, `6 failed, 12 passed`. Chequeo-6 igual
+  al tuyo, anclas 2541 con 0/0/0. `cuit_generar.sh` (21 `ROJO`) y `estudio1.sh` (37) sin
+  sabotaje sin rojo; `e2e_maria.sh` OK; suite completa `6196 passed`, 0 rojos.
+- Mis seis negativos (tabulador y salto de línea, «--» sin perfil, perfil malo con `cuit_agr`
+  de espacios, estudio bueno con `cuit_agr` malo, diez dígitos, ancho completo) pasan, y mis dos
+  sabotajes (limpiar sólo guiones; `/avisos` con `estudio=None`) dan rojo.
+- **D259 (a)**, riesgo escrito, decidido por la PM: `POST /api/estudios` limpia y exige 11
+  dígitos desde que existe (`609ec528`), así que hoy no hay camino. **D260 (a):** a la cola.
+- **Supuestos 1 a 3 y riesgos 1 a 3:** aceptados.
+- **Las horas del informe:** tu commit es de las 20:19:19 UTC y el informe dice «Entrega 20:25»
+  y «corrí el 1 a las 20:28». Horas, sólo de `date -u`; si no se midió, no se escribe la hora.
 
-## Tu próxima pieza: D244 (a), con el sí de Emi (2026-11-16 18:42 UTC)
+## Tu próxima pieza: Holanda→423 (activa ya)
 
-Emi contestó: D244 sí, «Holanda» sí y D239 sí. Tu cola: D244 → Holanda→423
-(también el número 434 escrito: sale 423) → D239 (a). Las dos últimas te las
-escribo al activarlas; no las toques antes.
+Ya no espera a Emi: dijo sí a «Holanda» y delegó el 434 escrito, que se decidió 423
+(`DECISIONS.md`, entradas del 2026-11-16 18:42 y 19:39 UTC). Lo guardado no se migra. Después
+viene D239 (a); te la escribo al aceptar ésta.
 
 **Criterio (comportamiento y prueba):**
-1. Con un CUIT del despachante que no cierra con su dígito verificador,
-   `/generate_maria/avisos` lo anuncia, venga del perfil, de `cuit_agr` o del
-   estudio elegido, con el mismo texto que el 400 de `/generate_maria` (el que
-   dice dónde corregirlo). Sin CUIT inválido, no aparece ningún aviso nuevo.
-2. Un `cuit_agr` de puros espacios o puros guiones cuenta como que no vino, en
-   los avisos y al generar: se usa el del perfil (o «Falta el CUIT…» si no
-   hay). Decidido por la PM: es la mitad de tu (a). Tu caso de
-   `tests/test_cuit_generar.py` que hoy fija el 400 que nombra «» pasa a fijar
-   esto.
-3. El orden estudio → `cuit_agr` → perfil queda en un solo lugar.
-   *Sugerencia:* que `/avisos` use `_cuit_del_despachante`.
-4. La familia (los tres orígenes inválidos, `cuit_agr` en blanco con y sin
-   perfil, y uno válido sin aviso) como datos de un solo caso. El rojo con el
-   arreglo revertido, una vez en el informe.
+1. Toda forma de Holanda («HOLANDA», «Holanda», «434», el número 434, «434 HOLANDA») da 423 en
+   el TXT, en la validación del catálogo y en la pantalla, que coinciden con el servidor. La
+   familia, como datos de un solo caso (hoy `test_paises_bajos_es_423_y_holanda_434` fija 434).
+2. Un volcado del mapa entero de países, antes y después, del servidor y de la pantalla: la
+   única diferencia es Holanda/434. El diff va al informe.
+3. Lo guardado: listá cada campo guardado que puede tener un código de país (producto del
+   catálogo, operación o despacho guardado, memoria, lo que encuentres) y, para cada uno, un
+   dato con 434 guardado que genera 423. No hay base de producción para medir: el informe dice
+   qué campos encontraste y que en producción no se midió.
+4. Grupo mezclado: «NL» + «HOLANDA», «NL» + «434» y «Países Bajos» + «434 HOLANDA» en un mismo
+   grupo generan un solo origen 423. Esto reemplaza el error «todos los ítems deben tener el
+   mismo origen» que PAIS-NL fijó para esos pares: sus pruebas y sabotajes se re-apuntan a esto,
+   y queda un dato de dos orígenes de verdad distintos que sigue dando el error. Si uno no se
+   puede re-apuntar, vuelve como D; no se saca callado.
+5. La pantalla nunca muestra 434 para algo que sale 423: ni el selector (`paises_maria.js`
+   tiene `{"code":"434","name":"HOLANDA"}` en `COUNTRIES`) ni lo tipeado (`"HOLANDA":"434"` en
+   `ALIASES`). *Sugerencia:* el archivo dice que sale de la tabla oficial en xlsx; si hay un
+   generador, el cambio va ahí.
+6. El rojo con el arreglo revertido, una vez en el informe.
 
-**Revisión:** la misma que CUIT-GENERAR (§3: toca el CUIT que sale en el TXT):
-`/security-review`, adversarios, suite completa y `e2e_maria.sh` sobre el SHA.
-Si tocás la pantalla, su guion (`pantalla_cuit_generar1.js`) corre también.
+**Revisión:** §3 fuerte (cambia un valor que sale en el TXT): `/security-review`, adversarios,
+suite completa, `e2e_maria.sh` sobre el SHA, `sabotajes/catalogo3.sh` y los guiones que anclen
+lo que toques.
 
-**`test_despacho1b`:** lo sigo midiendo yo.
-
-**Próxima D: D259.**
+**Próxima D: D261.**
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 

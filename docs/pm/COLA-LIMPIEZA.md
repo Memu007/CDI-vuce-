@@ -316,3 +316,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon`): los textos que ya están en
   `SUCIO` y `LIMPIO` se repiten como literales; usar las constantes. Lo vio la Dev
   MARIA.
+- `proyecto_maria/main.py` (`:4747`, `:4965` y `:7723` en `6112322`): la limpieza del CUIT
+  (sacar guiones y espacios) está escrita tres veces; una función, donde pasan las tres (D260 a).
+  Lo vio la Dev MARIA.
