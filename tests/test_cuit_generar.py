@@ -1,6 +1,7 @@
 """Con un CUIT del despachante que no es un CUIT no se genera el TXT: iría al
 CDDTAGR. Vale para el que ya estaba guardado en el perfil y para el que manda
-la operación en `cuit_agr`, y el error dice dónde se corrige.
+la operación en `cuit_agr`, y el error dice dónde se corrige. Los avisos de
+antes de generar lo dicen con el mismo texto.
 
 Lo mismo en el navegador: `scripts/testing/pantalla_cuit_generar1.js`.
 """
@@ -10,6 +11,7 @@ import pytest
 from sqlalchemy import func, select
 
 from proyecto_maria.database.models import Estudio, Operation
+from proyecto_maria.main import FALTA_CUIT_DONDE_CARGARLO
 from tests.test_maria7_rechazos_24_10 import _pedido
 from tests.test_sesion1 import (  # noqa: F401  (las dos fixtures se usan solas)
     _bearer, _consulta, _http, _login, _poner, _sin_limites, _tablas, _usuario,
@@ -27,7 +29,6 @@ MALOS = {
     "guardado con guiones y un espacio": ("20-99999999 8", "", None, MALO, EN_EL_PERFIL),
     "en cuit_agr, con uno bueno en el perfil": (BUENO, "30712345670", None, "30712345670", EN_LA_OPERACION),
     "en cuit_agr con guiones, sin CUIT en el perfil": (None, "20-99999999-8", None, MALO, EN_LA_OPERACION),
-    "en cuit_agr de puros espacios, sin CUIT en el perfil": (None, "   ", None, "", EN_LA_OPERACION),
     "en el estudio elegido, con uno bueno en el perfil y en cuit_agr": (BUENO, BUENO, MALO, MALO, EN_EL_ESTUDIO),
 }
 # qué se usa → (guardado en el perfil, `cuit_agr`, con estudio elegido, CDDTAGR)
@@ -38,6 +39,22 @@ BUENOS = {
     # los dos verificadores que no salen de «11 − resto»: el 0 y el 9
     "cuit_agr con verificador 0": (None, "20111111120", False, "20111111120"),
     "cuit_agr con verificador 9, guiones y un espacio": (None, "20-11111118 9", False, "20111111189"),
+}
+
+
+def _no_cierra(cuit, donde):
+    return f"El CUIT del despachante «{cuit}» no es válido: son 11 dígitos (0-9) y el último es el verificador. {donde}"
+
+
+# de dónde sale → (guardado en el perfil, `cuit_agr`, el del estudio elegido, lo que avisan y dice el 400, o el CDDTAGR)
+ANTES_DE_GENERAR = {
+    "malo en el perfil": (MALO, "", None, _no_cierra(MALO, EN_EL_PERFIL)),
+    "malo en cuit_agr": (BUENO, "30712345670", None, _no_cierra("30712345670", EN_LA_OPERACION)),
+    "malo en el estudio elegido": (BUENO, BUENO, MALO, _no_cierra(MALO, EN_EL_ESTUDIO)),
+    # Un cuit_agr de puros espacios o guiones es como si no viniera.
+    "cuit_agr en blanco, con uno bueno en el perfil": (BUENO, " - -", None, BUENO),
+    "cuit_agr en blanco, sin CUIT en el perfil": (None, "   ", None, FALTA_CUIT_DONDE_CARGARLO),
+    "uno bueno": (MALO, OTRO_BUENO, None, OTRO_BUENO),
 }
 
 
@@ -74,8 +91,7 @@ def test_con_un_cuit_del_despachante_malo_no_se_genera_y_dice_donde_corregirlo(o
         pedido["estudio_id"] = _estudio_en_la_base(u, del_estudio)
     r = _http().post("/generate_maria", json=pedido, headers=sesion)
     assert r.status_code == 400, f"{origen}: {r.status_code} {r.text[:300]}"
-    assert r.json()["detail"] == {"errors": [
-        f"El CUIT del despachante «{nombrado}» no es válido: son 11 dígitos (0-9) y el último es el verificador. {donde}"]}
+    assert r.json()["detail"] == {"errors": [_no_cierra(nombrado, donde)]}
     assert _operaciones(u) == 0, "lo que no se genera no queda contado ni guardado"
 
 
@@ -92,3 +108,23 @@ def test_con_un_cuit_del_despachante_bueno_se_genera(usado):
     assert r.status_code == 200, f"{usado}: {r.status_code} {r.text[:300]}"
     assert re.findall(r"^CDDTAGR=(.*?)\r?$", r.json()["content"], re.M) == [cddtagr]
     assert _operaciones(u) == 1
+
+
+@pytest.mark.parametrize("caso", ANTES_DE_GENERAR)
+def test_los_avisos_dicen_lo_mismo_que_el_400_del_cuit_del_despachante(caso):
+    perfil, cuit_agr, del_estudio, esperado = ANTES_DE_GENERAR[caso]
+    u, sesion = _cuenta(perfil)
+    pedido = _pedido(cuit_agr=cuit_agr)
+    if del_estudio:
+        pedido["estudio_id"] = _estudio_en_la_base(u, del_estudio)
+    r = _http().post("/generate_maria/avisos", json=pedido, headers=sesion)
+    assert r.status_code == 200, f"{caso}: {r.status_code} {r.text[:300]}"
+    avisan = [a for a in r.json()["avisos"] if "CUIT del despachante" in a]
+    r = _http().post("/generate_maria", json=pedido, headers=sesion)
+    if r.status_code == 200:
+        sale = re.findall(r"^CDDTAGR=(.*?)\r?$", r.json()["content"], re.M)
+    else:
+        detalle = r.json()["detail"]
+        sale = detalle["errors"] if isinstance(detalle, dict) else [detalle]
+    # Con uno bueno no se avisa nada y sale en el CDDTAGR.
+    assert (avisan, sale) == ([] if esperado.isdigit() else [esperado], [esperado]), f"{caso}: avisan {avisan}, sale {sale}"
