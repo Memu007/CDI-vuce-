@@ -263,7 +263,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-16 19:39 UTC: Railway de fc5944fc OK (Emi). El 434 escrito sale 423 (Emi: «como piense el advisor»). MARIA con D244 (a); después Holanda→423 y D239 (a). Técnica igual en de4d121e.
+2026-11-16 19:56 UTC: sin entregas. MARIA trabaja D244 (a) (cabeza c824b0d9, corriendo puertas; 191k de 224k). Técnica igual en de4d121e, sin pieza. Railway de fc5944fc OK (Emi); el 434 escrito sale 423.
 
 ## /compact conservar de la PM principal
 
