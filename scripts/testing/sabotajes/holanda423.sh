@@ -31,7 +31,7 @@ sabotaje pantalla $CLI "el catálogo del cliente muestra lo guardado" \
   "CDI.escapeHtml(CDI.paisesMaria.mostrar(p.origen || 'XX'))" "CDI.escapeHtml(p.origen || 'XX')" \
   "FALLA: catálogo del cliente: «434» guardado se ve «434»"
 sabotaje pantalla $CLI "el catálogo del cliente deja lo escrito" \
-  "            if (field === 'origen') input.value = CDI.paisesMaria.mostrar(value);
+  "            if (field === 'origen' && input.value.trim() === value) input.value = CDI.paisesMaria.mostrar(value);
 " "" \
   "FALLA: «434» escrito en el catálogo del cliente se ve «434»"
 sabotaje pantalla $REV "la procedencia del borrador se ve como vino" \
@@ -42,7 +42,13 @@ sabotaje pantalla $REV "la procedencia escrita queda como se escribió" \
   "if (el.name === 'procedencia' && ev.type === 'change') el.value" "if (false) el.value" \
   "FALLA: procedencia «434» escrita se ve «434»"
 
-# 3. Mientras se escribe no se toca.
+# 3. Lo que se ve no se guarda solo, y mientras se escribe no se toca.
+sabotaje pantalla $CAT "el catálogo del proveedor manda el origen sin tocar" \
+  "if (campoOrigen.value !== campoOrigen.defaultValue) cambios.origen" "cambios.origen" \
+  "FALLA: cambiar sólo el NCM reescribe el origen guardado"
+sabotaje pantalla $CLI "el catálogo del cliente pisa lo que se sigue escribiendo" \
+  "if (field === 'origen' && input.value.trim() === value)" "if (field === 'origen')" \
+  "FALLA: lo escrito mientras se guardaba «434» quedó «423»"
 sabotaje pantalla $REV "la procedencia cambia en cada tecla" \
   "if (el.name === 'procedencia' && ev.type === 'change') el.value" "if (el.name === 'procedencia') el.value" \
   "FALLA: «4340» escrito tecla por tecla se ve «4230»"

@@ -40,9 +40,26 @@ async function catalogoDelProveedor(page, base) {
   const filaChina = page.locator('.catalogo-product-row', { hasText: 'Producto ' + origenes.indexOf('CHINA') });
   await filaChina.locator('input[data-field="origen"]').fill('0434');
   await filaChina.locator('[data-action="save-product"]').click();
-  await page.waitForFunction(() => [...document.querySelectorAll('.catalogo-product-row input[data-field="origen"]')].filter(i => i.value === '423').length === 6, null, { timeout: 10000 })
+  const con423 = deTexto.filter(p => CON_434.includes(p.origen)).length + 1;
+  await page.waitForFunction(n => [...document.querySelectorAll('.catalogo-product-row input[data-field="origen"]')].filter(i => i.value === '423').length === n, con423, { timeout: 10000 })
     .catch(() => falla('escribir «0434» en el catálogo del proveedor no se ve 423 al guardar'));
   console.log('OK catálogo del proveedor: «0434» escrito y guardado se ve 423');
+  await soloElNcm(page, base, proveedor.vendor_id);
+}
+
+// Guardar la fila cambiando sólo el NCM deja el origen guardado como estaba.
+async function soloElNcm(page, base, vendorId) {
+  const guardados = async () => Object.fromEntries(Object.values((await (await page.request.get(base + '/api/catalog/' + vendorId)).json()).productos)
+    .map(p => [p.descripcion_original, p.origen]));
+  const antes = await guardados();
+  const fila = page.locator('.catalogo-product-row', { hasText: 'Producto ' + origenes.indexOf('434 · HOLANDA') });
+  const guardado = page.waitForResponse(x => x.request().method() === 'PUT' && x.url().includes('/productos/'), { timeout: 10000 });
+  await fila.locator('input[data-field="ncm"]').fill('84713000');
+  await fila.locator('[data-action="save-product"]').click();
+  if (!(await guardado).ok()) falla('cambiar el NCM en el catálogo del proveedor no se guarda');
+  const despues = await guardados();
+  if (JSON.stringify(despues) !== JSON.stringify(antes)) falla('cambiar sólo el NCM reescribe el origen guardado: ' + JSON.stringify(antes) + ' → ' + JSON.stringify(despues));
+  console.log('OK catálogo del proveedor: cambiar sólo el NCM deja el origen guardado ' + JSON.stringify(antes['Producto ' + origenes.indexOf('434 · HOLANDA')]));
 }
 
 // Catálogo del cliente: lo guardado y lo que se escribe.
@@ -63,9 +80,29 @@ async function catalogoDelCliente(page, base) {
   await campo.fill('434');
   await campo.press('Enter');
   if (!(await guardado.catch(() => falla('escribir «434» en el catálogo del cliente no se guarda'))).ok()) falla('el catálogo del cliente no guardó «434»');
-  await page.waitForFunction(() => document.activeElement.tagName !== 'INPUT', null, { timeout: 5000 });
-  if (await campo.inputValue() !== '423') falla('«434» escrito en el catálogo del cliente se ve «' + await campo.inputValue() + '»');
+  await page.waitForFunction(c => c.value === '423', await campo.elementHandle(), { timeout: 5000 })
+    .catch(async () => falla('«434» escrito en el catálogo del cliente se ve «' + await campo.inputValue() + '»'));
   console.log('OK catálogo del cliente: «434» escrito se ve 423');
+  await escritoMientrasGuarda(page, campo);
+}
+
+// Lo que se vuelve a escribir mientras se guarda no se pisa con lo guardado.
+async function escritoMientrasGuarda(page, campo) {
+  let soltar;
+  const retenido = new Promise(r => { soltar = r; });
+  await page.route('**/catalogo/productos/*', async route => { await retenido; await route.continue(); });
+  const guardado = page.waitForResponse(x => x.request().method() === 'PUT' && x.url().includes('/catalogo/productos/'), { timeout: 10000 });
+  await campo.fill('434');
+  await campo.press('Enter');
+  await campo.fill('CN');
+  // El aviso de «Producto actualizado» sale después de que la pantalla usó la respuesta.
+  await page.evaluate(() => { document.getElementById('toastHost').innerHTML = ''; });
+  soltar();
+  await guardado;
+  await page.waitForSelector('#toastHost .toast', { timeout: 10000 });
+  await page.unroute('**/catalogo/productos/*');
+  if (await campo.inputValue() !== 'CN') falla('lo escrito mientras se guardaba «434» quedó «' + await campo.inputValue() + '»');
+  console.log('OK catálogo del cliente: lo escrito mientras se guarda no se pisa');
 }
 
 // Procedencia de la revisión: la del borrador y la que se escribe.
