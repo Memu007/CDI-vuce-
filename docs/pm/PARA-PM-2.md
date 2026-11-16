@@ -148,7 +148,7 @@ git worktree add -f /tmp/rojo423 a910c5f && (cd /tmp/rojo423 && git checkout 8d2
   git worktree remove -f /tmp/rojo423
 #    «4 failed, 243 passed»
 
-# 2. los guiones de sabotaje que anclan lo que toqué (catalogo3 tarda cerca de una hora)
+# 2. los guiones de sabotaje que anclan lo que toqué (catalogo3 tardó 37 minutos acá)
 PY=$VENV/bin/python bash scripts/testing/sabotajes/catalogo3.sh a910c5f | tail -2
 #    «fallas: 0»
 bash scripts/testing/sabotaje_maria3.sh a910c5f $VENV | tail -1
@@ -217,8 +217,9 @@ item» sólo con una diferencia, y estos sabotajes dejan de 2 a 6 («N more item
 Cada uno de los cuatro de pantalla con texto propio lo medí a mano con el archivo de pruebas entero:
 pone en rojo sólo `test_la_pantalla_y_el_servidor_reconocen_los_mismos_paises` o `$H`.
 
-`catalogo3.sh` sobre `a910c5f`: **en curso**; a las 22:29 UTC, 46 de 66 en rojo por la razón
-esperada y ninguna falla. El resultado final va en el commit siguiente a éste.
+`catalogo3.sh` sobre `a910c5f` (22:02:50 → 22:39:24 UTC): 65 sabotajes (53 de la base y 12 nuevos),
+los 65 `ROJO` por la razón esperada, ningún `ROJO?`, `VERDE` ni `ROTO`; termina con «fallas: 0»,
+salida 0.
 
 ## Revisión
 
@@ -254,7 +255,7 @@ esperada y ninguna falla. El resultado final va en el commit siguiente a éste.
 |---|---|---|
 | suite completa, worktree limpio, `test.db` borrada | `a910c5f` | `6197 passed, 110 skipped, 3 xfailed` en 20:43 (22:02:50 → 22:23:38 UTC), salida 0 |
 | `e2e_maria.sh` | `a910c5f` | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.» |
-| `sabotajes/catalogo3.sh` | `a910c5f` | ver «Sabotajes» |
+| `sabotajes/catalogo3.sh` | `a910c5f` | «fallas: 0», 65 de 65 `ROJO`, salida 0 |
 | `sabotaje_maria3.sh` | `4f63d23` | «OK: los 32 sabotajes dan rojo por la razón esperada»; el producto, `test_maria3_antes_de_generar.py` y el guion no cambian de `4f63d23` a `a910c5f` (`git diff --stat` vacío) |
 | `sabotaje_maria1a.sh` | `7924f36` | «OK: los 10 sabotajes dan rojo por la razón esperada»; ídem hasta `a910c5f` |
 | pruebas vecinas (catalogo3, catalogo_largo2, generar_maria_txt, maria1a, ncm_batch_frontend, punta_a_punta1, despacho1a, despacho1c, excel1_lectura, maria1c_avisos_lectura, country_catalog_frontend, maria3) | `9d6595e` | `593 passed, 2 xfailed` |
