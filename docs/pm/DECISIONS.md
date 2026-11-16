@@ -817,3 +817,17 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   respuesta a lo que quedó abierto el 2026-11-09 21:00: «NL» y «NLD» → 423;
   «HOLANDA» queda en 434 (otra entrada de la tabla oficial). Pieza PAIS-NL a
   MARIA, después de la devolución de SUFIJO-BORRADOR; es puerta de publicar.
+
+## 2026-11-16 18:42 UTC — D244, «Holanda» y D239 (Emi; PM con el consejero)
+
+- Emi: «D244 sí, Holanda sí, D239 sí».
+- D244 (a): `/generate_maria/avisos` anuncia el CUIT del despachante que no
+  cierra, con el texto del 400. Decidido por la PM: un `cuit_agr` en blanco
+  cuenta como ausente en los avisos y al generar (la otra mitad de la (a)).
+  Pieza a MARIA, con la revisión de CUIT-GENERAR.
+- «Holanda» también 423 (reemplaza «HOLANDA queda en 434» de la entrada del
+  2026-11-13 16:30). Falta un dato para escribirla junto con D239 (a): qué
+  sale en el TXT cuando algo ya dice el número 434 (un despacho «434» o
+  «434 HOLANDA», un producto guardado). Se le pregunta a Emi; las dos piezas
+  esperan esa respuesta, Holanda antes que D239. Ninguna migra lo guardado:
+  se mide y se informa, como en PAIS-NL.

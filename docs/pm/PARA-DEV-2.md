@@ -20,16 +20,31 @@ Acta `REPRODUCCION-D257-2026-11-15.md`.
   con «Falta el sufijo de valor SBT» sin pasar por `usa_el_sufijo_de_la_operacion`: se pierde
   un 400 claro, no sale un TXT sin sufijo. No abre pieza.
 
-## Tu próxima pieza: ninguna por ahora (2026-11-15 05:57 UTC)
+## Tu próxima pieza: D244 (a), con el sí de Emi (2026-11-16 18:42 UTC)
 
-No tenés pieza activa. D244 y D239 esperan a Emi:
-- Si dice que sí a D244, te la escribo con su criterio.
-- Si dice que sí a D239 (a), lleva adentro, como datos de un caso, un código sin sigla con
-  el nombre de otro país («434 BELGICA» guarda `BE` sin avisar).
-- Si Emi dice que «Holanda» también es 423, es una pieza chica aparte.
+Emi contestó: D244 sí, «Holanda» sí y D239 sí. Arrancás por D244; las otras
+dos esperan una pregunta más a Emi (qué hace el número 434 escrito solo) y te
+las escribo al activarlas. No las toques.
 
-La cola de limpieza es para después del lanzamiento: no la tomes. Tu rutina sigue; si al
-despertar no hay nada nuevo acá, terminá la vuelta sin arrancar nada.
+**Criterio (comportamiento y prueba):**
+1. Con un CUIT del despachante que no cierra con su dígito verificador,
+   `/generate_maria/avisos` lo anuncia, venga del perfil, de `cuit_agr` o del
+   estudio elegido, con el mismo texto que el 400 de `/generate_maria` (el que
+   dice dónde corregirlo). Sin CUIT inválido, no aparece ningún aviso nuevo.
+2. Un `cuit_agr` de puros espacios o puros guiones cuenta como que no vino, en
+   los avisos y al generar: se usa el del perfil (o «Falta el CUIT…» si no
+   hay). Decidido por la PM: es la mitad de tu (a). Tu caso de
+   `tests/test_cuit_generar.py` que hoy fija el 400 que nombra «» pasa a fijar
+   esto.
+3. El orden estudio → `cuit_agr` → perfil queda en un solo lugar.
+   *Sugerencia:* que `/avisos` use `_cuit_del_despachante`.
+4. La familia (los tres orígenes inválidos, `cuit_agr` en blanco con y sin
+   perfil, y uno válido sin aviso) como datos de un solo caso. El rojo con el
+   arreglo revertido, una vez en el informe.
+
+**Revisión:** la misma que CUIT-GENERAR (§3: toca el CUIT que sale en el TXT):
+`/security-review`, adversarios, suite completa y `e2e_maria.sh` sobre el SHA.
+Si tocás la pantalla, su guion (`pantalla_cuit_generar1.js`) corre también.
 
 **`test_despacho1b`:** lo sigo midiendo yo.
 
