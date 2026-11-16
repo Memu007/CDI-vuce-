@@ -23,7 +23,7 @@ from fastapi.testclient import TestClient
 import proyecto_maria.main as main
 from proyecto_maria.core import catalog_service, maria_generator
 from proyecto_maria.core.maria_generator import PAISES_INDEC, get_pais_codigo
-from proyecto_maria.core.despacho_lector import origen_para_catalogo
+from proyecto_maria.core.despacho_lector import origen_iso2, origen_para_catalogo
 from tests.test_catalogo_largo1 import _dueno
 from tests.test_catalogo_largo2 import NCM, VENDOR, _escribir, _match
 from tests.test_generar_maria_txt import _gen
@@ -291,26 +291,69 @@ def test_la_tabla_de_paises_no_tiene_claves_repetidas():
     assert {k for k in claves if claves.count(k) > 1} == set()
 
 
-# «HOLANDA» es otra entrada de la tabla oficial: no es una forma de escribir Países Bajos.
-PAISES_BAJOS = ("NL", "nl", "NLD", "nld", "PAISES BAJOS", "Países Bajos", "423", "423 · PAISES BAJOS")
+# Holanda es Países Bajos: su nombre y el código 434 dan 423, como «NL».
+PAISES_BAJOS = ("NL", "nl", "NLD", "nld", "PAISES BAJOS", "Países Bajos", "423", "423 · PAISES BAJOS",
+                "HOLANDA", "Holanda", "434", "0434", "434 · HOLANDA", "434 - Holanda", "423 · HOLANDA",
+                "434 · PAISES BAJOS")
+# Dos orígenes en un mismo grupo: el código que sale, o None si son dos países. «434 HOLANDA» es como
+# lo trae un despacho: llega al grupo lo que guarda su lector.
+GRUPOS = {("NL", "HOLANDA"): 423, ("NL", "434"): 423, ("Países Bajos", origen_iso2("434 HOLANDA")): 423,
+          ("HOLANDA", 434): 423, ("434", "BELGICA"): None}
 
 
-def test_paises_bajos_es_423_y_holanda_434():
+def test_holanda_y_paises_bajos_son_423():
     from proyecto_maria import pdf_extractor
-    from proyecto_maria.core import despacho_lector, maria_generator_export
-    formas = [*PAISES_BAJOS, "HOLANDA"]
-    esperado = [423] * len(PAISES_BAJOS) + [434]
-    assert [get_pais_codigo(origen_para_catalogo(p)[0]) for p in formas] == esperado
-    assert [maria_generator_export.get_pais_codigo(p) for p in formas] == esperado
-    # Escrito de estas formas, lo que cada lector deja guardado genera el mismo código.
-    for lector in (pdf_extractor._origen_desde_factura, despacho_lector.origen_iso2):
-        assert [maria_generator.codigo_de_pais(lector(p)) for p in formas] == esperado, lector.__name__
+    from proyecto_maria.core import maria_generator_export
+    assert [get_pais_codigo(origen_para_catalogo(p)[0]) for p in PAISES_BAJOS] == [423] * len(PAISES_BAJOS)
+    assert {maria_generator_export.get_pais_codigo(p) for p in PAISES_BAJOS} == {423}
+    # Lo que cada lector deja guardado genera 423.
+    for lector, formas in ((pdf_extractor._origen_desde_factura, PAISES_BAJOS),
+                           (origen_iso2, (*PAISES_BAJOS, "434 HOLANDA"))):
+        assert {maria_generator.codigo_de_pais(lector(p)) for p in formas} == {423}, lector.__name__
+    # El selector de la pantalla sale de esta misma tabla.
+    assert 434 not in maria_generator.codigos_tabla_oficial()
+    formas = (*PAISES_BAJOS, 434)
     items = [{"pieza": "84713000", "descripcion": f"Producto {i}", "cantidad": 1, "valor_unitario": 10,
-              "peso_unitario": 1, "origen": o, "procedencia": "NL", "unidad": "07", "grupo_id": i}
+              "peso_unitario": 1, "origen": o, "procedencia": o, "unidad": "07", "grupo_id": i}
              for i, o in enumerate(formas, start=1)]
     txt = _gen("OP123456", items)
-    assert [int(c) for c in re.findall(r"CARTPAYORI=(\d+)", txt)] == esperado
-    assert set(re.findall(r"CARTPAYPRC=(\d+)", txt)) == {"423"}
+    assert re.findall(r"CARTPAYORI=(\d+)", txt) == re.findall(r"CARTPAYPRC=(\d+)", txt) == ["423"] * len(formas)
+    for par, codigo in GRUPOS.items():
+        items = [{"pieza": "84713000", "descripcion": f"Producto {o}", "cantidad": 1, "valor_unitario": 10,
+                  "peso_unitario": 1, "origen": o, "unidad": "07", "grupo_id": 1} for o in par]
+        if codigo is None:
+            with pytest.raises(ValueError, match="mismo origen"):
+                _gen("OP123456", items)
+        else:
+            assert re.findall(r"CARTPAYORI=(\d+)", _gen("OP123456", items)) == [str(codigo)], par
+
+
+def test_holanda_guardada_genera_423(client):
+    """La memoria del cliente y el catálogo del proveedor devuelven el origen como se guardó, y la
+    pantalla lo pone en el producto: lo guardado con 434 antes de este cambio genera 423."""
+    cid = _cliente(client)
+    owner = _dueno(cid)
+    guardados = ("434", "0434", "HOLANDA", "Holanda", "434 · HOLANDA")
+    for i, guardado in enumerate(guardados):
+        desc = f"TORNILLO HOLANDA {i}"
+        r = client.post("/api/ncm/guardar-uso", json={
+            "descripcion": desc, "ncm": NCM, "vendor_name": VENDOR, "origen": "NL", "client_id": cid})
+        assert r.status_code == 200, r.text
+        _escribir("update client_product_history set origen_frecuente=:g where client_id=:c and descripcion=:d",
+                  g=guardado, c=cid, d=desc)
+        _escribir("update vendor_catalog_products set origen=:g where owner_username=:o and descripcion=:d",
+                  g=guardado, o=owner, d=desc)
+        devueltos = []
+        for cliente in (cid, None):
+            r = client.post("/api/catalog/lookup", json={
+                "items": [{"descripcion": desc}], "vendor_name": VENDOR, "client_id": cliente})
+            item = r.json()["items"][0]
+            devueltos.append((item["source"], item["origen"]))
+        assert devueltos == [("cliente", guardado), ("proveedor", guardado)], devueltos
+        txt = _gen("OP123456", [{"pieza": "84713000", "descripcion": desc, "cantidad": 1, "valor_unitario": 10,
+                                 "peso_unitario": 1, "origen": guardado.upper(), "procedencia": guardado,
+                                 "unidad": "07"}])
+        assert re.findall(r"CARTPAY(?:ORI|PRC)=(\d+)", txt) == ["423", "423"], guardado
 
 
 def test_nombre_y_codigo_de_cada_pais_dan_el_mismo_codigo():

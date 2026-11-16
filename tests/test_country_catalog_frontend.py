@@ -30,7 +30,7 @@ console.log(JSON.stringify(result));
     result = json.loads(completed.stdout)
 
     assert result == {
-        "count": 309,
+        "count": 308,
         "chinaFromIso": "310",
         "chinaFromName": "310",
         "chinaFromLabel": "310",
