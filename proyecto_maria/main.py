@@ -4748,7 +4748,7 @@ def _cuit_del_despachante(estudio, cuit_agr: str, user) -> tuple[str, bool]:
 
     del_perfil = sin_separadores((user or {}).get("cuit"))
     cuit = sin_separadores(estudio.cuit if estudio is not None else cuit_agr) or del_perfil
-    es_el_del_perfil = estudio is None and cuit == del_perfil
+    es_el_del_perfil = estudio is None and bool(cuit) and cuit == del_perfil
     if cuit and not cuit_valido(cuit):
         if estudio is not None:
             donde = "Es el del estudio elegido: en «Mi perfil», «Mis estudios», borralo y agregalo de nuevo."
