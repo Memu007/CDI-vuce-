@@ -273,7 +273,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-16 13:57 UTC: sin entregas (MARIA sólo trajo mi rama, 0dae23d0; Técnica igual en de4d121e). Apagué la rutina de MARIA (decidido por la PM: su cola espera a Emi; 6 vueltas vacías, ~3k y ~0,7 USD cada una). Falta que Emi revise Railway de fc5944fc.
+2026-11-16 15:55 UTC: sin entregas (MARIA quieta en 0dae23d0, su rutina apagada desde las 13:57 por la PM: su cola espera a Emi; Técnica igual en de4d121e). Falta que Emi revise Railway de fc5944fc y conteste D244, D239 y Holanda.
 
 ## /compact conservar de la PM principal
 
