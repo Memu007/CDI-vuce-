@@ -116,6 +116,8 @@ async function procedencia(page) {
     }, o);
     await page.waitForSelector('#f_procedencia', { state: 'visible', timeout: 10000 });
     if (await page.inputValue('#f_procedencia') !== esperado(o)) falla('procedencia «' + o + '» del borrador se ve «' + await page.inputValue('#f_procedencia') + '»');
+    const enLaOperacion = await page.evaluate(() => String(CDI.state.operacion.procedencia));
+    if (enLaOperacion !== String(o)) falla('procedencia «' + o + '» del borrador queda «' + enLaOperacion + '» en la operación');
     await page.fill('#f_procedencia', String(o));
     await page.locator('#f_procedencia').blur();
     if (await page.inputValue('#f_procedencia') !== esperado(o)) falla('procedencia «' + o + '» escrita se ve «' + await page.inputValue('#f_procedencia') + '»');

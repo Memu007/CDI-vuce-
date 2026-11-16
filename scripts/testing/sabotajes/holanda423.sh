@@ -35,14 +35,17 @@ sabotaje pantalla $CLI "el catálogo del cliente deja lo escrito" \
 " "" \
   "FALLA: «434» escrito en el catálogo del cliente se ve «434»"
 sabotaje pantalla $REV "la procedencia del borrador se ve como vino" \
-  "        if (name === 'procedencia') return CDI.paisesMaria.mostrar(val);
-" "" \
+  "CDI.paisesMaria.mostrar(normalized) : normalized" "normalized : normalized" \
   "FALLA: procedencia «434» del borrador se ve «434»"
 sabotaje pantalla $REV "la procedencia escrita queda como se escribió" \
   "if (el.name === 'procedencia' && ev.type === 'change') el.value" "if (false) el.value" \
   "FALLA: procedencia «434» escrita se ve «434»"
 
 # 3. Lo que se ve no se guarda solo, y mientras se escribe no se toca.
+sabotaje pantalla $REV "la procedencia del borrador cambia en la operación" \
+  "const normalized = valorEnLaRevision(key, op);" \
+  "const normalized = key === 'procedencia' ? CDI.paisesMaria.mostrar(valorEnLaRevision(key, op)) : valorEnLaRevision(key, op);" \
+  "FALLA: procedencia «434» del borrador queda «423» en la operación"
 sabotaje pantalla $CAT "el catálogo del proveedor manda el origen sin tocar" \
   "if (campoOrigen.value !== campoOrigen.defaultValue) cambios.origen" "cambios.origen" \
   "FALLA: cambiar sólo el NCM reescribe el origen guardado"
