@@ -266,7 +266,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
-2026-11-16 23:30 UTC: Holanda→423 de MARIA con devolución sobre a910c5f (acta REPRODUCCION-HOLANDA-423-2026-11-16). Técnica igual en de4d121e, sin pieza.
+2026-11-16 23:56 UTC: MARIA trabaja la devolución de Holanda→423 (dev-maria c2fa0546, contexto 182k de 224k), sin entrega nueva. Técnica igual en de4d121e, sin pieza.
 
 ## /compact conservar de la PM principal
 
