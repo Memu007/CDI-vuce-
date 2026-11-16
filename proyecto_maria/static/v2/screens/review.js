@@ -268,7 +268,6 @@
         if (name === 'fecha_emision' || name === 'fecha_embarque') {
             return normalizeDateForInput(val);
         }
-        if (name === 'procedencia') return CDI.paisesMaria.mostrar(val);
         return String(val);
     }
 
@@ -310,7 +309,8 @@
             const el = form.querySelector('[name="' + key + '"]');
             if (!el) return;
             const normalized = valorEnLaRevision(key, op);
-            el.value = normalized;
+            // La procedencia guardada queda en el estado como vino; sólo se ve distinta.
+            el.value = key === 'procedencia' ? CDI.paisesMaria.mostrar(normalized) : normalized;
             // Si el valor viene del default del perfil (no del PDF), NO lo
             // marcamos como "Detectado del PDF" porque seria mentira.
             if (
