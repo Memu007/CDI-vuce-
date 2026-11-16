@@ -201,7 +201,7 @@ sabotaje $G "Holanda vuelve a ser 434 en el servidor" \
   '"HOLANDA": 423,' '"HOLANDA": 434,' \
   "FAILED $H"
 sabotaje $G "el servidor no lee el código 434" \
-  'codigo = _nombres_de_pais().get(m.group(1))' 'codigo = None' \
+  '    codigo = _reemplazos().get(codigo, codigo)' '    codigo = codigo' \
   "FAILED $H"
 sabotaje $J "la pantalla vuelve a dar 434 para Holanda" \
   '"HOLANDA":"423"' '"HOLANDA":"434"' \
@@ -210,7 +210,7 @@ sabotaje $J "el selector vuelve a ofrecer 434 · HOLANDA" \
   '{"code":"435","name":"CHIPRE"}' '{"code":"434","name":"HOLANDA"},{"code":"435","name":"CHIPRE"}' \
   "FAILED $H"
 sabotaje $J "la pantalla no lee el código 434" \
-  'const numero = byCode.has(code[1]) ? code[1] : ALIASES[code[1]];' 'const numero = code[1];' \
+  'const numero = REEMPLAZOS[code[1]] || code[1];' 'const numero = code[1];' \
   "one more item: ('434', '', '423')"
 sabotaje $J "la pantalla compara el nombre con el código escrito" \
   'ALIASES[nombre] === numero ? numero' 'ALIASES[nombre] === code[1] ? numero' \

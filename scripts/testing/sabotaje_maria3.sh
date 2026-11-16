@@ -174,7 +174,7 @@ reemplazar $G "    anio_iext = fecha_factura[-2:]" '    anio_iext = datetime.now
 caso iext_del_anio_de_hoy "${T}test_el_anio_del_iext_sale_de_la_fecha_valida[01/02/2024-/24]"
 
 # 18. un código numérico que no está en la tabla pasa
-reemplazar $G "    if codigo not in _tabla_oficial():" "    if False:"
+reemplazar $G "    if codigo in _tabla_oficial() and (nombre is None or" "    if (nombre is None or"
 caso procedencia_fuera_de_la_tabla "${T}test_procedencia_no_reconocida_se_rechaza[/generate_maria-100]"
 
 # 19. un importe NaN pasa (el infinito lo ataja el tope)

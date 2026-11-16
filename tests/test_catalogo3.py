@@ -295,6 +295,8 @@ def test_la_tabla_de_paises_no_tiene_claves_repetidas():
 PAISES_BAJOS = ("NL", "nl", "NLD", "nld", "PAISES BAJOS", "Países Bajos", "423", "423 · PAISES BAJOS",
                 "HOLANDA", "Holanda", "434", "0434", "434 · HOLANDA", "434 - Holanda", "423 · HOLANDA",
                 "434 · PAISES BAJOS")
+# El 434 se lee sólo como código: escrito como nombre o con cifras de otro alfabeto no es un país, como «423.».
+NO_SON_HOLANDA = ("434.", "４３４", "423 · 434", "434 · 434", "4340", "00434")
 # Dos orígenes en un mismo grupo: el código que sale, o None si son dos países. «434 HOLANDA» es como
 # lo trae un despacho: llega al grupo lo que guarda su lector.
 GRUPOS = {("NL", "HOLANDA"): 423, ("NL", "434"): 423, ("Países Bajos", origen_iso2("434 HOLANDA")): 423,
@@ -310,6 +312,8 @@ def test_holanda_y_paises_bajos_son_423():
     for lector, formas in ((pdf_extractor._origen_desde_factura, PAISES_BAJOS),
                            (origen_iso2, (*PAISES_BAJOS, "434 HOLANDA"))):
         assert {maria_generator.codigo_de_pais(lector(p)) for p in formas} == {423}, lector.__name__
+    assert {maria_generator.codigo_de_pais(p) for p in NO_SON_HOLANDA} == {None}
+    assert origen_iso2("４３４") is None
     # El selector de la pantalla sale de esta misma tabla.
     assert 434 not in maria_generator.codigos_tabla_oficial()
     formas = (*PAISES_BAJOS, 434)
@@ -497,7 +501,7 @@ def test_la_pantalla_y_el_servidor_reconocen_los_mismos_paises():
     codigos = sorted(maria_generator.codigos_tabla_oficial())
     valores = [*FAMILIA_ORIGEN, *PAISES_INDEC, *ISO3_A_ISO2, *(f"0{c}" for c in codigos),
                *(f"{c} · X" for c in codigos), "0313", "123", "ÉS", "ＢＲ", "XYZ", "99999", "Türkiye", "",
-               *ESPACIOS_RAROS, *PAISES_BAJOS,
+               *ESPACIOS_RAROS, *PAISES_BAJOS, *NO_SON_HOLANDA,
                *LECTURA_PAIS, *NO_SON_PAISES]
     servidor = [str(maria_generator.codigo_de_pais(v) or "") for v in valores]
     distintos = [(v, p, s) for v, p, s in zip(valores, _resolve_de_la_pantalla(valores), servidor) if p != s]

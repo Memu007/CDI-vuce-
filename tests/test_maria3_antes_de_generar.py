@@ -147,7 +147,7 @@ def _codigos_de_la_pantalla():
 
 def test_la_procedencia_acepta_todos_los_paises_de_la_pantalla():
     """Devolución: una sola tabla. Los 308 códigos que ofrece la pantalla
-    (TABLA PAISES V.0 25082010.xlsx sin el 434, alias de 423) son procedencias válidas."""
+    (TABLA PAISES V.0 25082010.xlsx sin el 434, que sale como 423) son procedencias válidas."""
     from proyecto_maria.core.maria_generator import pais_de_la_tabla
     codigos = _codigos_de_la_pantalla()
     assert len(codigos) == 308
