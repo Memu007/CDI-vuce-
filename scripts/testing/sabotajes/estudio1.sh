@@ -75,8 +75,8 @@ sabotaje $M "un estudio que no está cae en silencio al perfil" \
   $'    if estudio is None:\n        return None\n        raise HTTPException(\n            status_code=400,\n            detail="El estudio elegido' \
   "FAILED $T::test_un_estudio_que_no_existe_da_error_y_no_cae_al_perfil"
 sabotaje $M "el cuit_agr que manda la pantalla gana al estudio" \
-  'crudo = (estudio.cuit if estudio is not None else cuit_agr) or del_perfil' \
-  'crudo = cuit_agr or (estudio.cuit if estudio is not None else "") or del_perfil' \
+  'cuit = sin_separadores(estudio.cuit if estudio is not None else cuit_agr) or del_perfil' \
+  'cuit = sin_separadores(cuit_agr or (estudio.cuit if estudio is not None else "")) or del_perfil' \
   "FAILED $T::test_el_estudio_elegido_va_al_cddtagr_aunque_haya_perfil_y_cuit_agr"
 sabotaje $M "el uso se anota antes de generar" \
   $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    if not request.items:' \
@@ -99,8 +99,8 @@ sabotaje $M "el aviso no dice dónde cargarlo" \
   'supuestos = [FALTA_CUIT_DEL_DESPACHANTE, *supuestos]' \
   "FAILED $T::test_sin_estudio_ni_perfil_el_error_dice_donde_cargarlo"
 sabotaje $M "con estudio el aviso igual pide el CUIT" \
-  'if estudio is None and not str(request.cuit_agr or "").strip()' \
-  'if not str(request.cuit_agr or "").strip()' \
+  '        cuit, _ = _cuit_del_despachante(estudio, request.cuit_agr, user)' \
+  '        cuit, _ = _cuit_del_despachante(None, request.cuit_agr, user)' \
   "FAILED $T::test_con_estudio_los_avisos_no_piden_el_cuit"
 sabotaje $M "el CUIT del estudio no se mira" \
   'if not cuit_valido(cuit):' \
