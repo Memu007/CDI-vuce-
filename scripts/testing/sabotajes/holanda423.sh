@@ -20,6 +20,12 @@ MUESTRA="return (code && REEMPLAZOS[code[1]] && resolve(value)) || String(value 
 # 1. `mostrar` pone el código del TXT en lugar del reemplazado.
 sabotaje casos $J "mostrar devuelve lo que vino" "$MUESTRA" "return String(value ?? '');" \
   "At index 0 diff: '434' != '423'" test_holanda_y_paises_bajos_son_423
+sabotaje casos $J "mostrar escribe «null» por lo que falta" "$MUESTRA" \
+  "return (code && REEMPLAZOS[code[1]] && resolve(value)) || String(value);" \
+  "'null' != ''" test_holanda_y_paises_bajos_son_423
+sabotaje casos $J "mostrar recorta lo que no es el 434" "$MUESTRA" \
+  "return (code && REEMPLAZOS[code[1]] && resolve(value)) || String(value ?? '').trim();" \
+  "'Holanda' != ' Holanda '" test_holanda_y_paises_bajos_son_423
 sabotaje pantalla $J "mostrar devuelve lo que vino" "$MUESTRA" "return String(value ?? '');" \
   "FALLA: catálogo del proveedor: «434» guardado se ve «434»"
 
@@ -52,6 +58,16 @@ sabotaje pantalla $CAT "el catálogo del proveedor manda el origen sin tocar" \
 sabotaje pantalla $CLI "el catálogo del cliente pisa lo que se sigue escribiendo" \
   "if (field === 'origen' && input.value.trim() === value)" "if (field === 'origen')" \
   "FALLA: lo escrito mientras se guardaba «434» quedó «423»"
+sabotaje pantalla $REV "el borrador muestra cada campo con mostrar" \
+  "el.value = key === 'procedencia' ? CDI.paisesMaria.mostrar(normalized) : normalized;" \
+  "el.value = CDI.paisesMaria.mostrar(normalized);" \
+  "FALLA: la factura «434» del borrador se ve «423»"
+sabotaje pantalla $REV "lo escrito en cualquier campo pasa por mostrar" \
+  "if (el.name === 'procedencia' && ev.type === 'change') el.value" "if (ev.type === 'change') el.value" \
+  "FALLA: la factura «434» escrita se ve «423»"
+sabotaje pantalla $CLI "el catálogo del cliente muestra el código de lo escrito" \
+  "input.value = CDI.paisesMaria.mostrar(value);" "input.value = CDI.paisesMaria.resolve(value) || value;" \
+  "FALLA: «nl» escrito en origen del catálogo del cliente se ve «423»"
 sabotaje pantalla $REV "la procedencia cambia en cada tecla" \
   "if (el.name === 'procedencia' && ev.type === 'change') el.value" "if (el.name === 'procedencia') el.value" \
   "FALLA: «4340» escrito tecla por tecla se ve «4230»"

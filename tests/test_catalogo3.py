@@ -319,9 +319,9 @@ def test_holanda_y_paises_bajos_son_423():
     assert set(_de_la_pantalla(PAISES_BAJOS, "label")) == {"423 · PAISES BAJOS"}
     assert [o for o in _de_la_pantalla([None], "optionMarkup")[0].split("<option") if "434" in o or "HOLANDA" in o] == []
     # Lo guardado o escrito con el código 434 se ve como sale; los nombres y lo que no es Holanda, como vino.
-    con_434 = [p for p in PAISES_BAJOS if re.match(r"0?434\b", p)] + [434]
-    otras = [p for p in PAISES_BAJOS + NO_SON_HOLANDA if p not in con_434]
-    assert _de_la_pantalla(con_434 + otras, "mostrar") == ["423"] * len(con_434) + otras
+    con_434 = [p for p in PAISES_BAJOS if re.match(r"0?434\b", p)] + [434, " 434 "]
+    otras = [p for p in PAISES_BAJOS + NO_SON_HOLANDA if p not in con_434] + ["", "XX", "0310", "0423", " Holanda ", "Países  Bajos"]
+    assert _de_la_pantalla(con_434 + otras + [None], "mostrar") == ["423"] * len(con_434) + otras + [""]
     formas = (*PAISES_BAJOS, 434)
     items = [{"pieza": "84713000", "descripcion": f"Producto {i}", "cantidad": 1, "valor_unitario": 10,
               "peso_unitario": 1, "origen": o, "procedencia": o, "unidad": "07", "grupo_id": i}

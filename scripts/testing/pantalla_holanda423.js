@@ -18,6 +18,8 @@ async function origenesEnPantalla(page, fila, descripcion) {
 }
 // El catálogo del proveedor no acepta un número como origen: esa fila no está.
 function comparar(donde, vistos, origenes) {
+  const faltan = origenes.filter((o, i) => typeof o === 'string' && !(('Producto ' + i) in vistos));
+  if (faltan.length) falla(donde + ': no se ven las filas de ' + JSON.stringify(faltan));
   origenes.forEach((o, i) => {
     if (('Producto ' + i) in vistos && vistos['Producto ' + i] !== esperado(o)) falla(donde + ': «' + o + '» guardado se ve «' + vistos['Producto ' + i] + '»');
   });
@@ -84,6 +86,21 @@ async function catalogoDelCliente(page, base) {
     .catch(async () => falla('«434» escrito en el catálogo del cliente se ve «' + await campo.inputValue() + '»'));
   console.log('OK catálogo del cliente: «434» escrito se ve 423');
   await escritoMientrasGuarda(page, campo);
+  await otrosEscritos(page);
+}
+
+// Lo que se escribe y no lleva el 434, o va en otro campo, se ve como se escribió.
+async function otrosEscritos(page) {
+  const fila = page.locator('.cx-catalogo-producto-row', { hasText: 'Producto ' + origenes.indexOf('CHINA') });
+  for (const [campo, valor] of [['origen', 'nl'], ['peso_unitario_avg', '434']]) {
+    const input = fila.locator('input[data-field="' + campo + '"]');
+    await page.evaluate(() => { document.getElementById('toastHost').innerHTML = ''; });
+    await input.fill(valor);
+    await input.press('Enter');
+    await page.waitForSelector('#toastHost .toast', { timeout: 10000 });
+    if (await input.inputValue() !== valor) falla('«' + valor + '» escrito en ' + campo + ' del catálogo del cliente se ve «' + await input.inputValue() + '»');
+  }
+  console.log('OK catálogo del cliente: «nl» y un peso de 434 escritos se ven como se escribieron');
 }
 
 // Lo que se vuelve a escribir mientras se guarda no se pisa con lo guardado.
@@ -102,6 +119,9 @@ async function escritoMientrasGuarda(page, campo) {
   await page.waitForSelector('#toastHost .toast', { timeout: 10000 });
   await page.unroute('**/catalogo/productos/*');
   if (await campo.inputValue() !== 'CN') falla('lo escrito mientras se guardaba «434» quedó «' + await campo.inputValue() + '»');
+  await page.evaluate(() => { document.getElementById('toastHost').innerHTML = ''; });
+  await campo.press('Enter');
+  await page.waitForSelector('#toastHost .toast', { timeout: 10000 });
   console.log('OK catálogo del cliente: lo escrito mientras se guarda no se pisa');
 }
 
@@ -110,18 +130,22 @@ async function procedencia(page) {
   for (const o of origenes) {
     await page.evaluate(p => {
       CDI.state = CDI.state || {};
-      CDI.state.operacion = { numero_factura: 'F-H423', moneda: 'DOL', incoterm: 'FOB', procedencia: p };
+      CDI.state.operacion = { numero_factura: '434', moneda: 'DOL', incoterm: 'FOB', procedencia: p };
       CDI.state.items = [{ pieza: '84714900100D', descripcion: 'Producto', origen: 'CN', cantidad: 1, valor_unitario: 1, peso_unitario: 1 }];
       CDI.goTo('review');
     }, o);
     await page.waitForSelector('#f_procedencia', { state: 'visible', timeout: 10000 });
     if (await page.inputValue('#f_procedencia') !== esperado(o)) falla('procedencia «' + o + '» del borrador se ve «' + await page.inputValue('#f_procedencia') + '»');
+    if (await page.inputValue('#f_numero_factura') !== '434') falla('la factura «434» del borrador se ve «' + await page.inputValue('#f_numero_factura') + '»');
     const enLaOperacion = await page.evaluate(() => String(CDI.state.operacion.procedencia));
     if (enLaOperacion !== String(o)) falla('procedencia «' + o + '» del borrador queda «' + enLaOperacion + '» en la operación');
     await page.fill('#f_procedencia', String(o));
     await page.locator('#f_procedencia').blur();
     if (await page.inputValue('#f_procedencia') !== esperado(o)) falla('procedencia «' + o + '» escrita se ve «' + await page.inputValue('#f_procedencia') + '»');
   }
+  await page.fill('#f_numero_factura', '434');
+  await page.locator('#f_numero_factura').blur();
+  if (await page.inputValue('#f_numero_factura') !== '434') falla('la factura «434» escrita se ve «' + await page.inputValue('#f_numero_factura') + '»');
   // Tecla por tecla, «434» es el comienzo de «4340»: no se toca hasta salir del campo.
   await page.fill('#f_procedencia', '');
   await page.locator('#f_procedencia').pressSequentially('4340');
