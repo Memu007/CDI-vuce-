@@ -856,3 +856,16 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   hoy no hay camino. Lo nuevo es sólo eso; un `""` ya caía al perfil en `fc5944fc`.
 - D260 (a), decidido por la PM: la limpieza del CUIT escrita tres veces en `main.py`, a la cola.
 - Sigue Holanda→423 (activada en `PARA-DEV-2.md`), después D239 (a).
+
+## 2026-11-16 23:30 UTC — Holanda→423 de MARIA: devolución sobre `a910c5f`
+
+- Todo el TXT da 423 para Holanda y el mapa de países cambia sólo ahí (acta
+  `REPRODUCCION-HOLANDA-423-2026-11-16.md`), pero la pantalla muestra lo guardado o escrito
+  («434») y el TXT dice 423: el criterio 5 no se cumple y la diferencia es nueva. Devolución por
+  la causa: ningún lugar que muestre un origen que llegue a un TXT muestra una forma con el código
+  reemplazado; los nombres y los demás países, sin cambios; lo guardado no se reescribe.
+- D261: mostrar todos los países con su etiqueta va a Emi con recomendación, aparte.
+- D262 (a), decidido por la PM: tercera lectura de una constante de `paises_maria.js`, a la cola.
+- D263, de la PM: la validación mira `origen` y el generador usa `pais_origen` primero; por la
+  API, `pais_origen="4340"` valida y sale en el TXT. Ya en la base. Pieza aparte después de
+  D239 (a).
