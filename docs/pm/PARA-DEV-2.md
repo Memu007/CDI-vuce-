@@ -27,7 +27,8 @@ viene D239 (a); te la escribo al aceptar ésta.
 
 **Criterio (comportamiento y prueba):**
 1. Toda forma de Holanda («HOLANDA», «Holanda», «434», el número 434, «434 HOLANDA») da 423 en
-   el TXT, en la validación del catálogo y en la pantalla, que coinciden con el servidor. La
+   el TXT, en la validación del catálogo, en el lector de despachos (`despacho_lector.py`: un
+   despacho «434 HOLANDA» entra como 423) y en la pantalla, que coinciden con el servidor. La
    familia, como datos de un solo caso (hoy `test_paises_bajos_es_423_y_holanda_434` fija 434).
 2. Un volcado del mapa entero de países, antes y después, del servidor y de la pantalla: la
    única diferencia es Holanda/434. El diff va al informe.

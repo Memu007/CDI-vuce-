@@ -5,7 +5,7 @@ Entrega `6112322` (informe `91cdc781`, canal `PARA-PM-2.md`). Base `2f96f2f`. Pr
 `/generate_maria/avisos` la usa). Arnés: `tests/test_cuit_generar.py` y los guiones
 `cuit_generar.sh`, `estudio1.sh`, `excel2.sh`. Veredicto: **aceptada sobre `6112322`**.
 
-## Corrido por la PM (2026-11-16, entre 20:00 y 20:54 UTC)
+## Corrido por la PM (2026-11-16; puertas de 20:21:26 a 20:53:38 UTC, historia de D259 a las 20:56)
 
 | Qué | Resultado |
 |---|---|
@@ -42,7 +42,7 @@ raros (422 en los dos), NBSP y U+3000 (ahora caen al perfil; antes, 400 con «»
 ajeno o inválido (el mismo 400, sin mostrar un CUIT ajeno).
 
 **No corrido por la PM:** `estudio1b.sh` y `excel2.sh` (los corrió la Dev, verdes);
-`/security-review` (lo corrió la Dev hasta `c824b0d`); el aviso nuevo mirado en el navegador.
+`/security-review` (lo corrió la Dev hasta `c824b0d`; `git diff --stat c824b0d9 6112322 -- proyecto_maria/` da vacío, así que cubre el producto entregado); el aviso nuevo mirado en el navegador.
 
 ## Las horas del informe
 
