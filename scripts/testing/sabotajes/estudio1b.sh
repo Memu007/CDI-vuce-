@@ -68,11 +68,11 @@ sabotaje $M "la preselección no mira el uso del perfil" \
   '        usados.append((_utc(uso_perfil.last_used_at), None))' '        pass' \
   "FAILED $T::test_generar_con_el_perfil_despues_de_un_estudio_preselecciona_el_perfil"
 sabotaje $M "el uso del perfil cuenta sólo con cuit_agr vacío (la pantalla siempre lo manda)" \
-  'es_el_del_perfil = estudio is None and cuit == del_perfil' \
+  'es_el_del_perfil = estudio is None and bool(cuit) and cuit == del_perfil' \
   'es_el_del_perfil = estudio is None and not cuit_agr and bool(cuit)' \
   "FAILED $T::test_el_cuit_del_perfil_en_cuit_agr_cuenta_como_uso_del_perfil"
 sabotaje $M "un cuit_agr ajeno cuenta como uso del perfil" \
-  'es_el_del_perfil = estudio is None and cuit == del_perfil' \
+  'es_el_del_perfil = estudio is None and bool(cuit) and cuit == del_perfil' \
   'es_el_del_perfil = estudio is None and bool(cuit)' \
   "FAILED $T::test_un_cuit_agr_propio_no_cuenta_como_uso_del_perfil"
 # Anotado al recibir el pedido, sin esperar a que el TXT salga: un pedido que
