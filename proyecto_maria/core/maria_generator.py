@@ -131,7 +131,7 @@ PAISES_INDEC = {
     "REINO UNIDO": 426, "GB": 426, "UK": 426,
     "RUMANIA": 427, "RO": 427, "SAN MARINO": 428, "SM": 428,
     "SUECIA": 429, "SE": 429, "SUIZA": 430, "CH": 430,
-    "HOLANDA": 434, "ALEMANIA,REP FED": 438, "DE": 438,
+    "HOLANDA": 423, "ALEMANIA,REP FED": 438, "DE": 438,
     "BIELORRUSIA": 439, "BY": 439, "ESTONIA": 440, "EE": 440,
     "LETONIA": 441, "LV": 441,
     "LITUANIA": 442, "LT": 442, "MOLDAVIA": 443, "MD": 443,
@@ -686,7 +686,7 @@ _PAISES_PANTALLA = Path(__file__).resolve().parents[1] / "static" / "v2" / "pais
 @lru_cache(maxsize=1)
 def _tabla_oficial() -> dict:
     """Código -> nombre normalizado de la tabla oficial MARIA (TABLA PAISES V.0
-    25082010.xlsx, 309 países). Una sola copia: la que usa la pantalla."""
+    25082010.xlsx, 308 países: 434 es alias de 423). Una sola copia: la que usa la pantalla."""
     js = _PAISES_PANTALLA.read_text(encoding="utf-8")
     m = re.search(r"const COUNTRIES = (\[.*?\]);", js)
     if not m:
@@ -718,17 +718,13 @@ def codigo_de_pais(texto) -> int | None:
     if not m:
         return _nombres_de_pais().get(_normalizar_pais(escrito))
     codigo, nombre = int(m.group(1)), m.group(2)
+    if codigo not in _tabla_oficial():
+        codigo = _nombres_de_pais().get(m.group(1))   # un código viejo con alias: 434 es 423
     # «310 - Vietnam» o «203-ARG»: el nombre que contradice el código no se adivina.
-    if codigo in _tabla_oficial() and (nombre is None or _normalizar_pais(nombre) == _tabla_oficial()[codigo]
+    if codigo is not None and (nombre is None or _normalizar_pais(nombre) == _tabla_oficial()[codigo]
                                        or _nombres_de_pais().get(_normalizar_pais(nombre)) == codigo):
         return codigo
     return None
-
-
-def _codigo_de_la_tabla(texto: str) -> bool:
-    """Un código de país: sólo cifras 0-9 y en la tabla oficial («²», «٢٢٢» o
-    «99999» no son países)."""
-    return bool(re.fullmatch(r"[0-9]{1,4}", texto)) and int(texto) in codigos_tabla_oficial()
 
 
 def procedencia_de(item: dict) -> str:
@@ -822,8 +818,7 @@ def get_pais_codigo(pais: str, default: int = PAIS_DEFAULT_IMPORT) -> int:
     if codigo is not None:
         return codigo
 
-    # Un código tiene hasta 4 cifras, como en `_codigo_de_la_tabla`: con miles
-    # de cifras int() lanza ValueError.
+    # Un código tiene hasta 4 cifras: con miles de cifras int() lanza ValueError.
     if re.fullmatch(r"[0-9]{1,4}", str(pais).strip()):
         return int(str(pais).strip())
 
