@@ -268,6 +268,7 @@
         if (name === 'fecha_emision' || name === 'fecha_embarque') {
             return normalizeDateForInput(val);
         }
+        if (name === 'procedencia') return CDI.paisesMaria.mostrar(val);
         return String(val);
     }
 
@@ -668,6 +669,8 @@
             value = value.trim();
         }
         op[el.name] = value;
+        // Mientras se escribe no se toca: «434» es el comienzo de «4340».
+        if (el.name === 'procedencia' && ev.type === 'change') el.value = CDI.paisesMaria.mostrar(value);
         // Un seguro escrito a mano deja de ser el calculado o el dejado; el
         // borrado, sólo si queda un valor: vaciado sigue siendo el borrado.
         if (el.name === 'seguro') {

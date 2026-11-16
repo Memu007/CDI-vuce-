@@ -10,6 +10,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - «Holanda», el código 434 y «434 · HOLANDA» salen 423 en el TXT, en el catálogo y en la pantalla; el selector ya no ofrece «434 · HOLANDA». Lo guardado con 434 no se reescribe: genera 423.
 - Un despacho con «434» u otra forma de Holanda guarda «NL».
+- Un origen guardado o escrito con el 434 («434», «0434», «434 · HOLANDA») se ve 423 en los catálogos del proveedor y del cliente y en la procedencia de la revisión, como sale en el TXT.
 
 ## 2026-11-16 · fix: los avisos de antes de generar dicen que el CUIT del despachante no cierra (D244)
 

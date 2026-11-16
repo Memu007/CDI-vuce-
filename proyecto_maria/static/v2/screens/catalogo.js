@@ -247,7 +247,7 @@
     function renderProductRow(key, p) {
         const desc = p.descripcion_original || key;
         const ncm = p.ncm || '';
-        const origen = p.origen || '';
+        const origen = CDI.paisesMaria.mostrar(p.origen);
         const usos = Number(p.usos || 0);
         const ncmFmt = ncm && CDI.formatNcm ? CDI.formatNcm(ncm) : ncm;
         const subParts = [];

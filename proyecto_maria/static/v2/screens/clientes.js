@@ -1424,7 +1424,7 @@
                         '<div class="cx-catalogo-producto-sub">' +
                             '<input type="text" class="cx-catalogo-producto-input" data-field="ncm" value="' + CDI.escapeHtml(p.ncm) + '" title="NCM" maxlength="10">' +
                             '<span> · Origen </span>' +
-                            '<input type="text" class="cx-catalogo-producto-input" data-field="origen" value="' + CDI.escapeHtml(p.origen || 'XX') + '" title="Origen" maxlength="3">' +
+                            '<input type="text" class="cx-catalogo-producto-input" data-field="origen" value="' + CDI.escapeHtml(CDI.paisesMaria.mostrar(p.origen || 'XX')) + '" title="Origen" maxlength="3">' +
                             '<span> · Peso </span>' +
                             '<input type="number" step="0.001" class="cx-catalogo-producto-input" data-field="peso_unitario_avg" value="' + peso + '" title="Peso unitario">' +
                             '<span> kg</span>' +
@@ -1464,6 +1464,7 @@
                 method: 'PUT', body: JSON.stringify({ [field]: value }),
             });
             if (!res || !res.ok) throw new Error('No se pudo guardar');
+            if (field === 'origen') input.value = CDI.paisesMaria.mostrar(value);
             CDI.toast && CDI.toast.success('Producto actualizado');
             CDI.track && CDI.track('catalogo_producto_updated', { cliente_id: detailClienteId, producto_id: productoId, field });
         } catch (err) {
