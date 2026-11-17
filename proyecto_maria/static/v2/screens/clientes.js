@@ -1572,7 +1572,7 @@
     const DESPACHO_CAMPOS = [
         ['posicion_sim', 'Posición SIM'],
         ['descripcion', 'Descripción'],
-        ['origen', 'Origen (sigla o código)'],
+        ['origen', 'Origen'],
         ['cantidad', 'Cantidad'],
         ['valor_unitario', 'Valor unitario'],
         ['kilo_neto', 'Kilo neto'],
@@ -1691,7 +1691,7 @@
                 ? '<textarea id="' + id + '" data-campo="' + campo + '" rows="2" maxlength="2000">' + CDI.escapeHtml(valor) + '</textarea>'
                 : '<input id="' + id + '" type="text" data-campo="' + campo + '" value="' + CDI.escapeHtml(valor) + '"' +
                   (DESPACHO_NUMEROS.includes(campo) ? ' inputmode="decimal" placeholder="1.234,56"' : '') +
-                  (campo === 'origen' ? ' maxlength="3" autocapitalize="characters"' : '') + '>';
+                  (campo === 'origen' ? ' autocapitalize="characters"' : '') + '>';
             return '<div class="cx-despacho-campo' + (falta ? ' is-faltante' : '') + (campo === 'descripcion' ? ' is-ancho' : '') + '">' +
                 '<label for="' + id + '">' + CDI.escapeHtml(etiqueta) + '</label>' + control +
                 (notas.length ? '<span class="cx-despacho-nota">' + CDI.escapeHtml(notas.join(' · ')) + '</span>' : '') +

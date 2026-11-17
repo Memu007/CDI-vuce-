@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-17 · fix: los países sin sigla entran por el despacho con su código (D239 a)
 
-- Un despacho con un código de país sin sigla de dos letras («143», «435 CHIPRE») guarda ese código y sale así en el TXT; código y nombre de dos países distintos («143 CHINA», «143 · CHINA», «310 (BRASIL)») quedan sin origen, con aviso; «435 CY» es Chipre y sale 435. El campo de origen de la importación acepta tres cifras.
+- Un despacho con un código de país sin sigla de dos letras («143», «435 CHIPRE») guarda ese código y sale así en el TXT; código y nombre de dos países distintos («143 CHINA», «143 · CHINA», «310 (BRASIL)») quedan sin origen, con aviso; «435 CY» es Chipre y sale 435. El campo de origen de la importación ya no corta lo escrito: entra un código de tres cifras o un nombre («ARGELIA» quedaba «ARG», Argentina).
 - El «Origen frecuente» del cliente con un 434 guardado se ve 423, como sale en el TXT.
 
 ## 2026-11-16 · fix: Holanda sale 423 en el TXT, como Países Bajos (Holanda→423)
