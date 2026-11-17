@@ -891,3 +891,12 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   catálogo del proveedor manda el origen sólo si cambió (supuesto 5).
 - Decidido por la PM: el «Origen frecuente» de las métricas del cliente, que todavía muestra «434»,
   va como criterio 6 de D239 (a).
+
+## 2026-11-17 — D239 (a): devolución sobre `196ef370`
+
+- Decidido por la PM: D264 (a), un código con un nombre que no se reconoce da el código, salvo que
+  el resto nombre otro país; D265 (a), un número fuera de la tabla con nombre da el país del nombre.
+- Decidido por la PM: el campo de origen sin tope de largo, con etiqueta «Origen» (valida el
+  servidor), y el caso del «Origen frecuente» por `/metricas` (supuestos 1 y 2).
+- Decidido por la PM: aceptadas las pérdidas con aviso («402 ALEMANIA», «668 HONG KONG»…); no ponen
+  un país equivocado.
