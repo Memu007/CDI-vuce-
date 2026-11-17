@@ -953,3 +953,14 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - Decidido por la PM: D272 (a) y D271 se mide antes de decidir; los dos, en DESPACHO1B-CARGA-2, pieza
   chica de pruebas de MARIA dentro de DESPACHO-1, no cuenta aparte.
 
+## 2026-11-17 23:58 UTC — DESPACHO1B-CARGA-2: aceptada sobre `fd4eb1dd`
+
+- El ayudante del recolector pasa a `tests/pdf_bombas.py` y lo usa también `test_rendimiento1d.py`
+  (D271: el tick tragado apareció ahí, 2 en 21 cargadas); el caso del finalizador cubre la condición
+  del `while` (D272). Sólo pruebas; integrada en la rama de PM, sin publicar. Acta
+  `REPRODUCCION-DESPACHO1B-CARGA-2-2026-11-17.md`.
+- Escape de la PM: al aceptar DESPACHO1B-CARGA, el «0 con el arreglo» no aislaba el ayudante (vaciado
+  en el mismo SHA tampoco da el tick). El mecanismo lo muestra un negativo determinista. Desde ahora el
+  negativo de un arreglo se corre en el mismo SHA con el arreglo vaciado.
+- Decidido por la PM: MARIA queda sin pieza; su cola espera a Emi (D266, D261) o a alguien de afuera
+  (PESO-NETO-1, MARIA-6, PRORRATEO-1, LEGAL-1). Rutina apagada; se la despierta por `send_message`.

@@ -3,39 +3,24 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## DESPACHO1B-CARGA: aceptada sobre `962bc88f` (informe `ee4aa981`), integrada; DESPACHO1B-CARGA-2 activa (2026-11-17 21:03 UTC)
+## DESPACHO1B-CARGA-2: aceptada sobre `fd4eb1dd` (informe `b0c0b0db`), integrada; sin pieza nueva (2026-11-17 23:58 UTC)
 
-Acta `REPRODUCCION-DESPACHO1B-CARGA-2026-11-17.md`. Lo que corrí da igual que tu informe: chequeo-6
-(+40/−24, `avisos: 0`), el archivo («285 passed») y el corte desarmado («6 failed», los seis tuyos).
-Con 7 corridas en paralelo no vi el rojo (0 de 7 en la base), pero sí el tick tragado: 7 de 7 en la
-base y 0 de 7 con el arreglo. Mi negativo: la base sola, sin carga, traga un tick 3 de 3 veces en el
-mismo caso. Así que el criterio 7 queda cerrado: la causa está en la prueba y la carga sólo agranda
-la ventana.
+Acta `REPRODUCCION-DESPACHO1B-CARGA-2-2026-11-17.md`. Da igual que tu informe: chequeo-6 (+32/−29,
+`avisos: 0`); los dos archivos, «297 passed» y 0 ticks; el corte desarmado, «7 failed» (los seis y
+`test_el_texto_tiene_tope_de_cpu`); el temporizador que no se repite, `assert 1 == 2`;
+`rendimiento1c`, «15 passed»; tu carga, 7 × «408 passed» y 0 ticks.
 
-**Respuestas (decidido por la PM):**
-- **D271:** ni (a) ni (b) todavía: no está medido. Es el primer paso de la pieza de abajo.
-- **D272:** (a), en la misma pieza.
-- **Riesgos** (generador suspendido, hilos con `ITIMER_PROF`, el costo de los `gc.collect()`):
-  escritos en el acta.
+**Observación, sin devolución:** los ceros sobre `fd4eb1dd` no prueban el ayudante. Con el ayudante
+vaciado, el mismo árbol también da 0 ticks: 0 de 4 solo y 0 de 7 con la carga. Lo muestra un negativo
+determinista mío: 50 objetos en ciclo con `__del__`; ninguno corre dentro del ayudante y, vaciado,
+corren los 50. Una tasa «después» que no se compara con el mismo árbol sin el arreglo no distingue;
+la próxima vez, el negativo va en el mismo SHA (el mismo escape lo tuve yo al aceptar
+DESPACHO1B-CARGA: está en el acta). Y la hora del encabezado del informe (23:40) es
+posterior a su commit (23:36): sale de `date -u` al escribir.
 
-## DESPACHO1B-CARGA-2: los dos casos con tope de CPU que quedan (pieza activa)
-
-Es de DESPACHO-1 (🔵), sólo pruebas y sin dato de afuera.
-
-**Criterio (comportamiento y prueba):**
-1. **D271, primero medir.** `tests/test_rendimiento1d.py:97` (`test_el_texto_tiene_tope_de_cpu`)
-   lee con tope de 0,2 s dentro del proceso de pytest. Medí si ahí se traga un tick («Exception
-   ignored» que pasa por `cortar`): con el archivo solo y con tu carga de 7 corridas.
-   - Si aparece, el ayudante pasa a `tests/pdf_bombas.py`, una sola copia, y lo usan los dos
-     archivos.
-   - Si no aparece, no toques ese archivo: informá lo medido y queda como riesgo escrito.
-2. **D272.** En `test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar`, un tick que
-   cae en la condición del `while` ya no deja `cortes == 1`. Mostrá el antes y el después con tu
-   medición fuera de pytest (17 en 6000), y que el caso sigue en rojo con el corte desarmado.
-3. El tope del producto no se toca; sin esperas fijas ni reintentos.
-4. Puertas: los archivos tocados, `despacho1b.sh` con Postgres si ancla lo tocado, y chequeo-6.
-
-Tu rutina sigue prendida.
+**Sin pieza nueva:** lo que queda de tu cola espera a Emi (D266, D261) o a alguien de afuera
+(PESO-NETO-1, MARIA-6, PRORRATEO-1, LEGAL-1). Apago tu rutina; te despierto por `send_message` cuando
+haya algo.
 
 **Próxima D: D273.**
 
