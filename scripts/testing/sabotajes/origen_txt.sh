@@ -79,7 +79,7 @@ sabotaje casos $G "lleva el estado de importado" \
 sabotaje casos $M "los avisos no dicen el origen" \
   '"avisos": errores_de_pais(items) + ' \
   '"avisos": [e for e in errores_de_pais(items) if "rigen" not in e] + ' \
-  "Falta origen" $AVISOS
+  "['procedencia 1', 'estado 1']" $AVISOS
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

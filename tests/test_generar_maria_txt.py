@@ -539,6 +539,11 @@ def _pedir(client, ruta, items):
     })
 
 
+def _lo_que_no_coincide(vistos, esperado):
+    """Sólo las filas distintas: el rojo muestra lo visto en ellas, no la familia entera."""
+    return {k: v for k, v in vistos.items() if v != esperado[k]}
+
+
 def _con_origen(pais_origen, origen):
     """El celular con esos campos de origen; None es que el campo no viene."""
     return {**_CELULAR, **{k: v for k, v in (("pais_origen", pais_origen), ("origen", origen)) if v is not None}}
@@ -565,7 +570,7 @@ def test_generate_maria_valida_el_origen_que_sale_en_el_txt(client):
         else:
             detalle = resp.json()["detail"]
             vistos[pais_origen, origen] = detalle["errors"] if isinstance(detalle, dict) else detalle
-    assert vistos == familia
+    assert _lo_que_no_coincide(vistos, familia) == {}
 
 
 def test_los_avisos_no_toman_un_origen_que_falta_como_china(client):
@@ -598,7 +603,7 @@ def test_los_avisos_no_toman_un_origen_que_falta_como_china(client):
         generar = "200" if resp.status_code == 200 else resp.json()["detail"]["errors"]
         avisos = _pedir(client, "/generate_maria/avisos", items).json()["avisos"]
         vistos[pais_origen, origen] = (generar, [d for d in map(que_dice, avisos) if d])
-    assert vistos == familia
+    assert _lo_que_no_coincide(vistos, familia) == {}
 
 
 def test_cada_lugar_lee_el_origen_que_sale_en_el_txt(client):
@@ -630,7 +635,8 @@ def test_cada_lugar_lee_el_origen_que_sale_en_el_txt(client):
         "sin procedencia": (lambda: items_del_supuesto([dict(_CELULAR, pais_origen="  "), blanco_br], "Procedencia"),
                             ["2"]),
     }
-    assert {k: medir() for k, (medir, _) in lugares.items()} == {k: v for k, (_, v) in lugares.items()}
+    vistos = {k: medir() for k, (medir, _) in lugares.items()}
+    assert _lo_que_no_coincide(vistos, {k: v for k, (_, v) in lugares.items()}) == {}
 
 
 def test_get_pais_codigo_vietnam_thailand_indonesia_malaysia():
