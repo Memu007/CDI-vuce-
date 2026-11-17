@@ -71,8 +71,12 @@ async function catalogoDelCliente(page, base) {
   const items = productos.map(p => ({ ...p, cantidad: 1, valor_unitario: 1, peso_unitario: 1 }));
   const r = await page.request.post(base + '/api/clientes/' + cid + '/catalogo/productos/learn', { data: { items } });
   if (!r.ok()) falla('no se guardó el catálogo del cliente: ' + r.status());
+  // El origen frecuente sale de las operaciones: se responde uno guardado con el 434.
+  await page.route('**/api/clientes/' + cid + '/metricas', ruta => ruta.fulfill({ json: { metricas: { origen_frecuente: '434 · HOLANDA' } } }));
   await page.evaluate(() => CDI.goTo('clientes'));
   await page.locator('.cx-card[data-cliente-id="' + cid + '"]').click({ timeout: 10000 });
+  await page.waitForFunction(() => document.getElementById('cxKpiOrigen').textContent === '423', null, { timeout: 5000 })
+    .catch(async () => falla('el origen frecuente «434 · HOLANDA» se ve «' + await page.locator('#cxKpiOrigen').textContent() + '»'));
   await page.locator('#cxTabCatalogo').click();
   await page.waitForFunction(n => document.querySelectorAll('.cx-catalogo-producto-row').length === n, origenes.length, { timeout: 10000 })
     .catch(() => falla('el catálogo del cliente no muestra los ' + origenes.length + ' productos'));
