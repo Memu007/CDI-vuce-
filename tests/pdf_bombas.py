@@ -3,6 +3,8 @@
 Sin imports pesados: `medir_lectura_aparte` corre en un python nuevo y chico,
 porque la memoria que se mide del proceso que lee incluye la que hereda al
 nacer (`RUSAGE_CHILDREN` cuenta la del fork)."""
+import contextlib
+import gc
 import zlib
 
 
@@ -152,6 +154,18 @@ def texto_que_se_infla(llamadas=280, saltos=100_000):
         objs[-2] = objs[-2].replace(b">> >> /Contents", b">> /XObject << /X %d 0 R >> >> /Contents" % forma)
         return catalogo
     return _pdf(armar)
+
+
+@contextlib.contextmanager
+def recolector_sin_la_suite():
+    """Para leer con el tope de CPU dentro de pytest (el producto lee aparte): que el recolector no pase por
+    la suite dentro del tope, donde un tick en un finalizador ajeno va al aviso de pytest y otro lo rompe."""
+    gc.collect()
+    gc.freeze()
+    try:
+        yield
+    finally:
+        gc.unfreeze()
 
 
 # Corre en un python nuevo: arma la bomba, la lee con `leer_despacho_aparte`

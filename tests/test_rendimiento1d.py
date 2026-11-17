@@ -98,9 +98,10 @@ def test_el_texto_tiene_tope_de_cpu():
     """Dos hojas que cuestan casi un segundo de CPU cada una: con tope de
     0,2 s el texto se corta, en vez de esperar al tiempo máximo del vendedor."""
     from proyecto_maria.core.despacho_lector import _DemasiadoTrabajo, texto_plano_del_pdf
-    from tests.pdf_bombas import trabajo
-    with pytest.raises(_DemasiadoTrabajo):
-        texto_plano_del_pdf(trabajo(hojas=2), limite_cpu_s=0.2)
+    from tests.pdf_bombas import recolector_sin_la_suite, trabajo
+    data = trabajo(hojas=2)
+    with recolector_sin_la_suite(), pytest.raises(_DemasiadoTrabajo):
+        texto_plano_del_pdf(data, limite_cpu_s=0.2)
 
 
 def test_el_texto_no_ocupa_los_lugares_de_validar(monkeypatch):
