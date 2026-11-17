@@ -74,7 +74,7 @@ nombra otro país o no se reconoce, no hay origen (con aviso). Producto `despach
 | `sabotajes/sin_sigla.sh` (copia del SHA) | 16/16 `ROJO`, «sabotajes sin rojo: 0», salida 0 |
 | `sabotajes/holanda423.sh` (copia del SHA) | 17/17 `ROJO`, «sabotajes sin rojo: 0», salida 0 |
 | `e2e_maria.sh` sobre el SHA | «E2E MARIA OK…», salida 0 |
-| `despacho1b.sh` con Postgres (`pm_d239`) | en curso: 11 `ROJO` y 0 sin rojo a las 08:51 UTC; la Dev lo corrió entero. Se completa en la próxima vuelta; un «sin rojo» reabre la pieza |
+| `despacho1b.sh` con Postgres (`pm_d239`) | `rc=0`, 136 `ROJO`, «sabotajes sin rojo: 0», «sin Postgres, no corridos: 0» (10:37 UTC) |
 | volcado del lector (11348 formas) | 0 diferencias contra `196ef370` |
 | anclas perdidas | 1 en base y en `01c28e83` (`limpieza1.sh:135`), igual |
 | tabla entera ida y vuelta | 616 con origen |
@@ -116,4 +116,4 @@ Unas 2,5 millones de formas. Reproducido por mí, base → `01c28e83`:
 
 ## No corrido
 
-- `despacho1b.sh` entero por la PM: en curso (arriba).
+Nada de la vuelta: `despacho1b.sh` terminó entero (arriba).
