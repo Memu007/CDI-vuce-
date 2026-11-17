@@ -869,3 +869,10 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - D263, de la PM: la validación mira `origen` y el generador usa `pais_origen` primero; por la
   API, `pais_origen="4340"` valida y sale en el TXT. Ya en la base. Pieza aparte después de
   D239 (a).
+
+## 2026-11-17 00:45 UTC — Punto 14: sí de Emi al tope de la CI
+
+- Emi: «Punto 14 sí, dale» (17/11, 00:41 UTC). Es un sí a la pieza, no un «dale» para publicar
+  (no trae SHA).
+- Pieza CI-TOPE de la Técnica: el job `tests` de `ci.yml` pasa de 20 a 30 minutos y `e2e-maria`
+  queda en 10. Con unos 23 minutos de suite, 30 deja margen. Rige desde la próxima PR a `main`.
