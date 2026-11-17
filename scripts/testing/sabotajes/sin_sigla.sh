@@ -14,19 +14,22 @@ source "$(dirname "$0")/_casos_y_pantalla.sh"
 L=proyecto_maria/core/despacho_lector.py
 CLI=proyecto_maria/static/v2/screens/clientes.js
 CASO=test_un_codigo_sin_sigla_entra_por_el_despacho
-DEVUELVE='return _iso2_por_codigo_maria().get(codigo, f"{codigo:03d}") if codigo else por_nombre or None'
-PROPIO='codigo_de_pais(f"{codigo:03d} · {nombre}") is None'
+DEVUELVE='return _iso2_por_codigo_maria().get(codigo, f"{codigo:03d}")'
+PAIS='tabla.get(codigo_de_pais(por_nombre)) != tabla[codigo]'
 
 # 1. El lector: el código sin sigla sale, y código y nombre de dos países no dan ninguno.
 sabotaje casos $L "el código sin sigla no da origen" "$DEVUELVE" \
   "return _iso2_por_codigo_maria().get(codigo) or por_nombre or None" \
   "At index 0 diff: '310' != '143'" $CASO
 sabotaje casos $L "código y nombre de dos países dan el código" \
-  "if codigo and por_nombre and $PROPIO:" "if False:" \
+  "if por_nombre and $PAIS:" "if False:" \
   "At index 0 diff: '143' != None" $CASO
-sabotaje casos $L "el nombre se compara por sigla y no con su código" \
-  "$PROPIO" "codigo_de_pais(por_nombre) != codigo" \
+sabotaje casos $L "se compara el código y no el país" \
+  "$PAIS" "codigo_de_pais(por_nombre) != codigo" \
   "diff: '310' != '435'" $CASO
+sabotaje casos $L "la puntuación tapa el nombre de otro país" \
+  'r"^(\d{3})\b\W*(.*?)\W*$"' 'r"^(\d{3})\b[\s\-/]*(.*)$"' \
+  "At index 4 diff: '143' != None" $CASO
 
 # 2. La pantalla de importar deja escribir el código de tres cifras.
 sabotaje pantalla $CLI "el origen del despacho vuelve a cortar en dos" \
