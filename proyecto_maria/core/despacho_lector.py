@@ -246,7 +246,7 @@ def numero_ar(texto) -> float | None:
 def origen_iso2(texto) -> str | None:
     """«310», «310 CHINA», «CHINA» o «CN» → «CN». None si no se reconoce o si
     el código y el nombre dicen países distintos."""
-    from proyecto_maria.core.maria_generator import _codigo_de_la_tabla
+    from proyecto_maria.core.maria_generator import codigo_de_pais
     from proyecto_maria.pdf_extractor import _iso2_por_codigo_maria, _origen_desde_factura
 
     t = re.sub(r"\s+", " ", str(texto or "")).strip(" -/")
@@ -255,8 +255,7 @@ def origen_iso2(texto) -> str | None:
     m = re.match(r"^(\d{3})\b[\s\-/]*(.*)$", t)
     if m:
         codigo, nombre = m.group(1), m.group(2).strip()
-        por_codigo = (_iso2_por_codigo_maria().get(int(codigo))
-                      if _codigo_de_la_tabla(codigo) else None)
+        por_codigo = _iso2_por_codigo_maria().get(codigo_de_pais(codigo))
         por_nombre = _origen_desde_factura(nombre) if nombre else None
         if por_codigo and por_nombre and por_codigo != por_nombre:
             return None

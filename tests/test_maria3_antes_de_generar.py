@@ -146,11 +146,11 @@ def _codigos_de_la_pantalla():
 
 
 def test_la_procedencia_acepta_todos_los_paises_de_la_pantalla():
-    """Devolución: una sola tabla. Los 309 códigos que ofrece la pantalla
-    (TABLA PAISES V.0 25082010.xlsx) son procedencias válidas."""
+    """Devolución: una sola tabla. Los 308 códigos que ofrece la pantalla
+    (TABLA PAISES V.0 25082010.xlsx sin el 434, que sale como 423) son procedencias válidas."""
     from proyecto_maria.core.maria_generator import pais_de_la_tabla
     codigos = _codigos_de_la_pantalla()
-    assert len(codigos) == 309
+    assert len(codigos) == 308
     assert [c for c in codigos if not pais_de_la_tabla(c)] == []
 
 

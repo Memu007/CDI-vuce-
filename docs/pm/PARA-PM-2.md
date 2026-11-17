@@ -2,231 +2,300 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## Entrega D244 (a) sobre `6112322` (2026-11-16 20:25 UTC)
+## Entrega Holanda→423, vuelta sobre `b3a3bf69` (2026-11-17 00:35 UTC)
 
-**Resultado.** Tus puntos 1 a 4 de D244 (a) se cumplen en `6112322`. Base: `2f96f2f` (tu rama
-hasta `ad13f1a`). Producto: sólo `proyecto_maria/main.py`, `producto +16/−8`.
+**Resultado.** Los cinco criterios de tu devolución se cumplen en `b3a3bf69` (base `a910c5f`).
+Un origen guardado o escrito con el 434 («434», «0434», « 434 », el número 434, «434 · HOLANDA»,
+«434 - Holanda», «434 · PAISES BAJOS») se ve **423** en el catálogo del proveedor, en el del cliente
+y en la procedencia de la revisión; lo demás se ve como vino. Lo guardado no se reescribe, tampoco
+al guardar otra cosa de la fila. `producto +20/−8` en cuatro JS: `paises_maria.js` suma
+`mostrar(value)` y la usan `catalogo.js`, `clientes.js` y `review.js`.
 
-- **Punto 1.** `/generate_maria/avisos` llama a `_cuit_del_despachante`, la misma función que
-  `/generate_maria`. Si levanta el 400, su texto va a los avisos tal cual, venga del perfil, de
-  `cuit_agr` o del estudio elegido. Sin CUIT inválido no hay aviso nuevo: «uno bueno» lo fija.
-- **Punto 2.** Un `cuit_agr` de puros espacios o guiones se limpia antes de elegir, así que cae al
-  del perfil, o a «Falta el CUIT…» si no hay perfil. Vale en los avisos y al generar, porque es la
-  misma función. Sale el dato de `MALOS` que fijaba el 400 con «».
-- **Punto 3.** El orden estudio → `cuit_agr` → perfil está sólo en `_cuit_del_despachante`. Se
-  fue la condición propia que tenían los avisos para «Falta».
-- **Punto 4.** Es un solo caso, `test_los_avisos_dicen_lo_mismo_que_el_400_del_cuit_del_despachante`,
-  con 7 datos: los tres orígenes malos; `cuit_agr` en blanco con perfil bueno, con perfil malo y sin
-  perfil; y uno bueno. Cada dato mira los avisos y lo que sale al generar.
-  - **Agregué uno a tu lista:** en blanco con perfil malo. Lo pidió `/code-review`. Es el único dato
-    en el que, al caer al perfil, el error tiene que mandar a «Mi perfil». Con el código de la base,
-    los avisos no decían nada y el 400 nombraba «» y mandaba a recargar la página.
-  - **Rojo con el arreglo revertido** (el `main.py` de `2f96f2f` con las pruebas de `6112322`):
-    `6 failed, 12 passed`. Fallan los seis datos con problema y pasa «uno bueno».
+**Lo que decidís vos** (supuestos; ninguna D nueva, la próxima sería D264):
+- **Supuesto 4: se ve el código «423», no la etiqueta «423 · PAISES BAJOS».** Tu criterio dice «lo
+  que sale en el TXT», el campo del cliente tiene `maxlength=3`, y mostrar etiquetas es D261.
+  Consecuencia que encontró `/code-review`: «434 · PAISES BAJOS» guardado se ve «423», y
+  «423 · PAISES BAJOS» guardado se sigue viendo con el nombre. Si preferís la etiqueta para lo
+  reemplazado, es cambiar `resolve(value)` por `label(value)` dentro de `mostrar`.
+- **Supuesto 5: guardar una fila del catálogo del proveedor manda el origen sólo si se cambió.** Era
+  necesario para el criterio 4: la fila muestra «423» y antes mandaba siempre lo que se ve, así que
+  cambiar el NCM de una fila «434 · HOLANDA» la guardaba «423» (lo encontraron `/code-review` y los dos
+  adversarios; reproducido). Efecto lateral: antes, guardar la fila también pasaba a mayúsculas un
+  origen no tocado («Holanda» → «HOLANDA»); ahora queda como estaba. El servidor ya dejaba igual el
+  campo que no llega (`catalog_service.update_product`, `if updates.get("origen") is not None`).
 
-**Lo que decidís vos:**
+### Criterio 1: los lugares
 
-1. **D259. Un estudio elegido con CUIT de puros espacios o guiones cae al del perfil.** Esto lo
-   introdujo este cambio. En la base daba 400 nombrando «». Hoy:
-   - con perfil bueno, sale el CUIT del perfil;
-   - con perfil malo, el error dice «Es el del estudio elegido» y nombra el del perfil.
+Salen de `grep -rn "origen\|procedencia\|default_origin\|getOriginLabel" proyecto_maria/static
+proyecto_maria/templates` y de leer cada uno; el adversario Opus repitió la búsqueda sin encontrar
+otro.
 
-   Por la API no se llega: el alta de estudios exige 11 dígitos con verificador. Sólo pasa con un
-   estudio escrito a mano en la base. Las opciones:
-   - (a) Dejarlo así, como límite escrito.
-   - (b) Con estudio elegido, sin caída al perfil:
-     `cuit = sin_separadores(estudio.cuit) if estudio is not None else sin_separadores(cuit_agr) or del_perfil`.
-     Daría «Falta el CUIT…». Cambia también el estudio con `""`, que en CUIT-GENERAR dejaste así.
+| lugar | ¿llega a un TXT hoy? | qué queda |
+|---|---|---|
+| `catalogo.js:250` → `:270`, catálogo del proveedor (`VendorCatalogProduct.origen`) | sí, por el lookup del catálogo | **`mostrar`**; al guardar la fila, el origen va sólo si se tocó |
+| `clientes.js:1427`, catálogo del cliente (`ClientProductHistory.origen_frecuente`) | sí, por el lookup | **`mostrar`** al dibujar y después del PUT de lo escrito (si no se siguió escribiendo) |
+| `review.js`, procedencia (`populate` y `onFieldChange`) | sí: el borrador va a `finalize.js:921`, que la resuelve | **`mostrar`** sólo en el campo, al cargar y en `change` (no en cada tecla: «434» es el comienzo de «4340»); el estado de la operación queda como vino |
+| `upload.js:586`, `:600-602` y la grilla NCM (`ncm.js:690`, `:988`, `:1019`) | sí | sin cambio: ya muestran `getOriginLabel` = `label` («423 · PAISES BAJOS») y guardan con `getOriginCode` |
+| `finalize.js` | — | no muestra el origen de los ítems: sólo lo manda (`:168`, `:859`, `:1288`, `:1383`) |
+| `clientes.js:1071`, `:1232`, `:1955`, `default_origin` | no | ningún camino a la generación (el `default_origin` de `pdf_extractor` es otra variable). Riesgo |
+| `clientes.js:1139` y `main.py:8466`, «Origen frecuente» de métricas | no | riesgo |
+| `clientes.js:1686`, nota «decía «…»» del despacho | no | texto leído del documento cuando falta el origen; el campo queda vacío |
+| `templates/public_quote.html:269`, `calculadora.js:112`, `main.py:8350` (`/agrupar`) | no | cotización, select fijo, mensaje que la interfaz no llama |
+| `main.py:8767`, Excel del catálogo del cliente | no (no es pantalla) | sigue con lo guardado; lo vio el adversario Opus |
 
-   Recomiendo **(b)**: el estudio elegido manda y no tiene por qué caer en silencio al perfil.
-   Son una línea y un dato. No lo hice porque es producto fuera de lo pedido.
-2. **D260. La limpieza «sin guiones ni espacios» del CUIT está escrita tres veces en `main.py`.**
-   Las tres están en `:4747` (`sin_separadores`, nueva), `:4965` (`comprador_cuit`, de la base) y
-   `:7723` (el alta de estudios, de la base).
-   - (a) Una línea para `docs/pm/COLA-LIMPIEZA.md`.
-   - (b) Nada.
+### Criterio 2: la familia, como datos de un caso
 
-   Recomiendo **(a)**. No la unifiqué: dos de las tres son de la base (§6, lo ya escrito se limpia
-   después).
+`test_holanda_y_paises_bajos_son_423` (`tests/test_catalogo3.py`), sobre `mostrar` de la pantalla:
+- con el 434 → «423»: las formas de `PAISES_BAJOS` que empiezan con 434 o 0434 («434», «0434»,
+  «434 · HOLANDA», «434 - Holanda», «434 · PAISES BAJOS»), el número 434 y « 434 »;
+- de control → como vinieron: el resto de `PAISES_BAJOS` («HOLANDA», «Holanda», «Países Bajos», «NL»,
+  «423 · HOLANDA»…), `NO_SON_HOLANDA` («434.», «４３４», «4340», «00434», «434 · BELGICA»…), «», «XX»,
+  «0310», «0423», « Holanda », «Países  Bajos», y None → «».
 
-**Supuestos (reversibles):**
+`scripts/testing/pantalla_holanda423.js` lo mira en el navegador contra una API local:
+- guardadas: `434`, `0434`, `434 · HOLANDA`, `434 - Holanda`, `434 · PAISES BAJOS` (y el número 434 en
+  el cliente; el proveedor rechaza números) frente a `HOLANDA`, `Holanda`, `Países Bajos`, `NL`,
+  `CHINA`, `310`, en los dos catálogos y como procedencia del borrador;
+- escritas: «0434» en el proveedor (guardar), «434» en el cliente (Enter), cada una en la procedencia
+  (salir del campo), y «4340» tecla por tecla;
+- lo que no se toca: cambiar sólo el NCM deja el origen guardado igual (leído de la API), la
+  procedencia del borrador queda igual en `CDI.state.operacion`, lo que se vuelve a escribir mientras
+  se guarda no se pisa, «nl» y un peso 434 escritos en el cliente y una factura 434 (borrador y
+  escrita) se ven como se escribieron.
 
-1. **El aviso de CUIT inválido va en `supuestos`, adelante, como ya iba «Falta».** La pantalla lo
-   muestra con el resto de los avisos. No toqué la pantalla.
-2. **Un `cuit_agr` de `"="` cuenta como en blanco.** `limpiar_texto` lo pasa a `-` antes de llegar
-   (ya era así en la base), y uno de puros guiones es en blanco.
-3. **El commit `f165e9d` dice `fix:`, pero no cambia nada observable.** Devuelve `bool(cuit)` a la
-   línea de `es_el_del_perfil`, que yo había sacado por muerta en `827189d`. La línea queda igual a
-   la base. Sin ese `bool` sólo cambiaría lo que devuelve la función con `cuit` vacío, y generar
-   corta con «Falta» antes de usarlo. Ya estaba subido, así que no lo reescribí.
+### Criterio 3: volcado
 
-| qué | SHA |
-|---|---|
-| base (tu rama hasta `ad13f1a`) | `2f96f2f` |
-| producto y CHANGELOG | `827189d` |
-| pruebas: el caso con la familia | `a4cd2fb` |
-| pruebas: los sabotajes siguen al código nuevo | `68fd099` |
-| producto: vuelve `bool(cuit)` (supuesto 3) | `f165e9d` |
-| pruebas: `estudio1b.sh` igual a la base | `54d2ac2` |
-| pruebas: dos frases de sabotaje | `c824b0d` |
-| pruebas: el dato de perfil malo con `cuit_agr` en blanco | `7b920aa` |
-| pruebas: los sabotajes cuentan ese dato. **Lo que se entrega** | `6112322` |
-| tu `beccd54` (sólo `docs/pm/NOW.md`), integrado | `8c27f56` |
-| informe | el commit siguiente |
+8042 formas (todos los códigos 000–999 con y sin 0 adelante, con espacios, con « HOLANDA» y «· X»;
+cada «código · nombre» y «código - nombre» de la tabla; nombres en mayúsculas, minúsculas y título;
+alias, INDEC, ISO3; vacío, XX, None y números). «Antes» es lo que hacían los tres lugares (el valor
+como texto); «ahora», `mostrar`. Diff entero:
+
+```
+formas: 8042; se ven distinto: 8
+' 434 ': ' 434 ' -> '423'
+'0434': '0434' -> '423'
+'434': '434' -> '423'
+'434 - HOLANDA': '434 - HOLANDA' -> '423'
+'434 - Holanda': '434 - Holanda' -> '423'
+'434 · HOLANDA': '434 · HOLANDA' -> '423'
+'434 · PAISES BAJOS': '434 · PAISES BAJOS' -> '423'
+434: '434' -> '423'
+```
+
+Ningún otro país cambia. «434 · BELGICA», «４３４», «434.», «4340» y «00434» se ven como vinieron, y
+el servidor tampoco les da país. El guion del volcado va en «Comandos».
+
+### Criterio 4: lo guardado no se reescribe
+
+Sólo cambia lo que se ve. Tres caminos que podían guardar lo mostrado, y la prueba de cada uno:
+- proveedor, guardar la fila: el origen va sólo si se cambió (supuesto 5). Prueba: `soloElNcm`.
+- revisión, abrir el borrador: `populate` sincroniza al estado lo normalizado (USD → DOL); `mostrar`
+  queda fuera de eso y sólo toca el campo. Lo encontró el adversario Opus en `e7741c37`; arreglado en
+  `45e17c26`. Prueba: la procedencia del borrador en `CDI.state.operacion`.
+- cliente: el PUT es por campo y sólo en `change`; sin tocar el origen no hay PUT.
+
+Lo escrito sí se guarda como se escribió: «0434» escrito en el proveedor queda «0434» (genera 423).
+
+### Criterio 5: el rojo con el arreglo revertido
+
+El producto de `a910c5f` con las pruebas de `b3a3bf69`:
+
+```
+FAILED tests/test_catalogo3.py::test_holanda_y_paises_bajos_son_423 - subproc...
+=========== 1 failed, 1 passed, 107 deselected, 5 warnings in 0.97s ============
+FALLA: catálogo del proveedor: «434» guardado se ve «434»
+```
+
+El caso falla porque `mostrar` no existe en la base; el rojo que distingue el defecto es el de la
+pantalla. Los rojos de cada parte del arreglo, uno por uno, son los sabotajes.
+
+## Sabotajes (§3)
+
+`scripts/testing/sabotajes/holanda423.sh` (nuevo, con `_casos_y_pantalla.sh`): 15 sabotajes, cada uno
+con su frase medida.
+- `mostrar`: devuelve lo que vino (caso y pantalla), escribe «null» por lo que falta, recorta lo que
+  no es el 434 (caso);
+- cada llamada: el proveedor muestra lo guardado; el cliente muestra lo guardado y deja lo escrito; la
+  procedencia del borrador y la escrita quedan como vinieron;
+- lo que no se toca: el proveedor manda el origen sin tocar; el cliente pisa lo que se sigue
+  escribiendo; la procedencia del borrador cambia en la operación;
+- el alcance: el borrador muestra cada campo con `mostrar`; lo escrito en cualquier campo pasa por
+  `mostrar`; el cliente muestra el código de lo escrito («nl» → 423); la procedencia cambia en cada
+  tecla.
+
+Sobre `b3a3bf69` (23:57:46 → 00:00:45 UTC): base verde (`109 passed`, «OK: pantalla Holanda→423»),
+15 de 15 `ROJO` con su frase, «sabotajes sin rojo: 0», salida 0.
+
+En la puerta sobre `c2fa0546` uno quedó verde: «lo escrito en cualquier campo pasa por `mostrar`».
+La prueba escribía en la factura el mismo «434» que traía el borrador, y con el mismo valor no hay
+`change`: no distinguía el defecto. Ahora escribe «0434» (`b3a3bf69`, sólo pruebas); medido a mano
+verde en la copia buena y «FALLA: la factura «0434» escrita se ve «423»» con el sabotaje.
+
+## Revisión
+
+- **`/code-review high`** sobre `a910c5f..e7741c37`: 8 hallazgos.
+  - El proveedor reescribía el origen al guardar la fila: arreglado (`77286ab6`), supuesto 5.
+  - El cliente pisaba lo que se seguía escribiendo mientras volvía el PUT: arreglado (`77286ab6`).
+  - La pantalla leía el valor del cliente apenas llegaba la respuesta (carrera) y contaba «6» a mano:
+    ahora espera una condición y cuenta desde la familia.
+  - «434 · PAISES BAJOS» se ve distinto de «423 · PAISES BAJOS»: supuesto 4.
+  - `mostrar` analiza dos veces: no lo cambié (una lectura de texto por fila).
+  - «Arreglarlo en un solo lugar, en el servidor»: no. Cambiar lo que devuelve la API haría que la
+    pantalla mandara de vuelta el 423 y reescribiera lo guardado.
+  - «Guion de sabotaje propio fuera de §3»: tu devolución pide §3 fuerte.
+- **Adversario Opus alto** (sobre `e7741c37`): confirmó lo del proveedor y encontró que abrir la
+  revisión cambiaba la procedencia en la operación (arreglado en `45e17c26`). Sospecha: las llamadas
+  nuevas no tienen la guarda `CDI.paisesMaria &&` de otras; ver riesgos. Sin hallazgo: otros lugares,
+  XSS («434 · <b>» se ve tal cual, escapado), «4340», 34 entradas contra `codigo_de_pais`.
+- **Adversario Sonnet alto** (sobre `e7741c37`, foco en las pruebas): confirmó lo del proveedor, y
+  doce mutaciones que dejaban caso y pantalla verdes (null → «null», vacío → «XX», recortar, juntar
+  espacios, «0310» → 310, « 434 » no reconocido, el cliente con `resolve`, `mostrar` en otros campos
+  de la revisión o del cliente, `comparar` salteando filas). Ahora mueren todas por el caso o la
+  pantalla salvo dos: un origen numérico en el proveedor (no se alcanza: la API lo rechaza) y
+  `mostrar(p.origen || 'XX')` en el proveedor (el caso cubre el vacío en `mostrar`, no esa llamada). Las del
+  caso las medí a mano: `'null' != ''`, `'XX' != ''`, `'Holanda' != ' Holanda '`,
+  `'Países Bajos' != 'Países  Bajos'`, `'310' != '0310'`, `' 434 ' != '423'`.
+- **`/security-review`**: no lo corrí. El diff no suma rutas ni cambia permisos; el único dato nuevo
+  que va al servidor es *no* mandar un campo. El adversario Opus miró XSS.
+
+## Puertas
+
+| puerta | SHA | resultado |
+|---|---|---|
+| suite completa, worktree limpio, `test.db` borrada | `c2fa0546` | `6197 passed, 110 skipped, 3 xfailed` en 18:28 (23:52:50 → 00:11:23 UTC), salida 0 |
+| `e2e_maria.sh` | `c2fa0546` | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.», salida 0 |
+| `sabotajes/holanda423.sh` | `b3a3bf69` | «sabotajes sin rojo: 0», 15 de 15 `ROJO`, salida 0 (3 minutos) |
+| `sabotajes/seguro2.sh` | `c2fa0546` | base `78 passed`, «sabotajes sin rojo: 0», 19 de 19 `ROJO`, salida 0 |
+| `sabotajes/catalogo3.sh` | `c2fa0546` | «fallas: 0», 65 de 65 `ROJO`, salida 0 (32 minutos) |
+| `anclas_perdidas.py`, `chequeo-6.py` | `b3a3bf69` | 2569 anclas, 0 perdidas; 0 avisos |
+
+De `c2fa0546` a `b3a3bf69` cambian sólo `pantalla_holanda423.js` y `holanda423.sh`
+(`git diff --stat c2fa0546 b3a3bf69`), que no entran en la suite, en `e2e_maria.sh`, en `seguro2.sh`
+ni en `catalogo3.sh`: esas cuatro valen para `b3a3bf69`. El rojo revertido y el volcado los volví a
+correr sobre `b3a3bf69`, con los comandos de abajo tal como están.
+
+`anclas_perdidas.py b3a3bf69`: 2569 anclas medidas, perdidas 0, 0 y 0. De los guiones que nombran los
+archivos tocados, sólo `seguro2.sh` ancla una línea que cambié (`const normalized = valorEnLaRevision(key, op);`,
+que sigue igual): corrió. No corrí `avisos1`, `cliente1`, `despacho1a`, `foco_cliente1`, `pa1`,
+`sabotaje_separadores1`, `sabotaje_valor1` ni `sabotaje_valor1b`: anclan otras líneas de esos
+archivos y sus anclas están. Tampoco `test_despacho1b` (lo medís vos).
 
 ## Comandos
 
 ```bash
 VENV=/ruta/al/venv   # el tuyo
-# 1. el rojo con el arreglo revertido: el main.py de la base con las pruebas de 6112322
-git worktree add -f /tmp/rojo244 6112322 && (cd /tmp/rojo244 && git checkout 2f96f2f -- proyecto_maria/main.py \
-  && env -u DATABASE_URL -u ENVIRONMENT GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
-     PYTHONPATH=. $VENV/bin/python -B -m pytest -q --no-cov -p no:cacheprovider tests/test_cuit_generar.py | tail -1); \
-  git worktree remove -f /tmp/rojo244
-#    «6 failed, 12 passed»
+# 1. el rojo con el arreglo revertido: producto de a910c5f, pruebas de b3a3bf69
+R=/tmp/rojo423; git worktree add -f -q --detach $R b3a3bf69 && cd $R && git checkout a910c5f -- proyecto_maria
+git diff --cached --shortstat                     # «4 files changed, 8 insertions(+), 20 deletions(-)»
+env -u DATABASE_URL -u ENVIRONMENT GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
+  PYTHONPATH=. $VENV/bin/python -B -m pytest -q --no-cov -p no:cacheprovider tests/test_catalogo3.py -k holanda | tail -1
+#    «1 failed, 1 passed, 107 deselected»
+T=$(mktemp -d); P=8423
+env GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares \
+  PYTHONPATH=. ENVIRONMENT=development DATABASE_URL="sqlite+aiosqlite:///$T/p.db" CDI_DATA_DIR="$T/data" \
+  JWT_SECRET_KEY=clave-inventada-solo-local-0123456789abcdef EMAIL_VERIFICATION_REQUIRED=false \
+  ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x \
+  $VENV/bin/python -m uvicorn proyecto_maria.main:app --host 127.0.0.1 --port $P > $T/api.log 2>&1 < /dev/null & A=$!
+until curl -fsS http://127.0.0.1:$P/health >/dev/null 2>&1; do sleep 0.3; done
+BASE_URL=http://127.0.0.1:$P node scripts/testing/pantalla_holanda423.js | tail -1
+#    «FALLA: catálogo del proveedor: «434» guardado se ve «434»»
+kill $A; cd - >/dev/null; git worktree remove -f $R; rm -rf $T
 
-# 2. los cuatro guiones de sabotaje que tocan el CUIT del despachante (unos 35 minutos en total)
-for g in cuit_generar estudio1 estudio1b excel2; do PY=$VENV/bin/python bash scripts/testing/sabotajes/$g.sh 6112322 | tail -1; done
-#    «sabotajes sin rojo: 0» en los tres primeros y «sabotajes con falla: 0» en excel2
+# 2. sabotajes (acá: holanda423 3 minutos, seguro2 6, catalogo3 32)
+PATH=$VENV/bin:$PATH PY=$VENV/bin/python bash scripts/testing/sabotajes/holanda423.sh b3a3bf69 | tail -1
+#    «sabotajes sin rojo: 0»
+PY=$VENV/bin/python bash scripts/testing/sabotajes/seguro2.sh b3a3bf69 | tail -1
+#    «sabotajes sin rojo: 0»
+PY=$VENV/bin/python bash scripts/testing/sabotajes/catalogo3.sh b3a3bf69 | tail -1
+#    «fallas: 0»
 
 # 3. anclas y §6
-python3.12 scripts/testing/anclas_perdidas.py 6112322 | grep -E '^revisión|perdida'
-#    «2541 anclas medidas», perdidas 0, 0 y 0
-python3.12 docs/pm/herramientas/chequeo-6.py 2f96f2f 6112322
-#    «producto +16/−8», «arnés +94/−50», «avisos: 0»
+python3.12 scripts/testing/anclas_perdidas.py b3a3bf69 | grep -E '^revisión|perdida'
+#    «2569 anclas medidas», perdidas 0, 0 y 0
+python3.12 docs/pm/herramientas/chequeo-6.py a910c5f b3a3bf69
+#    «producto +20/−8», «arnés +252/−0», «avisos: 0»
+
+# 4. el volcado (antes = el valor como texto; ahora = mostrar)
+PYTHONPATH=. $VENV/bin/python - <<'PY'
+import json, re, subprocess
+from proyecto_maria.core import maria_generator as mg
+from proyecto_maria.core.paises_iso3 import ISO3_A_ISO2
+
+js = mg._PAISES_PANTALLA.read_text(encoding="utf-8")
+countries = json.loads(re.search(r"const COUNTRIES = (\[.*?\]);", js).group(1))
+aliases = json.loads(re.search(r"const ALIASES = (\{.*?\});", js).group(1))
+formas = {*mg.PAISES_INDEC, *aliases, *ISO3_A_ISO2, *(c["name"] for c in countries)}
+for n in range(1000):
+    formas |= {f"{n:03d}", f"0{n:03d}", f"{n:03d} · X", f"{n} - HOLANDA", f"{n:03d} HOLANDA", f" {n:03d} "}
+for c in countries:
+    formas |= {f"{c['code']} · {c['name']}", f"{c['code']} - {c['name']}", c["name"].lower(), c["name"].title()}
+formas |= {"Holanda", "holanda", "434 · HOLANDA", "434 - Holanda", "423 · HOLANDA", "434 · PAISES BAJOS", "00434",
+           "4340", "434.", "４３４", "", "XX", "434 · BELGICA"}
+valores = sorted(formas) + [434, 423, 310, None]
+nodo = (f"global.window = {{}}; require({str(mg._PAISES_PANTALLA)!r}); const P = window.CDI.paisesMaria;"
+        "const v = JSON.parse(require('fs').readFileSync(0, 'utf8'));"
+        "console.log(JSON.stringify(v.map(x => P.mostrar(x))));")
+vistos = json.loads(subprocess.run(["node", "-e", nodo], input=json.dumps(valores), check=True,
+                                   capture_output=True, text=True).stdout)
+antes = ["" if v is None else str(v) for v in valores]
+distintos = [(v, a, d) for v, a, d in zip(valores, antes, vistos) if a != d]
+print(f"formas: {len(valores)}; se ven distinto: {len(distintos)}")
+for v, a, d in distintos:
+    print(f"{v!r}: {a!r} -> {d!r}")
+PY
+#    «formas: 8042; se ven distinto: 8», las ocho de arriba
 ```
 
-Corrí el 1 tal como está escrito, a las 20:28 UTC: `6 failed, 12 passed, 5 warnings in 13.56s`. Los
-seis en rojo, de la misma medición con `grep FAILED` a las 19:47:
+El 3, como lo medí:
 
 ```
-FAILED tests/test_cuit_generar.py::test_los_avisos_dicen_lo_mismo_que_el_400_del_cuit_del_despachante[malo en el perfil]
-FAILED tests/test_cuit_generar.py::test_los_avisos_dicen_lo_mismo_que_el_400_del_cuit_del_despachante[malo en cuit_agr]
-FAILED tests/test_cuit_generar.py::test_los_avisos_dicen_lo_mismo_que_el_400_del_cuit_del_despachante[malo en el estudio elegido]
-FAILED tests/test_cuit_generar.py::test_los_avisos_dicen_lo_mismo_que_el_400_del_cuit_del_despachante[cuit_agr en blanco, con uno bueno en el perfil]
-FAILED tests/test_cuit_generar.py::test_los_avisos_dicen_lo_mismo_que_el_400_del_cuit_del_despachante[cuit_agr en blanco, con uno malo en el perfil]
-FAILED tests/test_cuit_generar.py::test_los_avisos_dicen_lo_mismo_que_el_400_del_cuit_del_despachante[cuit_agr en blanco, sin CUIT en el perfil]
-================== 6 failed, 12 passed, 5 warnings in 14.45s ===================
-```
-
-El 3:
-
-```
-revisión 6112322: 103 guiones, 2541 anclas medidas y 11 llamadas sin medir
-  perdida, una línea          0   guiones: 0
-  perdida, varias líneas      0   guiones: 0
-  perdidas de una línea sin repetir (archivo y texto): 0
-chequeo-6 2f96f2f..6112322: avisos para mirar, no un veredicto
-producto +16/−8
-arnés +94/−50
+chequeo-6 a910c5f..b3a3bf69: avisos para mirar, no un veredicto
+producto +20/−8
+arnés +252/−0
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/main.py: 12272 → 12280
+  proyecto_maria/static/v2/paises_maria.js: 50 → 56
+  proyecto_maria/static/v2/screens/catalogo.js: 403 → 404
+  proyecto_maria/static/v2/screens/clientes.js: 2211 → 2213
+  proyecto_maria/static/v2/screens/review.js: 1195 → 1198
 avisos: 0
 ```
 
-El grep de historia de §6 sobre `proyecto_maria/` da vacío.
+El grep de historia de §6 sobre `proyecto_maria/` da vacío. Producto +12 netas.
 
-## Sabotajes (§3)
-
-`cuit_generar.sh` tiene dos sabotajes nuevos:
-- «un cuit_agr en blanco tapa el del perfil»;
-- «los avisos no dicen que no cierra».
-
-Salen dos, que fijaban el 400 con «» y ahora contradicen tu punto 2:
-- «uno de puros espacios cuenta como que falta»;
-- «uno vacío cuenta como el del perfil». Atacaba `bool(cuit)` a través de ese 400; sin él, ningún
-  dato lo distingue (supuesto 3).
-
-Dos cambiaron de frase («…se nombra como está guardado» y «…se nombra con el espacio»). Con un solo
-`sin_separadores`, un perfil sin limpiar ahora se nombra tal como está guardado. El rojo sigue
-siendo del mismo caso.
-
-Cada sabotaje de `main.py` lista también los datos del caso nuevo que pone en rojo. El arnés exige
-ese conjunto exacto. Lo medí a mano, mutación por mutación, con el archivo entero:
-
-| sabotaje | en rojo |
+| commit | qué |
 |---|---|
-| sólo se cuentan los dígitos | 10 |
-| el del perfil no se mira | 5 |
-| el que manda la operación no se mira | 3 |
-| el del estudio elegido no se mira | 2 |
-| dónde se corrige, al revés | 8 |
-| el del estudio manda a corregir como la operación | 2 |
-| el del perfil con guiones se nombra como está guardado | 1 |
-| el del perfil con un espacio se nombra con el espacio | 1 |
-| se nombra como llegó | 6 |
-| un espacio en el medio queda en el CDDTAGR | 2 |
-| el del perfil manda sobre cuit_agr | 4 |
-| el estudio elegido no manda | 3 |
-| un cuit_agr en blanco tapa el del perfil | 2 |
-| los avisos no dicen que no cierra | 4 |
-| el verificador sale siempre de «11 − resto» | 2 |
-| se rechaza después de contar la operación | 6 |
-
-En `estudio1.sh` cambian dos anclas, en `excel2.sh` una y `estudio1b.sh` queda igual a la base.
-Cada sabotaje cambiado sigue poniendo en rojo sólo lo suyo; lo medí a mano.
-
-**Límite del arnés:** la frase que exige `sabotaje` sale de un solo dato. Para los datos del caso de
-los avisos que también caen, el arnés controla que estén en rojo, pero no por qué. Lo miré a mano:
-todos caen por `AssertionError`, y el adversario Sonnet repitió 14 de esas mediciones.
-
-## Revisión
-
-| revisor | sobre | hallazgos | qué hice |
-|---|---|---|---|
-| `/code-review high` | `2f96f2f..68fd099` | los de al lado | **Arreglado:** `bool(cuit)` vuelve (`f165e9d`, supuesto 3). **Sin arreglo:** el chequeo de «Falta» en dos lugares (ya estaba en la base: generar corta antes de usar la función); la forma de `e.detail` (siempre `{"errors": [...]}` en esa función); los avisos en `supuestos` (supuesto 1); la limpieza repetida (D260); el caso en blanco sin `_operaciones` (lo cuenta `MALOS`); `ANTES_DE_GENERAR` repite orígenes de `MALOS` (lo pediste como familia de un caso); `isdigit` para separar «bueno» de un texto de error (todos los CUIT del caso son dígitos) |
-| adversario Opus alto | `68fd099` | 4 bajos | **D259** (estudio en blanco cae al perfil, introducido acá). Ya estaban en la base: los caracteres invisibles (U+200B), `=` → `-` por `limpiar_texto` (supuesto 2), y un `cuit_agr` que no es texto da 422 |
-| adversario Sonnet alto | `68fd099` | 3 | **Arreglado:** dos sabotajes daban `ROJO?` con la frase vieja (`c824b0d`); `bool(cuit)` (`f165e9d`). Los invisibles ya estaban en la base |
-| `/security-review` | `2f96f2f..c824b0d` | ninguno | Miró el aislamiento de estudios, el escape del aviso en pantalla (`CDI.escapeHtml`, `finalize.js:274-281`), la validación del CDDTAGR y la autenticación |
-| `/code-review high` | `2f96f2f..c824b0d` | los de al lado | **Arreglado:** el docstring del archivo de pruebas (`7b920aa`) y el dato de perfil malo con `cuit_agr` en blanco (`7b920aa`, `6112322`). **Sin arreglo:** D259; `bool(cuit)` no se puede observar (supuesto 3) |
-| adversario Sonnet alto | `c824b0d` | ninguno | Reprodujo las dos frases nuevas; `209 passed` en los cuatro archivos |
-| `/code-review high` | **`2f96f2f..6112322`** | 10 | **Sin arreglo:** D259 (dos hallazgos); D260; el límite del arnés (arriba); el caso de «Falta» sin `_operaciones` (es el camino de la base, no lo amplío); la forma de `e.detail`, `supuestos`, un caso por causa e `isdigit`, como en la primera vuelta; una línea larga en el encabezado de `cuit_generar.sh` (sólo comentario) |
-| adversario Sonnet alto | **`c824b0d..6112322`** | ninguno | El dato nuevo distingue tres sabotajes reales; las 14 listas de rojos que corrió coinciden con el guion; el docstring es cierto |
-
-Mi criterio para dejar de iterar fue que lo que saliera sobre `6112322` iba al informe, salvo un
-defecto real dentro de lo pedido. No salió ninguno. `/security-review` corrió hasta `c824b0d`:
-`7b920aa` y `6112322` sólo tocan el archivo de pruebas y el guion. Ningún subagente queda vivo.
-
-## Puertas
-
-Todo sobre `6112322`, en un worktree limpio de ese SHA, de 19:23 a 20:17 UTC. Salida exacta:
-
-```
-### cuit_generar salida 0 · sabotajes sin rojo: 0
-### estudio1 salida 0 · sabotajes sin rojo: 0
-### estudio1b salida 0 · sabotajes sin rojo: 0
-### excel2 salida 0 · sabotajes con falla: 0
-### suite salida 0 · === 6196 passed, 110 skipped, 3 xfailed, 108 warnings in 1264.52s (0:21:04) ====
-### compileall 0
-### npm ci 0
-### e2e salida 0 · E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.
-```
-
-- **Cuenta de cada guion:** `cuit_generar` 21 `ROJO`, `estudio1` 37, `estudio1b` 20 y `excel2` 42.
-  Ningún `ROJO?`.
-- **La suite** corrió entera, sin `-k` ni deselección, con `DATABASE_URL=sqlite+aiosqlite:///./test.db`
-  y `ENVIRONMENT=test`, desde un `test.db` borrado.
-
-**No corrí:**
-- `pantalla_cuit_generar1.js` suelto. No toqué la pantalla; el guion corre dentro de
-  `cuit_generar.sh`, en sus sabotajes de pantalla.
-- `test_despacho1b` aparte, porque me pediste que no lo midiera. Corrió dentro de la suite
-  y pasó, pero no lo miré más allá de eso.
+| `11f223bf` fix | `mostrar` y sus cuatro llamadas; CHANGELOG |
+| `e7741c37` test | caso, pantalla y `holanda423.sh` |
+| `77286ab6` fix | el proveedor manda el origen sólo si se tocó; el cliente no pisa lo que se sigue escribiendo |
+| `2ef75b78` test | sus pruebas y sabotajes |
+| `45e17c26` fix | la revisión no cambia la procedencia de la operación |
+| `0dd5bd1b` test | su prueba y sabotaje |
+| `c2fa0546` test | la familia de control y el alcance (lo de Sonnet) |
+| `b3a3bf69` test | la factura escrita distinta de la del borrador (el sabotaje de `mostrar` en cualquier campo quedaba verde en la puerta). **Lo que se entrega** |
+| informe | el commit siguiente |
 
 ## Riesgos
 
-1. **D259**, mientras no la decidas. Baja: por la API no se llega.
-2. **Un carácter invisible (U+200B) pegado a un CUIT de `cuit_agr` no se limpia.** Ya estaba en la
-   base. No llega al TXT: da 400 al generar y, desde ahora, un aviso con el mismo texto. Pero el
-   mensaje nombra un CUIT que se ve igual a uno bueno, o «» si sólo vino el invisible. Baja: es un
-   mensaje confuso, no un TXT malo.
-3. **El aviso ahora sale también con estudio elegido.** Antes, con estudio, los avisos nunca hablaban
-   del CUIT; ahora dicen si el del estudio no cierra. Es lo que pediste en el punto 1, y
-   `test_con_estudio_los_avisos_no_piden_el_cuit` sigue verde con uno bueno.
+- **«Origen frecuente» de las métricas del cliente y `default_origin`** muestran lo guardado tal cual;
+  no llegan al TXT hoy. Si vuelven a la generación, tienen que pasar por `mostrar`. Sin código (D261).
+- **Sin guarda `CDI.paisesMaria &&`** en las llamadas nuevas: si `paises_maria.js` no cargara, la
+  revisión y los catálogos tirarían un error al dibujar. El orden no es riesgo (todo es `defer` y se
+  dibuja después); `?v=` cambia con cada arranque.
+- **«434 · PAISES BAJOS» se ve «423»** y «423 · PAISES BAJOS» se ve con nombre: supuesto 4.
+- **El Excel del catálogo del cliente** (`main.py:8767`) sigue con lo guardado: no es pantalla.
+- **Previo, no de esta pieza:** escribir en el NCM del catálogo del proveedor tira
+  `Cannot create property '__cdiMaskNcmApplied' on string` (`catalogo.js` le pasa un texto a
+  `CDI.maskNcm`); lo vio el adversario Opus. Lo propongo para la cola.
+- **Dos mutaciones sin prueba** (Sonnet): `mostrar(p.origen || 'XX')` en el proveedor (un origen vacío
+  se vería «XX»; ninguna fila de la pantalla lo tiene vacío), y la rama de un origen numérico en el
+  proveedor, que la API rechaza hoy.
+- **`mostrar(0)` da «0»**: antes, un origen 0 en el catálogo del proveedor se veía vacío
+  (`p.origen || ''`). Ningún origen guardado es número en el proveedor; en el cliente se veía «XX» y
+  se sigue viendo «XX».
+- **Lo guardado en producción no se midió.** Las filas con «434» se ven 423 y generan 423; no sé
+  cuántas hay.
+- **El despachante puede seguir usando 434** (tu DECISIONS de las 19:39): no lo verifiqué.
+- La CI deselecciona tests de presupuestos y Railway no la espera: no es red.
 
-D259 y D260 esperan tu respuesta; D239 y «Holanda» esperan a Emi.
-
-Última vuelta: 2026-11-16 20:25 UTC.
-
-/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`, rutina trig_01Ukttby1fc4sGVQfSn1jC9U; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK, rama `claude/practical-shannon-szpwkn`, integrada hasta `beccd54`). Aceptadas: las de antes (CUIT-GENERAR `29327d2` … D257 (b) `3c7eb14`, acta `REPRODUCCION-D257-2026-11-15.md`); D258 (a): a la cola. En revisión: D244 (a), entregada sobre `6112322` (base `2f96f2f`), informe en el commit siguiente; puertas verdes sobre `6112322` (4 guiones de sabotaje, suite 6196 passed, e2e OK). Abiertas mías: D259 (estudio elegido con CUIT en blanco cae al perfil; recomiendo (b)) y D260 (limpieza del CUIT escrita tres veces; recomiendo (a), cola). D239 y «Holanda»: Emi dijo sí, pero esperan otra pregunta a Emi (el 434 escrito solo); no se tocan hasta que la PM las active. `test_despacho1b`: lo mide la PM, yo no. Próxima D: D261. Sin pieza marcada «apenas entregues»: si al despertar no hay nada nuevo, termino la vuelta. Lecciones: frenar una cola deja el generador mutado en su worktree: `git checkout -- .` antes de medir a mano ahí; la premisa de un criterio se mide antes de elegir el dato (la 55, con el sufijo de operación de siempre, quedaba verde); cuando dos revisores se contradicen se decide por lo que controla: un número escrito a mano en un guion es un control, un contador no; el worktree de una cola decide qué SHA mide: las tareas «base» corren en el worktree de la base, no en el del SHA que se entrega; antes de comparar una cuenta con la de otra sesión se miran los `skipped` con `-rs` (una dependencia que falta en el venv, como `xlwt`, saltea pruebas sin dar rojo); «por carga» no explica un corte de `ITIMER_PROF`, que cuenta CPU del proceso y no reloj; un bloque de comandos del informe se corre tal como está escrito antes de entregarlo; antes de lanzar algo en segundo plano se borra su marca de fin; un texto de error que manda a corregir se prueba por cada origen del dato; una prueba que sólo mira el 200 de un endpoint que se traga sus errores no prueba nada; un dato nuevo de un caso no reusa un valor que otro control del mismo caso espera; antes de escribir el informe se trae la rama de la PM; antes de sacar una prueba por duplicada se compara lo que afirma cada una, no sólo sus entradas; antes de reescribir un sabotaje con el ancla perdida se mira si la protección que atacaba sigue existiendo: si no, es una D (D195 (a)); al ajustar una afirmación, la nueva tiene que seguir afirmando todo lo que afirmaba la vieja (el orden también), y una mutación que «mueve» una frase la tiene que sacar de donde estaba; una medición corre sobre el conjunto más angosto de pruebas que contesta la pregunta; antes de cambiar un número que la PM fijó como criterio se lee por qué lo fijó; un comentario o un mensaje de commit no afirma lo que el guion no obliga, y su porqué se comprueba con `git show`, no se supone; que «nadie cubría» algo se mide antes de escribirlo, y con todas las pruebas que usan ese dato, no sólo las del guion (un adversario que corre cuatro archivos dice «hueco» donde otra prueba lo atrapa); `anclas_perdidas.py` mide un commit: el arreglo se commitea antes de medir; el SHA que se entrega pasa por subagente o `/code-review`, y si el gancho de parada ya subió el commit, lo que siga va en un commit nuevo; después de un commit nuevo o de corregir uno, las puertas corren otra vez sobre ese SHA; un ancla lleva sólo el texto que saca más lo mínimo que la ata a su lugar; la cuenta escrita a mano en el último `echo` de un guion se compara con sus líneas `ROJO`; una mutación se mide a mano con el archivo de pruebas entero, para ver que pone en rojo sólo lo suyo y por aserción; `anclas_perdidas.py` sólo lee los `.sh`; un worktree que aparece en `git worktree list` mientras corre un guion mío es de ese guion, no un resto; una espera de 110 vueltas de 5 s no alcanza para tres corridas de 4 minutos: se vuelve a esperar la marca de fin, no se relanza; mientras haya una D mía sin contestar, el informe siguiente la repite arriba; el dato que fija «qué pedazo se muestra» no tiene ese pedazo al principio de donde sale, o cortar el todo da lo mismo; `sabotaje_sufijos1.sh` recibe el venv como segundo argumento, no por `PY`; un riesgo que diría «cubierto» se mide antes de escribirlo; mover un dato para tapar un agujero se mide de los dos lados, con todos los cambios anotados otra vez; un ítem vecino en un caso de avisos lleva su propio aviso, o el recorrido de ítems queda sin mirar; el criterio para dejar de iterar se dice y se sostiene, y lo que queda va como D; dos cambios del mismo tamaño aplicados en el mismo segundo comparten el `.pyc`: una medición rápida corre con `python -B` y sin `.pyc`; lo que vería el despachante con un cambio se mide en pantalla antes de escribirlo en una D; un dato de un caso se agrega, no se mueve: mover un dato destapa lo que el dato viejo fijaba; al reemplazar una prueba de la base, la nueva conserva la forma del dato viejo (largo, caracteres) o se mide qué deja de atrapar; al clasificar salidas de pytest por texto, «xfailed» contiene «failed»: se busca `\d+ failed`; el «conjunto ancho» se arma con `grep` de todos los archivos de prueba que tocan el generador, no con una lista de nombres; el informe de un subagente se guarda en un archivo apenas llega, y que lo haya escrito no quiere decir que terminó: antes de medir se mira con `ps` qué más corre; al despertar se trae la rama de la PM antes de seguir con lo que venía; regla de la PM: `/code-review high` se corre siempre, aunque sea sólo arnés, va hasta el SHA que se entrega, y un commit que nace de sus hallazgos pasa por el adversario; regla de la PM: en un vencido de sólo arnés, un último commit que cambia únicamente comentarios no necesita revisor si el informe lo dice, cualquier otro cambio sí; un `fix:` que deja una línea igual a la base y no es observable se declara como supuesto, no se reescribe lo subido; un dato que agrega una revisión se cuenta en las listas de rojos de cada sabotaje del guion, medido a mano; un vigilante en segundo plano no lleva un `timeout` menor que lo que espera: se espera la notificación de la tarea principal. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica salvo lo que una D autoriza; subagentes hasta esfuerzo alto y sin consejero.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`, rutina trig_01Ukttby1fc4sGVQfSn1jC9U; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `edf076dc`). Aceptadas: las de antes (CUIT-GENERAR `29327d2` … D257 (b) `3c7eb14`); D244 (a) entregada sobre `6112322`. En revisión: Holanda→423, vuelta sobre `b3a3bf69` (base `a910c5f`, devolución en `docs/pm/REPRODUCCION-HOLANDA-423-2026-11-16.md`), informe en el commit siguiente; puertas verdes (suite 6197 passed y e2e sobre `c2fa0546`, holanda423 sobre `b3a3bf69`, seguro2 y catalogo3 sobre `c2fa0546`; de uno a otro sólo cambian dos guiones). Supuestos abiertos para la PM: 4 (se ve el código, no la etiqueta) y 5 (el proveedor manda el origen sólo si se tocó). D261 la lleva la PM; D262 (a) a la cola; D263 después de D239 (a). Después viene D239 (a): la escribe la PM al aceptar Holanda→423; no la toco antes. `test_despacho1b`: lo mide la PM. Próxima D: D264. Sin pieza marcada «apenas entregues»: si al despertar no hay nada nuevo, termino la vuelta. Lecciones (además de las de antes, que siguen en el historial de este archivo): no editar un guion de sabotaje mientras corre (el arnés lo lee de la copia de trabajo); un `fill` con el mismo valor que ya tiene el campo no dispara `change`: la prueba escribe algo distinto de lo cargado; el toast es la condición observable de que el handler terminó; horas, sólo de `date -u`. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe.

@@ -188,13 +188,55 @@ sabotaje $G "el servidor vuelve a aceptar un nombre que contradice el código" \
   '(True or ' \
   "FAILED $CF[310 - Vietnam]"
 sabotaje $J "la pantalla vuelve a aceptar un nombre que contradice el código" \
-  "return nombre === null || nombre === normalize(country.name) || ALIASES[nombre] === code[1] ? code[1] : '';" \
-  "return code[1];" \
+  "return nombre === null || nombre === normalize(country.name) || ALIASES[nombre] === numero ? numero : '';" \
+  "return numero;" \
   "FAILED $PS"
 sabotaje $J "la pantalla vuelve a reconocer una provincia como país" \
   "const ALIASES = {" \
   'const ALIASES = {"CORDOBA":"256",' \
   "FAILED $PS"
+# Holanda es 423: el nombre y el código 434, en el servidor, la pantalla, el lector de despachos y el grupo.
+H="$T::test_holanda_y_paises_bajos_son_423"
+sabotaje $G "Holanda vuelve a ser 434 en el servidor" \
+  '"HOLANDA": 423,' '"HOLANDA": 434,' \
+  "FAILED $H"
+sabotaje $G "el servidor no lee el código 434" \
+  '    codigo = _reemplazos().get(codigo, codigo)' '    codigo = codigo' \
+  "FAILED $H"
+sabotaje $J "la pantalla vuelve a dar 434 para Holanda" \
+  '"HOLANDA":"423"' '"HOLANDA":"434"' \
+  "item: ('HOLANDA', '434', '423')"
+sabotaje $J "el selector vuelve a ofrecer 434 · HOLANDA" \
+  '{"code":"435","name":"CHIPRE"}' '{"code":"434","name":"HOLANDA"},{"code":"435","name":"CHIPRE"}' \
+  "FAILED $H"
+sabotaje $J "la pantalla no lee el código 434" \
+  'const numero = REEMPLAZOS[code[1]] || code[1];' 'const numero = code[1];' \
+  "item: ('434', '', '423')"
+sabotaje $J "la pantalla compara el nombre con el código escrito" \
+  'ALIASES[nombre] === numero ? numero' 'ALIASES[nombre] === code[1] ? numero' \
+  "item: ('434 · HOLANDA', '', '423')"
+sabotaje $J "la pantalla muestra Holanda como 434 · HOLANDA" \
+  "return country ? country.code + ' · ' + country.name : '';" \
+  "if (/^(0?434|HOLANDA)/i.test(String(value).trim())) return '434 · HOLANDA'; return country ? country.code + ' · ' + country.name : '';" \
+  "FAILED $H"
+sabotaje $J "el selector ofrece 434 · HOLANDA aparte de la tabla" \
+  'return COUNTRIES.map(' $'return \'<option value="434 · HOLANDA"></option>\' + COUNTRIES.map(' \
+  "FAILED $H"
+sabotaje $G "el servidor da 423 para 434 con el nombre de otro país" \
+  '    codigo = _reemplazos().get(codigo, codigo)' \
+  $'    if codigo in _reemplazos() and (nombre is None or _nombres_de_pais().get(_normalizar_pais(nombre))):\n        return _reemplazos()[codigo]\n    codigo = _reemplazos().get(codigo, codigo)' \
+  "FAILED $H"
+sabotaje $J "la pantalla da 423 para 434 con el nombre de otro país" \
+  "|| ALIASES[nombre] === numero ? numero : '';" \
+  "|| ALIASES[nombre] === numero || (code[1] !== numero && ALIASES[nombre]) ? numero : '';" \
+  "item: ('434 · BELGICA', '423', '')"
+sabotaje proyecto_maria/core/despacho_lector.py "el despacho con 434 vuelve a quedar sin origen" \
+  'por_codigo = _iso2_por_codigo_maria().get(codigo_de_pais(codigo))' \
+  'por_codigo = _iso2_por_codigo_maria().get(int(codigo))' \
+  "AssertionError: origen_iso2"
+sabotaje $G "un grupo con dos países vuelve a generar" \
+  "        if len(origenes) != 1:" "        if False:" \
+  "FAILED $H"
 sabotaje $J "la pantalla vuelve a recortar con trim()" \
   "return value.replace(new RegExp('^' + ESPACIO + '+|' + ESPACIO + '+\$', 'g'), '');" \
   "return value.trim();" \
