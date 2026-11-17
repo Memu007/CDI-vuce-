@@ -2,197 +2,229 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## Entrega D269: sobre `471db09a` (16:31 UTC)
+## Entrega DESPACHO1B-CARGA: sobre `962bc88f` (2026-11-17 20:50 UTC)
 
-**Resultado.** Los seis criterios se cumplen en `471db09a` (base `6649ff89`). Hoy, con un renglón «CN» y
-otro igual con origen vacío, en blanco, «XX» o «ATLANTIDA» (por `origen` o por `pais_origen`),
-`/generate_maria/avisos` no dice nada del origen, dice «los renglones 1 y 2 van en un solo ítem» y le
-aplica al 2 el estado de importado (con «XX» o un nombre, también la procedencia); generar frena. Con el arreglo, ese renglón no se junta ni lleva procedencia o
-estado por defecto, y los avisos traen el mismo «Item 2: Falta origen/país de origen» u «Origen no
-reconocido '…'» con que frena generar. Con orígenes válidos no cambia nada. `producto +16/−16`.
+**Resultado.** Sólo cambia `tests/test_despacho1b.py` (`producto +0/−0`). Base `50d32c26`.
+
+- **Se reprodujo.** Con 7 corridas de pytest en paralelo en 4 núcleos (catalogo3 más despacho1b): 1 rojo
+  en 21 corridas.
+- **El caso:** `test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado`.
+- **El error:** no falla ningún assert del caso. Da `RuntimeError: Failed to process unraisable
+  exception` desde `collect_unraisable` de pytest.
+- **La causa, medida:**
+  1. El lector lee dentro del proceso de pytest, con la memoria de la suite.
+  2. El recolector corre dentro del tope y ejecuta un finalizador ajeno (`_collection_gced` de
+     sqlalchemy).
+  3. Un tick del tope cae en ese finalizador. Python no lo propaga y se lo pasa a `sys.unraisablehook`.
+  4. El gancho de pytest es Python y formatea el traceback con el temporizador andando.
+  5. Medí el gancho en 52 avisos: 50 tardaron menos de 0,05 ms y 2, 3,6 y 4,0 ms. Leo los lentos como la
+     primera lectura del archivo (`linecache.updatecache`, que es donde cae el tick del rojo); eso no lo
+     medí aparte. Con la máquina cargada, la ventana crece.
+  6. Un segundo tick cae dentro del gancho y pytest lo cuenta como error del caso.
+- **Producción no:** el lector corre en un proceso aparte, con el gancho de C.
+- **El arreglo (sólo prueba):** un ayudante, `_recolector_sin_la_suite`, rodea sólo la lectura. Hace
+  `gc.collect()`, `gc.freeze()` y al salir `gc.unfreeze()`. Los seis casos que leen con el temporizador
+  en el hilo principal lo usan. Es el `gc.freeze()` del acta del 07/11 (criterio 6), que tenía uno solo
+  de los seis, ahora en un lugar.
+- **Con la misma carga:** 21 de 21 verdes y 0 ticks tragados. Antes eran 18 ticks tragados en 21
+  corridas.
+- **Con el corte desarmado y la misma carga:** 7 de 7 en rojo, con dos sabotajes distintos.
+
+**Criterio 7.** Lo leo como causa en la prueba, no en el entorno:
+- La prueba lee en el proceso de pytest, cosa que el producto no hace. La carga sólo agranda la ventana.
+- Con 8 procesos gastando CPU al lado y sólo este archivo, no salió (3 de 3 verdes).
+- Salió con 7 suites en paralelo en 4 núcleos, sin otros procesos al lado. Si eso no te parece una carga
+  razonable, el arreglo se retira: son tres commits de prueba.
 
 **Lo que decidís vos:**
-- **D270. Una procedencia no reconocida se sigue tomando como China.** Dos renglones de la misma
-  posición con origen CN, el segundo con procedencia «XX» o «ATLANTIDA»: los avisos dicen «Procedencia no
-  reconocida…» y también «los renglones 1 y 2 van en un solo ítem» y el sufijo de valor compartido;
-  generar frena (400). Con procedencia «BR» no se juntan, como debe ser. Es D269 por la procedencia:
-  la clave de posición la lee con `get_pais_codigo`. Propongo pieza chica: `renglones_por_posicion`
-  saltea también un renglón con procedencia escrita no reconocida. No lo hice: fuera de la tarea.
-- **Criterio 5, desvío.** Tus filas de «sin estado» y «sin procedencia», tal como están, ya no
-  distinguen el sabotaje: con el arreglo, un origen que no se reconoce no lleva ni estado ni procedencia
-  por defecto, así que `pais_origen` «  » leído crudo da lo mismo que leído con `strip`. A cada una le
-  sumé un segundo renglón con `pais_origen` «  » y `origen` BR, sin procedencia ni estado: con
-  `origen_de` es Brasil y lleva el aviso; leído crudo, no. Tus renglones quedan como primer renglón de
-  la fila y siguen sin aviso. Si preferís otra forma, decime.
+- **D271. El mismo caso en otro archivo.** `tests/test_rendimiento1d.py:97`
+  `test_el_texto_tiene_tope_de_cpu` llama a `texto_plano_del_pdf(trabajo(hojas=2), limite_cpu_s=0.2)` en
+  el proceso de la suite, con el temporizador y sin el ayudante.
+  - Espera el corte con `pytest.raises`, así que gastar de más no lo pone rojo. Un tick en el gancho de
+    pytest, sí. No lo medí: mis corridas cargadas eran catalogo3 más despacho1b.
+  - El criterio 5 dice «del archivo», por eso no lo toqué.
+  - Descartado: `tests/test_rendimiento1c.py:395`, que marcó el adversario, valida por
+    `validate_file_upload` → `validar_pdf_aparte`, que lee en un proceso aparte (`create_subprocess_exec`).
+    Las otras lecturas dentro del proceso de esos dos archivos (`1c:278`, `1d:90`) usan el tope por
+    defecto de 10 s: el temporizador sólo dispara si una lectura gasta eso. No las medí.
+  - (a) Pieza chica: el ayudante pasa a `tests/pdf_bombas.py` y lo usan los dos archivos. Recomendada:
+    un chequeo en un solo lugar (§6).
+  - (b) Queda como riesgo escrito.
+- **D272. Otro intermitente, con otra causa, en la familia.** Es
+  `test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar`:
+  - Su cuerpo, fuera de pytest, da `cortes == 1` 17 veces en 6000 (5, 4 y 8 en tres tandas de 2000).
+  - La pila de las 8 de la última tanda: `('<module>', 10), ('cortar', 346)`. La línea 10 es la condición
+    del `while`.
+  - El primer tick se atiende fuera del `try` interno, así que el caso cree que no se tragó ninguno.
+  - Ya estaba antes de esta pieza, y el ayudante no lo cambia.
+  - En las 63 corridas cargadas sin sabotaje (21 en la base, 21 en `45e4ac61`, 21 en `962bc88f`) no salió.
+  - (a) Pieza chica de prueba: la condición del bucle entra al `try` interno. Recomendada.
+  - (b) Riesgo escrito.
 
-**El arreglo (`a9bdaa61`, `82a94faa`).** La causa es una: los avisos usaban `get_pais_codigo`, que con un
-país que no reconoce da 310, y no avisaban del origen. Tres cambios, todos sobre `origen_de`:
-- `errores_de_procedencia` pasa a `errores_de_pais`: suma el origen que falta o no se reconoce, con el
-  texto de la validación, que ahora la usa en vez de repetirlo. Los avisos la llaman igual que antes.
-- `renglones_por_posicion` saltea el renglón sin origen reconocido. **La usa también el generador**
-  (`maria_generator.py:1452`): por eso §3 fuerte (criterio 6). Por HTTP no cambia nada, porque la
-  validación frena antes; sí cambia llamando al generador directo (riesgos, D268).
-- «sin procedencia» pide `pais_reconocido(origen_de(item))`; «sin estado», `codigo_de_pais(...)` fuera de
-  `None` y 200 (`codigo_de_pais` da `None` si no lo reconoce; `get_pais_codigo` cae en 310).
+## El rojo, antes del arreglo
 
-### Criterios 1 a 3: el caso
-
-`test_los_avisos_no_toman_un_origen_que_falta_como_china` (`tests/test_generar_maria_txt.py`). El primer
-renglón es CN; el segundo, el mismo producto con `(pais_origen, origen)` como dato. Cada fila pide
-`/generate_maria` y `/generate_maria/avisos` y compara lo que dice generar con los avisos del origen, de
-los renglones juntos y de lo declarado por defecto:
-- `(None,"CN")` → genera; «juntos 1 y 2», «procedencia 1, 2», «estado 1, 2» (criterio 3);
-- `(None,"")`, `(None,"  ")`, `("",None)`, `("  ",None)` → generar y avisos: «Item 2: Falta origen/país
-  de origen»; nada junto; procedencia y estado sólo del 1;
-- `(None,"XX")`, `("XX","CN")`, `(None,"ATLANTIDA")`, `("ATLANTIDA",None)` → «Item 2: Origen no
-  reconocido '…'», igual en los dos.
-
-Criterio 3 para el TXT: suite completa y `e2e_maria.sh` sobre el SHA (abajo).
-
-### Criterio 4: el rojo con el arreglo revertido
-
-Producto de `6649ff89`, pruebas de `471db09a` (los otros dos casos del origen, verdes: ya pasaban en la base):
+Base `50d32c26`. Un lazo corre `tests/test_catalogo3.py tests/test_despacho1b.py` tres veces; siete
+lazos en paralelo, en 4 núcleos y sin otros procesos. `contar.py` cuenta, por caso, los avisos «Exception
+ignored» que pasan por `cortar` (ticks tragados) y los `FAILED`:
 ```
-E   AssertionError: (None, '')
-E   assert (['Item 2: Fa...estado 1, 2']) == (['Item 2: Fa..., 'estado 1'])
-E     
-E     At index 1 diff: ['juntos 1 y 2', 'procedencia 1', 'estado 1, 2'] != ['Item 2: Falta origen/país de origen', 'procedencia 1', 'estado 1']
-E     Use -v to get more diff
-FAILED tests/test_generar_maria_txt.py::test_los_avisos_no_toman_un_origen_que_falta_como_china
-============ 1 failed, 4 passed, 58 deselected, 8 warnings in 4.25s ============
+corridas: 21 {'396 passed': 20, '1 failed, 395 passed, 6 warnings': 1}
+ticks tragados por caso: {'test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado': 18}
+fallas: {'test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado': 1}
+```
+El rojo (recortado):
+```
+______ test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado _______
+/usr/lib/python3.12/traceback.py:139: in format_exception
+...
+/usr/lib/python3.12/linecache.py:137: in updatecache
+    lines = fp.readlines()
+proyecto_maria/core/despacho_lector.py:346: in cortar
+    raise _DemasiadoTrabajo
+E   proyecto_maria.core.despacho_lector._DemasiadoTrabajo
+The above exception was the direct cause of the following exception:
+...
+/tmp/cdi-dev2/venv/lib/python3.12/site-packages/_pytest/unraisableexception.py:75: in collect_unraisable
+    raise errors[0]
+E   RuntimeError: Failed to process unraisable exception
+```
+En una corrida verde, el tick tragado se ve como aviso:
+```
+tests/test_despacho1b.py::test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado
+  PytestUnraisableExceptionWarning: Exception ignored in: <function _collection_gced at 0x7f21b1c807c0>
+    File ".../sqlalchemy/event/registry.py", line 103, in _collection_gced
+    File "/home/user/CDI-vuce-/proyecto_maria/core/despacho_lector.py", line 346, in cortar
+  proyecto_maria.core.despacho_lector._DemasiadoTrabajo
 ```
 
-### Criterio 5: cada lugar de `origen_de`
+**Lo que descarté midiendo:** que el temporizador quede armado después de leer, o que la excepción
+escape del lector. Fueron 300 lecturas cortadas, con 0, 2 y 4 hilos gastando al lado: 0 y 0
+(`temporizador_armado_despues=0 excepcion_afuera=0`, las 100 de cada tanda con el aviso del corte).
 
-`test_cada_lugar_lee_el_origen_que_sale_en_el_txt`, cuatro filas (con el desvío de arriba):
-- «clave de posición»: CN, (`pais_origen` «  », `origen` BR) ×2, BR ×4 → `[("310","1.00"),("203","6.00")]`;
-- «defensa del grupo»: el par BR con `grupo_id` "1" → `[("203","6.00")]`;
-- «sin estado»: (`pais_origen` «  », AR, procedencia AR) y (`pais_origen` «  », BR) → estado sólo del 2;
-- «sin procedencia»: (`pais_origen` «  », sin `origen`) y (`pais_origen` «  », BR) → procedencia sólo del 2.
+## El arreglo
 
-Lo que vas a hacer al aceptar, ya hecho: cada uno de los siete lugares (los seis y el nuevo de
-`renglones_por_posicion`) con `(item.get('pais_origen') or item.get('origen') or '')`, de a uno. Todos
-rojos; el primer rojo nombra la fila:
-
-| lugar | rojo |
+| commit | qué |
 |---|---|
-| validación (`errores_de_pais`) | `('  ', '  ')`, `(None, '  ')`, `'clave de posición'` |
-| generador | `('  ', 'BR')`, `'clave de posición'` |
-| clave de posición | `'clave de posición'` |
-| lo que se junta | `'clave de posición'` |
-| defensa del grupo | `'defensa del grupo'` |
-| supuesto de procedencia | `'sin procedencia'` |
-| supuesto de estado | `'sin estado'` |
+| `45e4ac61` test | el `gc.freeze()` del caso de las hojas leídas pasa a una fixture para cinco casos más |
+| `27c7e314` merge | tu rama hasta `da1a6bc8` (criterios 6 y 7) |
+| `161952ba` test | de `/code-review`: el congelado rodea sólo la lectura y antes hace `gc.collect()` |
+| `962bc88f` test | de `/code-review`: también el caso del finalizador tragado y el de las 60 hojas. **Lo que se entrega** |
+| informe | el commit siguiente |
 
-Los cinco últimos están en `origen_txt.sh`; los dos primeros los corrí a mano; el guion ya los
-cubre con los sabotajes de D263 (sólo `origen`, el blanco que tapa, el TXT con su propio origen).
+Por qué cambió la primera forma:
+- Como fixture, congelaba desde el arranque del caso, así que lo que arma el PDF quedaba dentro del tope.
+- Sin `gc.collect()` antes, la basura de la suite quedaba congelada. Al descongelarla, sus finalizadores
+  corrían en un caso posterior: la misma falla, en otro lado.
+- En el caso del finalizador tragado, la medición de tiempo ahora arranca después del `gc.collect()`.
 
-## Sabotajes (§3)
+Los seis casos:
+- `test_un_pdf_que_da_mucho_trabajo_deja_de_leerse_por_tiempo_de_cpu` (0,5 s);
+- `test_una_sola_hoja_cara_se_corta_en_el_tope_de_cpu` (0,5 s);
+- `test_el_tope_de_cpu_deja_la_senal_como_estaba` (0,5 s);
+- `test_las_hojas_leidas_antes_del_corte_dan_sus_productos` (1,0 s; ya tenía `gc.freeze()`);
+- `test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado` (0,05 s);
+- `test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar` (0,02 s).
 
-`origen_txt.sh` pasa de 4 a 13: los cinco lugares de arriba y cuatro del origen tomado como China (se
-junta, lleva procedencia, lleva estado, los avisos no dicen el origen). Los casos ahora se detienen en la
-primera fila distinta, en el orden de la familia, y la nombran (`_fila_por_fila`): antes la diferencia
-de un dict con claves `None` y texto salía cortada y en un orden que dependía de la memoria, y la frase
-de un sabotaje aparecía en 7 de 20 semillas. Con 10 y 13: «sabotajes sin rojo: 0».
+Quedan sin el ayudante, y por qué:
+- los de `leer_despacho_aparte` y `_medir_aparte`: corren en un proceso aparte;
+- `test_fuera_del_hilo_principal_el_tope_se_mira_entre_hojas`: sin señal, el control es entre hojas y su
+  assert es `< 60`;
+- `test_sin_memoria_al_abrir_el_pdf_no_se_disfraza_de_pdf_roto`: el lector está reemplazado y termina al
+  instante.
 
-Anclas que se movieron y seguí: `sabotaje_maria1d.sh:118` (los avisos llaman a `errores_de_pais`; el
-sabotaje saca sólo la procedencia), `sabotaje_maria4.sh:98` (el supuesto de estado) y
-`sabotaje_maria8.sh:113` (lo que se junta).
+Dentro del bloque, sólo muere lo que crea la lectura. pypdf no tiene `__del__` ni callbacks de weakref,
+y los `WeakKeyDictionary` del lector son del camino aparte.
 
-`catalogo3.sh` perdió un rojo: «get_pais_codigo vuelve a hacer int() de cualquier tira de cifras»
-esperaba `test_un_origen_de_miles_de_cifras_no_rompe_los_avisos_ni_el_txt`, y con el arreglo los avisos
-ya no llegan a `get_pais_codigo` con ese origen (lo que se junta lo saltea; la validación frena antes de
-generar). El sabotaje sigue dando rojo, en `test_cada_forma_del_pais…[1111…]`: ahí lo apunté
-(`471db09a`). Ese caso de las cifras queda como guarda de comportamiento, sin sabotaje propio.
+## Pruebas
 
-| guion | SHA | resultado |
+| qué | SHA | resultado |
 |---|---|---|
-| `origen_txt.sh` | `5de87f20` | 13 ROJO, «sabotajes sin rojo: 0» (también con semillas 10 y 13) |
-| `sabotaje_maria1d.sh` | `5de87f20` | «OK: los 8 sabotajes dan rojo por la razón esperada» |
-| `sabotaje_maria4.sh` | `5de87f20` | «OK: los 8 sabotajes dan rojo por la razón esperada» |
-| `sabotaje_maria8.sh` | `5de87f20` | «OK: los 70 sabotajes dan rojo por la razón esperada» |
-| `sabotaje_maria3.sh` | `5de87f20` | «OK: los 32 sabotajes dan rojo por la razón esperada» |
-| `catalogo3.sh` | `471db09a` | 65 ROJO, «fallas: 0» |
+| carga, antes | `50d32c26` | 21 corridas: 20 × «396 passed», 1 × «1 failed, 395 passed»; 18 ticks tragados |
+| carga, con el arreglo | `45e4ac61` | 21 × «396 passed»; 0 ticks tragados |
+| carga, con el arreglo | `962bc88f` | 21 × «396 passed»; 0 ticks tragados |
+| corte desarmado (`_tope_de_cpu` sin temporizador), carga | `962bc88f` | 7 × «6 failed, 390 passed»; el caso, en las 7 |
+| corte por CPU que dice escaneado (sin `salteadas = True`), carga | `962bc88f` | 7 × «3 failed, 393 passed»; el caso, en las 7 |
+| las dos de arriba | `45e4ac61` | iguales: 7 × 6 y 7 × 3 |
+| `tests/test_despacho1b.py` solo | `962bc88f` | «285 passed» |
+| `despacho1b.sh` con Postgres | `962bc88f` | «BASE \| verde sin sabotaje», 136 ROJO, «sin Postgres, no corridos: 0», «sabotajes sin rojo: 0» (18:47 a 20:48) |
+| chequeo-6 | `50d32c26..962bc88f` | abajo, entero |
 
-De `5de87f20` a `471db09a` sólo cambia `catalogo3.sh` (una línea): los otros cinco no se repiten.
-`anclas_perdidas.py 5de87f20`: igual que la base (2590 → 2599 medidas; sólo la de siempre,
-`limpieza1.sh:135`). No corrí `despacho1b.sh` ni `catalogo_largo2.sh` (Postgres): no anclan nada de lo tocado.
-
-## Revisión
-
-- `/code-review high` y dos adversarios de modelos distintos (esfuerzo alto), sin mi conclusión. Ninguno
-  encontró un origen inválido tratado como China ni un cambio con orígenes válidos (uno probó 2000 entradas).
-- Atendido: el comentario y el docstring viejos (`82a94faa`); el sabotaje 8 de `maria1d` sacaba también
-  el aviso del origen (`d9e50a0a`); ayudantes repetidos entre los casos (`d9e50a0a`); el rojo que
-  dependía del azar (`3a1a797b`, `5de87f20`).
-- No atendido, con razón: arreglarlo en `clave_de_posicion` (cambia la clave del generador para todos;
-  más riesgo que saltear en el que junta); `pais_reconocido` y `codigo_de_pais` repiten la búsqueda
-  (cola de limpieza); se calcula `origen_de` dos veces por renglón (despreciable); las anclas de
-  otros guiones van en un commit de pruebas antes del guion propio (no reescribo lo subido).
-
-## Puertas
-
-Sobre `471db09a`, en un worktree limpio (`/tmp/cdi-dev2/wt-d269`, sólo el enlace a `config/node_modules`):
+Los tres sabotajes de `despacho1b.sh` que anclan en los casos tocados:
 ```
-=== 6202 passed, 110 skipped, 3 xfailed, 109 warnings in 1164.89s (0:19:24) ====
-E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.
+ROJO  | el temporizador de CPU no se repite: «FAILED tests/test_despacho1b.py::test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar»
+ROJO  | un corte por CPU parece escaneado: «FAILED tests/test_despacho1b.py::test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado»
+ROJO  | extraer se lleva el tope entero: «FAILED tests/test_despacho1b.py::test_las_hojas_leidas_antes_del_corte_dan_sus_productos»
 ```
-Los sabotajes, arriba.
 
-## Comandos
-
-```bash
-VENV=/ruta/al/venv   # el tuyo
-PT="env -u DATABASE_URL -u ENVIRONMENT GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=. $VENV/bin/python -B -m pytest -q --no-cov -p no:cacheprovider -W ignore"
-# 1. el rojo: producto de 6649ff89, pruebas de 471db09a
-R=/tmp/rojo269; git worktree add -f -q --detach $R 471db09a && cd $R && git checkout 6649ff89 -- proyecto_maria
-$PT tests/test_generar_maria_txt.py -k origen | grep -E "^E   AssertionError|failed"   # «(None, '')» y «1 failed, 4 passed»
-cd - >/dev/null; git worktree remove -f $R
-# 2. los casos, verdes en 471db09a
-$PT tests/test_generar_maria_txt.py -k origen | tail -1                                 # «5 passed»
-# 3. sabotajes (incluye los cinco lugares) y §6
-PATH=$VENV/bin:$PATH PY=$VENV/bin/python bash scripts/testing/sabotajes/origen_txt.sh 471db09a | tail -1   # «sabotajes sin rojo: 0»
-python3.12 docs/pm/herramientas/chequeo-6.py 6649ff89 471db09a                         # «producto +16/−16», «avisos: 0»
+Los rojos del caso con el corte desarmado:
+```
+E   AssertionError: {'renglones': [], 'divisa': None, 'avisos': ['Una línea pasa de 2000 caracteres: no parece un despacho.'], 'sin_texto': False}
+```
+y sin `salteadas = True`:
+```
+E   assert True is False
 ```
 
 chequeo-6, entero:
 ```
-chequeo-6 6649ff89..471db09a: avisos para mirar, no un veredicto
-producto +16/−16
-arnés +146/−18
+chequeo-6 50d32c26..962bc88f: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +40/−24
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/core/maria_generator.py: 2400 → 2400
-  proyecto_maria/main.py: 12280 → 12280
 avisos: 0
 ```
 
-| commit | qué |
-|---|---|
-| `a9bdaa61` fix | `errores_de_pais`; lo que se junta y los dos supuestos piden un origen reconocido; CHANGELOG |
-| `41160302` test | el caso de los avisos y el de cada lugar; anclas de maria1d, maria4 y maria8 |
-| `6fc0b947` test | `origen_txt.sh` suma nueve |
-| `82a94faa` fix | el comentario y el docstring |
-| `d9e50a0a` test | ayudantes compartidos; el sabotaje 8 de maria1d saca sólo la procedencia |
-| `628f34b0` test | los casos muestran sólo las filas distintas |
-| `3a1a797b` test | los casos se detienen en la primera fila distinta |
-| `5de87f20` test | la frase del sabotaje del blanco |
-| `471db09a` test | `catalogo3.sh`: el sabotaje del `int()` espera el caso de las cifras. **Lo que se entrega** |
-| `83aecf45` merge | tu rama hasta `46842b02` (sólo `NOW.md`) |
-| informe | el commit siguiente |
+Subagentes y revisiones:
+
+| quién | sobre | hallazgos | qué hice |
+|---|---|---|---|
+| `/code-review high` | `45e4ac61` | 6 | la fixture amplía el congelado y no hace `gc.collect()`: arreglado (`161952ba`); otros archivos: D271; caso del finalizador: D272; el gancho de C en vez del congelado: abajo |
+| `adversario-sonnet-medio` | `45e4ac61` | 0 graves; dos de otros archivos | `rendimiento1d:97`, D271; `rendimiento1c:395` lee aparte: descartado |
+| `/code-review high` | `161952ba` | 7 | el caso de las 60 hojas y el del finalizador: arreglado (`962bc88f`); los demás: abajo |
+| `/code-review high` | `962bc88f` | 6 | ninguno nuevo dentro de la tarea: abajo |
+| `adversario-sonnet-medio` | `962bc88f` | 0 reproducidos; 1 residuo teórico | riesgos |
+
+- **Lo propuesto y no hecho: cambiar el gancho de pytest por el de C** durante la lectura. Lo descarté
+  por dos razones:
+  - no cubre la otra mitad del acta del 07/11 (el recolector gasta el tope);
+  - escondería las excepciones ignoradas del propio lector.
+- **Del `/code-review` sobre `161952ba`, sobre `NOW.md`:** las horas corregidas ponen la integración de
+  D269 (17:45) antes de la aceptación (17:47). Es tu archivo; te lo paso.
+
+## Comandos
+
+```bash
+VENV=/ruta/al/venv
+PT="env -u DATABASE_URL -u ENVIRONMENT GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=. $VENV/bin/python -B -m pytest -q --no-cov -p no:cacheprovider --timeout=300"
+# 1. el archivo, en 962bc88f                                   → «285 passed»
+$PT tests/test_despacho1b.py | tail -1
+# 2. el corte desarmado                → «6 failed», entre ellos ..._no_dice_que_es_escaneado
+R=/tmp/d1bc; git worktree add -f -q --detach $R 962bc88f && cd $R
+python3 - <<'EOF'
+p = "proyecto_maria/core/despacho_lector.py"; s = open(p, encoding="utf-8").read()
+a = "    anterior = signal.signal(signal.SIGPROF, cortar)"
+assert s.count(a) == 1; open(p, "w", encoding="utf-8").write(s.replace(a, "    yield\n    return\n" + a))
+EOF
+$PT tests/test_despacho1b.py | grep -E "^FAILED|passed"
+cd - >/dev/null; git worktree remove -f $R
+# 3. §6                                                          → «producto +0/−0», «avisos: 0»
+python3 docs/pm/herramientas/chequeo-6.py 50d32c26 962bc88f
+```
+La carga de 7 × 3 tarda unos 7 minutos y no te la pido; está en el informe.
 
 ## Riesgos
 
-- **D268 cambia de forma**: `generate_maria_txt` llamado sin validar, con un origen inválido, ahora no
-  junta ese renglón (2 ART en vez de 1); sigue escribiendo 310. Por HTTP no se llega.
-- **La pantalla manda «XX» por un origen en blanco**, así que el aviso dice «Origen no reconocido 'XX'»,
-  no «Falta origen». Es lo mismo que dice generar, y ya era así.
-- **Grupos**: un grupo con orígenes válidos distintos frena al generar y los avisos no lo dicen (ya era
-  así; no es un origen tomado como China).
-- **Pantalla**: `despachante.js:362` propone el estado 2 por defecto con un origen no reconocido («XX»). Es
-  pantalla, no aviso del servidor; no lo toqué.
-- **Intermitente**: un test de `test_despacho1b.py` falló una vez con la máquina cargada; solo, verde.
-  No es de esta pieza.
-- Lo de producción no se midió; la CI deselecciona y Railway no la espera.
+- **Residuo teórico, no reproducido** (lo marcó el adversario): un generador suspendido que muera dentro
+  de la lectura cerraría en un marco de Python. Un tick ahí iría al gancho de pytest. En pypdf no
+  encontré ninguno que quede suspendido: el lector consume las hojas con `list(reader.pages)`.
+- **Hilos:** `ITIMER_PROF` y `process_time` cuentan la CPU de todos los hilos del proceso. Un hilo de
+  otro caso que siga gastando se come el tope. Ya era así y no lo vi pasar.
+- **Costo:** seis `gc.collect()` completos más por corrida del archivo, fuera del tope. Medí uno después
+  del archivo, con 241 024 objetos vivos y el guion de sabotajes corriendo al lado: entre 97 y 202 ms de
+  CPU cada uno (`GC_CPU 96.6ms 116.3ms 160.4ms 190.1ms 201.6ms 152.4ms`). Son cerca de 1 s en un archivo
+  de unos 50 s.
+- **D271 y D272**, arriba.
+- **Lo que no corrí:** la suite completa (sólo cambia este archivo, y el criterio 4 no la pide);
+  `e2e_maria.sh`; la carga con quemadores sobre el SHA final (la de 7 suites, sí).
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`, rutina trig_01Ukttby1fc4sGVQfSn1jC9U; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `46842b02` con el merge `83aecf45`). Aceptadas: las de antes (CUIT-GENERAR `29327d2` … D257 (b) `3c7eb14`), D244 (a) y Holanda→423 sobre `b3a3bf69`, D239 (a) sobre `01c28e83`, D263 sobre `9e5960d2`. Entregada, en revisión: D269 sobre `471db09a` (informe: el commit siguiente): los avisos no toman como China un origen que falta o no se reconoce (`errores_de_pais`; lo que se junta y los supuestos piden `pais_reconocido(origen_de(item))`); casos `test_los_avisos_no_toman_un_origen_que_falta_como_china` y `test_cada_lugar_lee_el_origen_que_sale_en_el_txt`; `origen_txt.sh` 13; suite 6202 passed y e2e OK sobre `471db09a`. Abierto para la PM: D270 (procedencia no reconocida se junta como China) y el desvío del criterio 5 (filas de los supuestos con un renglón `blanco_br`). Sin pieza «apenas entregues» en mi canal: al volver, `/respondio`. D268 y la unidad: riesgo escrito (decidido por la PM). Próxima D: D271. Lecciones (además de las del historial de este archivo): la diferencia de un dict con claves `None` y texto sale cortada y en orden de memoria: un caso de familia se detiene en la primera fila distinta y la nombra; un arreglo que corta un camino puede dejar sin rojo el sabotaje de otro guion: correr todos los que anclan lo tocado; una tarea en segundo plano muere a las 2 h: puertas con `setsid nohup` y un vigía; no editar un guion de sabotaje mientras corre; un python que reescribe un archivo antes de correr deja el worktree sucio si falla: worktree nuevo; horas, sólo de `date -u`. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`, rutina trig_01Ukttby1fc4sGVQfSn1jC9U; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `da1a6bc8` con el merge `27c7e314`). Aceptadas: las de antes (CUIT-GENERAR `29327d2` … D263 `9e5960d2`), D269 sobre `471db09a` (D270: riesgo escrito; desvío del criterio 5: aceptado). Entregada, en revisión: DESPACHO1B-CARGA sobre `962bc88f` (informe: el commit siguiente): sólo `tests/test_despacho1b.py`; el ayudante `_recolector_sin_la_suite` (`gc.collect`, `gc.freeze`, `gc.unfreeze`) rodea la lectura en los seis casos con temporizador en el hilo principal; causa: un tick tragado por un finalizador ajeno va al gancho de pytest y otro tick lo rompe (`RuntimeError: Failed to process unraisable exception`); carga 7 × 3 en 4 núcleos: base 1 rojo y 18 ticks tragados en 21, arreglo 21 de 21 y 0; desarmado 7 × «6 failed», escaneado 7 × «3 failed». Abierto para la PM: D271 (`rendimiento1d:97` sin el ayudante; recomiendo (a), el ayudante a `pdf_bombas.py`) y D272 (el caso del finalizador da `cortes == 1` 17 en 6000 fuera de pytest: el tick cae en la condición del `while`; recomiendo (a)). Sin pieza «apenas entregues» en mi canal: al volver, `/respondio`. Próxima D: D273. Lecciones (además de las del historial de este archivo): cada número del informe sale de un log, y el que no está, se mide o se saca; lo que marca un adversario se reproduce antes de proponerlo (`rendimiento1c:395` leía aparte); un congelado del recolector sin `gc.collect()` antes mueve los finalizadores al caso siguiente; una tarea en segundo plano muere a las 2 h: puertas con `setsid nohup` y un vigía de timeout largo; horas, sólo de `date -u`. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe.
