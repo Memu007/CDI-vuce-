@@ -78,3 +78,53 @@ otra cosa y la decide Emi.
 - **`/security-review`** cubrió `8d2cacc..a910c5f`, el producto entregado.
 
 **No corrido por la PM:** `/security-review` propio; lo nuevo mirado en el navegador.
+
+## Vuelta: aceptada sobre `b3a3bf69` (informe `97a066a8`), base `a910c5f` (2026-11-17 01:05 UTC)
+
+Integrada con `merge` (no es fast-forward); `git diff b3a3bf69 HEAD -- . ':!docs/pm' ':!.github'`
+da vacío.
+
+### Corrido por la PM
+
+| qué | resultado | hora (UTC) |
+|---|---|---|
+| producto de `a910c5f` con las pruebas de `b3a3bf69` | `1 failed, 1 passed, 107 deselected`; `FALLA: catálogo del proveedor: «434» guardado se ve «434»` | — |
+| `scripts/testing/sabotajes/holanda423.sh` desde la copia del SHA | «sabotajes sin rojo: 0», 15 `ROJO` distintos, `rc=0` | 00:40:06 |
+| `scripts/testing/sabotajes/seguro2.sh` | «sabotajes sin rojo: 0», 19 `ROJO`, BASE `78 passed`, `rc=0` | 00:47:23 |
+| `e2e_maria.sh` (con `TMPDIR=/tmp/cdi-pm/e2eh`: con la ruta larga el socket no abre) | «E2E MARIA OK», `rc=0` | 00:40:35 |
+| `chequeo-6.py a910c5f b3a3bf69` | producto +20/−8, arnés +252/−0, avisos 0; el grep de §6 da vacío | — |
+| suite completa | `6197 passed, 110 skipped, 3 xfailed` en 1099.89 s, `rc=0` | 00:37:05 → 00:55:30 |
+| negativo propio: ~30 formas en pantalla contra el TXT | 0 diferencias | — |
+| supuesto 5 en Chromium: «CN» guardado → «BR» y guardar → «CN» y guardar, sin recargar | queda «CN» (después de guardar se redibuja la fila y lo guardado pasa a ser el punto de partida); igual con «434» → «BR» → «434» | 00:59:19 |
+| lo mismo con el guardado de «BR» fallando (500) y después «CN» | el segundo PUT va sin origen; pantalla y base quedan en «CN» | 00:59:19 |
+| procedencia de la revisión con otros países: «310 · CHINA», «Alemania», «0310», «423», «BELGICA», «434 · BELGICA» | se ven y quedan en el estado como vinieron | 01:00:24 |
+
+**Salvedades de la suite:** corrió con `-x`, sin `ENVIRONMENT=test` ni `DOLARAPI_BASE` local, y el
+adversario corrió pytest en el mismo worktree a la vez.
+
+### Adversario (Opus alto, sin red, `GEMINI_API_KEY` vacía)
+
+Nada roto. Diferencial de 7759 textos: 1168 se ven 423 y esos mismos 1168 dan 423 en el TXT.
+Foco y salida sin tocar, en los tres lugares: ningún guardado. No corrió `holanda423.sh` (lo corrí
+yo, arriba).
+
+### Criterios
+
+1. **Lugares:** la tabla del informe sale del código. Confirmé que `finalize.js`, `despachante.js` y
+   `semaforo.js` no muestran el valor del origen: sólo lo mandan o eligen opciones con él.
+2. **Familia:** como datos de `test_holanda_y_paises_bajos_son_423`, con el número 434.
+3. **Volcado:** 8042 formas, cambian sólo las 8 de Holanda.
+4. **Lo guardado no se reescribe:** `soloElNcm` y mi secuencia de arriba.
+5. **Rojo:** arriba.
+
+### Decisiones
+
+- **Supuesto 4** (se ve «423», no la etiqueta), decidido por la PM: aceptado; es lo que sale en el
+  TXT. Mostrar etiquetas es D261 y lo decide Emi.
+- **Supuesto 5** (guardar la fila manda el origen sólo si cambió), decidido por la PM: aceptado.
+- **«Origen frecuente»** (`clientes.js:1139`), preexistente, decidido por la PM: el adversario lo
+  reprodujo por la API («434» en la métrica, 423 en el TXT). No vuelve a la generación, como pedía el
+  criterio, y va como una línea de D239 (a), que ya toca `clientes.js`.
+- **Riesgo:** `mostrar` se llama sin guarda de `CDI.paisesMaria`; sin camino hoy.
+
+**No corrido por la PM:** `/security-review` propio; la CI.

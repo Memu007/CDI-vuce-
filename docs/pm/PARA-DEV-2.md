@@ -3,55 +3,52 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Holanda→423: devolución sobre `a910c5f` (informe `c6cb661` y `df935f5`) (2026-11-16 23:30 UTC)
+## Holanda→423: aceptada sobre `b3a3bf69` (informe `97a066a8`) e integrada (2026-11-17 01:05 UTC)
 
-Acta `REPRODUCCION-HOLANDA-423-2026-11-16.md`. No se integra.
+Acta `REPRODUCCION-HOLANDA-423-2026-11-16.md`, sección «Vuelta». Reproduje tu rojo, `holanda423.sh`,
+`seguro2.sh`, `e2e_maria.sh`, chequeo-6 y la suite entera (`6197 passed`): todo igual al informe.
+El adversario no rompió nada. Probé ejemplos que no di: «CN» → «BR» → «CN» guardando sin recargar
+(queda «CN»), lo mismo con un guardado fallido, y otros países en la procedencia («310 · CHINA»,
+«434 · BELGICA»…), que se ven como vinieron.
 
-- **Lo que está bien y no se toca:** chequeo-6 igual al tuyo; anclas 2553 con 0/0/0; tus tres
-  archivos `247 passed` y `4 failed` con el producto de `8d2cacc`; `e2e_maria.sh` OK sobre el SHA y
-  la unión; `sabotaje_maria3.sh` 32 OK, `sabotaje_maria1a.sh` 10 OK, `catalogo3.sh` `rc=0`, 65 `ROJO`, 0 «ROJO?» ni sin rojo, «fallas: 0» (23:30:31);
-  suite completa `6197 passed`, 0 rojos. Mi mapa independiente de `codigo_de_pais` (4019 formas,
-  `8d2cacc` contra `a910c5f`) cambia sólo las seis de Holanda. Mis siete negativos pasan.
-- **La causa de la devolución: una forma que lleva el código reemplazado se muestra distinta de
-  lo que sale.** En `8d2cacc`, 434 se mostraba 434 y salía 434; ahora, con la API del catálogo,
-  escribir «434» u «0434» guarda y devuelve eso, la pantalla lo pone tal cual y el TXT dice 423.
-  Tiene camino hoy (escribirlo, o un 434 ya guardado que el lookup lleva a la grilla) y tu informe
-  dice que el criterio 5 no se cumple. Un nombre («HOLANDA», como «CHINA») que se muestra como se
-  escribió no es parte de esto.
+- **Supuesto 4** (se ve «423», no la etiqueta): aceptado, decidido por la PM. Las etiquetas son D261.
+- **Supuesto 5** (la fila manda el origen sólo si cambió): aceptado, decidido por la PM.
+- **«Origen frecuente»** (`clientes.js:1139`), preexistente, decidido por la PM: el adversario lo
+  reprodujo por la API. Va como criterio 6 de D239 (a), abajo.
+- **Riesgo que queda escrito:** `mostrar` sin guarda de `CDI.paisesMaria`; sin camino hoy.
 
-**Criterio de la vuelta (comportamiento y prueba):**
-1. Ningún lugar de la pantalla que muestre un origen guardado o escrito, y cuyo valor pueda llegar
-   a un TXT hoy, muestra una forma que lleve el código reemplazado: muestra lo que sale en el TXT.
-   La lista de lugares sale del código y va al informe con, para cada uno, si llega a un TXT hoy.
-   Los que vi en `a910c5f`: la fila del catálogo (`catalogo.js:270`), el catálogo del cliente
-   (`clientes.js:1427`), el origen que el lookup trae a la grilla (`upload.js:586`, `:600-602`) y
-   la grilla de ítems antes de generar (`finalize.js`); la procedencia de la revisión
-   (`review.js:252-271`). Según tu tabla, `default_origin` («Origen habitual», `clientes.js:1071`,
-   `:1232`, `:1955`) y el «Origen frecuente» (`clientes.js:1139`, `main.py:8466-8475`) no vuelven a
-   la generación: si es así, van como riesgo escrito y sin código. Sumá los que encuentres.
-2. La familia como datos de un caso: las formas con el código reemplazado (434, 0434, el número
-   434, «434 · HOLANDA», «434 - Holanda», «434 · PAISES BAJOS»), guardadas y escritas. Los nombres
-   («HOLANDA», «Holanda», «Países Bajos») y «NL» son control: se muestran como hoy.
-3. Un volcado antes y después de lo que muestra cada lugar para todos los demás países: sin
-   diferencias. El diff va al informe. Mostrar todos los países con su etiqueta no es parte de
-   esta vuelta (D261, abajo).
-4. Lo guardado sigue sin reescribirse (`DECISIONS.md`, 2026-11-16 19:39 UTC).
-5. El rojo con el arreglo revertido, una vez.
+No se publica: espera el próximo «dale» de Emi.
 
-**Revisión:** §3 fuerte, como la pieza. `e2e_maria.sh`, `catalogo3.sh` y los guiones que anclen lo
-que toques, desde la copia del SHA que entregás.
+## Tu próxima pieza: D239 (a), códigos sin sigla en el lector de despachos (activa ya)
 
-**Las D:**
-- **D261:** la parte de 434 es esta devolución. La (a), mostrar todos los países con `label`,
-  cambia la pantalla para todos y no se pidió: se la llevo a Emi con tu recomendación, aparte.
-  No la hagas en esta vuelta.
-- **D262 (a)**, decidido por la PM: a la cola de limpieza.
-- **D263**, de la PM: `validate_items_for_maria` mira `origen` y el generador usa `pais_origen`
-  primero; `pais_origen="4340"` con `origen="CN"` valida y sale `CARTPAYORI=4340`. Sólo por la
-  API, ya en la base. Pieza aparte, después de D239 (a); no la toques ahora.
-- **Supuestos 1 a 3:** aceptados. **La premisa del criterio 4:** verificada, bien dicho.
+Emi dijo sí a D239 (`DECISIONS.md`, 2026-11-16 18:42 UTC); va después de Holanda→423. Es tu D239
+de `22e84e5d`, medida otra vez sobre `a910c5f`: 114 códigos de la tabla no tienen sigla de dos
+letras (`_iso2_por_codigo_maria`). Un despacho que trae uno solo («143») sale sin origen y con
+«No reconocí el origen…», y uno con código y nombre de países distintos elige el nombre
+(«143 CHINA» da CN). Lo guardado no se migra.
 
-Después de esta vuelta sigue D239 (a), que te escribo al aceptar ésta.
+**Criterio (comportamiento y prueba):**
+1. Un código de la tabla sin sigla, escrito solo o con su propio nombre, entra por el lector de
+   despachos, se guarda y genera ese código en el TXT (`CARTPAYORI`). La familia (los 114, con y
+   sin su nombre) como datos de un solo caso; la lista sale de la tabla, no escrita a mano.
+2. Código y nombre de países distintos dan ningún origen y el aviso, también cuando el código no
+   tiene sigla («143 CHINA», y uno con sigla como «310 BRASIL», que ya lo hace). Un código con
+   sigla, solo o con su nombre, sigue dando la sigla.
+3. La pantalla de importar un despacho muestra y deja guardar el origen de tres cifras (hoy el
+   campo corta en dos, `clientes.js:1692`), y lo que guarda llega igual al TXT.
+4. Un volcado antes y después del lector de despachos sobre las mismas formas que usaste en
+   Holanda (criterio 2): las únicas diferencias son los códigos sin sigla y los pares que se
+   contradicen. El diff va al informe.
+5. El rojo con el arreglo revertido, una vez en el informe.
+6. El «Origen frecuente» de las métricas del cliente (`clientes.js:1139`) con un 434 guardado se ve
+   como lo que sale en el TXT (423); los demás países, como hoy. Es una línea de la misma causa que
+   Holanda→423, en un archivo que ya tocás.
+
+**Revisión:** §3 fuerte (cambia un valor que sale en el TXT): `/security-review`, adversarios,
+suite completa, `e2e_maria.sh` sobre el SHA y los guiones que anclen lo que toques.
+
+**Lo que sigue en tu cola:** D263 (validación mira `origen`, el generador usa `pais_origen`), después
+de ésta; D262 (a) ya está en la cola de limpieza.
 
 **Próxima D: D264.**
 

@@ -882,3 +882,12 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - La pieza de la Técnica (`c721f7fc`) cambia sólo `timeout-minutes` del job `tests` a 30. La PM lo
   reprodujo y no encontró otro tope en `ci.yml`. Queda integrada en la rama de PM; la CI la prueba
   recién en la próxima PR de publicación.
+
+## 2026-11-17 01:05 UTC — Holanda→423 aceptada
+
+- La vuelta de MARIA (`b3a3bf69`) muestra 423 donde el TXT da 423, en el catálogo del proveedor, el
+  del cliente y la procedencia de la revisión. Integrada en la rama de PM; sin publicar.
+- Decidido por la PM: se ve el código «423», no la etiqueta (supuesto 4); guardar una fila del
+  catálogo del proveedor manda el origen sólo si cambió (supuesto 5).
+- Decidido por la PM: el «Origen frecuente» de las métricas del cliente, que todavía muestra «434»,
+  va como criterio 6 de D239 (a).
