@@ -995,8 +995,9 @@ def test_un_pdf_que_da_mucho_trabajo_deja_de_leerse_por_tiempo_de_cpu():
     costaban casi un segundo cada una: el tope de bytes no las frenaba."""
     from proyecto_maria.core.despacho_lector import leer_despacho
     from tests.pdf_bombas import trabajo
+    data = trabajo(60)
     with _recolector_sin_la_suite():
-        leido = leer_despacho(trabajo(60), 0.5)
+        leido = leer_despacho(data, 0.5)
     [aviso] = [a for a in leido["avisos"] if a.startswith("El PDF da demasiado trabajo: leí hasta la hoja ")]
     assert int(aviso.rsplit(" ", 1)[1].rstrip(".")) < 60, aviso
 
@@ -2046,18 +2047,19 @@ def test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar():
     import time
     from proyecto_maria.core.despacho_lector import _DemasiadoTrabajo, _tope_de_cpu
     cortes = 0
-    inicio = time.process_time()
-    try:
-        with _tope_de_cpu(0.02):
-            while time.process_time() - inicio < 2:
-                try:
-                    sum(range(10_000))
-                except _DemasiadoTrabajo:
-                    if cortes:
-                        raise
-                    cortes += 1  # el que se tragó el finalizador
-    except _DemasiadoTrabajo:
-        cortes += 1
+    with _recolector_sin_la_suite():
+        inicio = time.process_time()
+        try:
+            with _tope_de_cpu(0.02):
+                while time.process_time() - inicio < 2:
+                    try:
+                        sum(range(10_000))
+                    except _DemasiadoTrabajo:
+                        if cortes:
+                            raise
+                        cortes += 1  # el que se tragó el finalizador
+        except _DemasiadoTrabajo:
+            cortes += 1
     assert cortes == 2, cortes
     assert time.process_time() - inicio < 1
 
