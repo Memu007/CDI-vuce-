@@ -3,58 +3,60 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D239 (a): aceptada sobre `01c28e83` (informe `42cad854`), integrada; D263 activa (2026-11-17 08:53 UTC)
+## D263: aceptada sobre `9e5960d2` (informe `b039eabb`), integrada; D269 activa (2026-11-17 11:50 UTC)
 
-Acta `REPRODUCCION-D239a-2026-11-17.md`, sección «Vuelta». Lo que corrí da igual que tu informe:
-chequeo-6 (+57/−14, un AVISO), el rojo con el arreglo revertido («At index 7 diff: None !=
-'RESTO (AFRICA)'»), suite completa (6199 passed), `sin_sigla` 16/16, `holanda423` 17/17,
-`e2e_maria.sh` OK, volcado igual a `196ef370` y anclas como la base. `despacho1b.sh` con
-Postgres sigue corriendo (11 ROJO y 0 sin rojo a las 08:51); si da un «sin rojo», la pieza se
-reabre. Cada código de la tabla con cada nombre o alias del índice, en cuatro formas (unas
-900 000), da 0 países equivocados (la base daba 434 918): eso vale para los nombres que el índice
-conoce. El ejemplo que no te di, «212 ARUBA (TERRITORIO DE PAISES BAJOS)», da ningún origen.
-El adversario (unas 2,5 millones de formas) no encontró país equivocado con texto ASCII.
+Acta `REPRODUCCION-D263-2026-11-17.md`. Lo que corrí da igual que tu informe: chequeo-6 (+19/−13,
+`avisos: 0`), el rojo con el arreglo revertido, suite completa (6200 passed), `e2e_maria.sh` OK,
+`origen_txt.sh` 4/4, maria3 32, maria4 8, maria8 70, `catalogo3.sh` «fallas: 0», y anclas como la base. Revertí cada uno de los
+seis lugares de `origen_de` de a uno: validación y generador dan rojo con tu caso; clave de posición,
+defensa del grupo y los dos supuestos quedan verdes, y cada uno cambia con una entrada mía (acta, y
+abajo en D269). Mis negativos por el endpoint con renglones
+juntos y con `grupo_id` dan, en cada 200, el valor validado, y muestran que la entrega arregla dos cosas de la base
+(«4340» salía en el TXT al juntarse, y un `pais_origen` en blanco rechazaba un grupo bueno).
+
+De D239 (a): mi `despacho1b.sh` con Postgres terminó: 136 `ROJO`, 0 sin rojo, `rc=0`. Se sostiene.
 
 **Respuestas (decidido por la PM):**
-- **AVISO +43 líneas netas:** aceptado con tu motivo. La línea de los tres reconocedores de país
-  entra a `COLA-LIMPIEZA.md` en este commit.
-- **D266, ampliado:** no son sólo nombres en inglés: cualquier nombre que el índice no conoce deja
-  ganar al código («435 República Dominicana» → 435, Chipre; ya pasaba en `196ef370`). Riesgo
-  escrito, no pieza: `origen_iso2` sólo lee el despacho impreso por el sistema oficial, que trae
-  el nombre de la tabla, y lo de pantalla pasa por `origen_para_catalogo`. Va a Emi como
-  propuesta de alias.
-- **Dígitos de ancho completo** («３１０ ＢＲ» → BR, nuevo de esta vuelta): el `\d` del patrón
-  acepta dígitos Unicode y `codigo_de_pais` no. Riesgo escrito, junto a la propuesta de alias;
-  no lo arregles ahora.
-- **D267** («900 SD» da Sudán, y SN, NO, SI, ROU): riesgo escrito; ya estaba en la base.
-- **Pérdidas con aviso de más** («310 12», «310 12,5 KG», «143 - REP. DE SUDAFRICA», «310 POR
-  MAR», «309 COREA (SUR)», «341 HONG KONG (CHINA)»…): aceptadas. Son ruidosas.
-- El tope de CPU de `test_despacho1b` queda como riesgo escrito; no es de esta pieza.
+- **D268** (el generador sin validar escribe 310): riesgo escrito, no pieza. El único llamador valida
+  antes; no hay camino de hoy. Si aparece otro llamador, su pieza lleva la validación.
+- **Unidad** (`unidad="  "` con `unidad_medida="KG"` sale 07): riesgo escrito. Sale con el aviso «la
+  unidad no se reconoce», y la pantalla manda sólo `unidad`. No va a la cola de limpieza.
+- **Cambios por API y sub-ítems:** aceptados como están; riesgos escritos en el acta.
+- **Sin caso propio:** no alcanza. `test_supuestos_leen_el_origen_como_el_generador` no cubre la clave
+  de posición (lee el aviso de estado con «CN»; la clave revertida quedó verde). Los cuatro lugares
+  sin caso van como criterio 5 de D269.
 
-## D263: la validación y el TXT leen el mismo campo (pieza activa)
+## D269: los avisos no toman un origen que falta como China, y un caso por lugar de `origen_de` (pieza activa)
 
-Hoy `validate_items_for_maria` (`maria_generator.py`) revisa `item["origen"]`, pero el generador
-escribe `pais_origen` si viene y si no `origen`. Por la API (`MariaRequest.items` es una lista
-libre), un ítem con `pais_origen="4340"` y `origen="CN"` valida y sale `CARTPAYORI=4340`. La
-pantalla no manda `pais_origen`. Pieza de la PM (`DECISIONS.md`, 2026-11-16 23:30 UTC).
+Hallazgo del adversario de D263, ya estaba en la base. `/generate_maria/avisos` lee el origen con
+`get_pais_codigo(origen_de(item))`, que con un origen vacío o no reconocido da 310. La pantalla manda
+«XX» cuando el origen está en blanco (`finalize.js`). Con un ítem «CN» y otro igual con «XX», los avisos
+dicen «los renglones 1 y 2 van en un solo ítem (misma posición SIM, origen…)» y «Estado… 2 (nuevo sin
+uso importado) por defecto»; después generar frena con «Origen no reconocido 'XX'». El aviso engaña
+antes de generar. Pieza de la PM (`DECISIONS.md`, 2026-11-17).
 
 **Criterio (comportamiento y prueba):**
-1. La validación y el TXT leen el mismo campo. La familia, como datos en un caso:
-   - `pais_origen` no reconocido («4340») con `origen` válido: error que nombra el ítem, y
-     nunca llega a `CARTPAYORI`;
-   - `pais_origen` válido sin `origen`: hoy da «Falta origen»; tiene que comportarse según el
-     mismo campo que usa el TXT;
-   - ninguno de los dos: error, nunca el `'CN'` de respaldo;
-   - `pais_origen` vacío con `origen` válido: como hoy.
-2. Lo que manda la pantalla (sólo `origen`) sigue igual.
-3. El rojo con el arreglo revertido, una vez en el informe.
-4. Revisión §3 fuerte (cambia lo que sale en el TXT): suite completa, `e2e_maria.sh` sobre el SHA,
-   adversarios y los guiones que anclen lo que toques.
+1. Con un ítem sin origen o con uno no reconocido, ningún aviso lo trata como China: no lo junta con
+   otro renglón ni le aplica el estado de importado. Un aviso nombra el ítem y dice lo mismo con que
+   generar va a frenar.
+2. La familia, como datos en un caso: vacío, en blanco, «XX», un nombre que no es país, y lo mismo
+   por `pais_origen`.
+3. Con orígenes válidos, los avisos y el TXT quedan como hoy.
+4. El rojo con el arreglo revertido, una vez en el informe.
+5. Los cuatro lugares de `origen_de` que hoy no tienen caso, como filas de datos en un caso
+   (`pais_origen` en blanco viene por la API, no por la pantalla):
+   - clave de posición: tres de la misma posición, uno CN, uno con `pais_origen` en blanco y `origen`
+     BR, y uno BR → 2 ART (los dos BR juntos);
+   - defensa del grupo: ese par BR con el mismo `grupo_id` → 200;
+   - «sin estado»: `pais_origen` en blanco, `origen` AR, procedencia AR → sin aviso de estado;
+   - «sin procedencia»: `pais_origen` en blanco sin `origen` → sin aviso de procedencia.
+   Al aceptar, en cada uno de los seis lugares cambio `origen_de(item)` por la lectura sin `strip`
+   (`pais_origen or origen`), de a uno, y falla la fila de ese lugar.
+6. Si tocás lo que comparte el TXT (`clave_de_posicion`, el agrupado), revisión §3 fuerte: suite
+   completa, `e2e_maria.sh` sobre el SHA y los guiones que anclen lo que toques. Si no, el caso, la
+   suite y `e2e_maria.sh`.
 
-Sugerencia, no criterio: un solo lugar que diga qué campo manda, y que lo usen la validación y el
-generador.
-
-**Próxima D: D268.**
+**Próxima D: D270.**
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 

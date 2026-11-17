@@ -914,3 +914,17 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - Decidido por la PM: D267 riesgo escrito (ya estaba en la base); aceptado el AVISO de +43 líneas
   y las pérdidas con aviso nuevas («310 12», «143 - REP. DE SUDAFRICA»…).
 - D263 (la validación y el TXT leen el mismo campo de origen) pasa a pieza activa de MARIA.
+
+## 2026-11-17 11:50 UTC — D263: aceptada sobre `9e5960d2`
+
+- La validación, el generador, la clave de posición, la defensa del grupo y los supuestos leen el
+  origen con `origen_de` (el primero escrito entre `pais_origen` y `origen`). Integrada en la rama de
+  PM; sin publicar. Acta `REPRODUCCION-D263-2026-11-17.md`.
+- Decidido por la PM: D268 (el generador sin validar escribe 310) riesgo escrito, porque el único
+  llamador valida antes; la unidad (`unidad` en blanco con `unidad_medida` sale 07, con aviso) y el
+  origen de sub-ítems, riesgos escritos; los cambios por API, aceptados.
+- Cuatro lugares de `origen_de` quedaron verdes al revertirlos; cada uno cambia con una entrada de la
+  PM. Van como criterio de D269.
+- D269, pieza de la PM para MARIA: los avisos toman un origen vacío o «XX» como China. Es arreglo de
+  un defecto dentro de su cola, no algo nuevo: el aviso engaña antes de generar y se alcanza desde la
+  pantalla, que manda «XX» con el origen en blanco.
