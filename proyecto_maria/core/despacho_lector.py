@@ -244,8 +244,8 @@ def numero_ar(texto) -> float | None:
 
 
 def origen_iso2(texto) -> str | None:
-    """«310», «310 CHINA», «CHINA» o «CN» → «CN». None si no se reconoce o si
-    el código y el nombre dicen países distintos."""
+    """«310», «310 CHINA», «CHINA» o «CN» → «CN»; un país sin sigla, su código
+    («143»). None si no se reconoce o si el código y el nombre dicen países distintos."""
     from proyecto_maria.core.maria_generator import codigo_de_pais
     from proyecto_maria.pdf_extractor import _iso2_por_codigo_maria, _origen_desde_factura
 
@@ -254,12 +254,12 @@ def origen_iso2(texto) -> str | None:
         return None
     m = re.match(r"^(\d{3})\b[\s\-/]*(.*)$", t)
     if m:
-        codigo, nombre = m.group(1), m.group(2).strip()
-        por_codigo = _iso2_por_codigo_maria().get(codigo_de_pais(codigo))
+        codigo, nombre = codigo_de_pais(m.group(1)), m.group(2).strip()
         por_nombre = _origen_desde_factura(nombre) if nombre else None
-        if por_codigo and por_nombre and por_codigo != por_nombre:
+        # Con el nombre de su código: Chipre es 311 y también 435.
+        if codigo and por_nombre and codigo_de_pais(f"{codigo:03d} · {nombre}") is None:
             return None
-        return por_codigo or por_nombre or None
+        return _iso2_por_codigo_maria().get(codigo, f"{codigo:03d}") if codigo else por_nombre or None
     return _origen_desde_factura(t) or None
 
 
