@@ -295,8 +295,8 @@ sabotaje $C "el PUT vuelve a perder el NCM por el origen" \
         textos["origen"] = origen' \
   "FAILED $T::test_cambiar_el_ncm_de_una_fila_con_origen_viejo_guarda_el_ncm"
 sabotaje $G "el TXT vuelve a agrupar por la forma del país" \
-  "origenes = {clave_de_origen(it.get('pais_origen') or it.get('origen')) for it in grupo_items}" \
-  "origenes = {str(it.get('pais_origen') or it.get('origen')) for it in grupo_items}" \
+  "origenes = {clave_de_origen(origen_de(it)) for it in grupo_items}" \
+  "origenes = {origen_de(it) for it in grupo_items}" \
   "FAILED $T::test_el_txt_agrupa_el_mismo_pais_escrito_de_tres_formas"
 sabotaje $M "agrupar por la API vuelve a comparar la forma del país" \
   'origenes = {clave_de_origen(it.origen) for it in items}' \

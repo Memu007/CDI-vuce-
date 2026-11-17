@@ -1,7 +1,8 @@
 # Arnés común de los sabotajes que miran casos de pytest y un guion de pantalla.
 # Se carga con `source` después de definir T (el archivo de casos) y PANTALLA
-# (el guion de navegador). Deja el worktree descartable del SHA, `sabotaje` y
-# FALLAS, y comprueba que sin sabotaje todo pasa: si no, ningún rojo distingue nada.
+# (el guion de navegador; sin él, sólo casos). Deja el worktree descartable del
+# SHA, `sabotaje` y FALLAS, y comprueba que sin sabotaje todo pasa: si no,
+# ningún rojo distingue nada.
 set -uo pipefail
 REPO="$(git rev-parse --show-toplevel)"
 SHA="$(git -C "$REPO" rev-parse "${1:-HEAD}")"
@@ -91,5 +92,6 @@ sabotaje() {
 
 salida="$(correr_casos)" || { echo "BASE  | los casos no pasan sin sabotaje"; tail -20 <<<"$salida"; exit 1; }
 echo "BASE  | casos: $(tail -1 <<<"$salida")"
+[ -z "${PANTALLA:-}" ] && return 0
 salida="$(correr_pantalla)" || { echo "BASE  | la pantalla no pasa sin sabotaje"; tail -20 <<<"$salida"; exit 1; }
 echo "BASE  | pantalla: $(tail -1 <<<"$salida")"

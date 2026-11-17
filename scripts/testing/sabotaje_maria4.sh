@@ -95,7 +95,7 @@ reemplazar $F "    if (argentino and estado in ESTADOS_IMPORTADOS) or (not argen
 caso "estado_contra_origen" "FAILED $T::test_estado_que_no_corresponde_al_origen_se_rechaza"
 
 # 8. (devolución) los supuestos vuelven a leer origen antes que pais_origen
-reemplazar $F '        and get_pais_codigo(item.get("pais_origen") or item.get("origen")) != PAIS_ARGENTINA' '        and get_pais_codigo(item.get("origen") or item.get("pais_origen")) != PAIS_ARGENTINA'
+reemplazar $F '        and get_pais_codigo(origen_de(item)) != PAIS_ARGENTINA' '        and get_pais_codigo(item.get("origen") or item.get("pais_origen")) != PAIS_ARGENTINA'
 caso "orden_del_origen" "FAILED $T::test_supuestos_leen_el_origen_como_el_generador"
 
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
