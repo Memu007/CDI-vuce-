@@ -244,9 +244,8 @@ def numero_ar(texto) -> float | None:
 
 
 def origen_iso2(texto) -> str | None:
-    """«310», «310 CHINA», «CHINA» o «CN» → «CN». Un código sin sigla, solo o con
-    su nombre, da el código («143»); el nombre solo, el nombre. None si no se
-    reconoce o si el código y el nombre dicen países distintos."""
+    """«310», «310 CHINA», «CHINA» o «CN» → «CN»; un código sin sigla da el código («143»).
+    None si no se reconoce o si el código y el nombre dicen países distintos."""
     from proyecto_maria.core.maria_generator import _tabla_oficial, codigo_de_pais
     from proyecto_maria.pdf_extractor import _iso2_por_codigo_maria, _origen_desde_factura
 
