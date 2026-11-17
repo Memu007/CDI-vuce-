@@ -78,7 +78,7 @@ from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
 from proyecto_maria.services.fecha_inic_activ import fecha_del_alta
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, seguro_en_el_precio, importe_escrito, usa_el_sufijo_de_la_operacion, fecha_inicio_actividad, destinacion_del_txt
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_pais, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, seguro_en_el_precio, importe_escrito, usa_el_sufijo_de_la_operacion, fecha_inicio_actividad, destinacion_del_txt
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     DocumentoNoAdmitido,
@@ -5001,7 +5001,7 @@ async def avisos_maria_endpoint(
     else:
         if not cuit:
             supuestos = [FALTA_CUIT_DONDE_CARGARLO, *supuestos]
-    # Lo que al generar es un error de procedencia, acá se avisa con el mismo texto.
+    # Lo que al generar es un error de origen o de procedencia, acá se avisa con el mismo texto.
     # La NCM dada de baja o que no está en el vigente, como en la validación
     # (CATALOGO-NCM-1): aviso, no freno.
     from proyecto_maria.core.controles_maria import avisos_de_ncm
@@ -5013,7 +5013,7 @@ async def avisos_maria_endpoint(
     if not items:
         avisos_valor = [SIN_PRODUCTOS, *avisos_valor]
     return {
-        "avisos": errores_de_procedencia(items) + kit_warnings + avisos_ncm + avisos_valor + supuestos,
+        "avisos": errores_de_pais(items) + kit_warnings + avisos_ncm + avisos_valor + supuestos,
         "supuestos": supuestos,
         "valor": valor,
     }

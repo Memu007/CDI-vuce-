@@ -110,8 +110,7 @@ reemplazar $F '            if juntos_de[n_renglon][0] == n_renglon:' '          
 caso "orden_ultimo" "FAILED $T::test_el_item_va_donde_aparece_su_primer_renglon"
 
 # 11. los grupos y sub-ítems a mano se mezclan con los automáticos
-reemplazar $F "        if item.get('grupo_id') is not None or item.get('subitems'):
-            continue" "        pass"
+reemplazar $F "        if item.get('grupo_id') is not None or item.get('subitems') or not pais_reconocido(origen_de(item)):" "        if not pais_reconocido(origen_de(item)):"
 caso "mezcla_a_mano" "FAILED $T::test_un_grupo_a_mano_y_los_subitems_a_mano_no_se_mezclan"
 
 # 12. el sobrante del redondeo va al primero y no al más grande

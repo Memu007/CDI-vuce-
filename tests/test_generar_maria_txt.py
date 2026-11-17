@@ -21,6 +21,7 @@ from proyecto_maria.core.maria_generator import (  # noqa: E402
     generate_maria_txt,
     validate_items_for_maria,
     get_pais_codigo,
+    supuestos_declarados,
 )
 from proyecto_maria.main import app  # noqa: E402
 
@@ -527,6 +528,28 @@ def test_generate_maria_usa_cuit_del_perfil(client):
     assert "CDDTAGR=20111222348" in resp.json()["content"]
 
 
+_CELULAR = {"pieza": "85171200900A", "descripcion": "Celular Samsung", "cantidad": 1, "valor_unitario": 300,
+            "peso_unitario": 0.2}
+
+
+def _pedir(client, ruta, items):
+    return client.post(ruta, json={
+        "comprador_cuit": "30999999995", "moneda": "DOL", "incoterm": "FOB", "fecha_emision": "18/07/2025",
+        "operation_id": "OP_ORIGEN", "items": items, "sbt_sufijo_valor": _SBT_TEST,
+    })
+
+
+def _fila_por_fila(vistos, esperado):
+    """El rojo nombra la primera fila distinta, en el orden de la familia, y lo visto en ella."""
+    for fila, visto in vistos.items():
+        assert visto == esperado[fila], repr(fila)
+
+
+def _con_origen(pais_origen, origen):
+    """El celular con esos campos de origen; None es que el campo no viene."""
+    return {**_CELULAR, **{k: v for k, v in (("pais_origen", pais_origen), ("origen", origen)) if v is not None}}
+
+
 def test_generate_maria_valida_el_origen_que_sale_en_el_txt(client):
     """La validación lee el mismo campo de origen que escribe el TXT."""
     _register(client, "maria_origen_txt")
@@ -542,20 +565,79 @@ def test_generate_maria_valida_el_origen_que_sale_en_el_txt(client):
     }
     vistos = {}
     for pais_origen, origen in familia:
-        item = {"pieza": "85171200900A", "descripcion": "Celular Samsung", "cantidad": 2, "valor_unitario": 300,
-                "peso_unitario": 0.2, "pais_origen": pais_origen, "origen": origen}
-        resp = client.post("/generate_maria", json={
-            "comprador_cuit": "30999999995", "moneda": "DOL", "incoterm": "FOB",
-            "fecha_emision": "18/07/2025", "operation_id": "OP_ORIGEN",
-            "items": [ITEMS_OK[0], {k: v for k, v in item.items() if v is not None}],
-            "sbt_sufijo_valor": _SBT_TEST,
-        })
+        resp = _pedir(client, "/generate_maria", [ITEMS_OK[0], _con_origen(pais_origen, origen)])
         if resp.status_code == 200:
             vistos[pais_origen, origen] = re.findall(r"^CARTPAYORI=(\d+)", resp.json()["content"], re.M)[1:]
         else:
             detalle = resp.json()["detail"]
             vistos[pais_origen, origen] = detalle["errors"] if isinstance(detalle, dict) else detalle
-    assert vistos == familia
+    _fila_por_fila(vistos, familia)
+
+
+def test_los_avisos_no_toman_un_origen_que_falta_como_china(client):
+    """Antes de generar, un origen vacío o no reconocido no se junta con China ni lleva la
+    procedencia y el estado por defecto: el aviso dice lo mismo con que generar frena."""
+    _register(client, "maria_avisos_origen")
+    def frena(error):
+        return [error], [error, "procedencia 1", "estado 1"]
+    falta = frena("Item 2: Falta origen/país de origen")
+    def no_reconocido(pais):
+        return frena(f"Item 2: Origen no reconocido '{pais}'. Debe indicar un país válido.")
+    # (pais_origen, origen) del segundo renglón; el primero es CN → (lo que dice generar, lo que
+    # dicen los avisos del origen, de los renglones que se juntan y de lo declarado por defecto).
+    familia = {
+        (None, "CN"): ("200", ["juntos 1 y 2", "procedencia 1, 2", "estado 1, 2"]),
+        (None, ""): falta, (None, "  "): falta, ("", None): falta, ("  ", None): falta,
+        (None, "XX"): no_reconocido("XX"), ("XX", "CN"): no_reconocido("XX"),
+        (None, "ATLANTIDA"): no_reconocido("ATLANTIDA"), ("ATLANTIDA", None): no_reconocido("ATLANTIDA"),
+    }
+    def que_dice(aviso):
+        if juntos := re.match(r"Sub-ítems: los renglones (.+?) van en un solo ítem", aviso):
+            return f"juntos {juntos[1]}"
+        if supuesto := re.match(r"(Procedencia|Estado)[^:]*: en el/los ítem\(s\) (.+?) se declaró", aviso):
+            return f"{supuesto[1].lower()} {supuesto[2]}"
+        return aviso if re.match(r"Item \d+: .*rigen", aviso) else None
+    vistos = {}
+    for pais_origen, origen in familia:
+        items = [dict(_CELULAR, origen="CN"), _con_origen(pais_origen, origen)]
+        resp = _pedir(client, "/generate_maria", items)
+        generar = "200" if resp.status_code == 200 else resp.json()["detail"]["errors"]
+        avisos = _pedir(client, "/generate_maria/avisos", items).json()["avisos"]
+        vistos[pais_origen, origen] = (generar, [d for d in map(que_dice, avisos) if d])
+    _fila_por_fila(vistos, familia)
+
+
+def test_cada_lugar_lee_el_origen_que_sale_en_el_txt(client):
+    """Un `pais_origen` en blanco (llega por la API) no tapa el `origen` en ningún lugar
+    que lo lee: la clave que junta renglones, la defensa del grupo y los dos supuestos."""
+    _register(client, "maria_origen_lugares")
+    blanco_br = dict(_CELULAR, cantidad=2, pais_origen="  ", origen="BR")
+    br = dict(_CELULAR, cantidad=4, origen="BR")
+
+    def items_del_txt(items):
+        resp = _pedir(client, "/generate_maria", items)
+        if resp.status_code != 200:
+            return resp.json()["detail"]
+        contenido = resp.json()["content"]
+        return list(zip(re.findall(r"^CARTPAYORI=(\d+)", contenido, re.M),
+                        re.findall(r"^QARTUNTDCL=([\d.]+)", contenido, re.M)))
+
+    def items_del_supuesto(items, inicio):
+        return [re.search(r"ítem\(s\) ([\d, ]+) ", s)[1] for s in supuestos_declarados(items) if s.startswith(inicio)]
+
+    # El segundo renglón de cada supuesto lleva aviso sólo si se lee su `origen`.
+    lugares = {
+        "clave de posición": (lambda: items_del_txt([dict(_CELULAR, origen="CN"), blanco_br, br]),
+                              [("310", "1.00"), ("203", "6.00")]),
+        "defensa del grupo": (lambda: items_del_txt([dict(blanco_br, grupo_id="1"), dict(br, grupo_id="1")]),
+                              [("203", "6.00")]),
+        "sin estado": (lambda: items_del_supuesto(
+            [dict(_CELULAR, pais_origen="  ", origen="AR", procedencia="AR"), blanco_br], "Estado"), ["2"]),
+        "sin procedencia": (lambda: items_del_supuesto([dict(_CELULAR, pais_origen="  "), blanco_br], "Procedencia"),
+                            ["2"]),
+    }
+    vistos = {k: medir() for k, (medir, _) in lugares.items()}
+    _fila_por_fila(vistos, {k: v for k, (_, v) in lugares.items()})
 
 
 def test_get_pais_codigo_vietnam_thailand_indonesia_malaysia():

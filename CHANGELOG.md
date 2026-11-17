@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-17 · fix: los avisos no toman como China un origen que falta (D269)
+
+- Antes de generar, un producto sin origen o con uno no reconocido («XX», «ATLANTIDA») ya no se junta con un renglón de China ni lleva la procedencia y el estado de importado por defecto: el aviso dice el mismo error del origen con que generar frena. Con orígenes válidos, los avisos y el TXT quedan iguales.
+
 ## 2026-11-17 · fix: generar el TXT valida el mismo origen que escribe (D263)
 
 - Con `pais_origen` y `origen` en un producto, la validación miraba `origen` y el TXT escribía `pais_origen`: un `pais_origen` no reconocido («4340», «ATLANTIDA») salía en el TXT o como China sin aviso, y un `pais_origen` válido sin `origen` frenaba. Ahora los dos leen el primero escrito; uno en blanco no tapa al otro. La pantalla, que manda sólo `origen`, sigue igual.
