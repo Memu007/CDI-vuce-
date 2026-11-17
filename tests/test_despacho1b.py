@@ -2051,13 +2051,14 @@ def test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar():
         inicio = time.process_time()
         try:
             with _tope_de_cpu(0.02):
-                while time.process_time() - inicio < 2:
-                    try:
+                # El try abarca el bucle entero: el tick también cae en la condición del while.
+                try:
+                    while time.process_time() - inicio < 2:
                         sum(range(10_000))
-                    except _DemasiadoTrabajo:
-                        if cortes:
-                            raise
-                        cortes += 1  # el que se tragó el finalizador
+                except _DemasiadoTrabajo:
+                    cortes += 1  # el que se tragó el finalizador
+                while time.process_time() - inicio < 2:
+                    sum(range(10_000))
         except _DemasiadoTrabajo:
             cortes += 1
     assert cortes == 2, cortes
