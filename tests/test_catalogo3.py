@@ -362,6 +362,28 @@ def test_un_codigo_sin_sigla_entra_por_el_despacho():
     assert [origen_iso2(f) for f in ("310", "310 CHINA", "203 BRASIL")] == ["CN", "CN", "BR"]
 
 
+def test_un_codigo_con_otro_pais_al_lado_no_da_ninguno():
+    from proyecto_maria.pdf_extractor import _iso2_por_codigo_maria
+    tabla = maria_generator._tabla_oficial()
+    js = maria_generator._PAISES_PANTALLA.read_text(encoding="utf-8")
+    paises = json.loads(re.search(r"const COUNTRIES = (\[.*?\]);", js).group(1))
+    # Los nombres de la tabla con paréntesis o punto, tal como están escritos.
+    con_signos = [(int(p["code"]), p["name"]) for p in paises if re.search(r"[(.]", p["name"])]
+    assert len(con_signos) > 40
+    propios = [f"{c:03d} {n}" for c, n in con_signos]
+    assert [origen_iso2(f) for f in propios] == [_iso2_por_codigo_maria().get(c, f"{c:03d}") for c, _ in con_signos]
+    ajenos = [f"{otro:03d} {n}" for c, n in con_signos for otro in (143, 310) if tabla[otro] != tabla[c]]
+    # Otro país escrito libre, y números que no son un código de tres cifras suelto.
+    ajenos += ["143 CHINA (MAINLAND)", "143 CHINA POPULAR", "310 (HONG KONG)", "212 VATICANO(SANTA SEDE)",
+               "143,00 310 CHINA", "143 310 CHINA", "143.5 CHINA", "212,00 310 CHINA", "143,00", "143.5", "143 310", "143 MADE IN USA"]
+    assert {f: o for f in ajenos if (o := origen_iso2(f)) is not None} == {}
+    # Sin otro país al lado gana el código; con un número fuera de la tabla, el país nombrado.
+    solos = {"143": "143", "143.": "143", "143 ORIGEN": "143", "143 REPUBLICA DE SUDAFRICA": "143",
+             "310 CHINA": "CN", "310 (CN)": "CN", "999 ATLANTIDA": "999",
+             "310 MADE IN CHINA": "CN", "900 · CHINA": "CN"}
+    assert {f: o for f, v in solos.items() if (o := origen_iso2(f)) != v} == {}
+
+
 def test_holanda_guardada_genera_423(client):
     """La memoria del cliente y el catálogo del proveedor devuelven el origen como se guardó, y eso,
     como origen y procedencia, genera 423."""
