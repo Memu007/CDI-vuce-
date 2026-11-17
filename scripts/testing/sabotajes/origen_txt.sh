@@ -27,7 +27,7 @@ sabotaje casos $G "origen manda sobre pais_origen" \
 sabotaje casos $G "un origen en blanco tapa al otro" \
   'return _primero_escrito(item, ("pais_origen", "origen"))' \
   'return str(item.get("pais_origen") or item.get("origen") or "")' \
-  "('  ', 'BR')" $CASO $LUGARES $AVISOS
+  "('  ', '  ')" $CASO $LUGARES $AVISOS
 sabotaje casos $G "el TXT vuelve a escribir su propio origen" \
   "        pais = origen_de(item)
         pais_codigo = get_pais_codigo(pais)
