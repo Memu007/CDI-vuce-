@@ -536,7 +536,7 @@ def test_generate_maria_valida_el_origen_que_sale_en_el_txt(client):
         return [f"Item 2: Origen no reconocido '{pais}'. Debe indicar un país válido."]
     familia = {
         ("4340", "CN"): no_reconocido("4340"), ("ATLANTIDA", "BR"): no_reconocido("ATLANTIDA"),
-        ("BR", None): ["203"], ("BR", ""): ["203"],
+        ("BR", None): ["203"], ("BR", ""): ["203"], ("BR", "ATLANTIDA"): ["203"],
         (None, None): falta, ("", ""): falta, ("  ", "  "): falta,
         ("", "BR"): ["203"], ("  ", "BR"): ["203"], (None, "BR"): ["203"],
     }
