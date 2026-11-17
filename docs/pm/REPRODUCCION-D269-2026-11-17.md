@@ -33,8 +33,19 @@ llegan a `get_pais_codigo` con un origen no reconocido.
 ## Cada lugar de `origen_de`, revertido de a uno
 
 Cambié `origen_de(item)` por la lectura cruda (`pais_origen or origen`, sin `strip`) en cada uno de los
-siete lugares, de a uno: cada uno da rojo en su fila de `test_cada_lugar_lee_el_origen_que_sale_en_el_txt`.
-Ese caso pasa sobre la base: es guarda, y lo prueba esta reversión.
+siete lugares, de a uno (`-k origen`, 5 casos). Los siete dan rojo:
+
+| Lugar revertido | Rojo |
+|---|---|
+| validación | `test_generate_maria_valida_el_origen_que_sale_en_el_txt`, `test_los_avisos_no_toman…` y la fila «clave de posición» |
+| clave de posición | fila «clave de posición» de `test_cada_lugar_lee_el_origen_que_sale_en_el_txt` |
+| lo que se junta en los avisos | fila «clave de posición» |
+| defensa del grupo | fila «defensa del grupo» |
+| generador | `test_generate_maria_valida…` y la fila «clave de posición» |
+| «sin procedencia» | fila «sin procedencia» |
+| «sin estado» | fila «sin estado» |
+
+Sin revertir nada: `5 passed`. `test_cada_lugar…` pasa sobre la base: es guarda, y lo prueba esta tabla.
 
 ## Mis negativos (avisos y generar, por el endpoint)
 
@@ -46,7 +57,7 @@ Ese caso pasa sobre la base: es guarda, y lo prueba esta reversión.
 | `origen` «999» | 200, 999 (OTROS PAISES, código válido de la tabla) | — |
 | `pais_origen` «Brasil» y `origen` CN | 203 (gana `pais_origen`) | no los junta |
 
-Avisos y generar coinciden en todos.
+Ningún aviso contradice a generar. Origen AR sin estado: los avisos no lo anticipan (riesgo abajo).
 
 ## Adversario (Sonnet, alto, sin red)
 
