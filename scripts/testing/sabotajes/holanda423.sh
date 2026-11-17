@@ -71,6 +71,9 @@ sabotaje pantalla $CLI "el catálogo del cliente muestra el código de lo escrit
 sabotaje pantalla $REV "la procedencia cambia en cada tecla" \
   "if (el.name === 'procedencia' && ev.type === 'change') el.value" "if (el.name === 'procedencia') el.value" \
   "FALLA: «4340» escrito tecla por tecla se ve «4230»"
+sabotaje pantalla $CLI "el origen frecuente se ve como vino" \
+  "CDI.paisesMaria.mostrar(metricas.origen_frecuente) || '—'" "metricas.origen_frecuente || '—'" \
+  "FALLA: el origen frecuente «434 · HOLANDA» se ve «434 · HOLANDA»"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
