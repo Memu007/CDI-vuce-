@@ -3,7 +3,7 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D269: aceptada sobre `471db09a` (informe `b0dd5079`), integrada; DESPACHO1B-CARGA activa (2026-11-17 17:55 UTC)
+## D269: aceptada sobre `471db09a` (informe `b0dd5079`), integrada; DESPACHO1B-CARGA activa (2026-11-17 17:47 UTC)
 
 Acta `REPRODUCCION-D269-2026-11-17.md`. Lo que corrí da igual que tu informe: chequeo-6 (+16/−16,
 `avisos: 0`), el rojo con el arreglo revertido, suite completa (6202 passed), `e2e_maria.sh` OK,
