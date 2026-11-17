@@ -244,23 +244,28 @@ def numero_ar(texto) -> float | None:
 
 
 def origen_iso2(texto) -> str | None:
-    """«310», «310 CHINA», «CHINA» o «CN» → «CN»; un país sin sigla, su código
-    («143»). None si no se reconoce o si el código y el nombre dicen países distintos."""
-    from proyecto_maria.core.maria_generator import codigo_de_pais
+    """«310», «310 CHINA», «CHINA» o «CN» → «CN». Un código sin sigla, solo o con
+    su nombre, da el código («143»); el nombre solo, el nombre. None si no se
+    reconoce o si el código y el nombre dicen países distintos."""
+    from proyecto_maria.core.maria_generator import _tabla_oficial, codigo_de_pais
     from proyecto_maria.pdf_extractor import _iso2_por_codigo_maria, _origen_desde_factura
 
     t = re.sub(r"\s+", " ", str(texto or "")).strip(" -/")
     if not t:
         return None
-    m = re.match(r"^(\d{3})\b[\s\-/]*(.*)$", t)
-    if m:
-        codigo, nombre = codigo_de_pais(m.group(1)), m.group(2).strip()
-        por_nombre = _origen_desde_factura(nombre) if nombre else None
-        # Con el nombre de su código: Chipre es 311 y también 435.
-        if codigo and por_nombre and codigo_de_pais(f"{codigo:03d} · {nombre}") is None:
-            return None
-        return _iso2_por_codigo_maria().get(codigo, f"{codigo:03d}") if codigo else por_nombre or None
-    return _origen_desde_factura(t) or None
+    # Sin la puntuación de alrededor, «143 · CHINA» o «143 (CHINA)» se compara con el código.
+    m = re.match(r"^(\d{3})\b\W*(.*?)\W*$", t)
+    if not m:
+        return _origen_desde_factura(t) or None
+    codigo, nombre = codigo_de_pais(m.group(1)), m.group(2)
+    por_nombre = _origen_desde_factura(nombre) if nombre else None
+    if not codigo:
+        return por_nombre or None
+    # Se compara el país y no el código: Chipre es 311 y también 435.
+    tabla = _tabla_oficial()
+    if por_nombre and tabla.get(codigo_de_pais(por_nombre)) != tabla[codigo]:
+        return None
+    return _iso2_por_codigo_maria().get(codigo, f"{codigo:03d}")
 
 
 def parsear_sufijo(linea: str) -> dict | None:
