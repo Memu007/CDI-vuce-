@@ -3,50 +3,41 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D269: aceptada sobre `471db09a` (informe `b0dd5079`), integrada; DESPACHO1B-CARGA activa (2026-11-17 17:47 UTC)
+## DESPACHO1B-CARGA: aceptada sobre `962bc88f` (informe `ee4aa981`), integrada; DESPACHO1B-CARGA-2 activa (2026-11-17 21:03 UTC)
 
-Acta `REPRODUCCION-D269-2026-11-17.md`. Lo que corrí da igual que tu informe: chequeo-6 (+16/−16,
-`avisos: 0`), el rojo con el arreglo revertido, suite completa (6202 passed), `e2e_maria.sh` OK,
-`origen_txt.sh` 13 `ROJO`, maria1d 8, maria3 32, maria4 8, maria8 70, `catalogo3.sh` «fallas: 0», y
-anclas como la base. Revertí los siete lugares de `origen_de` de a uno: los siete dan rojo (tabla en el acta). Mis
-negativos y un adversario de ~3700 entradas: avisos y TXT coinciden; nada nuevo de la pieza.
+Acta `REPRODUCCION-DESPACHO1B-CARGA-2026-11-17.md`. Lo que corrí da igual que tu informe: chequeo-6
+(+40/−24, `avisos: 0`), el archivo («285 passed») y el corte desarmado («6 failed», los seis tuyos).
+Con 7 corridas en paralelo no vi el rojo (0 de 7 en la base), pero sí el tick tragado: 7 de 7 en la
+base y 0 de 7 con el arreglo. Mi negativo: la base sola, sin carga, traga un tick 3 de 3 veces en el
+mismo caso. Así que el criterio 7 queda cerrado: la causa está en la prueba y la carga sólo agranda
+la ventana.
 
 **Respuestas (decidido por la PM):**
-- **D270** (procedencia de renglón no reconocida, juntada en los avisos): riesgo escrito, no pieza. No
-  hay camino de hoy: la procedencia de la operación fuera de la tabla da 400 en `_items_con_procedencia`
-  antes de avisos y de generar, y la pantalla no manda procedencia por renglón.
-- **Desvío del criterio 5:** aceptado como lo hiciste.
-- **D268** con su forma nueva, **`despachante.js:362`**, **grupo con orígenes válidos distintos** y
-  **origen AR sin estado en los avisos** (la pantalla y generar ya frenan): riesgos escritos en el acta.
-- **`grupo_id` como lista da 500** (del adversario, ya en `main`, sólo por API): riesgo escrito.
-- **Rojo intermitente de `test_despacho1b.py`:** es tu pieza nueva, abajo.
+- **D271:** ni (a) ni (b) todavía: no está medido. Es el primer paso de la pieza de abajo.
+- **D272:** (a), en la misma pieza.
+- **Riesgos** (generador suspendido, hilos con `ITIMER_PROF`, el costo de los `gc.collect()`):
+  escritos en el acta.
 
-## DESPACHO1B-CARGA: el rojo de `test_despacho1b.py` con la máquina cargada (pieza activa)
+## DESPACHO1B-CARGA-2: los dos casos con tope de CPU que quedan (pieza activa)
 
-Es de DESPACHO-1 (tu pieza, 🔵) y sin dato de afuera. Vos lo viste una vez en D269, y yo vi antes
-que los casos con tope de CPU chico (`limite_cpu_s=0.05`, `_tope_de_cpu(0.02)`) dependen de la carga
-de la máquina. Un rojo intermitente se diagnostica (`CLAUDE.md` §2): la suite tiene que dar lo mismo
-cargada o no.
+Es de DESPACHO-1 (🔵), sólo pruebas y sin dato de afuera.
 
 **Criterio (comportamiento y prueba):**
-1. Reproducí el rojo con la máquina cargada (por ejemplo, procesos que gastan CPU al lado) y nombrá
-   en el informe el caso, el assert y la causa medida.
-2. Con la misma carga, el caso da verde en todas las corridas que muestres (no una), y sigue
-   distinguiendo el defecto que cuida: con el corte del lector desarmado da rojo.
-3. El tope del producto no se afloja ni se saltea para que pase; sin esperas fijas ni reintentos. Si
-   la causa resulta estar en el producto y no en la prueba, frená con una D antes de tocarlo.
-4. Si cambia sólo la prueba: el archivo de pruebas, `despacho1b.sh` (con Postgres) si ancla lo
-   tocado, y chequeo-6. Si toca producto, revisión §3 fuerte.
-5. La familia: revisá los otros casos del archivo con tope de CPU o de tiempo; los que tengan la
-   misma causa van en el mismo arreglo, como datos.
-6. Punto de partida: `REPRODUCCION-DESPACHO1B-ROJO-2026-11-07.md`. Una pasada del recolector ya gastaba
-   el tope, y un caso se arregló con `gc.freeze()`; el de `limite_cpu_s=0.05` no tiene esa guarda.
-7. Si no se reproduce con una carga razonable, o la causa es el entorno y no la prueba, no arregles
-   nada: informá lo que mediste y frená con D271.
+1. **D271, primero medir.** `tests/test_rendimiento1d.py:97` (`test_el_texto_tiene_tope_de_cpu`)
+   lee con tope de 0,2 s dentro del proceso de pytest. Medí si ahí se traga un tick («Exception
+   ignored» que pasa por `cortar`): con el archivo solo y con tu carga de 7 corridas.
+   - Si aparece, el ayudante pasa a `tests/pdf_bombas.py`, una sola copia, y lo usan los dos
+     archivos.
+   - Si no aparece, no toques ese archivo: informá lo medido y queda como riesgo escrito.
+2. **D272.** En `test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar`, un tick que
+   cae en la condición del `while` ya no deja `cortes == 1`. Mostrá el antes y el después con tu
+   medición fuera de pytest (17 en 6000), y que el caso sigue en rojo con el corte desarmado.
+3. El tope del producto no se toca; sin esperas fijas ni reintentos.
+4. Puertas: los archivos tocados, `despacho1b.sh` con Postgres si ancla lo tocado, y chequeo-6.
 
 Tu rutina sigue prendida.
 
-**Próxima D: D271.**
+**Próxima D: D273.**
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 

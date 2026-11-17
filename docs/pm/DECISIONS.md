@@ -943,3 +943,13 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   `test_despacho1b.py` con la máquina cargada se diagnostica y se arregla sin aflojar el tope del
   producto. Es arreglo de DESPACHO-1 (su pieza), no cuenta aparte; lo demás de su cola espera a Emi
   (D266, D261) o a alguien de afuera.
+
+## 2026-11-17 21:03 UTC — DESPACHO1B-CARGA: aceptada sobre `962bc88f`
+
+- El rojo intermitente de `test_despacho1b.py` era de la prueba: lee dentro del proceso de pytest y
+  un tick del tope de CPU tragado por un finalizador ajeno rompía el aviso de pytest. Arreglo sólo de
+  pruebas (`producto +0/−0`); integrada en la rama de PM, sin publicar. Acta
+  `REPRODUCCION-DESPACHO1B-CARGA-2026-11-17.md`.
+- Decidido por la PM: D272 (a) y D271 se mide antes de decidir; los dos, en DESPACHO1B-CARGA-2, pieza
+  chica de pruebas de MARIA dentro de DESPACHO-1, no cuenta aparte.
+
