@@ -31,10 +31,14 @@ sabotaje casos $L "la puntuación tapa el nombre de otro país" \
   'r"^(\d{3})\b\W*(.*?)\W*$"' 'r"^(\d{3})\b[\s\-/]*(.*)$"' \
   "At index 4 diff: '143' != None" $CASO
 
-# 2. La pantalla de importar deja escribir el código de tres cifras.
+# 2. La pantalla de importar no corta lo que se escribe en el origen.
+ORIGEN="(campo === 'origen' ? ' autocapitalize"
 sabotaje pantalla $CLI "el origen del despacho vuelve a cortar en dos" \
-  "' maxlength=\"3\" autocapitalize" "' maxlength=\"2\" autocapitalize" \
+  "$ORIGEN" "(campo === 'origen' ? ' maxlength=\"2\" autocapitalize" \
   "FALLA: 1280 px: el panel no se cerró al guardar"
+sabotaje pantalla $CLI "el origen del despacho corta en tres" \
+  "$ORIGEN" "(campo === 'origen' ? ' maxlength=\"3\" autocapitalize" \
+  "FALLA: 1280 px: el origen «ARGELIA» escrito quedó \"ARG\""
 
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]

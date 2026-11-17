@@ -151,8 +151,9 @@ async function dentroDelAncho(page, ancho, selector, que) {
     // Corregido y con el kilo del rojo completado a mano: se guardan los tres.
     await page.locator('#cxDesp0_descripcion').fill('NOTEBOOK INVENTADA DE TIPO PORTATIL');
     await page.locator('#cxDesp2_kilo_neto').fill('5,00');
-    // Un país sin sigla se escribe con su código de tres cifras.
-    await page.locator('#cxDesp1_origen').fill('143');
+    // Un país sin sigla se escribe con su código de tres cifras, y un nombre no se corta («ARG» es Argentina).
+    const escritos = { 'NOTEBOOK INVENTADA DE TIPO PORTATIL': ['#cxDesp0_origen', 'ARGELIA'], 'TAPA INVENTADA AZUL': ['#cxDesp1_origen', '143'] };
+    for (const [campo, valor] of Object.values(escritos)) await page.locator(campo).fill(valor);
     await page.locator('#cxDespachoGuardar').click();
     await page.locator('#cxDespacho').waitFor({ state: 'hidden', timeout: 10000 }).catch(async () =>
       falla(ancho + ' px: el panel no se cerró al guardar; dice «' + await page.locator('#cxDespachoEstado').innerText() + '»'));
@@ -167,8 +168,10 @@ async function dentroDelAncho(page, ancho, selector, que) {
     if (!roja || roja.ncm !== '39269090' || roja.origen !== 'BR' || Math.abs(roja.peso_unitario_avg - 0.1) > 1e-9) {
       falla(ancho + ' px: la tapa roja quedó ' + JSON.stringify(roja));
     }
-    const azul = guardados.find(p => p.descripcion === 'TAPA INVENTADA AZUL');
-    if (!azul || azul.origen !== '143') falla(ancho + ' px: el origen «143» escrito quedó ' + JSON.stringify(azul && azul.origen));
+    for (const [descripcion, [, valor]] of Object.entries(escritos)) {
+      const p = guardados.find(g => g.descripcion === descripcion);
+      if (!p || p.origen !== valor) falla(ancho + ' px: el origen «' + valor + '» escrito quedó ' + JSON.stringify(p && p.origen));
+    }
     console.log('OK ' + ancho + ' px: 3 renglones, faltante marcado ' + JSON.stringify(faltantes) + ', nada guardado antes ni con error, ' +
       'guardados ' + JSON.stringify(enPantalla) + ', panel de ' + Math.round(medida.ancho) + ' px sin desbordes, página de ' + paginaAntes + ' px antes y después');
     await ctx.close();
