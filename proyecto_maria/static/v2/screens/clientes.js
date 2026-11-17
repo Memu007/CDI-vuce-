@@ -1136,7 +1136,7 @@
         kpiOps.textContent      = String(metricas.total_operaciones || 0);
         kpiItems.textContent    = String(metricas.total_items || 0);
         kpiPromedio.textContent = String(metricas.promedio_items_por_operacion || 0);
-        kpiOrigen.textContent   = metricas.origen_frecuente || '—';
+        kpiOrigen.textContent   = CDI.paisesMaria.mostrar(metricas.origen_frecuente) || '—';
         const v = Number(metricas.valor_total || 0);
         kpiValor.textContent = v > 0 ? formatMoney(v) : '—';
         kpiUltimo.textContent = metricas.ultimo_movimiento || '—';
@@ -1572,7 +1572,7 @@
     const DESPACHO_CAMPOS = [
         ['posicion_sim', 'Posición SIM'],
         ['descripcion', 'Descripción'],
-        ['origen', 'Origen (código de 2 letras)'],
+        ['origen', 'Origen (sigla o código)'],
         ['cantidad', 'Cantidad'],
         ['valor_unitario', 'Valor unitario'],
         ['kilo_neto', 'Kilo neto'],
@@ -1691,7 +1691,7 @@
                 ? '<textarea id="' + id + '" data-campo="' + campo + '" rows="2" maxlength="2000">' + CDI.escapeHtml(valor) + '</textarea>'
                 : '<input id="' + id + '" type="text" data-campo="' + campo + '" value="' + CDI.escapeHtml(valor) + '"' +
                   (DESPACHO_NUMEROS.includes(campo) ? ' inputmode="decimal" placeholder="1.234,56"' : '') +
-                  (campo === 'origen' ? ' maxlength="2" autocapitalize="characters"' : '') + '>';
+                  (campo === 'origen' ? ' maxlength="3" autocapitalize="characters"' : '') + '>';
             return '<div class="cx-despacho-campo' + (falta ? ' is-faltante' : '') + (campo === 'descripcion' ? ' is-ancho' : '') + '">' +
                 '<label for="' + id + '">' + CDI.escapeHtml(etiqueta) + '</label>' + control +
                 (notas.length ? '<span class="cx-despacho-nota">' + CDI.escapeHtml(notas.join(' · ')) + '</span>' : '') +
