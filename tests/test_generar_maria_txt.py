@@ -528,6 +528,22 @@ def test_generate_maria_usa_cuit_del_perfil(client):
     assert "CDDTAGR=20111222348" in resp.json()["content"]
 
 
+_CELULAR = {"pieza": "85171200900A", "descripcion": "Celular Samsung", "cantidad": 1, "valor_unitario": 300,
+            "peso_unitario": 0.2}
+
+
+def _pedir(client, ruta, items):
+    return client.post(ruta, json={
+        "comprador_cuit": "30999999995", "moneda": "DOL", "incoterm": "FOB", "fecha_emision": "18/07/2025",
+        "operation_id": "OP_ORIGEN", "items": items, "sbt_sufijo_valor": _SBT_TEST,
+    })
+
+
+def _con_origen(pais_origen, origen):
+    """El celular con esos campos de origen; None es que el campo no viene."""
+    return {**_CELULAR, **{k: v for k, v in (("pais_origen", pais_origen), ("origen", origen)) if v is not None}}
+
+
 def test_generate_maria_valida_el_origen_que_sale_en_el_txt(client):
     """La validación lee el mismo campo de origen que escribe el TXT."""
     _register(client, "maria_origen_txt")
@@ -543,31 +559,13 @@ def test_generate_maria_valida_el_origen_que_sale_en_el_txt(client):
     }
     vistos = {}
     for pais_origen, origen in familia:
-        item = {"pieza": "85171200900A", "descripcion": "Celular Samsung", "cantidad": 2, "valor_unitario": 300,
-                "peso_unitario": 0.2, "pais_origen": pais_origen, "origen": origen}
-        resp = client.post("/generate_maria", json={
-            "comprador_cuit": "30999999995", "moneda": "DOL", "incoterm": "FOB",
-            "fecha_emision": "18/07/2025", "operation_id": "OP_ORIGEN",
-            "items": [ITEMS_OK[0], {k: v for k, v in item.items() if v is not None}],
-            "sbt_sufijo_valor": _SBT_TEST,
-        })
+        resp = _pedir(client, "/generate_maria", [ITEMS_OK[0], _con_origen(pais_origen, origen)])
         if resp.status_code == 200:
             vistos[pais_origen, origen] = re.findall(r"^CARTPAYORI=(\d+)", resp.json()["content"], re.M)[1:]
         else:
             detalle = resp.json()["detail"]
             vistos[pais_origen, origen] = detalle["errors"] if isinstance(detalle, dict) else detalle
     assert vistos == familia
-
-
-_CELULAR = {"pieza": "85171200900A", "descripcion": "Celular Samsung", "cantidad": 1, "valor_unitario": 300,
-            "peso_unitario": 0.2}
-
-
-def _pedir(client, ruta, items):
-    return client.post(ruta, json={
-        "comprador_cuit": "30999999995", "moneda": "DOL", "incoterm": "FOB", "fecha_emision": "18/07/2025",
-        "operation_id": "OP_ORIGEN", "items": items, "sbt_sufijo_valor": _SBT_TEST,
-    })
 
 
 def test_los_avisos_no_toman_un_origen_que_falta_como_china(client):
@@ -595,8 +593,7 @@ def test_los_avisos_no_toman_un_origen_que_falta_como_china(client):
         return aviso if re.match(r"Item \d+: .*rigen", aviso) else None
     vistos = {}
     for pais_origen, origen in familia:
-        segundo = {**_CELULAR, **{k: v for k, v in (("pais_origen", pais_origen), ("origen", origen)) if v is not None}}
-        items = [dict(_CELULAR, origen="CN"), segundo]
+        items = [dict(_CELULAR, origen="CN"), _con_origen(pais_origen, origen)]
         resp = _pedir(client, "/generate_maria", items)
         generar = "200" if resp.status_code == 200 else resp.json()["detail"]["errors"]
         avisos = _pedir(client, "/generate_maria/avisos", items).json()["avisos"]

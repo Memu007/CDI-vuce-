@@ -115,7 +115,7 @@ reemplazar $X "    descripcion = _texto(item_data.get('descripcion'))" "    desc
 caso descripcion_numero "${T}test_una_descripcion_que_no_es_texto_no_tira_el_producto[pymupdf]"
 
 # 8. los avisos previos no dicen la procedencia rara de un producto
-reemplazar $M '"avisos": errores_de_pais(items) + ' '"avisos": '
+reemplazar $M '"avisos": errores_de_pais(items) + ' '"avisos": [e for e in errores_de_pais(items) if "Procedencia" not in e] + '
 caso procedencia_rara_sin_aviso "${T}test_procedencia_rara_de_un_producto_avisa_igual_antes_y_al_generar["
 
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
