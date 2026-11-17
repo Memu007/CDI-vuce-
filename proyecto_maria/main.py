@@ -5001,7 +5001,7 @@ async def avisos_maria_endpoint(
     else:
         if not cuit:
             supuestos = [FALTA_CUIT_DONDE_CARGARLO, *supuestos]
-    # Lo que al generar es un error de procedencia, acá se avisa con el mismo texto.
+    # Lo que al generar es un error de origen o de procedencia, acá se avisa con el mismo texto.
     # La NCM dada de baja o que no está en el vigente, como en la validación
     # (CATALOGO-NCM-1): aviso, no freno.
     from proyecto_maria.core.controles_maria import avisos_de_ncm

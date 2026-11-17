@@ -1860,8 +1860,8 @@ def _sim_position_error(ncm_raw: str) -> str | None:
 
 
 def errores_de_pais(items: list, desde: int = 1) -> list:
-    """El origen y la procedencia de cada producto que faltan o no se reconocen:
-    el mismo texto frena al generar y avisa antes."""
+    """El origen de cada producto que falta o no se reconoce, y la procedencia
+    escrita que no se reconoce: el mismo texto frena al generar y avisa antes."""
     errores = []
     for idx, item in enumerate(items or [], start=desde):
         if not isinstance(item, dict):
