@@ -301,7 +301,7 @@ def test_un_valor_vacio_no_corre_los_de_al_lado():
     assert not any("kilo" in a.lower() for a in r["avisos"])
 
 
-@pytest.mark.parametrize("origen", ["310 BRASIL", "999 ATLANTIDA", "ATLANTIDA"])
+@pytest.mark.parametrize("origen", ["310 BRASIL", "900 ATLANTIDA", "ATLANTIDA"])
 def test_origen_que_no_cierra_queda_faltante(origen):
     from proyecto_maria.core.despacho_lector import leer_texto
     r = leer_texto(_item_solo(origen=origen))["renglones"][0]
