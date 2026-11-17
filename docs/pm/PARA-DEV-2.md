@@ -8,7 +8,7 @@ contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 Acta `REPRODUCCION-D269-2026-11-17.md`. Lo que corrí da igual que tu informe: chequeo-6 (+16/−16,
 `avisos: 0`), el rojo con el arreglo revertido, suite completa (6202 passed), `e2e_maria.sh` OK,
 `origen_txt.sh` 13 `ROJO`, maria1d 8, maria3 32, maria4 8, maria8 70, `catalogo3.sh` «fallas: 0», y
-anclas como la base. Revertí cada lugar de `origen_de` de a uno: cada uno da rojo en su fila. Mis
+anclas como la base. Revertí los siete lugares de `origen_de` de a uno: los siete dan rojo (tabla en el acta). Mis
 negativos y un adversario de ~3700 entradas: avisos y TXT coinciden; nada nuevo de la pieza.
 
 **Respuestas (decidido por la PM):**
@@ -39,6 +39,10 @@ cargada o no.
    tocado, y chequeo-6. Si toca producto, revisión §3 fuerte.
 5. La familia: revisá los otros casos del archivo con tope de CPU o de tiempo; los que tengan la
    misma causa van en el mismo arreglo, como datos.
+6. Punto de partida: `REPRODUCCION-DESPACHO1B-ROJO-2026-11-07.md`. Una pasada del recolector ya gastaba
+   el tope, y un caso se arregló con `gc.freeze()`; el de `limite_cpu_s=0.05` no tiene esa guarda.
+7. Si no se reproduce con una carga razonable, o la causa es el entorno y no la prueba, no arregles
+   nada: informá lo que mediste y frená con D271.
 
 Tu rutina sigue prendida.
 
