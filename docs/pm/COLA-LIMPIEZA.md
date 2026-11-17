@@ -323,3 +323,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `a910c5f`): leer una constante de `paises_maria.js` está escrito tres veces; una sola función
   que reciba el nombre de la constante (D262 a). Ojo: dos líneas son anclas de sabotajes. Lo vio
   la Dev MARIA.
+- Tres reconocedores de país por nombre: `codigo_de_pais` con nombre (`maria_generator.py`),
+  `_origen_desde_factura` (`pdf_extractor.py`) y `_paises_nombrados` (`despacho_lector.py`); uno
+  solo, que usen los tres. Lo vio la Dev MARIA (D239 a).

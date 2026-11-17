@@ -900,3 +900,17 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   servidor), y el caso del «Origen frecuente» por `/metricas` (supuestos 1 y 2).
 - Decidido por la PM: aceptadas las pérdidas con aviso («402 ALEMANIA», «668 HONG KONG»…); no ponen
   un país equivocado.
+
+## 2026-11-17 08:53 UTC — D239 (a): vuelta aceptada sobre `01c28e83`
+
+- La vuelta de MARIA arregla la causa: el resto después del código se compara con los nombres y
+  alias conocidos; si nombra otro país o no se reconoce, queda sin origen con aviso. Integrada en
+  la rama de PM; sin publicar. Acta `REPRODUCCION-D239a-2026-11-17.md`.
+- Costo de D264 (a), escrito: la clase «un nombre que el índice no conoce deja ganar al código»
+  ya existía con siglas y ahora alcanza a los códigos sin sigla («435 República Dominicana» → 435).
+  Decidido por la PM: riesgo escrito (D266 ampliado a nombres en inglés y en castellano), porque
+  `origen_iso2` sólo lee el despacho impreso por el sistema oficial, que trae el nombre de la
+  tabla. Igual los dígitos de ancho completo («３１０ ＢＲ» → BR). Va a Emi como propuesta de alias.
+- Decidido por la PM: D267 riesgo escrito (ya estaba en la base); aceptado el AVISO de +43 líneas
+  y las pérdidas con aviso nuevas («310 12», «143 - REP. DE SUDAFRICA»…).
+- D263 (la validación y el TXT leen el mismo campo de origen) pasa a pieza activa de MARIA.

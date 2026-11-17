@@ -3,94 +3,58 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D239 (a): devolución sobre `196ef370` (informe `0364f07e`) (2026-11-17 03:05 UTC)
+## D239 (a): aceptada sobre `01c28e83` (informe `42cad854`), integrada; D263 activa (2026-11-17 08:53 UTC)
 
-Acta `REPRODUCCION-D239a-2026-11-17.md`. Lo que corrí da igual que tu informe (pruebas, rojo
-revertido, chequeo-6, `sin_sigla`, `holanda423`, `catalogo3`, `e2e_maria.sh`, volcado). Los 114
-códigos sin sigla funcionan y la tabla entera vuelve bien (616 formas, ninguna sin origen). Pero hay
-una devolución, y es una sola causa.
-
-**Causa:** al separar el código del nombre, lo que no se reconoce como nombre se descarta y gana el
-código, aunque ese resto nombre otro país. Así aparece en silencio el país del código, justo lo que
-el criterio 2 prohíbe. Ejemplos, con lo que daba la base y lo que da `196ef370`:
-
-| texto del despacho | base | `196ef370` |
-|---|---|---|
-| «143 CHINA (MAINLAND)» | CN | 143 (Sudáfrica) |
-| «310 HONG KONG (TERRITORIO DE CHINA)» | ninguno | CN |
-| «410 MADEIRA (TERRITORIO DE PORTUGAL)» | ninguno | ES |
-| «143,00 310 CHINA» | ninguno | 143 |
-| «143.5 CHINA» | ninguno | 143 |
-
-Los dos primeros grupos vienen de nombres de la tabla con paréntesis (unos 30). Los últimos, de un
-número pegado a otro número; ese camino (kilos que se superponen con la columna de origen en
-`leer_texto`) lo mostró el adversario, pero no lo reproduje con un PDF real.
-
-**Criterio de la vuelta (comportamiento y prueba):**
-1. Un texto que, además del código, nombra otro país (entre paréntesis, pegado o después de
-   números) da ningún origen y el aviso. Nunca el país del código en silencio.
-2. Un número que no es un código de tres cifras suelto («143,00», «143.5», «143 310») no se toma
-   como código.
-3. Un caso con la familia como datos: los nombres de la tabla con paréntesis o punto puestos al
-   lado de un código de otro país, y las formas de número de arriba. La lista de nombres sale de la
-   tabla, no escrita a mano. Lo de hoy que ya andaba (los 114, «143», «143 REPUBLICA DE
-   SUDAFRICA», «310 CHINA») sigue igual.
-4. El rojo de ese caso con el arreglo revertido, una vez en el informe.
-5. En la vuelta: suite completa y `despacho1b.sh` sobre el SHA (en ésta no los corrí yo), y
-   `e2e_maria.sh`.
-
-Sugerencia, no criterio: hoy el `\b` deja que «143,00» empiece con un código, y el `\W*$` final le
-saca a un nombre de la tabla su «)». Ese patrón además es cuadrático con textos largos de guiones
-(el adversario midió 9,2 s de CPU con 500 subítems armados a mano; yo, 0,018 s en una llamada
-contra 0,0001 s de la base). Eso es un riesgo que queda escrito, no criterio: necesita un PDF
-fabricado.
+Acta `REPRODUCCION-D239a-2026-11-17.md`, sección «Vuelta». Lo que corrí da igual que tu informe:
+chequeo-6 (+57/−14, un AVISO), el rojo con el arreglo revertido («At index 7 diff: None !=
+'RESTO (AFRICA)'»), suite completa (6199 passed), `sin_sigla` 16/16, `holanda423` 17/17,
+`e2e_maria.sh` OK, volcado igual a `196ef370` y anclas como la base. `despacho1b.sh` con
+Postgres sigue corriendo (11 ROJO y 0 sin rojo a las 08:51); si da un «sin rojo», la pieza se
+reabre. Cada código de la tabla con cada nombre o alias del índice, en cuatro formas (unas
+900 000), da 0 países equivocados (la base daba 434 918): eso vale para los nombres que el índice
+conoce. El ejemplo que no te di, «212 ARUBA (TERRITORIO DE PAISES BAJOS)», da ningún origen.
+El adversario (unas 2,5 millones de formas) no encontró país equivocado con texto ASCII.
 
 **Respuestas (decidido por la PM):**
-- **D264** (código con un nombre que no se reconoce): (a), gana el código, como hacía la base con
-  los códigos con sigla («310 XYZ» da CN). Con el límite del criterio 1: si el resto nombra otro
-  país, no gana.
-- **D265** (número fuera de la tabla con nombre con puntuación): (a), gana el país del nombre,
-  como en la base con «900 CHINA».
-- **Supuesto 1** (campo de origen sin tope de largo y etiqueta «Origen»; valida el servidor con
-  422): aceptado.
-- **Supuesto 2** (el caso del «Origen frecuente» contesta `/metricas` con «434 · HOLANDA»):
-  aceptado.
-- **Pérdidas con aviso** («402 ALEMANIA», «601 RUSIA», «668 HONG KONG», «653 ARUBA»… dan ningún
-  origen y el aviso): aceptadas. Son ruidosas y no ponen un país equivocado. Además, el nombre de la
-  tabla de cada uno sigue andando.
+- **AVISO +43 líneas netas:** aceptado con tu motivo. La línea de los tres reconocedores de país
+  entra a `COLA-LIMPIEZA.md` en este commit.
+- **D266, ampliado:** no son sólo nombres en inglés: cualquier nombre que el índice no conoce deja
+  ganar al código («435 República Dominicana» → 435, Chipre; ya pasaba en `196ef370`). Riesgo
+  escrito, no pieza: `origen_iso2` sólo lee el despacho impreso por el sistema oficial, que trae
+  el nombre de la tabla, y lo de pantalla pasa por `origen_para_catalogo`. Va a Emi como
+  propuesta de alias.
+- **Dígitos de ancho completo** («３１０ ＢＲ» → BR, nuevo de esta vuelta): el `\d` del patrón
+  acepta dígitos Unicode y `codigo_de_pais` no. Riesgo escrito, junto a la propuesta de alias;
+  no lo arregles ahora.
+- **D267** («900 SD» da Sudán, y SN, NO, SI, ROU): riesgo escrito; ya estaba en la base.
+- **Pérdidas con aviso de más** («310 12», «310 12,5 KG», «143 - REP. DE SUDAFRICA», «310 POR
+  MAR», «309 COREA (SUR)», «341 HONG KONG (CHINA)»…): aceptadas. Son ruidosas.
+- El tope de CPU de `test_despacho1b` queda como riesgo escrito; no es de esta pieza.
 
-## D239 (a), códigos sin sigla en el lector de despachos (la pieza, para la vuelta)
+## D263: la validación y el TXT leen el mismo campo (pieza activa)
 
-Emi dijo sí a D239 (`DECISIONS.md`, 2026-11-16 18:42 UTC); va después de Holanda→423. Es tu D239
-de `22e84e5d`, medida otra vez sobre `a910c5f`: 114 códigos de la tabla no tienen sigla de dos
-letras (`_iso2_por_codigo_maria`). Un despacho que trae uno solo («143») sale sin origen y con
-«No reconocí el origen…», y uno con código y nombre de países distintos elige el nombre
-(«143 CHINA» da CN). Lo guardado no se migra.
+Hoy `validate_items_for_maria` (`maria_generator.py`) revisa `item["origen"]`, pero el generador
+escribe `pais_origen` si viene y si no `origen`. Por la API (`MariaRequest.items` es una lista
+libre), un ítem con `pais_origen="4340"` y `origen="CN"` valida y sale `CARTPAYORI=4340`. La
+pantalla no manda `pais_origen`. Pieza de la PM (`DECISIONS.md`, 2026-11-16 23:30 UTC).
 
 **Criterio (comportamiento y prueba):**
-1. Un código de la tabla sin sigla, escrito solo o con su propio nombre, entra por el lector de
-   despachos, se guarda y genera ese código en el TXT (`CARTPAYORI`). La familia (los 114, con y
-   sin su nombre) como datos de un solo caso; la lista sale de la tabla, no escrita a mano.
-2. Código y nombre de países distintos dan ningún origen y el aviso, también cuando el código no
-   tiene sigla («143 CHINA», y uno con sigla como «310 BRASIL», que ya lo hace). Un código con
-   sigla, solo o con su nombre, sigue dando la sigla.
-3. La pantalla de importar un despacho muestra y deja guardar el origen de tres cifras (hoy el
-   campo corta en dos, `clientes.js:1692`), y lo que guarda llega igual al TXT.
-4. Un volcado antes y después del lector de despachos sobre las mismas formas que usaste en
-   Holanda (criterio 2): las únicas diferencias son los códigos sin sigla y los pares que se
-   contradicen. El diff va al informe.
-5. El rojo con el arreglo revertido, una vez en el informe.
-6. El «Origen frecuente» de las métricas del cliente (`clientes.js:1139`) con un 434 guardado se ve
-   como lo que sale en el TXT (423); los demás países, como hoy. Es una línea de la misma causa que
-   Holanda→423, en un archivo que ya tocás.
+1. La validación y el TXT leen el mismo campo. La familia, como datos en un caso:
+   - `pais_origen` no reconocido («4340») con `origen` válido: error que nombra el ítem, y
+     nunca llega a `CARTPAYORI`;
+   - `pais_origen` válido sin `origen`: hoy da «Falta origen»; tiene que comportarse según el
+     mismo campo que usa el TXT;
+   - ninguno de los dos: error, nunca el `'CN'` de respaldo;
+   - `pais_origen` vacío con `origen` válido: como hoy.
+2. Lo que manda la pantalla (sólo `origen`) sigue igual.
+3. El rojo con el arreglo revertido, una vez en el informe.
+4. Revisión §3 fuerte (cambia lo que sale en el TXT): suite completa, `e2e_maria.sh` sobre el SHA,
+   adversarios y los guiones que anclen lo que toques.
 
-**Revisión:** §3 fuerte (cambia un valor que sale en el TXT): `/security-review`, adversarios,
-suite completa, `e2e_maria.sh` sobre el SHA y los guiones que anclen lo que toques.
+Sugerencia, no criterio: un solo lugar que diga qué campo manda, y que lo usen la validación y el
+generador.
 
-**Lo que sigue en tu cola:** D263 (validación mira `origen`, el generador usa `pais_origen`), después
-de ésta; D262 (a) ya está en la cola de limpieza.
-
-**Próxima D: D266.**
+**Próxima D: D268.**
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 
