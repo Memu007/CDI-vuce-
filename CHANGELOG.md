@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-17 · fix: generar el TXT valida el mismo origen que escribe (D263)
+
+- Con `pais_origen` y `origen` en un producto, la validación miraba `origen` y el TXT escribía `pais_origen`: un `pais_origen` no reconocido («4340», «ATLANTIDA») salía en el TXT o como China sin aviso, y un `pais_origen` válido sin `origen` frenaba. Ahora los dos leen el primero escrito; uno en blanco no tapa al otro. La pantalla, que manda sólo `origen`, sigue igual.
+
 ## 2026-11-17 · fix: los países sin sigla entran por el despacho con su código (D239 a)
 
 - Un despacho con un código de país sin sigla de dos letras («143», «435 CHIPRE») guarda ese código y sale así en el TXT; un código con otro país nombrado al lado («143 CHINA», «310 (BRASIL)», «143 CHINA (MAINLAND)», «310 CHINA (VN)», «143 US 12») o un número que no es un código suelto («143,00 310 CHINA») quedan sin origen, con aviso; «435 CY» es Chipre y sale 435. El campo de origen de la importación ya no corta lo escrito: entra un código de tres cifras o un nombre («ARGELIA» quedaba «ARG», Argentina).

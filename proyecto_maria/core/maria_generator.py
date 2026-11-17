@@ -735,14 +735,23 @@ def codigo_de_pais(texto) -> int | None:
     return None
 
 
-def procedencia_de(item: dict) -> str:
-    """La procedencia propia del producto: la primera no vacía entre
-    `pais_procedencia` y `procedencia` (una en blanco no tapa la otra)."""
-    for clave in ("pais_procedencia", "procedencia"):
+def _primero_escrito(item: dict, claves: tuple) -> str:
+    """El primer valor no vacío entre `claves`: uno en blanco no tapa al otro."""
+    for clave in claves:
         valor = str(item.get(clave) or "").strip()
         if valor:
             return valor
     return ""
+
+
+def procedencia_de(item: dict) -> str:
+    """La procedencia propia del producto: `pais_procedencia` o `procedencia`."""
+    return _primero_escrito(item, ("pais_procedencia", "procedencia"))
+
+
+def origen_de(item: dict) -> str:
+    """El origen que sale en el TXT y que se valida: `pais_origen` o `origen`."""
+    return _primero_escrito(item, ("pais_origen", "origen"))
 
 
 def _estado_item(item: dict, idx, pais_codigo: int) -> int:
@@ -949,7 +958,7 @@ def clave_de_posicion(item: dict, donde, iva_por_defecto: str | None) -> tuple:
     """Lo que tienen que compartir dos renglones para ir en un solo ítem
     (MARIA-8): posición SIM, origen, procedencia y estado, y además lo que el
     ítem declara una sola vez (unidad, unidad estadística, IVA adicional)."""
-    pais = item.get('pais_origen') or item.get('origen', 'CN')
+    pais = origen_de(item)
     pais_codigo = get_pais_codigo(pais)
     unidad = get_unidad_codigo(item.get('unidad') or item.get('unidad_medida') or item.get('um'))
     iva = (_iva_adicional(item.get('iva_adicional'), f"Ítem {donde}")
@@ -1462,7 +1471,7 @@ def generate_maria_txt(operation_id: str, items: list,
         # Defensa en profundidad: el frontend lo valida, pero el endpoint de
         # generación también puede llamarse directamente.
         ncms = {str(it.get('ncm') or it.get('pieza') or '').replace('.', '').replace(' ', '').upper() for it in grupo_items}
-        origenes = {clave_de_origen(it.get('pais_origen') or it.get('origen')) for it in grupo_items}
+        origenes = {clave_de_origen(origen_de(it)) for it in grupo_items}
         # Las unidades, por su código: «kg» y «KGS», o «1» y «01», son la misma.
         unidades = {get_unidad_codigo(it.get('unidad') or it.get('unidad_medida') or it.get('um')) for it in grupo_items}
         if any(it.get('subitems') for it in grupo_items):
@@ -1549,7 +1558,7 @@ def generate_maria_txt(operation_id: str, items: list,
         valor_unit = float(item.get('valor_unitario', 0))
         valor_total = fobs[idx - 1]
         peso_kg = peso_de_la_linea(item)
-        pais = item.get('pais_origen') or item.get('origen', 'CN')
+        pais = origen_de(item)
         pais_codigo = get_pais_codigo(pais)
         # Procedencia: pais desde donde se despacha. Si no viene, se asume el
         # mismo que el origen (caso mas comun) en vez de un hardcode (antes 222,
@@ -1889,7 +1898,7 @@ def validate_items_for_maria(items: list) -> tuple[bool, list]:
         if not valor or float(valor) <= 0:
             errors.append(f"Item {idx}: Valor inválido")
             
-        origen = item.get('origen')
+        origen = origen_de(item)
         if not origen:
             errors.append(f"Item {idx}: Falta origen/país de origen")
         elif not pais_reconocido(origen):
@@ -2277,10 +2286,7 @@ def supuestos_declarados(
     for idx, item in enumerate(items or [], start=1):
         if not isinstance(item, dict):
             continue
-        # Mismo orden que el generador: pais_origen primero.
-        origen = item.get("pais_origen") or item.get("origen")
-        proc = procedencia_de(item)
-        if origen and not proc:
+        if origen_de(item) and not procedencia_de(item):
             sin_procedencia.append(str(idx))
         unidad = item.get("unidad") or item.get("unidad_medida") or item.get("um")
         if not unidad:
@@ -2310,7 +2316,7 @@ def supuestos_declarados(
     sin_estado = [
         str(idx) for idx, item in enumerate(items or [], start=1)
         if isinstance(item, dict) and item.get("estado") in (None, "")
-        and get_pais_codigo(item.get("pais_origen") or item.get("origen")) != PAIS_ARGENTINA
+        and get_pais_codigo(origen_de(item)) != PAIS_ARGENTINA
     ]
     if sin_estado:
         avisos.append(
