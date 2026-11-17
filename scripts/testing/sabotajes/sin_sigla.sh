@@ -20,7 +20,8 @@ DEVUELVE='return _iso2_por_codigo_maria().get(codigo, f"{codigo:03d}")'
 PAIS='tabla[c] != tabla[codigo]'
 LARGO='len("".join(nombre)) > 2'
 ENTRE='es_palabra(i - 1) and es_palabra(j)'
-ENTERO='return _origen_desde_factura(" ".join(re.findall(r"\w+", resto))) or None'
+NO_APLICA=' if palabras != ("NA",) else None'
+ENTERO="codigo = _paises_por_palabras().get(palabras)$NO_APLICA"
 
 # 1. El lector: el código sin sigla sale, y un código con otro país al lado no da ninguno.
 sabotaje casos $L "el código sin sigla no da origen" "$DEVUELVE" \
@@ -53,10 +54,12 @@ sabotaje casos $L "un número cuenta como palabra" "palabras[k].isalpha()" "True
 sabotaje casos $L "tres letras no cuentan entre dos palabras" "$LARGO" 'len("".join(nombre)) > 3' \
   "{'143 PRODUCTO USA ORIGINAL': '143'}" $AL_LADO
 sabotaje casos $L "fuera de la tabla, una palabra suelta da el país" "$ENTERO" \
-  "return _iso2_por_codigo_maria().get(min(_paises_nombrados(resto) or {0}))" \
+  "codigo = min(_paises_nombrados(resto) or {None})" \
   "'900 CAROLINA DEL SUR': 'SR'" $AL_LADO
-sabotaje casos $L "fuera de la tabla, el nombre no da el país" "$ENTERO" "return None" \
-  "{'900 (P.R. CHINA)': None, '900 TIMOR ORIENTAL': None, '900 · CHINA': None}" $AL_LADO
+sabotaje casos $L "fuera de la tabla, el nombre no da el país" "$ENTERO" "codigo = None" \
+  "At index 0 diff: None != 'REP CENTROAFRICANA'" $AL_LADO
+sabotaje casos $L "fuera de la tabla, «NA» es Namibia" "$NO_APLICA" "" \
+  "{'900 NA': 'NA'}" $AL_LADO
 
 # 2. La pantalla de importar no corta lo que se escribe en el origen.
 ORIGEN="(campo === 'origen' ? ' autocapitalize"
