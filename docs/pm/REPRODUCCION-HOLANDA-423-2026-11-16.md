@@ -105,7 +105,8 @@ adversario corrió pytest en el mismo worktree a la vez.
 ### Adversario (Opus alto, sin red, `GEMINI_API_KEY` vacía)
 
 Nada roto. Diferencial de 7759 textos: 1168 se ven 423 y esos mismos 1168 dan 423 en el TXT.
-Foco y salida sin tocar, en los tres lugares: ningún guardado. No corrió `holanda423.sh` (lo corrí
+Foco y salida sin tocar en el catálogo del cliente y en la revisión (`refocus.js`): ningún guardado. El
+catálogo del proveedor no lo cubrió ese guion. No corrió `holanda423.sh` (lo corrí
 yo, arriba).
 
 ### Criterios
@@ -116,6 +117,10 @@ yo, arriba).
 3. **Volcado:** 8042 formas, cambian sólo las 8 de Holanda.
 4. **Lo guardado no se reescribe:** `soloElNcm` y mi secuencia de arriba.
 5. **Rojo:** arriba.
+6. **Grilla de ítems** (`ncm.js:53`, `getOriginLabel`): «434», «0434», « 434 », «434 · HOLANDA»,
+   «434 - Holanda», «Holanda», «Países Bajos» y «NL» se ven «423 · PAISES BAJOS» en `a910c5f` y en
+   `b3a3bf69` (la función contra el `paises_maria.js` de cada SHA). Ese lugar ya estaba bien: mi
+   devolución lo nombró de más. «434 Holanda», sin separador, se ve como vino en los dos.
 
 ### Decisiones
 
@@ -126,5 +131,9 @@ yo, arriba).
   reprodujo por la API («434» en la métrica, 423 en el TXT). No vuelve a la generación, como pedía el
   criterio, y va como una línea de D239 (a), que ya toca `clientes.js`.
 - **Riesgo:** `mostrar` se llama sin guarda de `CDI.paisesMaria`; sin camino hoy.
+- **Sin `/security-review`** (la Dev no lo corrió; el informe dice por qué), decidido por la PM:
+  alcanza. El producto son 20 líneas de pantalla, sin rutas ni permisos, y cada salida de `mostrar`
+  va por `escapeHtml` o a `.value` (lo miré en el diff); el adversario Opus miró XSS.
 
-**No corrido por la PM:** `/security-review` propio; la CI.
+**No corrido por la PM:** `/security-review` propio; la CI; `e2e_maria.sh` sobre la unión, porque fuera
+de `docs/pm` y `.github` la unión no difiere de `b3a3bf69` (`git diff` vacío).
