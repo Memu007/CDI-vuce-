@@ -3,35 +3,15 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Tarea activa: CI-TOPE, el tope de la suite en la CI pasa de 20 a 30 minutos (2026-11-17 00:45 UTC)
+## CI-TOPE: aceptada sobre `c721f7fc` (informe `a0299443`) e integrada (2026-11-17 00:50 UTC)
 
-Emi dijo que sí al punto 14 el 17/11 a las 00:41 UTC. Pieza chica: va antes de cualquier otra cosa.
+Acta `REPRODUCCION-CI-TOPE-2026-11-17.md`. **Traé mi rama con `merge`.**
 
-**Por qué.** El job `tests` de `.github/workflows/ci.yml` corta a los 20 minutos (`ci.yml:15`).
-Hubo 9 cortes por tiempo sin ningún rojo antes del corte. La corrida de `ccd40350` murió al 88 %, o sea
-que la suite entera tarda unos 23 minutos. Las verdes tardaron entre 18 y 20 minutos (acta
-`REPRODUCCION-EXCEL2D-RELOJ-2026-11-13.md`).
+- Igual a tu informe: el diff fuera de `docs/pm` es la sola línea y el YAML da `tests` 30, `e2e-maria` 10.
+- Mi negativo: ningún paso de `ci.yml` trae otro tope (`grep` de `timeout`, `--max` y `pytest`).
+- La CI queda como no corrida: se ve en la próxima PR de publicación.
 
-**Comportamiento.**
-- El job `tests` tiene `timeout-minutes: 30`.
-- El job `e2e-maria` queda en 10.
-- No cambia ningún paso, ninguna deselección y ningún disparador.
-
-**Prueba.**
-- `git diff <base> <SHA> -- . ':!docs/pm'` es esa sola línea.
-- Una carga del YAML (por ejemplo, `yaml.safe_load`) muestra `tests` 30 y `e2e-maria` 10.
-- La CI corre sólo en un push o una PR a `main`, así que va como «no corrida». Se ve en la próxima PR
-  de publicación.
-
-**Lo que no hace falta:**
-- guion de sabotaje (no es §3);
-- línea en `CHANGELOG.md` (no es producto);
-- `chequeo-6`;
-- adversarios.
-
-Informe corto en `PARA-PM.md`: el SHA, el diff y la salida de la carga del YAML.
-
-Después de esto seguís esperando a Emi (D182, D206): no arranques otra cosa. **Próxima D: D231.**
+Seguís esperando a Emi (D182, D206): no arranques otra cosa; te aviso yo. **Próxima D: D231.**
 
 ## Aviso: MARIA toca `test_sufijos2.py` y `sabotajes/sufijos2.sh` (2026-11-14 PM)
 
@@ -57,7 +37,7 @@ Acta `REPRODUCCION-GUARDA-VERSION-2026-11-13.md`, sección «Vuelta 2».
   Acepto también el riesgo del tope: bajarlo sólo trae falsas alarmas.
 - D230 sigue con Emi (ahora no; va a la cola con los otros `async for`).
 
-**Lo que sigue espera a Emi** (D182, D206; el punto 14 ya es CI-TOPE, arriba): no arranques otra cosa;
+**Lo que sigue espera a Emi** (D182, D206): no arranques otra cosa;
 te aviso yo. **Próxima D: D231** (rango D228–D233).
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)

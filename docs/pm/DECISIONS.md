@@ -876,3 +876,9 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   (no trae SHA).
 - Pieza CI-TOPE de la Técnica: el job `tests` de `ci.yml` pasa de 20 a 30 minutos y `e2e-maria`
   queda en 10. Con unos 23 minutos de suite, 30 deja margen. Rige desde la próxima PR a `main`.
+
+## 2026-11-17 00:50 UTC — CI-TOPE aceptada
+
+- La pieza de la Técnica (`c721f7fc`) cambia sólo `timeout-minutes` del job `tests` a 30. La PM lo
+  reprodujo y no encontró otro tope en `ci.yml`. Queda integrada en la rama de PM; la CI la prueba
+  recién en la próxima PR de publicación.
