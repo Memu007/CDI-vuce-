@@ -3,60 +3,46 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## D263: aceptada sobre `9e5960d2` (informe `b039eabb`), integrada; D269 activa (2026-11-17 11:50 UTC)
+## D269: aceptada sobre `471db09a` (informe `b0dd5079`), integrada; DESPACHO1B-CARGA activa (2026-11-17 17:55 UTC)
 
-Acta `REPRODUCCION-D263-2026-11-17.md`. Lo que corrí da igual que tu informe: chequeo-6 (+19/−13,
-`avisos: 0`), el rojo con el arreglo revertido, suite completa (6200 passed), `e2e_maria.sh` OK,
-`origen_txt.sh` 4/4, maria3 32, maria4 8, maria8 70, `catalogo3.sh` «fallas: 0», y anclas como la base. Revertí cada uno de los
-seis lugares de `origen_de` de a uno: validación y generador dan rojo con tu caso; clave de posición,
-defensa del grupo y los dos supuestos quedan verdes, y cada uno cambia con una entrada mía (acta, y
-abajo en D269). Mis negativos por el endpoint con renglones
-juntos y con `grupo_id` dan, en cada 200, el valor validado, y muestran que la entrega arregla dos cosas de la base
-(«4340» salía en el TXT al juntarse, y un `pais_origen` en blanco rechazaba un grupo bueno).
-
-De D239 (a): mi `despacho1b.sh` con Postgres terminó: 136 `ROJO`, 0 sin rojo, `rc=0`. Se sostiene.
+Acta `REPRODUCCION-D269-2026-11-17.md`. Lo que corrí da igual que tu informe: chequeo-6 (+16/−16,
+`avisos: 0`), el rojo con el arreglo revertido, suite completa (6202 passed), `e2e_maria.sh` OK,
+`origen_txt.sh` 13 `ROJO`, maria1d 8, maria3 32, maria4 8, maria8 70, `catalogo3.sh` «fallas: 0», y
+anclas como la base. Revertí cada lugar de `origen_de` de a uno: cada uno da rojo en su fila. Mis
+negativos y un adversario de ~3700 entradas: avisos y TXT coinciden; nada nuevo de la pieza.
 
 **Respuestas (decidido por la PM):**
-- **D268** (el generador sin validar escribe 310): riesgo escrito, no pieza. El único llamador valida
-  antes; no hay camino de hoy. Si aparece otro llamador, su pieza lleva la validación.
-- **Unidad** (`unidad="  "` con `unidad_medida="KG"` sale 07): riesgo escrito. Sale con el aviso «la
-  unidad no se reconoce», y la pantalla manda sólo `unidad`. No va a la cola de limpieza.
-- **Cambios por API y sub-ítems:** aceptados como están; riesgos escritos en el acta.
-- **Sin caso propio:** no alcanza. `test_supuestos_leen_el_origen_como_el_generador` no cubre la clave
-  de posición (lee el aviso de estado con «CN»; la clave revertida quedó verde). Los cuatro lugares
-  sin caso van como criterio 5 de D269.
+- **D270** (procedencia de renglón no reconocida, juntada en los avisos): riesgo escrito, no pieza. No
+  hay camino de hoy: la procedencia de la operación fuera de la tabla da 400 en `_items_con_procedencia`
+  antes de avisos y de generar, y la pantalla no manda procedencia por renglón.
+- **Desvío del criterio 5:** aceptado como lo hiciste.
+- **D268** con su forma nueva, **`despachante.js:362`**, **grupo con orígenes válidos distintos** y
+  **origen AR sin estado en los avisos** (la pantalla y generar ya frenan): riesgos escritos en el acta.
+- **`grupo_id` como lista da 500** (del adversario, ya en `main`, sólo por API): riesgo escrito.
+- **Rojo intermitente de `test_despacho1b.py`:** es tu pieza nueva, abajo.
 
-## D269: los avisos no toman un origen que falta como China, y un caso por lugar de `origen_de` (pieza activa)
+## DESPACHO1B-CARGA: el rojo de `test_despacho1b.py` con la máquina cargada (pieza activa)
 
-Hallazgo del adversario de D263, ya estaba en la base. `/generate_maria/avisos` lee el origen con
-`get_pais_codigo(origen_de(item))`, que con un origen vacío o no reconocido da 310. La pantalla manda
-«XX» cuando el origen está en blanco (`finalize.js`). Con un ítem «CN» y otro igual con «XX», los avisos
-dicen «los renglones 1 y 2 van en un solo ítem (misma posición SIM, origen…)» y «Estado… 2 (nuevo sin
-uso importado) por defecto»; después generar frena con «Origen no reconocido 'XX'». El aviso engaña
-antes de generar. Pieza de la PM (`DECISIONS.md`, 2026-11-17).
+Es de DESPACHO-1 (tu pieza, 🔵) y sin dato de afuera. Vos lo viste una vez en D269, y yo vi antes
+que los casos con tope de CPU chico (`limite_cpu_s=0.05`, `_tope_de_cpu(0.02)`) dependen de la carga
+de la máquina. Un rojo intermitente se diagnostica (`CLAUDE.md` §2): la suite tiene que dar lo mismo
+cargada o no.
 
 **Criterio (comportamiento y prueba):**
-1. Con un ítem sin origen o con uno no reconocido, ningún aviso lo trata como China: no lo junta con
-   otro renglón ni le aplica el estado de importado. Un aviso nombra el ítem y dice lo mismo con que
-   generar va a frenar.
-2. La familia, como datos en un caso: vacío, en blanco, «XX», un nombre que no es país, y lo mismo
-   por `pais_origen`.
-3. Con orígenes válidos, los avisos y el TXT quedan como hoy.
-4. El rojo con el arreglo revertido, una vez en el informe.
-5. Los cuatro lugares de `origen_de` que hoy no tienen caso, como filas de datos en un caso
-   (`pais_origen` en blanco viene por la API, no por la pantalla):
-   - clave de posición: tres de la misma posición, uno CN, uno con `pais_origen` en blanco y `origen`
-     BR, y uno BR → 2 ART (los dos BR juntos);
-   - defensa del grupo: ese par BR con el mismo `grupo_id` → 200;
-   - «sin estado»: `pais_origen` en blanco, `origen` AR, procedencia AR → sin aviso de estado;
-   - «sin procedencia»: `pais_origen` en blanco sin `origen` → sin aviso de procedencia.
-   Al aceptar, en cada uno de los seis lugares cambio `origen_de(item)` por la lectura sin `strip`
-   (`pais_origen or origen`), de a uno, y falla la fila de ese lugar.
-6. Si tocás lo que comparte el TXT (`clave_de_posicion`, el agrupado), revisión §3 fuerte: suite
-   completa, `e2e_maria.sh` sobre el SHA y los guiones que anclen lo que toques. Si no, el caso, la
-   suite y `e2e_maria.sh`.
+1. Reproducí el rojo con la máquina cargada (por ejemplo, procesos que gastan CPU al lado) y nombrá
+   en el informe el caso, el assert y la causa medida.
+2. Con la misma carga, el caso da verde en todas las corridas que muestres (no una), y sigue
+   distinguiendo el defecto que cuida: con el corte del lector desarmado da rojo.
+3. El tope del producto no se afloja ni se saltea para que pase; sin esperas fijas ni reintentos. Si
+   la causa resulta estar en el producto y no en la prueba, frená con una D antes de tocarlo.
+4. Si cambia sólo la prueba: el archivo de pruebas, `despacho1b.sh` (con Postgres) si ancla lo
+   tocado, y chequeo-6. Si toca producto, revisión §3 fuerte.
+5. La familia: revisá los otros casos del archivo con tope de CPU o de tiempo; los que tengan la
+   misma causa van en el mismo arreglo, como datos.
 
-**Próxima D: D270.**
+Tu rutina sigue prendida.
+
+**Próxima D: D271.**
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 

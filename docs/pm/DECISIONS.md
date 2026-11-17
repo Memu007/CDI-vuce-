@@ -928,3 +928,18 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - D269, pieza de la PM para MARIA: los avisos toman un origen vacío o «XX» como China. Es arreglo de
   un defecto dentro de su cola, no algo nuevo: el aviso engaña antes de generar y se alcanza desde la
   pantalla, que manda «XX» con el origen en blanco.
+
+## 2026-11-17 17:55 UTC — D269: aceptada sobre `471db09a`
+
+- Los avisos ya no toman como China un origen que falta o no se reconoce: lo nombran con el mismo texto
+  con que frena generar, no lo juntan y no le ponen estado ni procedencia por defecto. Integrada en la
+  rama de PM con `9ec581db`; sin publicar. Acta `REPRODUCCION-D269-2026-11-17.md`.
+- Decidido por la PM: D270 (procedencia de renglón no reconocida, juntada en los avisos) riesgo
+  escrito, no pieza, como D268: la procedencia de la operación fuera de la tabla da 400 antes, y la
+  pantalla no manda procedencia por renglón. Aceptado el desvío del criterio 5.
+- Riesgos escritos, ya en la base: `grupo_id` como lista da 500 por API; origen AR sin estado y grupo con
+  orígenes válidos distintos no se anticipan en los avisos (la pantalla y generar frenan).
+- Decidido por la PM: DESPACHO1B-CARGA, pieza activa de MARIA. El rojo intermitente de
+  `test_despacho1b.py` con la máquina cargada se diagnostica y se arregla sin aflojar el tope del
+  producto. Es arreglo de DESPACHO-1 (su pieza), no cuenta aparte; lo demás de su cola espera a Emi
+  (D266, D261) o a alguien de afuera.
