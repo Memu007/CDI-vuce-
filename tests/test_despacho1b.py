@@ -977,6 +977,16 @@ def test_el_lector_no_hereda_los_secretos_del_proceso(monkeypatch):
 
 # --- DESPACHO-1b, devolución 20:07 -----------------------------------------
 
+@pytest.fixture
+def recolector_sin_la_suite():
+    # El lector corre en un proceso aparte. Acá el recolector pasaría por la suite dentro del tope: gasta
+    # tope, y un tick en un finalizador ajeno va al aviso de pytest, que otro tick rompe en error.
+    gc.freeze()
+    yield
+    gc.unfreeze()
+
+
+@pytest.mark.usefixtures("recolector_sin_la_suite")
 def test_un_pdf_que_da_mucho_trabajo_deja_de_leerse_por_tiempo_de_cpu():
     """20 hojas que comparten un contenido de 14 000 operaciones pesan 50 KB y
     costaban casi un segundo cada una: el tope de bytes no las frenaba."""
@@ -987,6 +997,7 @@ def test_un_pdf_que_da_mucho_trabajo_deja_de_leerse_por_tiempo_de_cpu():
     assert int(aviso.rsplit(" ", 1)[1].rstrip(".")) < 60, aviso
 
 
+@pytest.mark.usefixtures("recolector_sin_la_suite")
 def test_una_sola_hoja_cara_se_corta_en_el_tope_de_cpu():
     """Una hoja que cuesta más de 1 s: el tope se miraba sólo entre hojas y
     esa hoja se leía entera."""
@@ -1023,6 +1034,7 @@ def test_fuera_del_hilo_principal_el_tope_se_mira_entre_hojas():
     assert int(aviso.rsplit(" ", 1)[1].rstrip(".")) < 60, aviso
 
 
+@pytest.mark.usefixtures("recolector_sin_la_suite")
 def test_el_tope_de_cpu_deja_la_senal_como_estaba():
     import signal
     from proyecto_maria.core.despacho_lector import leer_despacho
@@ -1982,6 +1994,7 @@ def test_el_tope_de_cpu_cubre_entender_el_texto():
     assert any(a.startswith("El PDF da demasiado trabajo") for a in medido["resultado"]["avisos"]), medido
 
 
+@pytest.mark.usefixtures("recolector_sin_la_suite")
 def test_las_hojas_leidas_antes_del_corte_dan_sus_productos(monkeypatch):
     """Las dos hojas del despacho y después una hoja cara: el corte deja tope
     para entender lo que ya se leyó."""
@@ -2006,17 +2019,12 @@ def test_las_hojas_leidas_antes_del_corte_dan_sus_productos(monkeypatch):
             pdf.add_page(hoja)
     salida = io.BytesIO()
     pdf.write(salida)
-    # El lector corre en un proceso aparte. Acá comparte la memoria de la suite,
-    # y una pasada completa del recolector sobre esa memoria gasta el tope que queda.
-    gc.freeze()
-    try:
-        r = leer_despacho(salida.getvalue(), limite_cpu_s=1.0)
-    finally:
-        gc.unfreeze()
+    r = leer_despacho(salida.getvalue(), limite_cpu_s=1.0)
     assert r["renglones"] == _leer()["renglones"], r["avisos"]
     assert r["avisos"][0] == "El PDF da demasiado trabajo: leí hasta la hoja 2.", r["avisos"]
 
 
+@pytest.mark.usefixtures("recolector_sin_la_suite")
 def test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado():
     from proyecto_maria.core.despacho_lector import AVISO_SIN_TEXTO, leer_despacho
     from tests.pdf_bombas import una_hoja_cara
@@ -2026,6 +2034,7 @@ def test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado():
     assert [a.startswith("El PDF da demasiado trabajo") for a in r["avisos"]] == [True], r
 
 
+@pytest.mark.usefixtures("recolector_sin_la_suite")
 def test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar():
     # Si la señal cae dentro de un callback de weakref, Python ignora la
     # excepción: con un solo disparo, la hoja se leía sin tope.
