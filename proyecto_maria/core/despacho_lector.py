@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import io
 import json
 import logging
@@ -243,26 +244,56 @@ def numero_ar(texto) -> float | None:
     return float(t.replace(".", "").replace(",", "."))
 
 
+@functools.lru_cache(maxsize=1)
+def _paises_por_palabras() -> dict:
+    """Las palabras de cada nombre o alias de país, sin la puntuación → su código."""
+    from proyecto_maria.core.maria_generator import _nombres_de_pais, codigo_de_pais
+
+    indice = {tuple(re.findall(r"\w+", n)): codigo_de_pais(f"{c:03d}") for n, c in _nombres_de_pais().items()}
+    return {palabras: c for palabras, c in indice.items() if c}
+
+
+def _paises_nombrados(texto) -> set:
+    """Los códigos de los países que nombra el texto: desde cada palabra, el nombre más largo.
+    Dos letras cuentan sólo si es lo único escrito: «ZA» sí, el «IN» de «MADE IN USA» no."""
+    from proyecto_maria.core.maria_generator import _normalizar_pais
+
+    indice = _paises_por_palabras()
+    palabras = re.findall(r"\w+", _normalizar_pais(texto))
+    largo = max(map(len, indice))
+    nombrados, i = set(), 0
+    while i < len(palabras):
+        for j in range(min(len(palabras), i + largo), i, -1):
+            nombre = tuple(palabras[i:j])
+            if nombre in indice and (len(palabras) == 1 or len("".join(nombre)) > 2):
+                nombrados.add(indice[nombre])
+                break
+        else:
+            j = i + 1
+        i = j
+    return nombrados
+
+
 def origen_iso2(texto) -> str | None:
     """«310», «310 CHINA», «CHINA» o «CN» → «CN»; un código sin sigla da el código («143»).
-    None si no se reconoce o si el código y el nombre dicen países distintos."""
+    None si no se reconoce o si al lado del código se nombra otro país."""
     from proyecto_maria.core.maria_generator import _tabla_oficial, codigo_de_pais
     from proyecto_maria.pdf_extractor import _iso2_por_codigo_maria, _origen_desde_factura
 
     t = re.sub(r"\s+", " ", str(texto or "")).strip(" -/")
     if not t:
         return None
-    # Sin la puntuación de alrededor, «143 · CHINA» o «143 (CHINA)» se compara con el código.
-    m = re.match(r"^(\d{3})\b\W*(.*?)\W*$", t)
+    # «143,00», «143.5» o «143 310» no empiezan con un código.
+    m = re.match(r"(\d{3})\b(?!\W*\d)(.*)", t)
     if not m:
         return _origen_desde_factura(t) or None
-    codigo, nombre = codigo_de_pais(m.group(1)), m.group(2)
-    por_nombre = _origen_desde_factura(nombre) if nombre else None
-    if not codigo:
-        return por_nombre or None
+    codigo, resto = codigo_de_pais(m.group(1)), m.group(2)
+    nombrados = _paises_nombrados(resto)
+    if codigo is None and len(nombrados) == 1:
+        codigo = nombrados.pop()
     # Se compara el país y no el código: Chipre es 311 y también 435.
     tabla = _tabla_oficial()
-    if por_nombre and tabla.get(codigo_de_pais(por_nombre)) != tabla[codigo]:
+    if codigo is None or any(tabla[c] != tabla[codigo] for c in nombrados):
         return None
     return _iso2_por_codigo_maria().get(codigo, f"{codigo:03d}")
 
