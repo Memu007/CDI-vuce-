@@ -19,38 +19,44 @@ AL_LADO=test_un_codigo_con_otro_pais_al_lado_no_da_ninguno
 DEVUELVE='return _iso2_por_codigo_maria().get(codigo, f"{codigo:03d}")'
 PAIS='tabla[c] != tabla[codigo]'
 LARGO='len("".join(nombre)) > 2'
+ENTRE='es_palabra(i - 1) and es_palabra(j)'
+ENTERO='return _origen_desde_factura(" ".join(re.findall(r"\w+", resto))) or None'
 
 # 1. El lector: el código sin sigla sale, y un código con otro país al lado no da ninguno.
 sabotaje casos $L "el código sin sigla no da origen" "$DEVUELVE" \
   "return _iso2_por_codigo_maria().get(codigo)" \
-  "At index 0 diff: '310' != '143'" $CASO
+  "At index 0 diff: '310' != '143'" $CASO $AL_LADO
 sabotaje casos $L "código y nombre de dos países dan el código" \
-  "if codigo is None or any($PAIS for c in nombrados):" "if codigo is None:" \
-  "At index 0 diff: '143' != None" $CASO
+  "if any($PAIS for c in _paises_nombrados(resto)):" "if False:" \
+  "At index 0 diff: '143' != None" $CASO $AL_LADO
 sabotaje casos $L "se compara el código y no el país" \
   "$PAIS" "c != codigo" \
-  "diff: '310' != '435'" $CASO
+  "diff: '310' != '435'" $CASO $AL_LADO
 sabotaje casos $L "la puntuación tapa el nombre de otro país" \
   'palabras = re.findall(r"\w+", _normalizar_pais(texto))' "palabras = _normalizar_pais(texto).split()" \
-  "At index 187 diff: '310' != '653'" $CASO
+  "At index 147 diff: '310' != '271'" $CASO $AL_LADO
 sabotaje casos $L "lo que no es un nombre entero se descarta" \
-  "nombrados = _paises_nombrados(resto)" "nombrados = {codigo_de_pais(resto.strip())} - {None}" \
-  "{'143 CHINA POPULAR': '143', '143 MADE IN USA': '143', '310 (HONG KONG)': 'CN'}" $AL_LADO
+  "_paises_nombrados(resto)" "{codigo_de_pais(resto.strip())} - {None}" \
+  "{'143 CHINA POPULAR': '143'}" $CASO $AL_LADO
 sabotaje casos $L "gana el nombre más corto" \
   "range(min(len(palabras), i + largo), i, -1)" "range(i + 1, min(len(palabras), i + largo) + 1)" \
-  "At index 12 diff: None != '229'" $AL_LADO
+  "At index 125 diff: '310' != '229'" $CASO $AL_LADO
 sabotaje casos $L "un número pegado al código es código" \
   'r"(\d{3})\b(?!\W*\d)(.*)"' 'r"(\d{3})\b(.*)"' \
   "{'143 310': '143', '143,00': '143', '143.5': '143'}" $AL_LADO
-sabotaje casos $L "dos letras cuentan dentro de un texto" "$LARGO" 'len("".join(nombre)) > 0' \
-  "{'310 MADE IN CHINA': None}" $AL_LADO
-sabotaje casos $L "tres letras cuentan sólo solas" "$LARGO" 'len("".join(nombre)) > 3' \
-  "{'143 MADE IN USA': '143'}" $AL_LADO
-sabotaje casos $L "un número fuera de la tabla no toma el país nombrado" \
-  "    if codigo is None and len(nombrados) == 1:
-        codigo = nombrados.pop()
-" "" \
-  "{'900 · CHINA': None}" $AL_LADO
+sabotaje casos $L "dos letras cuentan entre dos palabras" "or not ($ENTRE)" "or True" \
+  "{'310 MADE IN CHINA': None, '310 PAIS DE ORIGEN': None}" $AL_LADO
+sabotaje casos $L "dos letras junto a una palabra no cuentan" "$ENTRE" "es_palabra(i - 1) or es_palabra(j)" \
+  "{'310 CHINA (AD)': 'CN'}" $AL_LADO
+sabotaje casos $L "un número cuenta como palabra" "palabras[k].isalpha()" "True" \
+  "{'310 CHINA AD 125': 'CN'}" $AL_LADO
+sabotaje casos $L "tres letras no cuentan entre dos palabras" "$LARGO" 'len("".join(nombre)) > 3' \
+  "{'143 PRODUCTO USA ORIGINAL': '143'}" $AL_LADO
+sabotaje casos $L "fuera de la tabla, una palabra suelta da el país" "$ENTERO" \
+  "return _iso2_por_codigo_maria().get(min(_paises_nombrados(resto) or {0}))" \
+  "'900 CAROLINA DEL SUR': 'SR'" $AL_LADO
+sabotaje casos $L "fuera de la tabla, el nombre no da el país" "$ENTERO" "return None" \
+  "{'900 (P.R. CHINA)': None, '900 TIMOR ORIENTAL': None, '900 · CHINA': None}" $AL_LADO
 
 # 2. La pantalla de importar no corta lo que se escribe en el origen.
 ORIGEN="(campo === 'origen' ? ' autocapitalize"
