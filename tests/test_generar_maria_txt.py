@@ -530,15 +530,18 @@ def test_generate_maria_usa_cuit_del_perfil(client):
 def test_generate_maria_valida_el_origen_que_sale_en_el_txt(client):
     """La validación lee el mismo campo de origen que escribe el TXT."""
     _register(client, "maria_origen_txt")
-    # (pais_origen, origen) del segundo ítem → el CARTPAYORI que sale, o None si tiene que frenar.
+    # (pais_origen, origen) del segundo ítem → el CARTPAYORI que sale, o los errores con que frena.
+    falta = ["Item 2: Falta origen/país de origen"]
+    def no_reconocido(pais):
+        return [f"Item 2: Origen no reconocido '{pais}'. Debe indicar un país válido."]
     familia = {
-        ("4340", "CN"): None, ("ATLANTIDA", "BR"): None,
-        ("BR", None): "203", ("BR", ""): "203",
-        (None, None): None, ("", ""): None, ("  ", "  "): None,
-        ("", "BR"): "203", ("  ", "BR"): "203", (None, "BR"): "203",
+        ("4340", "CN"): no_reconocido("4340"), ("ATLANTIDA", "BR"): no_reconocido("ATLANTIDA"),
+        ("BR", None): ["203"], ("BR", ""): ["203"],
+        (None, None): falta, ("", ""): falta, ("  ", "  "): falta,
+        ("", "BR"): ["203"], ("  ", "BR"): ["203"], (None, "BR"): ["203"],
     }
     vistos = {}
-    for (pais_origen, origen), _ in familia.items():
+    for pais_origen, origen in familia:
         item = {"pieza": "85171200900A", "descripcion": "Celular Samsung", "cantidad": 2, "valor_unitario": 300,
                 "peso_unitario": 0.2, "pais_origen": pais_origen, "origen": origen}
         resp = client.post("/generate_maria", json={
@@ -550,10 +553,9 @@ def test_generate_maria_valida_el_origen_que_sale_en_el_txt(client):
         if resp.status_code == 200:
             vistos[pais_origen, origen] = re.findall(r"^CARTPAYORI=(\d+)", resp.json()["content"], re.M)[1:]
         else:
-            errores = resp.json()["detail"]["errors"]
-            del_origen = errores and all(e.startswith("Item 2: ") and "rigen" in e for e in errores)
-            vistos[pais_origen, origen] = None if del_origen else errores
-    assert vistos == {k: v and [v] for k, v in familia.items()}
+            detalle = resp.json()["detail"]
+            vistos[pais_origen, origen] = detalle["errors"] if isinstance(detalle, dict) else detalle
+    assert vistos == familia
 
 
 def test_get_pais_codigo_vietnam_thailand_indonesia_malaysia():
