@@ -32,7 +32,7 @@ Corren los 50 archivos de prueba que tocan el generador, con `-x`.
 
 | lugar revertido | con las pruebas | entrada que lo distingue (mía, `9e5960d2` → revertido) |
 |---|---|---|
-| validación | rojo: el caso de la Dev | |
+| validación | rojo: el caso de la Dev; también con `pais_origen or origen` sin `strip` («  »/BR da «Origen no reconocido '  '») | |
 | generador | rojo: el caso de la Dev | |
 | clave de posición | verde (2641 passed) | tres de la misma posición, un CN, `pais_origen` en blanco con `origen` BR, y un BR: 2 ART [310, 203] → 3 ART [310, 203, 203] |
 | defensa del grupo | verde (2641 passed) | el mismo par BR con `grupo_id` g1: 200 → 400 «Grupo g1: todos los ítems deben tener el mismo origen» |
