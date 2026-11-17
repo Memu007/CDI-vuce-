@@ -375,10 +375,10 @@ def test_un_codigo_con_otro_pais_al_lado_no_da_ninguno():
     ajenos = [f"{otro:03d} {n}" for c, n in con_signos for otro in (143, 310) if tabla[otro] != tabla[c]]
     # Otro país escrito libre, y números que no son un código de tres cifras suelto.
     ajenos += ["143 CHINA (MAINLAND)", "143 CHINA POPULAR", "310 (HONG KONG)", "212 VATICANO(SANTA SEDE)",
-               "143,00 310 CHINA", "143 310 CHINA", "143.5 CHINA", "212,00 310 CHINA", "143,00", "143.5", "143 310", "143 MADE IN USA"]
+               "143,00 310 CHINA", "143 310 CHINA", "143.5 CHINA", "212,00 310 CHINA", "143,00", "143.5", "143 310", "143 MADE IN USA", "143 PRODUCTO USA ORIGINAL"]
     # La sigla de dos letras de otro país junto a un nombre o un número.
     siglas = sorted({s for s in _iso2_por_codigo_maria().values() if len(s) == 2} - {"CN"})
-    ajenos += [f for s in siglas for f in (f"310 CHINA ({s})", f"310 {s} 2", f"310 · {s} · 2")]
+    ajenos += [f for s in siglas for f in (f"310 CHINA ({s})", f"310 CHINA {s} 125", f"310 · {s} · 2")]
     # Fuera de la tabla, una palabra suelta no es el nombre de un país («MAR» es Marruecos, «NA» no aplica).
     ajenos += ["900 MAR DEL PLATA", "900 CAROLINA DEL SUR", "900 CHINA TAIPEI", "900 MADE IN VN CHINA", "900 NA"]
     assert {f: o for f in ajenos if (o := origen_iso2(f)) is not None} == {}
