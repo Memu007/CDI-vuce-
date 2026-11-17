@@ -230,10 +230,10 @@ sabotaje $J "la pantalla da 423 para 434 con el nombre de otro país" \
   "|| ALIASES[nombre] === numero ? numero : '';" \
   "|| ALIASES[nombre] === numero || (code[1] !== numero && ALIASES[nombre]) ? numero : '';" \
   "item: ('434 · BELGICA', '423', '')"
-sabotaje proyecto_maria/core/despacho_lector.py "el despacho con 434 vuelve a quedar sin origen" \
-  'por_codigo = _iso2_por_codigo_maria().get(codigo_de_pais(codigo))' \
-  'por_codigo = _iso2_por_codigo_maria().get(int(codigo))' \
-  "AssertionError: origen_iso2"
+sabotaje proyecto_maria/core/despacho_lector.py "el despacho toma cualquier número de tres cifras como código" \
+  'codigo, nombre = codigo_de_pais(m.group(1)), m.group(2).strip()' \
+  'codigo, nombre = int(m.group(1)), m.group(2).strip()' \
+  "where '434' = origen_iso2('４３４')"
 sabotaje $G "un grupo con dos países vuelve a generar" \
   "        if len(origenes) != 1:" "        if False:" \
   "FAILED $H"
