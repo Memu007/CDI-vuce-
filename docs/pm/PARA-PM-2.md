@@ -2,300 +2,274 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## Entrega Holanda→423, vuelta sobre `b3a3bf69` (2026-11-17 00:35 UTC)
+## Entrega D239 (a), códigos sin sigla en el lector de despachos, sobre `196ef370` (02:24 UTC)
 
-**Resultado.** Los cinco criterios de tu devolución se cumplen en `b3a3bf69` (base `a910c5f`).
-Un origen guardado o escrito con el 434 («434», «0434», « 434 », el número 434, «434 · HOLANDA»,
-«434 - Holanda», «434 · PAISES BAJOS») se ve **423** en el catálogo del proveedor, en el del cliente
-y en la procedencia de la revisión; lo demás se ve como vino. Lo guardado no se reescribe, tampoco
-al guardar otra cosa de la fila. `producto +20/−8` en cuatro JS: `paises_maria.js` suma
-`mostrar(value)` y la usan `catalogo.js`, `clientes.js` y `review.js`.
+**Resultado.** Los seis criterios se cumplen en `196ef370` (base `2e69a0b1`). Un código de la tabla sin
+sigla de dos letras («143», «143 REPUBLICA DE SUDAFRICA», «435 CHIPRE») entra por el lector, se guarda
+como «143» y sale `CARTPAYORI=143`. Código y nombre de países distintos («143 CHINA», «310 BRASIL»,
+también «143 · CHINA» o «310 (BRASIL)») quedan sin origen y con el aviso. La pantalla de importar deja
+escribir y guardar «143» y «ARGELIA» enteros. El «Origen frecuente» con «434 · HOLANDA» se ve «423».
+`producto +19/−15`: `origen_iso2` (`despacho_lector.py`) y tres líneas de `clientes.js`.
 
-**Lo que decidís vos** (supuestos; ninguna D nueva, la próxima sería D264):
-- **Supuesto 4: se ve el código «423», no la etiqueta «423 · PAISES BAJOS».** Tu criterio dice «lo
-  que sale en el TXT», el campo del cliente tiene `maxlength=3`, y mostrar etiquetas es D261.
-  Consecuencia que encontró `/code-review`: «434 · PAISES BAJOS» guardado se ve «423», y
-  «423 · PAISES BAJOS» guardado se sigue viendo con el nombre. Si preferís la etiqueta para lo
-  reemplazado, es cambiar `resolve(value)` por `label(value)` dentro de `mostrar`.
-- **Supuesto 5: guardar una fila del catálogo del proveedor manda el origen sólo si se cambió.** Era
-  necesario para el criterio 4: la fila muestra «423» y antes mandaba siempre lo que se ve, así que
-  cambiar el NCM de una fila «434 · HOLANDA» la guardaba «423» (lo encontraron `/code-review` y los dos
-  adversarios; reproducido). Efecto lateral: antes, guardar la fila también pasaba a mayúsculas un
-  origen no tocado («Holanda» → «HOLANDA»); ahora queda como estaba. El servidor ya dejaba igual el
-  campo que no llega (`catalog_service.update_product`, `if updates.get("origen") is not None`).
+**Lo que decidís vos:**
+- **D264. Código con un nombre que no se reconoce.** Gana el código, sin aviso: «999 ATLANTIDA» da 999,
+  «143 CHINA POPULAR» da 143, «143,5» da 143. Es la regla que la base ya tenía con sigla («310 ATLANTIDA»
+  y «203 CHINA POPULAR» dan CN y BR); ahora alcanza a los 114. La otra opción es dejarlo sin origen y
+  con aviso, para todos los códigos, con o sin sigla: es un cambio de una línea y un caso, pero cambia
+  lo que la base ya hacía. **Lo cambié en un test**: `test_despacho1b.py`, el parametrize de
+  `test_origen_que_no_cierra_queda_faltante` pasa de «999 ATLANTIDA» a «900 ATLANTIDA» (999 es «OTROS
+  PAISES», de la tabla; 900 no está). Con D264 en «sin origen», vuelve a «999».
+- **D265. Número fuera de la tabla con un nombre separado por puntuación.** «900 · CHINA», «000 (CHINA)»
+  y «001: BRASIL» pasan de ninguno a CN o BR. Es la regla de la base para el mismo número con espacio
+  («900 CHINA» ya daba CN); cambia porque el nombre ahora se separa por cualquier puntuación, que es lo
+  que cierra «143 · CHINA». Es la única clase del volcado que el criterio 4 no nombra (sale sólo de
+  formas que sumé yo; con las de Holanda no aparece). Si preferís que un número de tres cifras que no
+  es código deje sin origen, es la misma línea que D264.
+- **Supuesto: el campo de origen de la importación queda sin `maxlength` y con el rótulo «Origen».**
+  El criterio 3 pedía tres cifras; con `maxlength="3"` el adversario Sonnet midió que pegar un nombre lo
+  corta en silencio a otro país válido («ARGELIA» → «ARG», Argentina; «INDONESIA» → «IND»; 37 nombres
+  de la tabla), y el lector precarga nombres enteros. El servidor ya valida
+  (`origen_para_catalogo` → `origen_valido`, 422 si no reconoce). El rótulo decía «código de 2 letras».
+- **Supuesto: la prueba del «Origen frecuente» responde `/metricas`** con «434 · HOLANDA» en vez de
+  armarlo con operaciones guardadas. El arreglo es de pantalla (`mostrar`), no del servidor: `main.py`
+  sigue devolviendo la forma más usada como vino.
 
-### Criterio 1: los lugares
+**Cambios de comportamiento que no son de la familia** (los encontraron los adversarios; todos en el
+volcado):
+- «435 CY» y «436 TR» dan 435 y 436 (antes CY y TR, que en el TXT eran 311 y 336). Chipre es 311 y
+  435, Turquía 336 y 436: se compara el nombre de la tabla de los dos códigos, no el código.
+- Pares que en la tabla son países distintos y antes daban el país del nombre, ahora ninguno con
+  aviso: «143 ZA» (159 SUDAFRICA ≠ 143 REPUBLICA DE SUDAFRICA), «511 US», «668 HONG KONG» (341),
+  «653 ARUBA» (242), «659 ANTILLAS» (241), «402 ALEMANIA» (438), «601 RUSIA» (444), «432 SERBIA»
+  (454), «250 ARGENTINA» (200), «999 CHINA». Si un despacho imprime 143 con «SUDAFRICA», ahora hay que
+  cargarlo a mano.
+- «426 UK» pasa de ninguno a GB. «310 310» sigue CN.
 
-Salen de `grep -rn "origen\|procedencia\|default_origin\|getOriginLabel" proyecto_maria/static
-proyecto_maria/templates` y de leer cada uno; el adversario Opus repitió la búsqueda sin encontrar
-otro.
+### Criterios 1 a 3 y 6
 
-| lugar | ¿llega a un TXT hoy? | qué queda |
+- **1.** `test_un_codigo_sin_sigla_entra_por_el_despacho` (`test_catalogo3.py`): la familia sale de la
+  tabla (`_tabla_oficial()` menos `_iso2_por_codigo_maria()`, comprobado `== 114`); cada código solo y
+  con su nombre de tabla, más «435 CY» y «436 TR», pasa por `origen_iso2` → `origen_para_catalogo` →
+  el generador, y el TXT trae `CARTPAYORI` = ese código, en orden.
+- **2.** En el mismo caso: diez formas de dos países («143 CHINA», «143 BRASIL», «310 BRASIL», «435 TR» y
+  «143» con «CHINA» detrás de `·`, `(`, `:`, `–`, `,` y un espacio de ancho cero) dan None; «310»,
+  «310 CHINA» y «203 BRASIL» dan CN, CN y BR. El aviso lo da el lector cuando el origen es None
+  (`test_despacho1b`, `-k origen`, 30 passed).
+- **3.** `pantalla_despacho1b.js` escribe «ARGELIA» y «143» en dos renglones, guarda y lee el catálogo:
+  «ARGELIA» y «143» quedan enteros, a 1280 y 390 px. Que «143» guardado sale 143 en el TXT lo cubre el
+  caso del criterio 1 (`origen_para_catalogo` es lo que usa el guardado).
+- **6.** `pantalla_holanda423.js` responde `/metricas` con «434 · HOLANDA» y espera «423» en `#cxKpiOrigen`.
+
+### Criterio 4: volcado
+
+`lector.py` (en el scratchpad; el comando está abajo) corre `origen_iso2` sobre las formas de Holanda
+más tres con puntuación por número («NNN · CHINA», «NNN (CHINA)», «NNN: BRASIL») y las de la tarea:
+11348 formas, 3570 distintas. Clasificadas por causa:
+
+| formas | causa | ejemplo (antes → ahora) |
 |---|---|---|
-| `catalogo.js:250` → `:270`, catálogo del proveedor (`VendorCatalogProduct.origen`) | sí, por el lookup del catálogo | **`mostrar`**; al guardar la fila, el origen va sólo si se tocó |
-| `clientes.js:1427`, catálogo del cliente (`ClientProductHistory.origen_frecuente`) | sí, por el lookup | **`mostrar`** al dibujar y después del PUT de lo escrito (si no se siguió escribiendo) |
-| `review.js`, procedencia (`populate` y `onFieldChange`) | sí: el borrador va a `finalize.js:921`, que la resuelve | **`mostrar`** sólo en el campo, al cargar y en `change` (no en cada tecla: «434» es el comienzo de «4340»); el estado de la operación queda como vino |
-| `upload.js:586`, `:600-602` y la grilla NCM (`ncm.js:690`, `:988`, `:1019`) | sí | sin cambio: ya muestran `getOriginLabel` = `label` («423 · PAISES BAJOS») y guardan con `getOriginCode` |
-| `finalize.js` | — | no muestra el origen de los ítems: sólo lo manda (`:168`, `:859`, `:1288`, `:1383`) |
-| `clientes.js:1071`, `:1232`, `:1955`, `default_origin` | no | ningún camino a la generación (el `default_origin` de `pdf_extractor` es otra variable). Riesgo |
-| `clientes.js:1139` y `main.py:8466`, «Origen frecuente» de métricas | no | riesgo |
-| `clientes.js:1686`, nota «decía «…»» del despacho | no | texto leído del documento cuando falta el origen; el campo queda vacío |
-| `templates/public_quote.html:269`, `calculadora.js:112`, `main.py:8350` (`/agrupar`) | no | cotización, select fijo, mensaje que la interfaz no llama |
-| `main.py:8767`, Excel del catálogo del cliente | no (no es pantalla) | sigue con lo guardado; lo vio el adversario Opus |
+| 463 | sin sigla: ahora sale el código | «143», « 143 »: None → '143' |
+| 222 | sin sigla: el mismo código en el TXT, otra forma guardada | «143 REPUBLICA DE SUDAFRICA»: el nombre → '143' |
+| 229 | dos países, código sin sigla: ninguno | «143 CHINA»: CN → None; «143 HOLANDA»: NL → None |
+| 583 | dos países, código con sigla: ninguno | «101 (CHINA)»: BF → None; «434 · BELGICA»: NL → None |
+| 2073 | número fuera de la tabla con nombre puntuado: el nombre (D265) | «000 · CHINA»: None → CN (691 números × 3 formas) |
 
-### Criterio 2: la familia, como datos de un caso
-
-`test_holanda_y_paises_bajos_son_423` (`tests/test_catalogo3.py`), sobre `mostrar` de la pantalla:
-- con el 434 → «423»: las formas de `PAISES_BAJOS` que empiezan con 434 o 0434 («434», «0434»,
-  «434 · HOLANDA», «434 - Holanda», «434 · PAISES BAJOS»), el número 434 y « 434 »;
-- de control → como vinieron: el resto de `PAISES_BAJOS` («HOLANDA», «Holanda», «Países Bajos», «NL»,
-  «423 · HOLANDA»…), `NO_SON_HOLANDA` («434.», «４３４», «4340», «00434», «434 · BELGICA»…), «», «XX»,
-  «0310», «0423», « Holanda », «Países  Bajos», y None → «».
-
-`scripts/testing/pantalla_holanda423.js` lo mira en el navegador contra una API local:
-- guardadas: `434`, `0434`, `434 · HOLANDA`, `434 - Holanda`, `434 · PAISES BAJOS` (y el número 434 en
-  el cliente; el proveedor rechaza números) frente a `HOLANDA`, `Holanda`, `Países Bajos`, `NL`,
-  `CHINA`, `310`, en los dos catálogos y como procedencia del borrador;
-- escritas: «0434» en el proveedor (guardar), «434» en el cliente (Enter), cada una en la procedencia
-  (salir del campo), y «4340» tecla por tecla;
-- lo que no se toca: cambiar sólo el NCM deja el origen guardado igual (leído de la API), la
-  procedencia del borrador queda igual en `CDI.state.operacion`, lo que se vuelve a escribir mientras
-  se guarda no se pisa, «nl» y un peso 434 escritos en el cliente y una factura 434 (borrador y
-  escrita) se ven como se escribieron.
-
-### Criterio 3: volcado
-
-8042 formas (todos los códigos 000–999 con y sin 0 adelante, con espacios, con « HOLANDA» y «· X»;
-cada «código · nombre» y «código - nombre» de la tabla; nombres en mayúsculas, minúsculas y título;
-alias, INDEC, ISO3; vacío, XX, None y números). «Antes» es lo que hacían los tres lugares (el valor
-como texto); «ahora», `mostrar`. Diff entero:
-
-```
-formas: 8042; se ven distinto: 8
-' 434 ': ' 434 ' -> '423'
-'0434': '0434' -> '423'
-'434': '434' -> '423'
-'434 - HOLANDA': '434 - HOLANDA' -> '423'
-'434 - Holanda': '434 - Holanda' -> '423'
-'434 · HOLANDA': '434 · HOLANDA' -> '423'
-'434 · PAISES BAJOS': '434 · PAISES BAJOS' -> '423'
-434: '434' -> '423'
-```
-
-Ningún otro país cambia. «434 · BELGICA», «４３４», «434.», «4340» y «00434» se ven como vinieron, y
-el servidor tampoco les da país. El guion del volcado va en «Comandos».
-
-### Criterio 4: lo guardado no se reescribe
-
-Sólo cambia lo que se ve. Tres caminos que podían guardar lo mostrado, y la prueba de cada uno:
-- proveedor, guardar la fila: el origen va sólo si se cambió (supuesto 5). Prueba: `soloElNcm`.
-- revisión, abrir el borrador: `populate` sincroniza al estado lo normalizado (USD → DOL); `mostrar`
-  queda fuera de eso y sólo toca el campo. Lo encontró el adversario Opus en `e7741c37`; arreglado en
-  `45e17c26`. Prueba: la procedencia del borrador en `CDI.state.operacion`.
-- cliente: el PUT es por campo y sólo en `change`; sin tocar el origen no hay PUT.
-
-Lo escrito sí se guarda como se escribió: «0434» escrito en el proveedor queda «0434» (genera 423).
+Con sólo las 8038 formas de Holanda (sin las tres que sumé), 799 distintas, todas de las cuatro primeras
+clases: 459, 111, 228 y 1 («434 · BELGICA»).
 
 ### Criterio 5: el rojo con el arreglo revertido
 
-El producto de `a910c5f` con las pruebas de `b3a3bf69`:
-
+Producto de `2e69a0b1`, pruebas de `84e066d0` (iguales a las de `196ef370`):
 ```
-FAILED tests/test_catalogo3.py::test_holanda_y_paises_bajos_son_423 - subproc...
-=========== 1 failed, 1 passed, 107 deselected, 5 warnings in 0.97s ============
-FALLA: catálogo del proveedor: «434» guardado se ve «434»
+== catalogo3 -k sin_sigla
+E     At index 0 diff: '310' != '143'
+================ 1 failed, 109 deselected, 5 warnings in 0.38s =================
+== despacho1b -k origen
+================ 30 passed, 255 deselected, 5 warnings in 2.18s ================
+== pantalla_despacho1b
+FALLA: 1280 px: el panel no se cerró al guardar; dice «Hay productos sin completar: no guardé ninguno.»
+== pantalla_holanda423
+FALLA: el origen frecuente «434 · HOLANDA» se ve «434 · HOLANDA»
 ```
-
-El caso falla porque `mostrar` no existe en la base; el rojo que distingue el defecto es el de la
-pantalla. Los rojos de cada parte del arreglo, uno por uno, son los sabotajes.
+`despacho1b -k origen` queda verde también en la base: esos casos son de la regla vieja que se conserva
+(«310 BRASIL», «900 ATLANTIDA», nombre desconocido); el rojo de la pieza está en el caso de `catalogo3`.
 
 ## Sabotajes (§3)
 
-`scripts/testing/sabotajes/holanda423.sh` (nuevo, con `_casos_y_pantalla.sh`): 15 sabotajes, cada uno
-con su frase medida.
-- `mostrar`: devuelve lo que vino (caso y pantalla), escribe «null» por lo que falta, recorta lo que
-  no es el 434 (caso);
-- cada llamada: el proveedor muestra lo guardado; el cliente muestra lo guardado y deja lo escrito; la
-  procedencia del borrador y la escrita quedan como vinieron;
-- lo que no se toca: el proveedor manda el origen sin tocar; el cliente pisa lo que se sigue
-  escribiendo; la procedencia del borrador cambia en la operación;
-- el alcance: el borrador muestra cada campo con `mostrar`; lo escrito en cualquier campo pasa por
-  `mostrar`; el cliente muestra el código de lo escrito («nl» → 423); la procedencia cambia en cada
-  tecla.
+- `scripts/testing/sabotajes/sin_sigla.sh` (nuevo, con `_casos_y_pantalla.sh`), seis:
+  - el código sin sigla no da origen («At index 0 diff: '310' != '143'»);
+  - código y nombre de dos países dan el código («At index 0 diff: '143' != None»);
+  - se compara el código y no el país («diff: '310' != '435'»);
+  - la puntuación tapa el nombre de otro país, con la regex de la base («At index 4 diff: '143' != None»);
+  - el origen vuelve a cortar en dos («FALLA: 1280 px: el panel no se cerró al guardar»);
+  - el origen corta en tres («FALLA: 1280 px: el origen «ARGELIA» escrito quedó "ARG"»).
+- `holanda423.sh` suma «el origen frecuente se ve como vino» («FALLA: el origen frecuente «434 · HOLANDA»
+  se ve «434 · HOLANDA»»): 17.
+- `catalogo3.sh`: el sabotaje del lector («el despacho toma «４３４» de ancho completo como código») ancla
+  en la línea de hoy, `codigo_de_pais(int(m.group(1)))`, con la frase «where 'NL' = origen_iso2('４３４')».
+  Con `int()` suelto, como estaba, un número fuera de la tabla tira `KeyError` al juntar los tests: rojo,
+  pero no el defecto.
 
-Sobre `b3a3bf69` (23:57:46 → 00:00:45 UTC): base verde (`109 passed`, «OK: pantalla Holanda→423»),
-15 de 15 `ROJO` con su frase, «sabotajes sin rojo: 0», salida 0.
-
-En la puerta sobre `c2fa0546` uno quedó verde: «lo escrito en cualquier campo pasa por `mostrar`».
-La prueba escribía en la factura el mismo «434» que traía el borrador, y con el mismo valor no hay
-`change`: no distinguía el defecto. Ahora escribe «0434» (`b3a3bf69`, sólo pruebas); medido a mano
-verde en la copia buena y «FALLA: la factura «0434» escrita se ve «423»» con el sabotaje.
+Sobre `196ef370`, los tres guiones con salida 0 y ningún sabotaje sin rojo: `sin_sigla.sh` 6 de 6
+(01:45–01:48), `holanda423.sh` 17 de 17 (01:48–01:51) y `catalogo3.sh` 65 de 65 (01:51–02:23), con
+«ROJO  | el despacho toma «４３４» de ancho completo como código: dice «where 'NL' = origen_iso2('４３４')»».
 
 ## Revisión
 
-- **`/code-review high`** sobre `a910c5f..e7741c37`: 8 hallazgos.
-  - El proveedor reescribía el origen al guardar la fila: arreglado (`77286ab6`), supuesto 5.
-  - El cliente pisaba lo que se seguía escribiendo mientras volvía el PUT: arreglado (`77286ab6`).
-  - La pantalla leía el valor del cliente apenas llegaba la respuesta (carrera) y contaba «6» a mano:
-    ahora espera una condición y cuenta desde la familia.
-  - «434 · PAISES BAJOS» se ve distinto de «423 · PAISES BAJOS»: supuesto 4.
-  - `mostrar` analiza dos veces: no lo cambié (una lectura de texto por fila).
-  - «Arreglarlo en un solo lugar, en el servidor»: no. Cambiar lo que devuelve la API haría que la
-    pantalla mandara de vuelta el 423 y reescribiera lo guardado.
-  - «Guion de sabotaje propio fuera de §3»: tu devolución pide §3 fuerte.
-- **Adversario Opus alto** (sobre `e7741c37`): confirmó lo del proveedor y encontró que abrir la
-  revisión cambiaba la procedencia en la operación (arreglado en `45e17c26`). Sospecha: las llamadas
-  nuevas no tienen la guarda `CDI.paisesMaria &&` de otras; ver riesgos. Sin hallazgo: otros lugares,
-  XSS («434 · <b>» se ve tal cual, escapado), «4340», 34 entradas contra `codigo_de_pais`.
-- **Adversario Sonnet alto** (sobre `e7741c37`, foco en las pruebas): confirmó lo del proveedor, y
-  doce mutaciones que dejaban caso y pantalla verdes (null → «null», vacío → «XX», recortar, juntar
-  espacios, «0310» → 310, « 434 » no reconocido, el cliente con `resolve`, `mostrar` en otros campos
-  de la revisión o del cliente, `comparar` salteando filas). Ahora mueren todas por el caso o la
-  pantalla salvo dos: un origen numérico en el proveedor (no se alcanza: la API lo rechaza) y
-  `mostrar(p.origen || 'XX')` en el proveedor (el caso cubre el vacío en `mostrar`, no esa llamada). Las del
-  caso las medí a mano: `'null' != ''`, `'XX' != ''`, `'Holanda' != ' Holanda '`,
-  `'Países Bajos' != 'Países  Bajos'`, `'310' != '0310'`, `' 434 ' != '423'`.
-- **`/security-review`**: no lo corrí. El diff no suma rutas ni cambia permisos; el único dato nuevo
-  que va al servidor es *no* mandar un campo. El adversario Opus miró XSS.
+- **`/code-review high`** sobre `2e69a0b1..bb78df12`, 10 hallazgos:
+  - el caso nuevo quedó dentro del de Holanda y se llevaba el bucle de GRUPOS, y el sabotaje «un grupo
+    con dos países» de `catalogo3.sh` quedaba `ROJO?`: arreglado (`3a6f91fd`);
+  - la contradicción con `codigo_de_pais(f"{codigo:03d} · {nombre}")` comparaba códigos: arreglado, se
+    compara el nombre de tabla (`6a249b7a`);
+  - el código con un nombre desconocido gana y el test pasó de 999 a 900: D264;
+  - un país sin sigla se guarda «143» si vino con código y con el nombre si vino solo: previo, los dos
+    salen 143 en el TXT; el docstring lo dice;
+  - el campo cortaba en tres y el lector precarga nombres enteros: arreglado, sin `maxlength`
+    (`30b2cc08`);
+  - el «Origen frecuente» se arregla en la pantalla y no en `main.py`, y la prueba responde `/metricas`:
+    supuesto;
+  - `_iso2_por_codigo_maria()` se arma en cada llamada, sin caché: previo, no lo toqué (va a riesgos).
+- **Adversario Opus alto** (sobre `bb78df12`): ningún código sale con otro país (308 códigos × sus
+  nombres, 1088 entradas; la base tenía tres mal, «435 CHIPRE» → 311, «436 TURQUIA» → 336, «511 TER
+  VINCULADOS A ESTADOS UNIDOS» → 231). Hallazgos: la puntuación tapaba el nombre de otro país
+  («143 · CHINA» daba 143): arreglado (`6a249b7a`); el código con nombre desconocido: D264; los pares de
+  la tabla con nombres distintos quedan sin origen: arriba; «999 CHINA» pasa a ninguno.
+- **Adversario Sonnet alto** (sobre `bb78df12`): el caso dentro del de Holanda (lo mismo que
+  `/code-review`); el código con nombre desconocido y «426 UK» → GB; `maxlength="3"` corta en silencio
+  («ARGELIA» → Argentina; «0143» → «014» y el panel no cierra): arreglado (`30b2cc08`), con la pantalla
+  escribiendo «ARGELIA» y dos sabotajes. Previos: «310» escrito en pantalla se guarda «310», no «CN»;
+  `calculadora.js` ignora un origen «143» al precargar.
+- **`/security-review`** sobre `2e69a0b1..84e066d0`: sin hallazgos. El KPI se escribe con `textContent`;
+  el valor del campo sigue con `CDI.escapeHtml`; el guardado pasa por `origen_valido` (422 si no
+  reconoce) y el TXT escribe un entero de `get_pais_codigo`, así que quitar `maxlength` no deja llegar
+  texto libre al TXT. `origen_iso2` sólo devuelve None, una sigla, un nombre reconocido o un código de
+  la tabla.
 
 ## Puertas
 
 | puerta | SHA | resultado |
 |---|---|---|
-| suite completa, worktree limpio, `test.db` borrada | `c2fa0546` | `6197 passed, 110 skipped, 3 xfailed` en 18:28 (23:52:50 → 00:11:23 UTC), salida 0 |
-| `e2e_maria.sh` | `c2fa0546` | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.», salida 0 |
-| `sabotajes/holanda423.sh` | `b3a3bf69` | «sabotajes sin rojo: 0», 15 de 15 `ROJO`, salida 0 (3 minutos) |
-| `sabotajes/seguro2.sh` | `c2fa0546` | base `78 passed`, «sabotajes sin rojo: 0», 19 de 19 `ROJO`, salida 0 |
-| `sabotajes/catalogo3.sh` | `c2fa0546` | «fallas: 0», 65 de 65 `ROJO`, salida 0 (32 minutos) |
-| `anclas_perdidas.py`, `chequeo-6.py` | `b3a3bf69` | 2569 anclas, 0 perdidas; 0 avisos |
+| suite completa, worktree limpio | `1513c4f0` | «6198 passed, 110 skipped, 3 xfailed, 109 warnings in 1089.35s», salida 0 |
+| `e2e_maria.sh` | `196ef370` | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.», salida 0 |
+| `sin_sigla.sh` | `196ef370` | 6 de 6 ROJO, «sabotajes sin rojo: 0», salida 0 |
+| `holanda423.sh` | `196ef370` | base «110 passed» y «OK: pantalla Holanda→423»; 17 de 17 ROJO, salida 0 |
+| `catalogo3.sh` | `196ef370` | 65 de 65 ROJO, «fallas: 0», salida 0 |
+| `anclas_perdidas.py` | `196ef370` | 2576 anclas, perdida 1, la de la base |
+| `chequeo-6.py 2e69a0b1` | `196ef370` | producto +19/−15, avisos: 0 |
+| `/security-review` | `84e066d0` | sin hallazgos; de ahí a `196ef370` sólo cambian un docstring y `catalogo3.sh` |
 
-De `c2fa0546` a `b3a3bf69` cambian sólo `pantalla_holanda423.js` y `holanda423.sh`
-(`git diff --stat c2fa0546 b3a3bf69`), que no entran en la suite, en `e2e_maria.sh`, en `seguro2.sh`
-ni en `catalogo3.sh`: esas cuatro valen para `b3a3bf69`. El rojo revertido y el volcado los volví a
-correr sobre `b3a3bf69`, con los comandos de abajo tal como están.
+De `1513c4f0` a `196ef370` cambia sólo `catalogo3.sh` (`git diff --stat 1513c4f0 196ef370`), que no entra
+en la suite ni en `e2e_maria.sh`.
 
-`anclas_perdidas.py b3a3bf69`: 2569 anclas medidas, perdidas 0, 0 y 0. De los guiones que nombran los
-archivos tocados, sólo `seguro2.sh` ancla una línea que cambié (`const normalized = valorEnLaRevision(key, op);`,
-que sigue igual): corrió. No corrí `avisos1`, `cliente1`, `despacho1a`, `foco_cliente1`, `pa1`,
-`sabotaje_separadores1`, `sabotaje_valor1` ni `sabotaje_valor1b`: anclan otras líneas de esos
-archivos y sus anclas están. Tampoco `test_despacho1b` (lo medís vos).
+`anclas_perdidas.py 196ef370`: 105 guiones, 2576 anclas, una perdida, la misma que en la base
+(`limpieza1.sh:135`, `timeout-minutes: 20` en `ci.yml`). De los guiones que nombran los archivos tocados
+(avisos2, cliente1, despacho1a, foco_cliente1, pa1, rendimiento1/1c/1d) ninguno ancla una línea que
+cambié: no los corrí. Tampoco `despacho1b.sh` ni `test_despacho1b` entero (los medís vos): corrí
+`test_despacho1b -k origen`.
 
 ## Comandos
 
 ```bash
 VENV=/ruta/al/venv   # el tuyo
-# 1. el rojo con el arreglo revertido: producto de a910c5f, pruebas de b3a3bf69
-R=/tmp/rojo423; git worktree add -f -q --detach $R b3a3bf69 && cd $R && git checkout a910c5f -- proyecto_maria
-git diff --cached --shortstat                     # «4 files changed, 8 insertions(+), 20 deletions(-)»
-env -u DATABASE_URL -u ENVIRONMENT GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
-  PYTHONPATH=. $VENV/bin/python -B -m pytest -q --no-cov -p no:cacheprovider tests/test_catalogo3.py -k holanda | tail -1
-#    «1 failed, 1 passed, 107 deselected»
-T=$(mktemp -d); P=8423
+PT="env -u DATABASE_URL -u ENVIRONMENT GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=. $VENV/bin/python -B -m pytest -q --no-cov -p no:cacheprovider"
+# 1. el rojo con el arreglo revertido: producto de 2e69a0b1, pruebas de 196ef370
+R=/tmp/rojo239; git worktree add -f -q --detach $R 196ef370 && cd $R && git checkout 2e69a0b1 -- proyecto_maria
+$PT tests/test_catalogo3.py -k sin_sigla | tail -1          # «1 failed, 109 deselected»
+T=$(mktemp -d); P=8239
 env GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares \
   PYTHONPATH=. ENVIRONMENT=development DATABASE_URL="sqlite+aiosqlite:///$T/p.db" CDI_DATA_DIR="$T/data" \
   JWT_SECRET_KEY=clave-inventada-solo-local-0123456789abcdef EMAIL_VERIFICATION_REQUIRED=false \
   ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x \
   $VENV/bin/python -m uvicorn proyecto_maria.main:app --host 127.0.0.1 --port $P > $T/api.log 2>&1 < /dev/null & A=$!
 until curl -fsS http://127.0.0.1:$P/health >/dev/null 2>&1; do sleep 0.3; done
-BASE_URL=http://127.0.0.1:$P node scripts/testing/pantalla_holanda423.js | tail -1
-#    «FALLA: catálogo del proveedor: «434» guardado se ve «434»»
+BASE_URL=http://127.0.0.1:$P PY=$VENV/bin/python node scripts/testing/pantalla_despacho1b.js | grep FALLA
+#    «FALLA: 1280 px: el panel no se cerró al guardar; dice «Hay productos sin completar: no guardé ninguno.»»
+BASE_URL=http://127.0.0.1:$P node scripts/testing/pantalla_holanda423.js | grep FALLA
+#    «FALLA: el origen frecuente «434 · HOLANDA» se ve «434 · HOLANDA»»
 kill $A; cd - >/dev/null; git worktree remove -f $R; rm -rf $T
 
-# 2. sabotajes (acá: holanda423 3 minutos, seguro2 6, catalogo3 32)
-PATH=$VENV/bin:$PATH PY=$VENV/bin/python bash scripts/testing/sabotajes/holanda423.sh b3a3bf69 | tail -1
-#    «sabotajes sin rojo: 0»
-PY=$VENV/bin/python bash scripts/testing/sabotajes/seguro2.sh b3a3bf69 | tail -1
-#    «sabotajes sin rojo: 0»
-PY=$VENV/bin/python bash scripts/testing/sabotajes/catalogo3.sh b3a3bf69 | tail -1
-#    «fallas: 0»
+# 2. sabotajes
+PATH=$VENV/bin:$PATH PY=$VENV/bin/python bash scripts/testing/sabotajes/sin_sigla.sh 196ef370 | tail -1    # «sabotajes sin rojo: 0»
+PATH=$VENV/bin:$PATH PY=$VENV/bin/python bash scripts/testing/sabotajes/holanda423.sh 196ef370 | tail -1   # «sabotajes sin rojo: 0»
+PY=$VENV/bin/python bash scripts/testing/sabotajes/catalogo3.sh 196ef370 | tail -1                         # «fallas: 0»
 
 # 3. anclas y §6
-python3.12 scripts/testing/anclas_perdidas.py b3a3bf69 | grep -E '^revisión|perdida'
-#    «2569 anclas medidas», perdidas 0, 0 y 0
-python3.12 docs/pm/herramientas/chequeo-6.py a910c5f b3a3bf69
-#    «producto +20/−8», «arnés +252/−0», «avisos: 0»
+python3.12 scripts/testing/anclas_perdidas.py 196ef370 | grep -E '^revisión|perdida, una'   # 2576 anclas; perdida 1, la de la base
+python3.12 docs/pm/herramientas/chequeo-6.py 2e69a0b1 196ef370                              # «producto +19/−15», «avisos: 0»
 
-# 4. el volcado (antes = el valor como texto; ahora = mostrar)
-PYTHONPATH=. $VENV/bin/python - <<'PY'
-import json, re, subprocess
+# 4. el volcado: las formas de Holanda (tu paso 4) más tres por número, en la base y ahora
+cat > /tmp/lector239.py <<'PY'
+import json, re
 from proyecto_maria.core import maria_generator as mg
+from proyecto_maria.core.despacho_lector import origen_iso2
 from proyecto_maria.core.paises_iso3 import ISO3_A_ISO2
-
 js = mg._PAISES_PANTALLA.read_text(encoding="utf-8")
 countries = json.loads(re.search(r"const COUNTRIES = (\[.*?\]);", js).group(1))
 aliases = json.loads(re.search(r"const ALIASES = (\{.*?\});", js).group(1))
 formas = {*mg.PAISES_INDEC, *aliases, *ISO3_A_ISO2, *(c["name"] for c in countries)}
 for n in range(1000):
-    formas |= {f"{n:03d}", f"0{n:03d}", f"{n:03d} · X", f"{n} - HOLANDA", f"{n:03d} HOLANDA", f" {n:03d} "}
+    formas |= {f"{n:03d}", f"0{n:03d}", f"{n:03d} · X", f"{n} - HOLANDA", f"{n:03d} HOLANDA", f" {n:03d} ",
+               f"{n:03d} · CHINA", f"{n:03d} (CHINA)", f"{n:03d}: BRASIL"}
 for c in countries:
-    formas |= {f"{c['code']} · {c['name']}", f"{c['code']} - {c['name']}", c["name"].lower(), c["name"].title()}
+    formas |= {f"{c['code']} · {c['name']}", f"{c['code']} - {c['name']}", f"{c['code']} {c['name']}",
+               c["name"].lower(), c["name"].title()}
 formas |= {"Holanda", "holanda", "434 · HOLANDA", "434 - Holanda", "423 · HOLANDA", "434 · PAISES BAJOS", "00434",
-           "4340", "434.", "４３４", "", "XX", "434 · BELGICA"}
-valores = sorted(formas) + [434, 423, 310, None]
-nodo = (f"global.window = {{}}; require({str(mg._PAISES_PANTALLA)!r}); const P = window.CDI.paisesMaria;"
-        "const v = JSON.parse(require('fs').readFileSync(0, 'utf8'));"
-        "console.log(JSON.stringify(v.map(x => P.mostrar(x))));")
-vistos = json.loads(subprocess.run(["node", "-e", nodo], input=json.dumps(valores), check=True,
-                                   capture_output=True, text=True).stdout)
-antes = ["" if v is None else str(v) for v in valores]
-distintos = [(v, a, d) for v, a, d in zip(valores, antes, vistos) if a != d]
-print(f"formas: {len(valores)}; se ven distinto: {len(distintos)}")
-for v, a, d in distintos:
-    print(f"{v!r}: {a!r} -> {d!r}")
+           "4340", "434.", "４３４", "", "XX", "434 · BELGICA", "143 CHINA", "310 BRASIL", "999 ATLANTIDA"}
+for f in sorted(formas):
+    print(f"{f!r}\t{origen_iso2(f)!r}")
 PY
-#    «formas: 8042; se ven distinto: 8», las ocho de arriba
+for s in 2e69a0b1 196ef370; do R=/tmp/vol$s; git worktree add -f -q --detach $R $s
+  (cd $R && PYTHONPATH=. $VENV/bin/python /tmp/lector239.py > /tmp/vol_$s.txt); git worktree remove -f $R; done
+wc -l < /tmp/vol_196ef370.txt; diff /tmp/vol_2e69a0b1.txt /tmp/vol_196ef370.txt | grep -c '^>'   # «11348», «3570»
 ```
 
 El 3, como lo medí:
 
 ```
-chequeo-6 a910c5f..b3a3bf69: avisos para mirar, no un veredicto
-producto +20/−8
-arnés +252/−0
+chequeo-6 2e69a0b1..196ef370: avisos para mirar, no un veredicto
+producto +19/−15
+arnés +87/−5
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/static/v2/paises_maria.js: 50 → 56
-  proyecto_maria/static/v2/screens/catalogo.js: 403 → 404
-  proyecto_maria/static/v2/screens/clientes.js: 2211 → 2213
-  proyecto_maria/static/v2/screens/review.js: 1195 → 1198
+  proyecto_maria/core/despacho_lector.py: 899 → 903
+  proyecto_maria/static/v2/screens/clientes.js: 2213 → 2213
 avisos: 0
 ```
 
-El grep de historia de §6 sobre `proyecto_maria/` da vacío. Producto +12 netas.
+El grep de historia de §6 sobre `proyecto_maria/` da vacío. Producto +4 netas.
 
 | commit | qué |
 |---|---|
-| `11f223bf` fix | `mostrar` y sus cuatro llamadas; CHANGELOG |
-| `e7741c37` test | caso, pantalla y `holanda423.sh` |
-| `77286ab6` fix | el proveedor manda el origen sólo si se tocó; el cliente no pisa lo que se sigue escribiendo |
-| `2ef75b78` test | sus pruebas y sabotajes |
-| `45e17c26` fix | la revisión no cambia la procedencia de la operación |
-| `0dd5bd1b` test | su prueba y sabotaje |
-| `c2fa0546` test | la familia de control y el alcance (lo de Sonnet) |
-| `b3a3bf69` test | la factura escrita distinta de la del borrador (el sabotaje de `mostrar` en cualquier campo quedaba verde en la puerta). **Lo que se entrega** |
+| `1f1f69cb` fix | `origen_iso2`: código sin sigla y contradicción |
+| `42d0d6a5` test | el caso de los 114; «999» → «900» en `test_despacho1b` |
+| `339302d3` fix | `clientes.js`: el campo de origen y el «Origen frecuente»; CHANGELOG |
+| `21c91be5` test | las dos pantallas |
+| `f5fdad10` test | `sin_sigla.sh`; `holanda423.sh` suma el KPI |
+| `bb78df12` test | el ancla del lector en `catalogo3.sh` |
+| `6a249b7a` fix | se compara el país; el nombre se separa por cualquier puntuación |
+| `3a6f91fd` test | el caso de Holanda recupera GRUPOS; Chipre, Turquía y la puntuación |
+| `23e9e9ed` test | los sabotajes del lector siguen al arreglo |
+| `30b2cc08` fix | el campo de origen sin `maxlength`, rótulo «Origen» |
+| `84e066d0` test | la pantalla escribe «ARGELIA»; sabotajes con 2 y 3 |
+| `1513c4f0` fix | el docstring en dos líneas (el aviso de chequeo-6) |
+| `196ef370` test | el ancla del lector en `catalogo3.sh`, otra vez. **Lo que se entrega** |
 | informe | el commit siguiente |
 
 ## Riesgos
 
-- **«Origen frecuente» de las métricas del cliente y `default_origin`** muestran lo guardado tal cual;
-  no llegan al TXT hoy. Si vuelven a la generación, tienen que pasar por `mostrar`. Sin código (D261).
-- **Sin guarda `CDI.paisesMaria &&`** en las llamadas nuevas: si `paises_maria.js` no cargara, la
-  revisión y los catálogos tirarían un error al dibujar. El orden no es riesgo (todo es `defer` y se
-  dibuja después); `?v=` cambia con cada arranque.
-- **«434 · PAISES BAJOS» se ve «423»** y «423 · PAISES BAJOS» se ve con nombre: supuesto 4.
-- **El Excel del catálogo del cliente** (`main.py:8767`) sigue con lo guardado: no es pantalla.
-- **Previo, no de esta pieza:** escribir en el NCM del catálogo del proveedor tira
-  `Cannot create property '__cdiMaskNcmApplied' on string` (`catalogo.js` le pasa un texto a
-  `CDI.maskNcm`); lo vio el adversario Opus. Lo propongo para la cola.
-- **Dos mutaciones sin prueba** (Sonnet): `mostrar(p.origen || 'XX')` en el proveedor (un origen vacío
-  se vería «XX»; ninguna fila de la pantalla lo tiene vacío), y la rama de un origen numérico en el
-  proveedor, que la API rechaza hoy.
-- **`mostrar(0)` da «0»**: antes, un origen 0 en el catálogo del proveedor se veía vacío
-  (`p.origen || ''`). Ningún origen guardado es número en el proveedor; en el cliente se veía «XX» y
-  se sigue viendo «XX».
-- **Lo guardado en producción no se midió.** Las filas con «434» se ven 423 y generan 423; no sé
-  cuántas hay.
-- **El despachante puede seguir usando 434** (tu DECISIONS de las 19:39): no lo verifiqué.
+- **D264 y D265**: hasta que decidas, un código con un nombre que no se reconoce entra como código sin
+  aviso, también para los 114.
+- **Despachos con el nombre corto de un país que en la tabla tiene otro código** («143 SUDAFRICA»,
+  «668 HONG KONG», «402 ALEMANIA») ahora quedan para cargar a mano, con aviso.
+- **Lo guardado no se migra** (lo dice la tarea): un «143 REPUBLICA DE SUDAFRICA» guardado antes como
+  nombre sigue así; sale 143 igual.
+- **Un mismo país queda guardado de varias formas** según cómo entró («143» o el nombre; desde la
+  pantalla, «310» o «BRA» tal cual se escriban): previo; el agrupado del KPI y el TXT no cambian.
+- **`calculadora.js`** ignora un origen «143» al precargar (busca una opción con ese valor): previo.
+- **`_iso2_por_codigo_maria()` sin caché**: se arma en cada `origen_iso2`; previo, una vez por renglón.
+- **`proyecto_maria/README.md:148`** todavía dice «código de 2 letras» para ese campo: no lo toqué
+  (documentación fuera de la tarea); lo propongo para la cola.
+- **Lo guardado en producción no se midió.**
 - La CI deselecciona tests de presupuestos y Railway no la espera: no es red.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`, rutina trig_01Ukttby1fc4sGVQfSn1jC9U; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `2e69a0b1`). Aceptadas: las de antes (CUIT-GENERAR `29327d2` … D257 (b) `3c7eb14`), D244 (a) y Holanda→423 sobre `b3a3bf69` (supuestos 4 y 5 aceptados; acta `REPRODUCCION-HOLANDA-423-2026-11-16.md`, «Vuelta»). Activa: D239 (a), códigos sin sigla en el lector de despachos (`PARA-DEV-2.md`, seis criterios; el 6 es el «Origen frecuente» de `clientes.js:1139` con 434 → 423). Paso (base `2e69a0b1`): hechos con rojo antes y verde después los criterios 1, 2, 3 y 6 — producto `1f1f69cb` (`origen_iso2`: código sin sigla → «143»; contradicción con `codigo_de_pais(f"{codigo:03d} · {nombre}")`, porque Chipre 311/435, Turquía 336/436 y 231/511 tienen dos códigos) y `339302d3` (`clientes.js`: maxlength 3, rótulo «Origen (sigla o código)», «Origen frecuente» con `mostrar`; CHANGELOG); pruebas `42d0d6a5` (`test_un_codigo_sin_sigla_entra_por_el_despacho` en `test_catalogo3.py`; `test_despacho1b` cambia «999 ATLANTIDA» por «900»: 999 es «OTROS PAISES», de la tabla — supuesto para la PM) y `21c91be5` (`pantalla_despacho1b.js` escribe «143»; `pantalla_holanda423.js` responde métricas con «434 · HOLANDA» y espera «423»). Falta: volcado del lector antes/después (criterio 4, formas del volcado de Holanda), rojo revertido, sabotajes §3 (guion nuevo o en `holanda423.sh`), chequeo-6, anclas, `/code-review`, adversarios, `/security-review`, suite, `e2e_maria.sh`, guiones que anclen lo tocado, informe. Supuesto a informar: «999 ATLANTIDA» (nombre desconocido) da 999, como «310 ATLANTIDA» da CN. Revisión §3 fuerte: `/security-review`, adversarios, suite completa, `e2e_maria.sh` y los guiones que anclen lo tocado, sobre el SHA que se entrega. Después: D263 (validación mira `origen`, el generador usa `pais_origen`). D262 (a) está en la cola de limpieza; D261 la lleva la PM. `test_despacho1b`: lo mide la PM. Próxima D: D264. Lecciones (además de las de antes, que siguen en el historial de este archivo): no editar un guion de sabotaje mientras corre (el arnés lo lee de la copia de trabajo); un `fill` con el mismo valor que ya tiene el campo no dispara `change`: la prueba escribe algo distinto de lo cargado; el toast es la condición observable de que el handler terminó; el volcado de formas de país está en el informe de Holanda→423 («Comandos», paso 4) y sirve de base para el criterio 4; horas, sólo de `date -u`. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`, rutina trig_01Ukttby1fc4sGVQfSn1jC9U; aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `2e69a0b1`). Aceptadas: las de antes (CUIT-GENERAR `29327d2` … D257 (b) `3c7eb14`), D244 (a) y Holanda→423 sobre `b3a3bf69`. En revisión: D239 (a), códigos sin sigla en el lector de despachos, entregada sobre `196ef370` (base `2e69a0b1`), informe en el commit siguiente; puertas en «Puertas» de este archivo. Decisiones abiertas para la PM: D264 (código con nombre que no se reconoce: gana el código; el test pasó de «999 ATLANTIDA» a «900») y D265 (número fuera de la tabla con nombre puntuado da el nombre); supuestos: campo de origen sin `maxlength`, rótulo «Origen»; la prueba del «Origen frecuente» responde `/metricas`. Después: D263 (validación mira `origen`, el generador usa `pais_origen`), sin pieza marcada «apenas entregues»: si al despertar no hay nada nuevo, termino la vuelta. D262 (a) está en la cola de limpieza; D261 la lleva la PM. `test_despacho1b` entero y `despacho1b.sh`: los mide la PM. Próxima D: D266. Lecciones (además de las de antes, que siguen en el historial de este archivo): no editar un guion de sabotaje mientras corre (el arnés lo lee de la copia de trabajo); un ancla de sabotaje se pierde cuando cambio la línea que ancla: medir `anclas_perdidas.py` y correr el guion que la usa antes de entregar; un `fill` con el mismo valor no dispara `change`; el toast es la condición observable de que el handler terminó; `/security-review` necesita `origin/HEAD`: ref local temporal y borrarlo; horas, sólo de `date -u`. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe.
