@@ -328,24 +328,6 @@ def test_holanda_y_paises_bajos_son_423():
              for i, o in enumerate(formas, start=1)]
     txt = _gen("OP123456", items)
     assert re.findall(r"CARTPAYORI=(\d+)", txt) == re.findall(r"CARTPAYPRC=(\d+)", txt) == ["423"] * len(formas)
-
-
-def test_un_codigo_sin_sigla_entra_por_el_despacho():
-    from proyecto_maria.pdf_extractor import _iso2_por_codigo_maria
-    tabla = maria_generator._tabla_oficial()
-    sin_sigla = sorted(set(tabla) - set(_iso2_por_codigo_maria()))
-    assert len(sin_sigla) == 114
-    # Como lo escribe un despacho: el código solo o con su nombre. Lo que guarda el lector sale en el TXT.
-    formas = [f"{c:03d}" for c in sin_sigla] + [f"{c:03d} {tabla[c]}" for c in sin_sigla]
-    guardados = [origen_para_catalogo(origen_iso2(f)) for f in formas]
-    items = [{"pieza": "84713000", "descripcion": f"Producto {i}", "cantidad": 1, "valor_unitario": 10,
-              "peso_unitario": 1, "origen": o, "procedencia": o, "unidad": "07", "grupo_id": i}
-             for i, (o, _) in enumerate(guardados, start=1)]
-    txt = _gen("OP123456", items)
-    assert re.findall(r"CARTPAYORI=(\d+)", txt) == [f"{c:03d}" for c in sin_sigla] * 2
-    # Código y nombre de dos países no dan ninguno; con sigla, sale la sigla.
-    assert [origen_iso2(f) for f in ("143 CHINA", f"{sin_sigla[0]:03d} BRASIL", "310 BRASIL")] == [None] * 3
-    assert [origen_iso2(f) for f in ("310", "310 CHINA", "203 BRASIL")] == ["CN", "CN", "BR"]
     for par, codigo in GRUPOS.items():
         items = [{"pieza": "84713000", "descripcion": f"Producto {o}", "cantidad": 1, "valor_unitario": 10,
                   "peso_unitario": 1, "origen": o, "unidad": "07", "grupo_id": 1} for o in par]
@@ -354,6 +336,30 @@ def test_un_codigo_sin_sigla_entra_por_el_despacho():
                 _gen("OP123456", items)
         else:
             assert re.findall(r"CARTPAYORI=(\d+)", _gen("OP123456", items)) == [str(codigo)], par
+
+
+def test_un_codigo_sin_sigla_entra_por_el_despacho():
+    from proyecto_maria.pdf_extractor import _iso2_por_codigo_maria
+    tabla = maria_generator._tabla_oficial()
+    sin_sigla = sorted(set(tabla) - set(_iso2_por_codigo_maria()))
+    assert len(sin_sigla) == 114
+    # Chipre es 311 y 435, Turquía 336 y 436: «435 CY» es Chipre y sale 435.
+    con_sigla_ajena = {c: s for c in sin_sigla for d, s in _iso2_por_codigo_maria().items() if tabla[d] == tabla[c]}
+    assert sorted(con_sigla_ajena) == [435, 436]
+    # Como lo escribe un despacho: el código solo o con su nombre. Lo que guarda el lector sale en el TXT.
+    formas = ([f"{c:03d}" for c in sin_sigla] + [f"{c:03d} {tabla[c]}" for c in sin_sigla]
+              + [f"{c:03d} {s}" for c, s in con_sigla_ajena.items()])
+    guardados = [origen_para_catalogo(origen_iso2(f)) for f in formas]
+    items = [{"pieza": "84713000", "descripcion": f"Producto {i}", "cantidad": 1, "valor_unitario": 10,
+              "peso_unitario": 1, "origen": o, "procedencia": o, "unidad": "07", "grupo_id": i}
+             for i, (o, _) in enumerate(guardados, start=1)]
+    txt = _gen("OP123456", items)
+    assert re.findall(r"CARTPAYORI=(\d+)", txt) == [f"{c:03d}" for c in sin_sigla] * 2 + ["435", "436"]
+    # Código y nombre de dos países no dan ninguno, los separe lo que los separe; con sigla, sale la sigla.
+    otro_pais = ["143 CHINA", f"{sin_sigla[0]:03d} BRASIL", "310 BRASIL", "435 TR"] + [
+        f"143{sep}CHINA" for sep in (" · ", " (", ": ", " – ", ", ", "\u200b")]
+    assert [origen_iso2(f) for f in otro_pais] == [None] * len(otro_pais)
+    assert [origen_iso2(f) for f in ("310", "310 CHINA", "203 BRASIL")] == ["CN", "CN", "BR"]
 
 
 def test_holanda_guardada_genera_423(client):
