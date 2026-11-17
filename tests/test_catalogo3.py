@@ -370,8 +370,11 @@ def test_un_codigo_con_otro_pais_al_lado_no_da_ninguno():
     # Los nombres de la tabla con paréntesis o punto, tal como están escritos.
     con_signos = [(int(p["code"]), p["name"]) for p in paises if re.search(r"[(.]", p["name"])]
     assert len(con_signos) > 40
-    propios = [f"{c:03d} {n}" for c, n in con_signos]
-    assert [origen_iso2(f) for f in propios] == [_iso2_por_codigo_maria().get(c, f"{c:03d}") for c, _ in con_signos]
+    esperados = [_iso2_por_codigo_maria().get(c, f"{c:03d}") for c, _ in con_signos]
+    assert [origen_iso2(f"{c:03d} {n}") for c, n in con_signos] == esperados
+    # Con un número fuera de la tabla, el nombre entero da su país (511 y 231 se llaman igual).
+    fuera = [maria_generator.codigo_de_pais(origen_iso2(f"900 {n}")) for _, n in con_signos]
+    assert [tabla.get(c) for c in fuera] == [tabla[c] for c, _ in con_signos]
     ajenos = [f"{otro:03d} {n}" for c, n in con_signos for otro in (143, 310) if tabla[otro] != tabla[c]]
     # Otro país escrito libre, y números que no son un código de tres cifras suelto.
     ajenos += ["143 CHINA (MAINLAND)", "143 CHINA POPULAR", "310 (HONG KONG)", "212 VATICANO(SANTA SEDE)",
@@ -386,7 +389,7 @@ def test_un_codigo_con_otro_pais_al_lado_no_da_ninguno():
     solos = {"143": "143", "143.": "143", "143 ORIGEN": "143", "143 REPUBLICA DE SUDAFRICA": "143",
              "310 CHINA": "CN", "310 (CN)": "CN", "999 ATLANTIDA": "999",
              "310 MADE IN CHINA": "CN", "310 PAIS DE ORIGEN": "CN", "900 · CHINA": "CN", "900 (P.R. CHINA)": "CN",
-             "900 TIMOR ORIENTAL": "TIMOR ORIENTAL"}
+             "900 TIMOR ORIENTAL": "358", "900 timor oriental": "358"}
     assert {f: o for f, v in solos.items() if (o := origen_iso2(f)) != v} == {}
 
 
