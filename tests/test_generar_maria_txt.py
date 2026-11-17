@@ -527,6 +527,35 @@ def test_generate_maria_usa_cuit_del_perfil(client):
     assert "CDDTAGR=20111222348" in resp.json()["content"]
 
 
+def test_generate_maria_valida_el_origen_que_sale_en_el_txt(client):
+    """La validación lee el mismo campo de origen que escribe el TXT."""
+    _register(client, "maria_origen_txt")
+    # (pais_origen, origen) del segundo ítem → el CARTPAYORI que sale, o None si tiene que frenar.
+    familia = {
+        ("4340", "CN"): None, ("ATLANTIDA", "BR"): None,
+        ("BR", None): "203", ("BR", ""): "203",
+        (None, None): None, ("", ""): None, ("  ", "  "): None,
+        ("", "BR"): "203", ("  ", "BR"): "203", (None, "BR"): "203",
+    }
+    vistos = {}
+    for (pais_origen, origen), _ in familia.items():
+        item = {"pieza": "85171200900A", "descripcion": "Celular Samsung", "cantidad": 2, "valor_unitario": 300,
+                "peso_unitario": 0.2, "pais_origen": pais_origen, "origen": origen}
+        resp = client.post("/generate_maria", json={
+            "comprador_cuit": "30999999995", "moneda": "DOL", "incoterm": "FOB",
+            "fecha_emision": "18/07/2025", "operation_id": "OP_ORIGEN",
+            "items": [ITEMS_OK[0], {k: v for k, v in item.items() if v is not None}],
+            "sbt_sufijo_valor": _SBT_TEST,
+        })
+        if resp.status_code == 200:
+            vistos[pais_origen, origen] = re.findall(r"^CARTPAYORI=(\d+)", resp.json()["content"], re.M)[1:]
+        else:
+            errores = resp.json()["detail"]["errors"]
+            del_origen = errores and all(e.startswith("Item 2: ") and "rigen" in e for e in errores)
+            vistos[pais_origen, origen] = None if del_origen else errores
+    assert vistos == {k: v and [v] for k, v in familia.items()}
+
+
 def test_get_pais_codigo_vietnam_thailand_indonesia_malaysia():
     assert get_pais_codigo("VN") == 337
     assert get_pais_codigo("Vietnam") == 337
