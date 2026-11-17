@@ -255,17 +255,21 @@ def _paises_por_palabras() -> dict:
 
 def _paises_nombrados(texto) -> set:
     """Los códigos de los países que nombra el texto: desde cada palabra, el nombre más largo.
-    Dos letras cuentan sólo si es lo único escrito: «ZA» sí, el «IN» de «MADE IN USA» no."""
+    Dos letras no cuentan entre dos palabras: el «IN» de «MADE IN USA» no, «US 12» sí."""
     from proyecto_maria.core.maria_generator import _normalizar_pais
 
     indice = _paises_por_palabras()
     palabras = re.findall(r"\w+", _normalizar_pais(texto))
     largo = max(map(len, indice))
+
+    def es_palabra(k):
+        return 0 <= k < len(palabras) and len(palabras[k]) > 2 and palabras[k].isalpha()
+
     nombrados, i = set(), 0
     while i < len(palabras):
         for j in range(min(len(palabras), i + largo), i, -1):
             nombre = tuple(palabras[i:j])
-            if nombre in indice and (len(palabras) == 1 or len("".join(nombre)) > 2):
+            if nombre in indice and (len("".join(nombre)) > 2 or not (es_palabra(i - 1) and es_palabra(j))):
                 nombrados.add(indice[nombre])
                 break
         else:
@@ -288,12 +292,12 @@ def origen_iso2(texto) -> str | None:
     if not m:
         return _origen_desde_factura(t) or None
     codigo, resto = codigo_de_pais(m.group(1)), m.group(2)
-    nombrados = _paises_nombrados(resto)
-    if codigo is None and len(nombrados) == 1:
-        codigo = nombrados.pop()
+    if codigo is None:
+        # Fuera de la tabla vale el nombre entero, no una palabra suelta («900 MAR DEL PLATA»).
+        return _origen_desde_factura(" ".join(re.findall(r"\w+", resto))) or None
     # Se compara el país y no el código: Chipre es 311 y también 435.
     tabla = _tabla_oficial()
-    if codigo is None or any(tabla[c] != tabla[codigo] for c in nombrados):
+    if any(tabla[c] != tabla[codigo] for c in _paises_nombrados(resto)):
         return None
     return _iso2_por_codigo_maria().get(codigo, f"{codigo:03d}")
 
