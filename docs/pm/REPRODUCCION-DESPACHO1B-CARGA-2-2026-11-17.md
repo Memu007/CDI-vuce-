@@ -17,7 +17,7 @@ avisos: 0
 `test_despacho1b.py` y `test_rendimiento1d.py:97`, donde el PDF se arma antes del bloque. En el caso
 del finalizador, el `try` interno ahora abarca el primer bucle con su condición.
 
-## Lo que corrí (worktrees en el scratchpad de la PM, 23:37 a 23:59 UTC)
+## Lo que corrí (worktrees en el scratchpad de la PM, 23:37 a 23:57 UTC)
 
 | Qué | SHA | Resultado |
 |---|---|---|
@@ -67,7 +67,8 @@ print(sum(vistos), "de", len(vistos), "dentro")
 ## No corrido, y por qué
 
 Suite completa, `e2e_maria.sh`, `despacho1b.sh` mío y adversarios: producto +0/−0 y tres archivos de
-pruebas; los archivos, los dos sabotajes y la carga alcanzan. Tampoco reproduje su medición de D272
+pruebas; los archivos, los dos sabotajes y la carga alcanzan. Tampoco reproduje su medición de D271 (el tick en `test_el_texto_tiene_tope_de_cpu`, 2 de 21 sobre
+`8f3a9052`), ni la de D272
 fuera de pytest (18 en 6000 → 0): me alcanza que el caso siga en rojo con los dos sabotajes y que el
 `try` cubra la condición del `while`, que es donde caían sus 18.
 
