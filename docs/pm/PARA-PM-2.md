@@ -2,247 +2,203 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## Entrega PAISES-NOMBRES (D266): sobre `fa89e917` (2026-11-18 22:22 UTC)
+## Entrega ORIGEN-ETIQUETA (D261): sobre `5a28c13c` (2026-11-18 23:13 UTC)
 
-**Resultado.** Base `e5476182`. Los seis criterios están; los números salen de los logs de abajo. Lo
-que decidís vos: **D273** y **D274**, al final.
+**Resultado.** Base `bf787b2d`. Están los cuatro criterios. Incluye `dfa1b08d`, el merge de tu rama, que sólo
+trae `docs/pm/`. Los números salen de los logs de abajo. No hay D nuevas: lo que
+decidís vos es el supuesto 1 y si aceptás el riesgo 1.
 
-- **1. Toda la tabla.** `const NOMBRES` (en `paises_maria.js`) trae 225 países con su nombre en inglés y
-  en castellano, con puntos y sin ellos. Sale de la norma ISO 3166-1 (pycountry 26.2.16) con
-  `scripts/datos/generar_nombres_paises.py`, más los nombres corrientes que la norma no trae
-  («Holland», «EE.UU.», «Samoa Americana»). La leen el servidor (`_nombres_de_pais`, la misma que usan
-  los dos lectores y el TXT) y la pantalla. Los alias que ya existían mandan sobre los nombres nuevos.
-  El caso recorre NOMBRES: cada nombre solo, con su código y con el de otro país, en el despacho, la
-  factura y `codigo_de_pais`; otro caso hace lo mismo en la pantalla con node.
-- **2. Países Bajos.** «Netherlands», «The Netherlands», «Holland», «Holanda» y «Países Bajos» dan NL
-  (423) solos, con 423 y con 434. Al lado de 310, 406 o 241 no dan ninguno.
-- **3. Letra ancha.** U+FF01 a U+FF5E se leen como ASCII en los dos lectores. «３１０ ＢＲ» daba BR en
-  la base; ahora da ninguno, igual que «310 BR».
-- **4. Sin países nuevos equivocados.** Medí la base contra `fa89e917`: **0 orígenes cambian de un país
-  a otro** en 1609 textos, cada uno solo, con cada código de la tabla y con 434. Las facturas de prueba
-  del repositorio no cambian. Los nombres difíciles van como datos en un solo caso (`DIFICILES`).
-- **5. Lo que queda afuera.** Un nombre que no está en la lista sigue dejando ganar al código: D264 (a)
-  no cambia. D267 sigue como riesgo.
-- **6. Negativo en el mismo SHA.** Con todo el arreglo vaciado (los nombres en el servidor y en la
-  pantalla, y la letra ancha) fallan los casos 1, 2 y 3. Con sólo la letra ancha vaciada fallan sólo
-  los seis de la letra ancha. Las otras partes, una por una, también dan rojo.
-
-## Criterio 4: la medición
-
-`corpus.txt` tiene 1609 textos: los nombres de la norma, los alias, la tabla, INDEC, NOMBRES,
-`DIFICILES` y 22 entradas que trajo el adversario («MOROCCO LEATHER», «GREENLAND (DENMARK)»…). Cada texto
-va solo, como «c texto» y como «c · texto», para cada código de la tabla y 434. Todo pasa por el despacho,
-la factura y `codigo_de_pais`, y se guarda sólo lo que da país (como nombre de la tabla).
-```
-antes  (e5476182): 1609 textos, 226650 reconocidos
-después (fa89e917): 1609 textos, 40477 reconocidos
-antes 226650 después 40477 | ganados 3019 | país→otro país 0 | país→ninguno 189192
-ganados por lector: Counter({'factura': 1160, 'codigo': 1160, 'despacho': 699})
-código con el nombre de otro país: {'despacho': 184248} | otras pérdidas: 4944
-```
-- **184 248 pérdidas son lo que pide la tarea:** un código con el nombre de otro país.
-- **Las 4944 restantes salen de 15 textos.** Todos nombran otro país adentro:
-
-  | texto | veces | por qué |
-  |---|---|---|
-  | GREENLAND (DENMARK), COOK ISLANDS (NEW ZEALAND) | 618 c/u | territorio y su país; también con su propio código. En castellano («666 GROENLANDIA (DINAMARCA)») ya daba ninguno |
-  | United States Minor Outlying Islands | 616 | excluido a propósito (UM); nombra UNITED STATES |
-  | Republic of South Africa (dos formas) | 616 c/u | nombra SOUTH AFRICA; con 143 es D273 |
-  | MOROCCO LEATHER, JORDAN SHOES | 616 c/u | palabra de producto que es un país |
-  | TURKEY BREAST | 614 | ídem |
-  | 223 PUERTO RICO (UNITED STATES), 242 ARUBA (NETHERLANDS) | 2 c/u | territorio y su país, con su código |
-  | 310 CHINA MACAU / GIBRALTAR / HOLLAND COTTON / BERMUDA SHORTS | 2 c/u | otro país al lado de China |
-  | 315 MADE IN U.S.A. | 2 | **daba India**: ahora ninguno |
-
-  Todas quedan sin origen, con aviso: ninguna da otro país.
-- **Antes y después de las facturas de prueba del repositorio.** Corrí los 16 archivos de pruebas de
-  facturas y despachos (1983 casos) con un plugin de pytest que anota cada texto que pasa por los dos
-  lectores y lo que devuelven. Base y `fa89e917` son iguales, entrada por entrada (17 entradas):
+- **1. Código y nombre.** El «Origen frecuente» del cliente y la procedencia de la revisión usan una
+  función nueva, `etiqueta` (en `paises_maria.js`). Muestra `label` («310 · CHINA») si el valor es un
+  país y, si no, lo escrito. «CN», «CHINA», «CHN», «310» y «Hong Kong» se ven con código y nombre.
+  «434», «0434», 434 como número, «434 · HOLANDA», «HOLANDA» y «NL» se ven «423 · PAISES BAJOS».
+- **2. Lo que no se reconoce** se ve como se escribió, sin los blancos de los bordes. El KPI lo pone
+  con `textContent` y la revisión con `input.value`. La pantalla prueba un `<img onerror>`: no se
+  ejecuta y no crea elementos.
+- **3. TXT igual byte a byte.** Generé el TXT de la misma operación en la base y en `7a02d2ca`, desde
+  la pantalla de revisión. Fueron 14 formas de procedencia, cada una dejada como venía del borrador y
+  escrita a mano:
   ```
-  despacho '203 BRASIL' → 'BR' | despacho '310 BRASIL' → None | despacho '310 CHINA' → 'CN'
-  despacho '900 ATLANTIDA' → None | despacho 'ATLANTIDA' → None
-  factura 'AR' → 'AR' | 'ATLANTIDA' → '' | 'CHN' → 'CN' | 'CN' → 'CN' | 'China' → 'CN' | 'MEX' → 'MX'
-  factura 'N/A' → '' | 'NA' → '' | 'Narnia' → '' | 'P.R. China' → 'CN' | None → '' | nan → ''
-  diff registro_base.json registro2_nuevo.json → IGUALES_A_BASE
+  28 operaciones; 28 TXT iguales byte a byte; 22 se ven distinto
   ```
-  Las facturas de prueba traen pocos orígenes distintos. La medición de arriba es la que distingue.
+  Las 6 que se ven igual en la base y ahora son «222 · PERU», «423 · PAISES BAJOS» y la vacía, en sus
+  dos modos. Lo guardado no se reescribe: la operación conserva lo escrito. La pantalla lo comprueba
+  con cada forma, en el borrador y escrita. Hay un sabotaje que guarda lo que se ve y da rojo.
+- **4. Reemplaza «se ve el código «423»» en esos dos lugares.** Los catálogos del proveedor y del
+  cliente siguen con `mostrar` y «423» (supuesto 1).
 
 ## Supuestos
 
-1. **La letra ancha se lee sólo en los dos lectores.** `codigo_de_pais` y la pantalla siguen rechazando
-   «３１０» escrito a mano, como pide el caso de Holanda (`NO_SON_HOLANDA`). Las cifras de otro
-   alfabeto («٤٣٤») tampoco cuentan. Usé una tabla de ancho completo y no NFKC, que el repositorio
-   usa en otros lados, porque NFKC también cambia «№» por «No», y «No» es Noruega: lo probé y
-   `_origen_desde_factura` da `'NO'`.
-2. **Los territorios** sin sigla de dos letras entran por la lista `TERRITORIOS` del generador.
-   Quedan afuera Jersey y Guernsey («212 NEW JERSEY»), Bonaire, Curazao y San Martín, y las islas
-   menores de Estados Unidos (UM).
-3. **«UK»** sigue como antes: la factura y el despacho devuelven «UK», no «GB». Ya estaba así en la
-   base; por eso «UK» no está entre los nombres nuevos.
-4. **El índice es uno solo:** el TXT y la validación también reconocen los nombres nuevos. Un producto
-   con origen «United States» antes frenaba la generación por origen no reconocido; ahora sale 212.
-   En el caso de la tabla no cambia ninguna salida del TXT que antes saliera; lo que cambia es que
-   ahora sale algo donde antes frenaba.
-5. **«999 + nombre»:** 999 es «OTROS PAISES». Con un nombre de la lista al lado, ahora da ninguno.
-
-## Decisiones para vos
-
-- **D273.** La tabla tiene países con dos códigos y nombres distintos: 143/159 Sudáfrica, 402/438,
-  341/668, 242/653 Aruba y 241/659 Antillas. Con el código de uno y el nombre del otro dan ninguno, con
-  aviso. Por ejemplo, «143 SUDAFRICA», «659 NETHERLANDS ANTILLES» y «653 ARUBA».
-  - (a) Seguir así: pérdida con aviso. **Es el defecto que dejé.**
-  - (b) Tratarlos como el mismo país, como Chipre y Turquía (311/435, 336/436).
-- **D274.** «212 MADE IN U.S.A.» y «212 MADE IN E.E.U.U.» dan ninguno, en la base y ahora: con los
-  puntos, la palabra que sigue a «IN» tiene una letra y la regla de «MADE IN» la cuenta como India.
-  «212 MADE IN USA» da US. No lo toqué porque la regla de «MADE IN» queda igual (criterio 4).
-  - (a) Dejarlo: pérdida con aviso.
-  - (b) Una pieza chica que lea «MADE IN» con los puntos.
+1. «La revisión» es el campo de procedencia de la pantalla de revisión, el único de esa pantalla que
+   tiene país. El origen de cada ítem se edita en la grilla del NCM, que ya mostraba código y nombre con
+   su propia copia de la regla. Esa copia ahora llama a `etiqueta` (§6: un chequeo, un lugar). Para el
+   NCM no cambia nada, porque la regla era la misma. Los catálogos no entran: si los querés con
+   etiqueta, es otra pieza. Tienen `maxlength="3"` y la grilla del cliente es angosta.
+2. Lo que no es un país se ve sin los blancos de los bordes (« ATLANTIDA » se ve «ATLANTIDA»). Lo tomé
+   de la regla del NCM, para que las tres pantallas se vean igual. Un origen frecuente de sólo
+   espacios ahora se ve «—»; antes quedaba en blanco.
 
 ## Commits
 
 | commit | qué |
 |---|---|
-| `75d37027` fix | NOMBRES generado, el servidor y la pantalla lo leen; letra ancha en los dos lectores; CHANGELOG |
-| `3bf8c78c` test | los casos de la tarea; catalogo3 y maria1a siguen a la línea nueva («４３４» es NL) |
-| `d808c026` test | «310 · CHINA» en lugar de «310 - CHINA»: el arnés corta el nombre del caso en « - » |
-| `9bd853e2` test | `scripts/testing/sabotajes/paises_nombres.sh` |
-| `a12c9c03` fix | lo que encontró el adversario: Samoa Americana, las Islas Vírgenes y las Antillas por su nombre; «Republic of South Africa» afuera; la búsqueda de NOMBRES no depende de la sangría |
-| `fa89e917` test | esos nombres en `DIFICILES`; el caso no lee una tabla vacía en silencio. **Lo que se entrega** |
+| `30f5786a` fix | `etiqueta`; el KPI y la procedencia la usan; CHANGELOG |
+| `9288fc56` test | el caso de la etiqueta; la pantalla recorre 16 formas en el KPI y en la revisión |
+| `9b51ab54` test | `holanda423.sh`: los sabotajes siguen a la línea nueva; siete nuevos |
+| `876bc666` fix | lo que marcó `/code-review`: una sola etiqueta para el NCM, el KPI y la revisión; el nombre largo no ensancha el KPI |
+| `1fb6804f` test | el recorte en el caso; vaciar antes de escribir, para que dispare «change»; el chequeo de HTML en el KPI; un ayudante para la tabla |
+| `7a02d2ca` test | los sabotajes siguen al recorte |
+| `dfa1b08d` merge | tu rama (sólo `docs/pm/`) |
+| `5a28c13c` test | el sabotaje de «cada tecla» espera el rojo que ahora da antes (abajo). **Lo que se entrega** |
 | informe | el commit siguiente |
 
 ## Pruebas
 
 | qué | SHA | resultado |
 |---|---|---|
-| `test_paises_nombres.py` y `test_catalogo3.py` | `fa89e917` | «133 passed, 3 warnings in 26.63s» |
-| suite completa, desde un worktree limpio | `fa89e917` | «6224 passed, 110 skipped, 3 xfailed, 110 warnings in 1142.03s» |
-| `paises_nombres.sh` | `fa89e917` | nueve «ROJO», «OK: todos los sabotajes en rojo» (abajo) |
-| `catalogo3.sh` | `fa89e917` | 65 «ROJO», «fallas: 0» |
-| `sin_sigla.sh` | `fa89e917` | 16 «ROJO», «sabotajes sin rojo: 0» |
-| `holanda423.sh` | `fa89e917` | 17 «ROJO», «sabotajes sin rojo: 0» |
-| `origen_txt.sh` | `fa89e917` | 13 «ROJO», «sabotajes sin rojo: 0» |
-| `excel1.sh` | `fa89e917` | 36 «ROJO», «sabotajes con falla: 0» |
-| `sabotaje_maria1a.sh` | `fa89e917` | «OK: los 10 sabotajes dan rojo por la razón esperada» |
-| `sabotaje_maria3.sh` | `fa89e917` | «OK: los 32 sabotajes dan rojo por la razón esperada» |
-| `e2e_maria.sh` | `fa89e917` | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.» |
-| medición del criterio 4 | `e5476182` y `fa89e917` | arriba |
-| chequeo-6 | `e5476182..fa89e917` | abajo, entero |
+| `test_catalogo3.py` y `test_paises_nombres.py` | `7a02d2ca` (los mismos en `5a28c13c`) | «134 passed, 3 warnings in 26.25s» |
+| suite completa, desde un worktree limpio | `5a28c13c` | «6225 passed, 110 skipped, 3 xfailed, 105 warnings in 1098.28s (0:18:18)» |
+| `holanda423.sh` | `5a28c13c` | 24 «ROJO», «sabotajes sin rojo: 0» (abajo) |
+| `pantalla_holanda423.js` | `5a28c13c` | «OK: pantalla Holanda→423» (la base de `holanda423.sh`) |
+| `e2e_maria.sh`, desde un worktree limpio | `5a28c13c` | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.» |
+| TXT antes y después | `bf787b2d` y `7a02d2ca` | arriba |
+| KPI a 390 px con nombres largos | `9b51ab54` y `7a02d2ca` | abajo |
+| chequeo-6 | `bf787b2d..5a28c13c` | abajo, entero |
 
-Rojo antes del arreglo: los casos de `3bf8c78c` sobre el producto de `e5476182` dan «13 failed, 9 passed». Fallaban por
-la tarea: «310 UNITED STATES» daba CN, el nombre no se reconocía y la letra ancha no se leía.
+**Rojo antes del arreglo.**
+- La pantalla de `7a02d2ca` sobre el producto de `bf787b2d` da «FALLA: el origen frecuente «434» se ve
+  «423»».
+- El caso nuevo en la base no tiene `etiqueta`. Medido con `mostrar`, que es lo que se veía, da «353
+  distintos de 693». Por ejemplo: «('CHN', 'CHN', '310 · CHINA'), ('ITA', 'ITA', '417 · ITALIA'),
+  ('Hong Kong', 'Hong Kong', '341 · HONG KONG')».
 
-Los sabotajes de `paises_nombres.sh`:
+`holanda423.sh`:
 ```
-BASE  | casos: ======================== 22 passed, 5 warnings in 0.57s ========================
-ROJO  | todo vaciado: test_cada_pais_se_reconoce_por_su_nombre_en_ingles_y_en_castellano
-ROJO  | todo vaciado: test_paises_bajos_es_423_solo_con_423_o_con_434[Netherlands]
-ROJO  | todo vaciado: test_la_letra_ancha_se_lee_como_la_comun[310 BR]
-ROJO  | sin letra ancha: «AssertionError», 6 casos
-ROJO  | el servidor no lee los nombres: «AssertionError», 7 casos
-ROJO  | la pantalla no lee los nombres: «AssertionError», 1 casos
-ROJO  | el despacho no lee la letra ancha: «AssertionError», 3 casos
-ROJO  | la factura no lee la letra ancha: «AssertionError», 5 casos
-ROJO  | un nombre de la norma choca con el de otro país: «AssertionError», 2 casos
-OK: todos los sabotajes en rojo
+BASE  | casos: ======================= 112 passed, 5 warnings in 25.78s =======================
+BASE  | pantalla: OK: pantalla Holanda→423
+ROJO  | la etiqueta es lo que muestra el catálogo: «AssertionError», 1 casos
+ROJO  | la etiqueta es lo que muestra el catálogo: «FALLA: el origen frecuente «434» se ve «423»»
+ROJO  | la etiqueta es sólo el código: «AssertionError», 1 casos
+ROJO  | la etiqueta escribe «null» por lo que falta: «AssertionError», 1 casos
+ROJO  | la etiqueta deja los blancos de los bordes: «AssertionError», 1 casos
+ROJO  | el origen frecuente se ve como HTML: «FALLA: el origen frecuente «<img»
+ROJO  | mostrar devuelve lo que vino: «At index 0 diff: '434' != '423'», 1 casos
+ROJO  | mostrar escribe «null» por lo que falta: «'null' != ''», 1 casos
+ROJO  | mostrar recorta lo que no es el 434: «'Holanda' != ' Holanda '», 1 casos
+ROJO  | mostrar devuelve lo que vino: «FALLA: catálogo del proveedor: «434» guardado se ve «434»»
+ROJO  | el catálogo del proveedor muestra lo guardado: «FALLA: catálogo del proveedor: «434» guardado se ve «434»»
+ROJO  | el catálogo del cliente muestra lo guardado: «FALLA: catálogo del cliente: «434» guardado se ve «434»»
+ROJO  | el catálogo del cliente deja lo escrito: «FALLA: «434» escrito en el catálogo del cliente se ve «434»»
+ROJO  | la procedencia del borrador se ve como vino: «FALLA: procedencia «434» del borrador se ve «434»»
+ROJO  | la procedencia escrita queda como se escribió: «FALLA: procedencia «434» escrita se ve «434»»
+ROJO  | la procedencia del borrador cambia en la operación: «FALLA: procedencia «434» del borrador queda «423 · PAISES BAJOS» en la operación»
+ROJO  | la procedencia escrita se guarda como se ve: «FALLA: procedencia «434» escrita queda «423 · PAISES BAJOS» en la operación»
+ROJO  | el catálogo del proveedor manda el origen sin tocar: «FALLA: cambiar sólo el NCM reescribe el origen guardado»
+ROJO  | el catálogo del cliente pisa lo que se sigue escribiendo: «FALLA: lo escrito mientras se guardaba «434» quedó «423»»
+ROJO  | el borrador muestra cada campo con su etiqueta: «FALLA: la factura «434» del borrador se ve «423 · PAISES BAJOS»»
+ROJO  | lo escrito en cualquier campo pasa por la etiqueta: «FALLA: la factura «0434» escrita se ve «423 · PAISES BAJOS»»
+ROJO  | el catálogo del cliente muestra el código de lo escrito: «FALLA: «nl» escrito en origen del catálogo del cliente se ve «423»»
+ROJO  | la procedencia cambia en cada tecla: «FALLA: procedencia «434» escrita queda «423 · PAISES BAJOS» en la operación»
+ROJO  | el origen frecuente se ve como vino: «FALLA: el origen frecuente «434» se ve «434»»
+sabotajes sin rojo: 0
 ```
+«La procedencia cambia en cada tecla» daba rojo en `7a02d2ca`, pero con otra frase: «procedencia «434»
+escrita queda «423 · PAISES BAJOS» en la operación». Es la misma causa. Ahora la ve antes el bucle, que
+vacía y escribe cada forma; `5a28c13c` espera esa frase. El chequeo de «4340» tecla por tecla sigue en la
+pantalla.
+
+El KPI a 390 px de ancho, con los nombres más largos de la tabla. Los números son el ancho de la grilla
+(`scrollWidth`/`clientWidth`) y el alto de la tarjeta:
+```
+antes del CSS (9b51ab54)  109 · REP.DEMOCRAT.DEL CONGO EX ZAIRE   grilla [311, 308]  alto 66
+ahora (7a02d2ca)          109 · REP.DEMOCRAT.DEL CONGO EX ZAIRE   grilla [308, 308]  alto 88
+ahora (7a02d2ca)          682 · ISLAS VIRGENES BRITANICAS (TERRITORIO NO AUTONOMO DEL REINO UNIDO)  alto 176
+```
+La página entera ya mide 523 px de ancho a 390 px de vista, con cualquier origen (también con «310 ·
+CHINA»). Eso no es de esta pieza: va a riesgos.
 
 chequeo-6, entero:
 ```
-chequeo-6 e5476182..fa89e917: avisos para mirar, no un veredicto
-producto +248/−7
-  AVISO producto suma 241 líneas netas: el informe dice por qué (§6: más de 20)
-arnés +178/−7
+chequeo-6 bf787b2d..5a28c13c: avisos para mirar, no un veredicto
+producto +12/−5
+arnés +89/−30
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/core/despacho_lector.py: 942 → 942
-  proyecto_maria/core/maria_generator.py: 2400 → 2404
-  proyecto_maria/pdf_extractor.py: 2890 → 2894
-  proyecto_maria/static/v2/paises_maria.js: 56 → 289
-  AVISO creció una función de más de 150: proyecto_maria/static/v2/paises_maria.js:2 <anónima> 54 → 287, 233 en su propio cuerpo (§6: lo nuevo va aparte)
-avisos: 2
+  proyecto_maria/static/v2/paises_maria.js: 289 → 294
+  AVISO creció una función de más de 150: proyecto_maria/static/v2/paises_maria.js:2 <anónima> 287 → 292, 2 en su propio cuerpo (§6: lo nuevo va aparte)
+  proyecto_maria/static/v2/screens/clientes.js: 2213 → 2213
+  proyecto_maria/static/v2/screens/ncm.js: 2351 → 2351
+  proyecto_maria/static/v2/screens/review.js: 1198 → 1198
+avisos: 1
 ```
-- **AVISO «producto suma 241 líneas netas».** 233 son el bloque de datos generado: un renglón por país,
-  como ALIASES, que ya está en el mismo archivo. El código suma 12: el bucle de la pantalla, la lectura
-  del servidor y la letra ancha.
 - **AVISO «creció una función de más de 150».** La «función» es el envoltorio del módulo
-  (`(function () {…})()`), que ya guarda COUNTRIES y ALIASES. Lo nuevo es una constante de datos, no
-  una rama. Sacarla a otro archivo suma un `<script>`, un orden de carga y un segundo archivo que leer
-  en el servidor y en el caso de la pantalla. Si preferís el archivo aparte, es una pieza chica.
+  (`(function () {…})()`). `etiqueta` es una función aparte de tres líneas, como `mostrar` y `label`,
+  que están en el mismo envoltorio.
 
 ## Revisiones
 
 | quién | sobre | hallazgos | qué hice |
 |---|---|---|---|
-| `adversario-sonnet-alto` (datos) | `9bd853e2` | 0 países cambiados en 2 409 156 entradas; 3 tipos de pérdida | arreglé el primero; abajo |
-| `/code-review high` | `e5476182..9bd853e2` | 10 | arreglé 3; abajo |
-| `/security-review` | — | no corrió | el comando falla: el repositorio no tiene `origin/HEAD`. La revisé a mano: abajo |
+| `adversario-sonnet-alto` (datos) | `9b51ab54` | 0 que rompan un criterio; 3 menores | abajo |
+| `/code-review high` | `bf787b2d..9b51ab54` | 7 | arreglé 5; abajo |
+| `/security-review` | — | no corrió | el comando falla porque el repositorio no tiene `origin/HEAD`. La hice a mano: abajo |
 
 El adversario:
-1. **El nombre compuesto del propio país, con su código, quedaba sin origen.** «695 SAMOA AMERICANA»,
-   «683 UNITED STATES VIRGIN ISLANDS» y «241 NETHERLANDS ANTILLES» daban su código; con la pieza, SAMOA,
-   UNITED STATES o NETHERLANDS nombraban otro país. **Arreglado** en `a12c9c03`, con datos: las tres
-   formas en NOMBRES y en `DIFICILES`. Con el producto de `9bd853e2`, el archivo de casos de `fa89e917` da «1 failed, 21 passed»: falla sólo `DIFICILES`.
-   El territorio con su país entre paréntesis en inglés («666 GREENLAND (DENMARK)») ahora da ninguno,
-   como ya daba en castellano: queda en la tabla de pérdidas.
-2. **Palabras de producto que son un país** («310 CHINA BERMUDA SHORTS», «310 MOROCCO LEATHER», «212
-   NEW ENGLAND»): pérdida con aviso, en la tabla de pérdidas. «NEW ENGLAND» es como «NEW JERSEY». Lo
-   dejé porque «ENGLAND» es como se escribe Inglaterra en una factura.
-3. **La normalización de la pantalla y la del servidor difieren en marcas combinantes raras**
-   (U+20D0…): «CHINA⃐» es China en el servidor y nada en la pantalla. Ya estaba así en la base. Va a
-   riesgos.
+- Comparó `etiqueta` con `codigo_de_pais` del servidor en 30 000 cadenas al azar (separadores raros,
+  saltos, combinantes, mayúsculas): **0 diferencias**.
+- Comprobó en el navegador que enfocar y salir no cambia el estado, que lo escrito queda en la
+  operación y que el HTML se ve como texto.
+- Comprobó que nada más lee `#f_procedencia` y que `finalize.js` arma el TXT desde la operación.
+- Los tres menores:
+  1. Un arreglo `['CN']` se vería «310 · CHINA». No llega: el valor viene de JSON como texto.
+  2. Un origen frecuente de sólo espacios se veía en blanco. Queda arreglado por el supuesto 2.
+  3. Los catálogos siguen con `mostrar`. Es el supuesto 1.
 
 El `/code-review`:
-1. «212 MADE IN U.S.A.» da ninguno: igual que en la base (lo corrí en los dos). Es **D274**.
-2. «Republic of South Africa» daba 159 y «República de Sudáfrica», 143: **arreglado**, los dos afuera.
-3. La búsqueda de NOMBRES en el servidor dependía de la sangría: **arreglado**, la misma expresión que
-   el caso.
-4. El caso tomaba una tabla vacía si no encontraba NOMBRES: **arreglado**, ahora falla.
-5. «Republic of China» con 313 (Taiwán) da ninguno: igual que en la base. No lo sumé a Taiwán porque
-   hay facturas chinas que escriben así su país, y entonces un origen pasaría de China a Taiwán.
-   Queda en D264 (a).
-6. La letra ancha sólo en los lectores: es el supuesto 1.
-7. El AVISO de la función: arriba.
-8. NFKC en lugar de la tabla: no, por «№» (supuesto 1).
-9. Si dos nombres chocaran, el servidor se quedaría con el último y la pantalla con el primero. Hoy no
-   chocan, y el caso de choques lo frena (el sabotaje del 159 da rojo). Sin cambio.
-10. El caso de choques arma la tabla vieja a mano en lugar de usar `_nombres_de_pais()`: tiene que
-    ser así, porque compara lo viejo con lo nuevo y esa función ya los trae juntos. Sin cambio.
+1. **ncm.js tenía la misma regla duplicada.** Arreglado en `876bc666`: ahora llama a `etiqueta`.
+2. **Escribir lo mismo que se ve no dispara «change»**, así que ATLANTIDA, el HTML y «-» no probaban
+   lo escrito. Arreglado en `1fb6804f`: se vacía antes de escribir.
+3. **Un nombre largo ensanchaba el KPI.** Arreglado con `min-width: 0` y `overflow-wrap: anywhere`;
+   las medidas están arriba.
+4. **El campo muestra la etiqueta y la operación guarda lo escrito.** Eso es lo que pide el criterio
+   3. Nada compara el campo con la operación (lo verificó el adversario), y el campo no tiene la pista
+   «Detectado del PDF». Sin cambio.
+5. **El caso leía la tabla con su propia expresión.** Ahora hay un ayudante, `_paises_de_la_pantalla`,
+   que también usa el caso que ya la leía igual. No usa `_tabla_oficial` porque esa normaliza los
+   nombres y la etiqueta lleva el nombre como está escrito.
+6. **El chequeo de HTML ejecutado estaba en la revisión, donde no puede pasar.** Pasó al KPI.
+7. **El nombre del caso era largo.** Ahora es `test_la_etiqueta_es_la_del_txt`.
 
 La revisión de seguridad a mano:
-- NOMBRES es un dato fijo del repositorio, no algo que escriba un usuario. Lo que escribe el usuario
-  sólo pasa por `translate` y por los lectores de siempre.
-- Las claves nuevas de ALIASES salen en mayúsculas de `normalize`, así que no hay `__proto__`.
-- Ningún nombre nuevo llega a la pantalla como HTML.
+- Lo nuevo llega a la pantalla sólo por `textContent` (el KPI) y por `input.value` (la procedencia).
+  Hay un sabotaje que pasa el KPI a `innerHTML` y la pantalla da rojo.
+- En el NCM, `getOriginLabel` devuelve lo mismo que antes y sigue pasando por `CDI.escapeHtml` donde
+  arma HTML.
+- No cambia nada del servidor, de lo guardado ni del TXT.
 
 ## Comandos
 
 ```bash
 VENV=/ruta/al/venv
 PT="env -u DATABASE_URL -u ENVIRONMENT GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=. $VENV/bin/python -B -m pytest -q --no-cov -p no:cacheprovider --timeout=300"
-# 1. los casos, en fa89e917                                           → «133 passed»
-$PT tests/test_paises_nombres.py tests/test_catalogo3.py | tail -1
-# 2. los negativos (1 min)                → «ROJO  | todo vaciado» ×3, seis «ROJO» más, «OK: todos los sabotajes en rojo»
-PY=$VENV/bin/python scripts/testing/sabotajes/paises_nombres.sh fa89e917 | grep -E "^(ROJO|VERDE|ROTO|OK|FALLAS)"
-# 3. antes y después de los dos ejemplos de la tarea, la letra ancha y Netherlands
-for r in e5476182 fa89e917; do R=/tmp/pn-$r; git worktree add -f -q --detach $R $r && (cd $R && env -u DATABASE_URL ENVIRONMENT=development GEMINI_API_KEY=x PYTHONPATH=. $VENV/bin/python -B -W ignore -c "
-from proyecto_maria.core.despacho_lector import origen_iso2 as o
-print('$r', [o(t) for t in ('310 UNITED STATES', '435 República Dominicana', '212 U.S.A.', 'NETHERLANDS', '３１０ ＢＲ', '310 MADE IN USA')])" 2>&1 | tail -1); git worktree remove -f $R; done
-#    → e5476182 ['CN', '435', 'US', None, 'BR', None]
-#    → fa89e917 [None, None, 'US', 'NL', None, None]
-# 4. §6                                    → «producto +248/−7», «avisos: 2» (los dos de arriba)
-python3 docs/pm/herramientas/chequeo-6.py e5476182 fa89e917
+# 1. los casos, en 5a28c13c                                         → «134 passed»
+$PT tests/test_catalogo3.py tests/test_paises_nombres.py | tail -1
+# 2. los negativos y la pantalla (unos 25 min)          → 24 «ROJO», «sabotajes sin rojo: 0»
+PY=$VENV/bin/python scripts/testing/sabotajes/holanda423.sh 5a28c13c | grep -E "^(BASE|ROJO|VERDE|ROTO)|sin rojo"
+# 3. §6                                                 → «producto +12/−5», «avisos: 1» (el de arriba)
+python3 docs/pm/herramientas/chequeo-6.py bf787b2d 5a28c13c
 ```
-Los tres ya los corrí con esa salida. La medición del criterio 4 tarda unos 4 minutos por árbol y
-necesita los guiones de mi scratchpad: no te la pido, el resultado está arriba.
+Ya corrí los tres y dieron esa salida. El TXT antes y después y el KPI a 390 px salen de guiones de mi
+scratchpad: no te los pido, los resultados están arriba.
 
 ## Riesgos
 
-- **D273 y D274** (arriba).
-- **Pérdidas con aviso nuevas** (la tabla del criterio 4): la palabra de producto que es un país
-  («TURKEY BREAST», «MOROCCO LEATHER») y el territorio con su país entre paréntesis.
-- **Las marcas combinantes raras** (punto 3 del adversario), de antes.
-- **NOMBRES se regenera a mano:** si cambia pycountry, hay que volver a correr el generador, y el
-  caso de choques tiene que seguir en verde.
-- **Lo que no corrí:** nada de lo que pide la tarea. Hubo una primera medición sobre un corpus con renglones crudos de mi volcado (1805 textos): también dio «país→otro país 0»; la de arriba es la del corpus limpio.
+1. **El 682 ocupa 176 px de alto en el KPI** a 390 px de ancho. Es un país raro y no rompe la grilla.
+   Si preferís cortarlo con «…», es una línea de CSS.
+2. **La página de clientes ya era más ancha que un celular** (523 px a 390 px de vista), con cualquier
+   origen. Viene de antes; no lo toqué.
+3. **Un mismo país se ve distinto según la pantalla:** con código y nombre en el KPI, la revisión y el
+   NCM, y como se escribió en los catálogos (supuesto 1).
+4. **Lo que no corrí:** nada de lo que pide la tarea.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`; rutina trig_01Ukttby1fc4sGVQfSn1jC9U (/respondio cada 2 h). PM principal session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `e5476182`. Aceptadas: las de antes (… DESPACHO1B-CARGA-2 sobre `fd4eb1dd`). Entregada, en revisión: PAISES-NOMBRES (D266) sobre `fa89e917`, con D273 y D274 abiertas. Sigue, apenas entregué: ORIGEN-ETIQUETA (D261), datos (§3), adversario Sonnet alto y `e2e_maria.sh` sobre el SHA. Próxima D: D275. Lecciones (además de las del historial de este archivo): el negativo de un arreglo va en el mismo SHA con el arreglo vaciado; una tasa «después» sin ese negativo no distingue; cada número del informe sale de un log, y el que no está, se mide o se saca; lo que marca un adversario se reproduce antes de proponerlo; un congelado del recolector sin `gc.collect()` antes mueve los finalizadores al caso siguiente; una tarea en segundo plano muere a las 2 h: puertas con `setsid nohup` y un vigía de timeout largo; horas, sólo de `date -u` en el momento de escribirlas, también la del encabezado; los comandos para la PM se prueban antes de escribirlos. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe. Letra ancha: tabla U+FF01..FF5E, no NFKC («№» da Noruega).
+/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`; rutina trig_01Ukttby1fc4sGVQfSn1jC9U (/respondio cada 2 h). PM principal session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `04cdc9c0`. Aceptadas: las de antes (… PAISES-NOMBRES (D266) sobre `fa89e917`, D273 (a) y D274 (a)). Entregada, en revisión: ORIGEN-ETIQUETA (D261) sobre `5a28c13c`, sin D nuevas; supuestos 1 (la revisión es la procedencia; los catálogos siguen con «423») y 2 (recorte de bordes). No hay pieza marcada «apenas entregues»: espero el veredicto. Próxima D: D275. Lecciones (además de las del historial de este archivo): el negativo de un arreglo va en el mismo SHA con el arreglo vaciado; una tasa «después» sin ese negativo no distingue; cada número del informe sale de un log, y el que no está, se mide o se saca; lo que marca un adversario se reproduce antes de proponerlo; un congelado del recolector sin `gc.collect()` antes mueve los finalizadores al caso siguiente; una tarea en segundo plano muere a las 2 h: puertas con `setsid nohup` y un vigía de timeout largo; horas, sólo de `date -u` en el momento de escribirlas, también la del encabezado; los comandos para la PM se prueban antes de escribirlos. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe. Letra ancha: tabla U+FF01..FF5E, no NFKC («№» da Noruega).
