@@ -3,24 +3,43 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## DESPACHO1B-CARGA-2: aceptada sobre `fd4eb1dd` (informe `b0c0b0db`), integrada; sin pieza nueva (2026-11-17 23:58 UTC)
+## Tarea activa: PAISES-NOMBRES (D266); apenas entregues, ORIGEN-ETIQUETA (D261) (2026-11-18 20:30 UTC)
 
-Acta `REPRODUCCION-DESPACHO1B-CARGA-2-2026-11-17.md`. Da igual que tu informe: chequeo-6 (+32/−29,
-`avisos: 0`); los dos archivos, «297 passed» y 0 ticks; el corte desarmado, «7 failed» (los seis y
-`test_el_texto_tiene_tope_de_cpu`); el temporizador que no se repite, `assert 1 == 2`;
-`rendimiento1c`, «15 passed»; tu carga, 7 × «408 passed» y 0 ticks.
+Emi dijo «sí a los tres» (18/11 20:27 UTC) a D266, a D261 y a seguir con 423 para lo que ya dice 434.
+Es un sí a las piezas, no un «dale» para publicar. Base: la cabeza de mi rama. Traela con `merge`.
+Revisión: datos (§3), con el adversario de datos de la tabla «Modelo y esfuerzo» y `e2e_maria.sh` en
+el SHA. Lo anterior (DESPACHO1B-CARGA-2, aceptada sobre `fd4eb1dd`) está en su acta y en Git.
 
-**Observación, sin devolución:** los ceros sobre `fd4eb1dd` no prueban el ayudante. Con el ayudante
-vaciado, el mismo árbol también da 0 ticks: 0 de 4 solo y 0 de 7 con la carga. Lo muestra un negativo
-determinista mío: 50 objetos en ciclo con `__del__`; ninguno corre dentro del ayudante y, vaciado,
-corren los 50. Una tasa «después» que no se compara con el mismo árbol sin el arreglo no distingue;
-la próxima vez, el negativo va en el mismo SHA (el mismo escape lo tuve yo al aceptar
-DESPACHO1B-CARGA: está en el acta). Y la hora del encabezado del informe (23:40) es
-posterior a su commit (23:36): sale de `date -u` al escribir.
+### PAISES-NOMBRES (D266)
 
-**Sin pieza nueva:** lo que queda de tu cola espera a Emi (D266, D261) o a alguien de afuera
-(PESO-NETO-1, MARIA-6, PRORRATEO-1, LEGAL-1). Apago tu rutina; te despierto por `send_message` cuando
-haya algo.
+La causa: un nombre de país que ninguna tabla conoce no cuenta, y entonces gana el código
+(«310 UNITED STATES» da CN; «435 República Dominicana» da Chipre).
+
+1. **Toda la tabla.** Cada país de la tabla oficial se reconoce por su nombre en inglés y en castellano
+   corriente, con puntos o sin ellos («U.S.A.», «P.R. CHINA»). Al lado del código de otro país da
+   ningún origen, con aviso; al lado de su propio código da ese país. Un caso que recorra la tabla, no
+   una lista escrita a mano.
+2. **Países Bajos.** Netherlands, Holland, Holanda y Países Bajos dan 423, con o sin código.
+3. **Letra ancha.** Los dígitos y las letras de ancho completo («３１０ ＢＲ») se leen como los
+   comunes.
+4. **Sin países nuevos equivocados.** Ningún origen que hoy da un país pasa a dar otro, ni en el lector
+   de despachos ni en el de facturas, que usa los mismos nombres. En un solo caso y como datos: los
+   nombres que son palabras comunes o parte de otro nombre (Georgia, Turkey, Chad, Jersey,
+   Niger/Nigeria, las Guineas, Dominica y República Dominicana, los dos Congos, las dos Coreas). Siguen
+   igual la regla de «MADE IN USA» y las pérdidas con aviso ya aceptadas. El informe trae el antes y
+   el después de las facturas de prueba del repositorio.
+5. **Lo que queda afuera**, escrito en el informe: un nombre que no está en la lista sigue dejando ganar
+   al código (D264 (a) no cambia), y D267 sigue como riesgo.
+6. **Negativo en el mismo SHA,** con los nombres nuevos vaciados: los casos 1 a 3 dan rojo.
+
+### ORIGEN-ETIQUETA (D261), apenas entregues
+
+1. En las métricas del cliente («Origen frecuente») y en la revisión, el origen se ve con código y
+   nombre («310 · CHINA»), escriba como se escriba («CN», «CHINA», «310»). Lo que ya dice 434 se ve
+   «423 · PAISES BAJOS».
+2. Un origen que no se reconoce se ve como se escribió, escapado.
+3. El TXT sale igual, byte a byte, antes y después; lo guardado no se reescribe.
+4. Reemplaza «se ve el código «423», no la etiqueta» del 17/11 en esos dos lugares.
 
 **Próxima D: D273.**
 

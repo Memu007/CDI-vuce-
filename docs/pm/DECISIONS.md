@@ -964,3 +964,17 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   negativo de un arreglo se corre en el mismo SHA con el arreglo vaciado.
 - Decidido por la PM: MARIA queda sin pieza; su cola espera a Emi (D266, D261) o a alguien de afuera
   (PESO-NETO-1, MARIA-6, PRORRATEO-1, LEGAL-1). Rutina apagada; se la despierta por `send_message`.
+
+## 2026-11-18 20:29 UTC — Puntos 16 a 18: «sí a los tres» de Emi
+
+- Emi, 20:27 UTC: «sí a los tres», a las recomendaciones de los puntos 16 (D261), 17 (434) y 18
+  (D266). Es un sí a piezas, no un «dale» para publicar (no trae SHA).
+- Punto 17: Emi acepta la recomendación de seguir con 423 para lo que ya dice 434. Sigue sin
+  verificar si el despachante usa 434 para algo; no frena nada.
+- Sigue MARIA con PAISES-NOMBRES (D266) y, apenas la entregue, ORIGEN-ETIQUETA (D261), en
+  `PARA-DEV-2.md`. ORIGEN-ETIQUETA reemplaza «se ve el código «423», no la etiqueta» del 17/11.
+- Decidido por la PM, con el consejero: PAISES-NOMBRES alcanza también al lector de facturas, que
+  usa los mismos nombres. Ahí compara el campo de origen entero, así que un nombre nuevo sólo
+  convierte «no se reconoce» en el país correcto; el criterio 4 lo exige y pide el antes y después.
+- Decidido por la PM: D264 (a) no cambia. Un nombre que no está en la lista sigue dejando ganar al
+  código; D267 sigue como riesgo escrito.
