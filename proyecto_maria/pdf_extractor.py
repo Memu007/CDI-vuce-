@@ -2067,13 +2067,17 @@ def _iso2_por_codigo_maria() -> dict:
     return por_codigo
 
 
+# Las letras y cifras de ancho completo («３１０ ＢＲ») se leen como las comunes.
+_ANCHO_COMPLETO = {c: c - 0xFEE0 for c in range(0xFF01, 0xFF5F)}
+
+
 def _origen_desde_factura(raw) -> str:
     """País leído de la factura → código de dos letras de la tabla oficial
     VUCE (o el nombre, si el país no tiene uno), o "" si no se reconoce.
     Acepta dos letras, tres letras (ISO 3166-1) y el nombre ("China", "P.R. China")."""
     from proyecto_maria.core.maria_generator import get_pais_codigo, pais_reconocido
 
-    texto = str(raw or '').strip()
+    texto = str(raw or '').translate(_ANCHO_COMPLETO).strip()
     # «NA» en una factura casi siempre es «no aplica», no Namibia.
     if not texto or texto.upper() in ('NA', 'N/A'):
         return ''
