@@ -90,7 +90,7 @@ sabotaje pantalla $CLI "el catálogo del cliente muestra el código de lo escrit
   "FALLA: «nl» escrito en origen del catálogo del cliente se ve «423»"
 sabotaje pantalla $REV "la procedencia cambia en cada tecla" \
   "if (el.name === 'procedencia' && ev.type === 'change') el.value" "if (el.name === 'procedencia') el.value" \
-  "FALLA: «4340» escrito tecla por tecla se ve «423 · PAISES BAJOS0»"
+  "FALLA: procedencia «434» escrita queda «423 · PAISES BAJOS» en la operación"
 sabotaje pantalla $CLI "el origen frecuente se ve como vino" \
   "CDI.paisesMaria.etiqueta(metricas.origen_frecuente) || '—'" "metricas.origen_frecuente || '—'" \
   "FALLA: el origen frecuente «434» se ve «434»"
