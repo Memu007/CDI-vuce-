@@ -17,20 +17,20 @@ CAT=proyecto_maria/static/v2/screens/catalogo.js
 CLI=proyecto_maria/static/v2/screens/clientes.js
 REV=proyecto_maria/static/v2/screens/review.js
 MUESTRA="return (code && REEMPLAZOS[code[1]] && resolve(value)) || String(value ?? '');"
-ETIQUETA="return label(value) || String(value ?? '');"
-ETQ=test_la_etiqueta_es_el_codigo_y_el_nombre_que_salen_en_el_txt
+ETIQUETA="return label(value) || String(value || '').trim();"
+ETQ=test_la_etiqueta_es_la_del_txt
 
 # 0. La etiqueta vaciada: se ve lo de antes, el código del TXT sólo en lugar del 434.
 sabotaje casos $J "la etiqueta es lo que muestra el catálogo" "$ETIQUETA" "return mostrar(value);" \
   "AssertionError" $ETQ
 sabotaje pantalla $J "la etiqueta es lo que muestra el catálogo" "$ETIQUETA" "return mostrar(value);" \
   "FALLA: el origen frecuente «434» se ve «423»"
-sabotaje casos $J "la etiqueta es sólo el código" "$ETIQUETA" "return resolve(value) || String(value ?? '');" \
+sabotaje casos $J "la etiqueta es sólo el código" "$ETIQUETA" "return resolve(value) || String(value || '').trim();" \
   "AssertionError" $ETQ
-sabotaje casos $J "la etiqueta escribe «null» por lo que falta" "$ETIQUETA" "return label(value) || String(value);" \
+sabotaje casos $J "la etiqueta escribe «null» por lo que falta" "$ETIQUETA" "return label(value) || String(value).trim();" \
   "AssertionError" $ETQ
-sabotaje casos $J "la etiqueta recorta lo que no es un país" "$ETIQUETA" \
-  "return label(value) || String(value ?? '').trim();" "AssertionError" $ETQ
+sabotaje casos $J "la etiqueta deja los blancos de los bordes" "$ETIQUETA" \
+  "return label(value) || String(value || '');" "AssertionError" $ETQ
 sabotaje pantalla $CLI "el origen frecuente se ve como HTML" "kpiOrigen.textContent   = CDI.paisesMaria.etiqueta(" \
   "kpiOrigen.innerHTML   = CDI.paisesMaria.etiqueta(" "FALLA: el origen frecuente «<img"
 
