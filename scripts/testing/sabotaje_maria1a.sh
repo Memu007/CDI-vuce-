@@ -63,9 +63,9 @@ F=proyecto_maria/pdf_extractor.py
 T=tests/test_maria1a_lectura_factura.py
 
 # 1. el país vuelve a cortarse a dos letras (CHN → CH, Suiza)
-reemplazar $F "    texto = str(raw or '').strip()
+reemplazar $F "    texto = str(raw or '').translate(_ANCHO_COMPLETO).strip()
     # «NA» en una" "    return str(raw or '')[:2].upper()
-    texto = str(raw or '').strip()
+    texto = str(raw or '').translate(_ANCHO_COMPLETO).strip()
     # «NA» en una"
 caso "corta_a_dos_letras" "'CH', 'ME'"
 

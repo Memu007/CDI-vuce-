@@ -230,10 +230,10 @@ sabotaje $J "la pantalla da 423 para 434 con el nombre de otro país" \
   "|| ALIASES[nombre] === numero ? numero : '';" \
   "|| ALIASES[nombre] === numero || (code[1] !== numero && ALIASES[nombre]) ? numero : '';" \
   "item: ('434 · BELGICA', '423', '')"
-sabotaje proyecto_maria/core/despacho_lector.py "el despacho toma «４３４» de ancho completo como código" \
+sabotaje proyecto_maria/core/despacho_lector.py "el despacho toma «٤٣٤» de otro alfabeto como código" \
   'codigo, resto = codigo_de_pais(m.group(1)), m.group(2)' \
   'codigo, resto = codigo_de_pais(int(m.group(1))), m.group(2)' \
-  "where 'NL' = origen_iso2('４３４')"
+  "where 'NL' = origen_iso2('٤٣٤')"
 sabotaje $G "un grupo con dos países vuelve a generar" \
   "        if len(origenes) != 1:" "        if False:" \
   "FAILED $H"
