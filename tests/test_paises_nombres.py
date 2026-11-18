@@ -71,7 +71,7 @@ def test_paises_bajos_es_423_solo_con_423_o_con_434(nombre):
 ANCHO = {c - 0xFEE0: c for c in range(0xFF01, 0xFF5F)}
 
 
-@pytest.mark.parametrize("escrito", ["310 BR", "310 CN", "310", "434", "203 BRASIL", "310 - CHINA", "BR", "CN",
+@pytest.mark.parametrize("escrito", ["310 BR", "310 CN", "310", "434", "203 BRASIL", "310 · CHINA", "BR", "CN",
                                      "USA", "212 UNITED STATES", "310 MADE IN USA"])
 def test_la_letra_ancha_se_lee_como_la_comun(escrito):
     ancho = escrito.translate(ANCHO)
