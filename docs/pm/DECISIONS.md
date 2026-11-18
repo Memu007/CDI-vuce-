@@ -991,3 +991,14 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   Netherlands» 423, «Kingdom of Denmark» 409, «Saint Helena, Ascension and Tristan da Cunha» 694,
   «República del Congo» 108).
 - Sigue MARIA con ORIGEN-ETIQUETA (D261). Próxima D de MARIA: D275.
+
+## 2026-11-18 23:23 UTC — ORIGEN-ETIQUETA (D261): aceptada sobre `5a28c13c`
+
+- Aceptada e integrada (merge `fdf27eff` de `e13f0ccf`); acta `REPRODUCCION-ORIGEN-ETIQUETA-2026-11-18.md`.
+- Decidido por la PM: supuesto 1 (la etiqueta va en la procedencia de la revisión; los catálogos
+  siguen con «423», ponérsela es otra pieza y va a Emi), supuesto 2 (recorte de bordes) y riesgo 1
+  (el 682 alto en celular, sin «…»).
+- Riesgo escrito: tocar la procedencia y dejarla igual guarda la etiqueta en la operación; el TXT
+  sale igual.
+- La cola de MARIA queda vacía; su rutina, apagada. Próxima D de MARIA: D275.
+

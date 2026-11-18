@@ -3,29 +3,24 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Veredicto: PAISES-NOMBRES (D266) aceptada sobre `fa89e917` e integrada (2026-11-18 22:36 UTC)
+## Veredicto: ORIGEN-ETIQUETA (D261) aceptada sobre `5a28c13c` e integrada (2026-11-18 23:23 UTC)
 
-Integré `bf787b2d` con `merge`. Acta `REPRODUCCION-PAISES-NOMBRES-2026-11-18.md`. Reproduje los casos
-(«516 passed»), tus 9 sabotajes en rojo y `e2e_maria.sh` en el SHA y en la unión. El adversario de
-datos probó ~137 000 textos: 0 país→otro país, y la pantalla y el servidor coinciden. El aviso de
-`chequeo-6` por NOMBRES está bien explicado.
+Integré `e13f0ccf` con `merge`. Acta `REPRODUCCION-ORIGEN-ETIQUETA-2026-11-18.md`. Reproduje los casos
+(«134 passed»), tus 24 sabotajes en rojo y `e2e_maria.sh` en el SHA (también es la unión). Las 309
+etiquetas de la tabla vuelven por el servidor al mismo código. El aviso de `chequeo-6` está bien
+explicado: es el envoltorio del módulo.
 
-- **D273: (a)**, decidido por la PM. Para (b) hay que saber cuál código de cada par vale en la tabla
-  oficial, y eso no sale del repo. Queda como riesgo escrito.
-- **D274: (a)**, decidido por la PM. Probé «MADE IN U.S.A.» con y sin 212: da ninguno, nunca India.
+- **Supuesto 1: aceptado.** La procedencia es el único campo de origen de la revisión. Ponerles la
+  etiqueta a los catálogos sería otra pieza: va a Emi.
+- **Supuesto 2: aceptado**, decidido por la PM. Es sólo lo que se ve.
+- **Riesgo 1: aceptado sin «…»**, decidido por la PM. Cortarlo escondería el nombre.
+- **Riesgo escrito (del adversario):** si la persona toca la procedencia y la deja igual, queda
+  «310 · CHINA» en la operación en vez de «310». El TXT sale igual (`CARTPAYPRC=310`). Sin devolución.
 
-## Tarea activa: ORIGEN-ETIQUETA (D261) (2026-11-18 22:36 UTC)
+## Sin tarea activa (2026-11-18 23:23 UTC)
 
-Emi dijo «sí a los tres» (18/11 20:27 UTC): es un sí a la pieza, no un «dale» para publicar. Base: la
-cabeza de mi rama; traela con `merge`. Revisión: datos (§3), con el adversario de datos de la tabla
-«Modelo y esfuerzo» y `e2e_maria.sh` en el SHA.
-
-1. En las métricas del cliente («Origen frecuente») y en la revisión, el origen se ve con código y
-   nombre («310 · CHINA»), escriba como se escriba («CN», «CHINA», «310»). Lo que ya dice 434 se ve
-   «423 · PAISES BAJOS».
-2. Un origen que no se reconoce se ve como se escribió, escapado.
-3. El TXT sale igual, byte a byte, antes y después; lo guardado no se reescribe.
-4. Reemplaza «se ve el código «423», no la etiqueta» del 17/11 en esos dos lugares.
+Tu cola está vacía: lo que sigue espera a Emi (CATALOGO-4, ORIGEN-2 y lo demás de `NOW.md`). Apagué tu
+rutina; te despierto con `send_message` cuando haya pieza. No empieces nada por tu cuenta.
 
 **Próxima D: D275.**
 
