@@ -2,172 +2,247 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## Entrega DESPACHO1B-CARGA-2: sobre `fd4eb1dd` (2026-11-17 23:40 UTC)
+## Entrega PAISES-NOMBRES (D266): sobre `fa89e917` (2026-11-18 22:22 UTC)
 
-**Resultado.** Sólo cambian pruebas (`producto +0/−0`). Base `8f3a9052`. Sin decisiones nuevas para vos.
+**Resultado.** Base `e5476182`. Los seis criterios están; los números salen de los logs de abajo. Lo
+que decidís vos: **D273** y **D274**, al final.
 
-- **D271, medido: aparece.** `test_el_texto_tiene_tope_de_cpu` se tragó un tick en 2 de 21 corridas
-  cargadas. Con el archivo solo, 0 en 21. Entonces el ayudante pasó a `tests/pdf_bombas.py`
-  (`recolector_sin_la_suite`), una sola copia, y lo usan `test_despacho1b.py` (los seis casos) y
-  `test_rendimiento1d.py:97`. Con la misma carga sobre `fd4eb1dd`: 0 en 21.
-- **D272, arreglado.** El `try` interno abarca el bucle entero, condición incluida. Fuera de pytest, 3
-  tandas de 2000 del cuerpo del caso:
-  - antes: `cortes == 1` 18 veces en 6000 (5, 3 y 10), todas con la pila `('<module>', 10), ('cortar',
-    346)`: la línea 10 es la condición del `while`;
-  - después: 0 en 6000, y ninguna pasó de 1 s.
-  - Con el corte desarmado el caso sigue en rojo (`assert 0 == 2`), y con el temporizador que no se
-    repite también (`assert 1 == 2`).
-- **El tope del producto no se tocó.** Sin esperas fijas nuevas ni reintentos.
-- **Puertas:** los tres archivos tocados o que usan el ayudante, la carga 7 × 3, `despacho1b.sh` con
-  Postgres y chequeo-6, abajo con su salida.
+- **1. Toda la tabla.** `const NOMBRES` (en `paises_maria.js`) trae 225 países con su nombre en inglés y
+  en castellano, con puntos y sin ellos. Sale de la norma ISO 3166-1 (pycountry 26.2.16) con
+  `scripts/datos/generar_nombres_paises.py`, más los nombres corrientes que la norma no trae
+  («Holland», «EE.UU.», «Samoa Americana»). La leen el servidor (`_nombres_de_pais`, la misma que usan
+  los dos lectores y el TXT) y la pantalla. Los alias que ya existían mandan sobre los nombres nuevos.
+  El caso recorre NOMBRES: cada nombre solo, con su código y con el de otro país, en el despacho, la
+  factura y `codigo_de_pais`; otro caso hace lo mismo en la pantalla con node.
+- **2. Países Bajos.** «Netherlands», «The Netherlands», «Holland», «Holanda» y «Países Bajos» dan NL
+  (423) solos, con 423 y con 434. Al lado de 310, 406 o 241 no dan ninguno.
+- **3. Letra ancha.** U+FF01 a U+FF5E se leen como ASCII en los dos lectores. «３１０ ＢＲ» daba BR en
+  la base; ahora da ninguno, igual que «310 BR».
+- **4. Sin países nuevos equivocados.** Medí la base contra `fa89e917`: **0 orígenes cambian de un país
+  a otro** en 1609 textos, cada uno solo, con cada código de la tabla y con 434. Las facturas de prueba
+  del repositorio no cambian. Los nombres difíciles van como datos en un solo caso (`DIFICILES`).
+- **5. Lo que queda afuera.** Un nombre que no está en la lista sigue dejando ganar al código: D264 (a)
+  no cambia. D267 sigue como riesgo.
+- **6. Negativo en el mismo SHA.** Con todo el arreglo vaciado (los nombres en el servidor y en la
+  pantalla, y la letra ancha) fallan los casos 1, 2 y 3. Con sólo la letra ancha vaciada fallan sólo
+  los seis de la letra ancha. Las otras partes, una por una, también dan rojo.
 
-## D271: la medición, sobre `8f3a9052`
+## Criterio 4: la medición
 
-`contar.py` cuenta, por caso, los avisos «Exception ignored» que pasan por `cortar` (ticks tragados) y
-los `FAILED`. El archivo solo: `tests/test_rendimiento1d.py`, 21 veces seguidas. La carga: siete lazos en
-paralelo, en 4 núcleos y sin otros procesos, cada uno con `tests/test_catalogo3.py
-tests/test_despacho1b.py tests/test_rendimiento1d.py` tres veces.
+`corpus.txt` tiene 1609 textos: los nombres de la norma, los alias, la tabla, INDEC, NOMBRES,
+`DIFICILES` y 22 entradas que trajo el adversario («MOROCCO LEATHER», «GREENLAND (DENMARK)»…). Cada texto
+va solo, como «c texto» y como «c · texto», para cada código de la tabla y 434. Todo pasa por el despacho,
+la factura y `codigo_de_pais`, y se guarda sólo lo que da país (como nombre de la tabla).
 ```
-solo 21:04:52
-corridas: 21 {'12 passed': 21}
-ticks tragados por caso: {}
-fallas: {}
-carga 21:11:31
-corridas: 21 {'408 passed': 21}
-ticks tragados por caso: {'test_el_texto_tiene_tope_de_cpu': 2}
-fallas: {}
+antes  (e5476182): 1609 textos, 226650 reconocidos
+después (fa89e917): 1609 textos, 40477 reconocidos
+antes 226650 después 40477 | ganados 3019 | país→otro país 0 | país→ninguno 189192
+ganados por lector: Counter({'factura': 1160, 'codigo': 1160, 'despacho': 699})
+código con el nombre de otro país: {'despacho': 184248} | otras pérdidas: 4944
 ```
-El tick tragado, en `carga_5_2` y `carga_6_2`:
-```
-tests/test_rendimiento1d.py::test_el_texto_tiene_tope_de_cpu
-  PytestUnraisableExceptionWarning: Exception ignored in: <function WeakSet.__init__.<locals>._remove at 0x7f511649d800>
-    File "/usr/lib/python3.12/_weakrefset.py", line 39, in _remove
-    File ".../proyecto_maria/core/despacho_lector.py", line 346, in cortar
-  proyecto_maria.core.despacho_lector._DemasiadoTrabajo
-```
-No salió ningún rojo: hace falta un segundo tick dentro del gancho de pytest, como en la pieza anterior.
-Es la misma causa, y por eso va el mismo ayudante.
+- **184 248 pérdidas son lo que pide la tarea:** un código con el nombre de otro país.
+- **Las 4944 restantes salen de 15 textos.** Todos nombran otro país adentro:
 
-En `rendimiento1d:97`, el PDF se arma antes del bloque (`data = trabajo(hojas=2)`). Así el congelado
-rodea sólo la lectura y el armado no gasta el tope.
+  | texto | veces | por qué |
+  |---|---|---|
+  | GREENLAND (DENMARK), COOK ISLANDS (NEW ZEALAND) | 618 c/u | territorio y su país; también con su propio código. En castellano («666 GROENLANDIA (DINAMARCA)») ya daba ninguno |
+  | United States Minor Outlying Islands | 616 | excluido a propósito (UM); nombra UNITED STATES |
+  | Republic of South Africa (dos formas) | 616 c/u | nombra SOUTH AFRICA; con 143 es D273 |
+  | MOROCCO LEATHER, JORDAN SHOES | 616 c/u | palabra de producto que es un país |
+  | TURKEY BREAST | 614 | ídem |
+  | 223 PUERTO RICO (UNITED STATES), 242 ARUBA (NETHERLANDS) | 2 c/u | territorio y su país, con su código |
+  | 310 CHINA MACAU / GIBRALTAR / HOLLAND COTTON / BERMUDA SHORTS | 2 c/u | otro país al lado de China |
+  | 315 MADE IN U.S.A. | 2 | **daba India**: ahora ninguno |
 
-## D272: antes y después, fuera de pytest, sobre `fd4eb1dd`
+  Todas quedan sin origen, con aviso: ninguna da otro país.
+- **Antes y después de las facturas de prueba del repositorio.** Corrí los 16 archivos de pruebas de
+  facturas y despachos (1983 casos) con un plugin de pytest que anota cada texto que pasa por los dos
+  lectores y lo que devuelven. Base y `fa89e917` son iguales, entrada por entrada (17 entradas):
+  ```
+  despacho '203 BRASIL' → 'BR' | despacho '310 BRASIL' → None | despacho '310 CHINA' → 'CN'
+  despacho '900 ATLANTIDA' → None | despacho 'ATLANTIDA' → None
+  factura 'AR' → 'AR' | 'ATLANTIDA' → '' | 'CHN' → 'CN' | 'CN' → 'CN' | 'China' → 'CN' | 'MEX' → 'MX'
+  factura 'N/A' → '' | 'NA' → '' | 'Narnia' → '' | 'P.R. China' → 'CN' | None → '' | nan → ''
+  diff registro_base.json registro2_nuevo.json → IGUALES_A_BASE
+  ```
+  Las facturas de prueba traen pocos orígenes distintos. La medición de arriba es la que distingue.
 
-Los dos cuerpos, 2000 veces por tanda, tres tandas de cada uno en paralelo:
-```
-antes_1.txt: {2: 1995, 1: 5} {(('<module>', 10), ('cortar', 346)): 5}
-antes_2.txt: {2: 1997, 1: 3} {(('<module>', 10), ('cortar', 346)): 3}
-antes_3.txt: {2: 1990, 1: 10} {(('<module>', 10), ('cortar', 346)): 10}
-despues_1.txt: {2: 2000} lentos 0
-despues_2.txt: {2: 2000} lentos 0
-despues_3.txt: {2: 2000} lentos 0
-```
-El informe anterior decía 17 en 6000; esta corrida, 18. «lentos» cuenta las vueltas de 1 s o más (el
-segundo assert del caso).
+## Supuestos
 
-Por qué ahora no queda una ventana: en CPython 3.12 la señal se atiende en un punto de corte del
-intérprete (llamada, salto hacia atrás, entrada a función). Entre el `except` y el `cortes += 1` no hay
-ninguno (lo miré con `dis`). Todo lo demás del primer tramo está dentro del `try` interno.
+1. **La letra ancha se lee sólo en los dos lectores.** `codigo_de_pais` y la pantalla siguen rechazando
+   «３１０» escrito a mano, como pide el caso de Holanda (`NO_SON_HOLANDA`). Las cifras de otro
+   alfabeto («٤٣٤») tampoco cuentan. Usé una tabla de ancho completo y no NFKC, que el repositorio
+   usa en otros lados, porque NFKC también cambia «№» por «No», y «No» es Noruega: lo probé y
+   `_origen_desde_factura` da `'NO'`.
+2. **Los territorios** sin sigla de dos letras entran por la lista `TERRITORIOS` del generador.
+   Quedan afuera Jersey y Guernsey («212 NEW JERSEY»), Bonaire, Curazao y San Martín, y las islas
+   menores de Estados Unidos (UM).
+3. **«UK»** sigue como antes: la factura y el despacho devuelven «UK», no «GB». Ya estaba así en la
+   base; por eso «UK» no está entre los nombres nuevos.
+4. **El índice es uno solo:** el TXT y la validación también reconocen los nombres nuevos. Un producto
+   con origen «United States» antes frenaba la generación por origen no reconocido; ahora sale 212.
+   En el caso de la tabla no cambia ninguna salida del TXT que antes saliera; lo que cambia es que
+   ahora sale algo donde antes frenaba.
+5. **«999 + nombre»:** 999 es «OTROS PAISES». Con un nombre de la lista al lado, ahora da ninguno.
 
-## Sabotajes de los dos casos tocados, sobre `fd4eb1dd`
+## Decisiones para vos
 
-```
-desarmado: E   Failed: DID NOT RAISE _DemasiadoTrabajo|E   AssertionError: 0|E   assert 0 == 2|FAILED tests/test_rendimiento1d.py::test_el_texto_tiene_tope_de_cpu - Failed:...|FAILED tests/test_despacho1b.py::test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar| ======================== 2 failed, 5 warnings in 3.30s =========================
-norepite: E   AssertionError: 1|E   assert 1 == 2|FAILED tests/test_despacho1b.py::test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar| =================== 1 failed, 1 passed, 5 warnings in 2.87s ====================
-sin sabotaje: ======================== 2 passed, 5 warnings in 0.89s =========================
-```
-- **desarmado:** `_tope_de_cpu` sale sin armar el temporizador.
-- **norepite:** `setitimer(..., 0)` en vez de `0.05`: el temporizador no se repite.
+- **D273.** La tabla tiene países con dos códigos y nombres distintos: 143/159 Sudáfrica, 402/438,
+  341/668, 242/653 Aruba y 241/659 Antillas. Con el código de uno y el nombre del otro dan ninguno, con
+  aviso. Por ejemplo, «143 SUDAFRICA», «659 NETHERLANDS ANTILLES» y «653 ARUBA».
+  - (a) Seguir así: pérdida con aviso. **Es el defecto que dejé.**
+  - (b) Tratarlos como el mismo país, como Chipre y Turquía (311/435, 336/436).
+- **D274.** «212 MADE IN U.S.A.» y «212 MADE IN E.E.U.U.» dan ninguno, en la base y ahora: con los
+  puntos, la palabra que sigue a «IN» tiene una letra y la regla de «MADE IN» la cuenta como India.
+  «212 MADE IN USA» da US. No lo toqué porque la regla de «MADE IN» queda igual (criterio 4).
+  - (a) Dejarlo: pérdida con aviso.
+  - (b) Una pieza chica que lea «MADE IN» con los puntos.
 
 ## Commits
 
 | commit | qué |
 |---|---|
-| `bca3fff6` test | D272: el `try` interno abarca el bucle, condición incluida |
-| `fd4eb1dd` test | D271: el ayudante pasa a `tests/pdf_bombas.py` y lo usan los dos archivos. **Lo que se entrega** |
+| `75d37027` fix | NOMBRES generado, el servidor y la pantalla lo leen; letra ancha en los dos lectores; CHANGELOG |
+| `3bf8c78c` test | los casos de la tarea; catalogo3 y maria1a siguen a la línea nueva («４３４» es NL) |
+| `d808c026` test | «310 · CHINA» en lugar de «310 - CHINA»: el arnés corta el nombre del caso en « - » |
+| `9bd853e2` test | `scripts/testing/sabotajes/paises_nombres.sh` |
+| `a12c9c03` fix | lo que encontró el adversario: Samoa Americana, las Islas Vírgenes y las Antillas por su nombre; «Republic of South Africa» afuera; la búsqueda de NOMBRES no depende de la sangría |
+| `fa89e917` test | esos nombres en `DIFICILES`; el caso no lee una tabla vacía en silencio. **Lo que se entrega** |
 | informe | el commit siguiente |
 
 ## Pruebas
 
 | qué | SHA | resultado |
 |---|---|---|
-| carga 7 × 3 (catalogo3, despacho1b, rendimiento1d) | `fd4eb1dd` | 21 × «408 passed»; 0 ticks tragados; 0 fallas |
-| despacho1b, rendimiento1d y rendimiento1c | `fd4eb1dd` | «312 passed, 3 warnings in 110.20s» |
-| `despacho1b.sh` con Postgres | `fd4eb1dd` | «BASE \| verde sin sabotaje», 136 ROJO, «sin Postgres, no corridos: 0», «sabotajes sin rojo: 0» (21:36 a 23:35) |
-| chequeo-6 | `8f3a9052..fd4eb1dd` | abajo, entero |
+| `test_paises_nombres.py` y `test_catalogo3.py` | `fa89e917` | «133 passed, 3 warnings in 26.63s» |
+| suite completa, desde un worktree limpio | `fa89e917` | «6224 passed, 110 skipped, 3 xfailed, 110 warnings in 1142.03s» |
+| `paises_nombres.sh` | `fa89e917` | nueve «ROJO», «OK: todos los sabotajes en rojo» (abajo) |
+| `catalogo3.sh` | `fa89e917` | 65 «ROJO», «fallas: 0» |
+| `sin_sigla.sh` | `fa89e917` | 16 «ROJO», «sabotajes sin rojo: 0» |
+| `holanda423.sh` | `fa89e917` | 17 «ROJO», «sabotajes sin rojo: 0» |
+| `origen_txt.sh` | `fa89e917` | 13 «ROJO», «sabotajes sin rojo: 0» |
+| `excel1.sh` | `fa89e917` | 36 «ROJO», «sabotajes con falla: 0» |
+| `sabotaje_maria1a.sh` | `fa89e917` | «OK: los 10 sabotajes dan rojo por la razón esperada» |
+| `sabotaje_maria3.sh` | `fa89e917` | «OK: los 32 sabotajes dan rojo por la razón esperada» |
+| `e2e_maria.sh` | `fa89e917` | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.» |
+| medición del criterio 4 | `e5476182` y `fa89e917` | arriba |
+| chequeo-6 | `e5476182..fa89e917` | abajo, entero |
 
-`rendimiento1c` entra porque importa de `pdf_bombas.py`.
+Rojo antes del arreglo: los casos de `3bf8c78c` sobre el producto de `e5476182` dan «13 failed, 9 passed». Fallaban por
+la tarea: «310 UNITED STATES» daba CN, el nombre no se reconocía y la letra ancha no se leía.
 
-Los sabotajes de `despacho1b.sh` que anclan en los casos que usan el ayudante:
+Los sabotajes de `paises_nombres.sh`:
 ```
-ROJO  | el temporizador de CPU no se repite: «FAILED tests/test_despacho1b.py::test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar»
-ROJO  | un corte por CPU parece escaneado: «FAILED tests/test_despacho1b.py::test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado»
-ROJO  | extraer se lleva el tope entero: «FAILED tests/test_despacho1b.py::test_las_hojas_leidas_antes_del_corte_dan_sus_productos»
-ROJO  | la señal queda puesta: «FAILED tests/test_despacho1b.py::test_el_tope_de_cpu_deja_la_senal_como_estaba»
+BASE  | casos: ======================== 22 passed, 5 warnings in 0.57s ========================
+ROJO  | todo vaciado: test_cada_pais_se_reconoce_por_su_nombre_en_ingles_y_en_castellano
+ROJO  | todo vaciado: test_paises_bajos_es_423_solo_con_423_o_con_434[Netherlands]
+ROJO  | todo vaciado: test_la_letra_ancha_se_lee_como_la_comun[310 BR]
+ROJO  | sin letra ancha: «AssertionError», 6 casos
+ROJO  | el servidor no lee los nombres: «AssertionError», 7 casos
+ROJO  | la pantalla no lee los nombres: «AssertionError», 1 casos
+ROJO  | el despacho no lee la letra ancha: «AssertionError», 3 casos
+ROJO  | la factura no lee la letra ancha: «AssertionError», 5 casos
+ROJO  | un nombre de la norma choca con el de otro país: «AssertionError», 2 casos
+OK: todos los sabotajes en rojo
 ```
-`despacho1b.sh` no tiene sabotajes que anclen en `rendimiento1d`; ese caso lo cubre el «desarmado» de arriba.
 
 chequeo-6, entero:
 ```
-chequeo-6 8f3a9052..fd4eb1dd: avisos para mirar, no un veredicto
-producto +0/−0
-arnés +32/−29
+chequeo-6 e5476182..fa89e917: avisos para mirar, no un veredicto
+producto +248/−7
+  AVISO producto suma 241 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +178/−7
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-avisos: 0
+  proyecto_maria/core/despacho_lector.py: 942 → 942
+  proyecto_maria/core/maria_generator.py: 2400 → 2404
+  proyecto_maria/pdf_extractor.py: 2890 → 2894
+  proyecto_maria/static/v2/paises_maria.js: 56 → 289
+  AVISO creció una función de más de 150: proyecto_maria/static/v2/paises_maria.js:2 <anónima> 54 → 287, 233 en su propio cuerpo (§6: lo nuevo va aparte)
+avisos: 2
 ```
+- **AVISO «producto suma 241 líneas netas».** 233 son el bloque de datos generado: un renglón por país,
+  como ALIASES, que ya está en el mismo archivo. El código suma 12: el bucle de la pantalla, la lectura
+  del servidor y la letra ancha.
+- **AVISO «creció una función de más de 150».** La «función» es el envoltorio del módulo
+  (`(function () {…})()`), que ya guarda COUNTRIES y ALIASES. Lo nuevo es una constante de datos, no
+  una rama. Sacarla a otro archivo suma un `<script>`, un orden de carga y un segundo archivo que leer
+  en el servidor y en el caso de la pantalla. Si preferís el archivo aparte, es una pieza chica.
 
 ## Revisiones
 
 | quién | sobre | hallazgos | qué hice |
 |---|---|---|---|
-| `/code-review high` | `8f3a9052..fd4eb1dd` | 7 | ninguno pide cambio dentro de la tarea; abajo |
-| `adversario-sonnet-medio` | `fd4eb1dd` | 0 | sus sabotajes dan rojo; `rendimiento1c` y `rendimiento1d`: «27 passed» |
+| `adversario-sonnet-alto` (datos) | `9bd853e2` | 0 países cambiados en 2 409 156 entradas; 3 tipos de pérdida | arreglé el primero; abajo |
+| `/code-review high` | `e5476182..9bd853e2` | 10 | arreglé 3; abajo |
+| `/security-review` | — | no corrió | el comando falla: el repositorio no tiene `origin/HEAD`. La revisé a mano: abajo |
 
-Los siete del `/code-review`:
-1. **Carrera en el `finally` del producto** (un tick entre el `setitimer(0)` y la vuelta del manejador):
-   el producto queda fuera de la tarea. Medido antes, 0 en 10 000. Riesgo.
-2. **Un tick entre el `except` y el `cortes += 1`:** refutado con `dis` y con el 0 en 6000.
-3. **Los finalizadores por conteo de referencias no los frena el congelado:** cierto; dentro del bloque
-   sólo muere lo que crea la lectura. Riesgo.
-4. **El ayudante es voluntario:** un caso nuevo que lea con tope dentro de pytest puede olvidarlo. Riesgo.
-5. **`gc.unfreeze` no se anida:** no hay otro `gc.freeze` en el repositorio. Riesgo bajo.
-6. **El import a nivel de módulo en `test_despacho1b.py`:** lo dejé, es una línea para seis usos.
-7. **El costo de `gc.collect()`:** medido en la pieza anterior, entre 97 y 202 ms cada uno. Ahora suma
-   uno más, en `rendimiento1d`.
+El adversario:
+1. **El nombre compuesto del propio país, con su código, quedaba sin origen.** «695 SAMOA AMERICANA»,
+   «683 UNITED STATES VIRGIN ISLANDS» y «241 NETHERLANDS ANTILLES» daban su código; con la pieza, SAMOA,
+   UNITED STATES o NETHERLANDS nombraban otro país. **Arreglado** en `a12c9c03`, con datos: las tres
+   formas en NOMBRES y en `DIFICILES`. Con el producto de `9bd853e2`, el archivo de casos de `fa89e917` da «1 failed, 21 passed»: falla sólo `DIFICILES`.
+   El territorio con su país entre paréntesis en inglés («666 GREENLAND (DENMARK)») ahora da ninguno,
+   como ya daba en castellano: queda en la tabla de pérdidas.
+2. **Palabras de producto que son un país** («310 CHINA BERMUDA SHORTS», «310 MOROCCO LEATHER», «212
+   NEW ENGLAND»): pérdida con aviso, en la tabla de pérdidas. «NEW ENGLAND» es como «NEW JERSEY». Lo
+   dejé porque «ENGLAND» es como se escribe Inglaterra en una factura.
+3. **La normalización de la pantalla y la del servidor difieren en marcas combinantes raras**
+   (U+20D0…): «CHINA⃐» es China en el servidor y nada en la pantalla. Ya estaba así en la base. Va a
+   riesgos.
 
-El adversario corrió sus pruebas mientras corría mi carga. Por eso esa carga no es «sin otros procesos»;
-igual dio 0.
+El `/code-review`:
+1. «212 MADE IN U.S.A.» da ninguno: igual que en la base (lo corrí en los dos). Es **D274**.
+2. «Republic of South Africa» daba 159 y «República de Sudáfrica», 143: **arreglado**, los dos afuera.
+3. La búsqueda de NOMBRES en el servidor dependía de la sangría: **arreglado**, la misma expresión que
+   el caso.
+4. El caso tomaba una tabla vacía si no encontraba NOMBRES: **arreglado**, ahora falla.
+5. «Republic of China» con 313 (Taiwán) da ninguno: igual que en la base. No lo sumé a Taiwán porque
+   hay facturas chinas que escriben así su país, y entonces un origen pasaría de China a Taiwán.
+   Queda en D264 (a).
+6. La letra ancha sólo en los lectores: es el supuesto 1.
+7. El AVISO de la función: arriba.
+8. NFKC en lugar de la tabla: no, por «№» (supuesto 1).
+9. Si dos nombres chocaran, el servidor se quedaría con el último y la pantalla con el primero. Hoy no
+   chocan, y el caso de choques lo frena (el sabotaje del 159 da rojo). Sin cambio.
+10. El caso de choques arma la tabla vieja a mano en lugar de usar `_nombres_de_pais()`: tiene que
+    ser así, porque compara lo viejo con lo nuevo y esa función ya los trae juntos. Sin cambio.
+
+La revisión de seguridad a mano:
+- NOMBRES es un dato fijo del repositorio, no algo que escriba un usuario. Lo que escribe el usuario
+  sólo pasa por `translate` y por los lectores de siempre.
+- Las claves nuevas de ALIASES salen en mayúsculas de `normalize`, así que no hay `__proto__`.
+- Ningún nombre nuevo llega a la pantalla como HTML.
 
 ## Comandos
 
 ```bash
 VENV=/ruta/al/venv
 PT="env -u DATABASE_URL -u ENVIRONMENT GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=. $VENV/bin/python -B -m pytest -q --no-cov -p no:cacheprovider --timeout=300"
-CASOS="tests/test_rendimiento1d.py::test_el_texto_tiene_tope_de_cpu tests/test_despacho1b.py::test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar"
-# 1. los dos casos, en fd4eb1dd                                  → «2 passed»
-$PT $CASOS | tail -1
-# 2. el temporizador que no se repite                  → «1 failed, 1 passed», con «assert 1 == 2»
-R=/tmp/d1bc2; git worktree add -f -q --detach $R fd4eb1dd && cd $R
-sed -i 's/max(segundos, 0.001), 0.05)/max(segundos, 0.001), 0)/' proyecto_maria/core/despacho_lector.py
-git diff --stat; $PT $CASOS | grep -E "^E  |passed|failed"
-cd - >/dev/null; git worktree remove -f $R
-# 3. §6                                                          → «producto +0/−0», «avisos: 0»
-python3 docs/pm/herramientas/chequeo-6.py 8f3a9052 fd4eb1dd
+# 1. los casos, en fa89e917                                           → «133 passed»
+$PT tests/test_paises_nombres.py tests/test_catalogo3.py | tail -1
+# 2. los negativos (1 min)                → «ROJO  | todo vaciado» ×3, seis «ROJO» más, «OK: todos los sabotajes en rojo»
+PY=$VENV/bin/python scripts/testing/sabotajes/paises_nombres.sh fa89e917 | grep -E "^(ROJO|VERDE|ROTO|OK|FALLAS)"
+# 3. antes y después de los dos ejemplos de la tarea, la letra ancha y Netherlands
+for r in e5476182 fa89e917; do R=/tmp/pn-$r; git worktree add -f -q --detach $R $r && (cd $R && env -u DATABASE_URL ENVIRONMENT=development GEMINI_API_KEY=x PYTHONPATH=. $VENV/bin/python -B -W ignore -c "
+from proyecto_maria.core.despacho_lector import origen_iso2 as o
+print('$r', [o(t) for t in ('310 UNITED STATES', '435 República Dominicana', '212 U.S.A.', 'NETHERLANDS', '３１０ ＢＲ', '310 MADE IN USA')])" 2>&1 | tail -1); git worktree remove -f $R; done
+#    → e5476182 ['CN', '435', 'US', None, 'BR', None]
+#    → fa89e917 [None, None, 'US', 'NL', None, None]
+# 4. §6                                    → «producto +248/−7», «avisos: 2» (los dos de arriba)
+python3 docs/pm/herramientas/chequeo-6.py e5476182 fa89e917
 ```
-La carga de 7 × 3 tardó 8 minutos (21:27 a 21:36), y las 6000 vueltas con los sabotajes, 4 (21:23 a
-21:27). No te las pido: están arriba.
+Los tres ya los corrí con esa salida. La medición del criterio 4 tarda unos 4 minutos por árbol y
+necesita los guiones de mi scratchpad: no te la pido, el resultado está arriba.
 
 ## Riesgos
 
-- **Carrera en el `finally` del producto** (punto 1 de arriba). No la toqué: el criterio 3 deja el tope
-  como está.
-- **Finalizadores por conteo de referencias** (punto 3): si una lectura suelta el último puntero a un
-  objeto ajeno con `__del__`, ese finalizador corre dentro del tope. No lo vi.
-- **El ayudante es voluntario** (punto 4). Hoy lo usan los siete casos que leen con temporizador dentro
-  del proceso de pytest con un tope chico.
-- **`gc.unfreeze` no se anida** (punto 5).
-- **Lo que no corrí:** la suite completa (sólo cambian pruebas de tres archivos, y el criterio 4 no la
-  pide); `e2e_maria.sh`.
+- **D273 y D274** (arriba).
+- **Pérdidas con aviso nuevas** (la tabla del criterio 4): la palabra de producto que es un país
+  («TURKEY BREAST», «MOROCCO LEATHER») y el territorio con su país entre paréntesis.
+- **Las marcas combinantes raras** (punto 3 del adversario), de antes.
+- **NOMBRES se regenera a mano:** si cambia pycountry, hay que volver a correr el generador, y el
+  caso de choques tiene que seguir en verde.
+- **Lo que no corrí:** nada de lo que pide la tarea. Hubo una primera medición sobre un corpus con renglones crudos de mi volcado (1805 textos): también dio «país→otro país 0»; la de arriba es la del corpus limpio.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`; rutina trig_01Ukttby1fc4sGVQfSn1jC9U apagada por la PM: me despierta por send_message. PM principal session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `09ac6e29`. Aceptadas: las de antes (CUIT-GENERAR `29327d2` … D269 `471db09a`), DESPACHO1B-CARGA sobre `962bc88f`, DESPACHO1B-CARGA-2 sobre `fd4eb1dd` (informe `b0c0b0db`). Sin pieza: mi cola espera a Emi (D266, D261) o a alguien de afuera (PESO-NETO-1, MARIA-6, PRORRATEO-1, LEGAL-1); quieta hasta que la PM escriba. Próxima D: D273. Lecciones (además de las del historial de este archivo): el negativo de un arreglo va en el mismo SHA con el arreglo vaciado; una tasa «después» sin ese negativo no distingue; cada número del informe sale de un log, y el que no está, se mide o se saca; lo que marca un adversario se reproduce antes de proponerlo; un congelado del recolector sin `gc.collect()` antes mueve los finalizadores al caso siguiente; una tarea en segundo plano muere a las 2 h: puertas con `setsid nohup` y un vigía de timeout largo; horas, sólo de `date -u` en el momento de escribirlas, también la del encabezado; los comandos para la PM se prueban antes de escribirlos. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`; rutina trig_01Ukttby1fc4sGVQfSn1jC9U (/respondio cada 2 h). PM principal session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `e5476182`. Aceptadas: las de antes (… DESPACHO1B-CARGA-2 sobre `fd4eb1dd`). Entregada, en revisión: PAISES-NOMBRES (D266) sobre `fa89e917`, con D273 y D274 abiertas. Sigue, apenas entregué: ORIGEN-ETIQUETA (D261), datos (§3), adversario Sonnet alto y `e2e_maria.sh` sobre el SHA. Próxima D: D275. Lecciones (además de las del historial de este archivo): el negativo de un arreglo va en el mismo SHA con el arreglo vaciado; una tasa «después» sin ese negativo no distingue; cada número del informe sale de un log, y el que no está, se mide o se saca; lo que marca un adversario se reproduce antes de proponerlo; un congelado del recolector sin `gc.collect()` antes mueve los finalizadores al caso siguiente; una tarea en segundo plano muere a las 2 h: puertas con `setsid nohup` y un vigía de timeout largo; horas, sólo de `date -u` en el momento de escribirlas, también la del encabezado; los comandos para la PM se prueban antes de escribirlos. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe. Letra ancha: tabla U+FF01..FF5E, no NFKC («№» da Noruega).
