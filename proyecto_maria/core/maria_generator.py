@@ -704,7 +704,7 @@ def _nombres_de_pais() -> dict:
     y los del servidor, que mandan."""
     js = _PAISES_PANTALLA.read_text(encoding="utf-8")
     m = re.search(r"const ALIASES = (\{.*?\});", js)
-    n = re.search(r"const NOMBRES = (\{.*?\n    \});", js, re.S)
+    n = re.search(r"const NOMBRES = (\{.*?\});", js, re.S)
     if not (m and n):
         raise RuntimeError(f"No se encontraron los nombres de país (const ALIASES y NOMBRES) en {_PAISES_PANTALLA}")
     corrientes = {_normalizar_pais(nombre): int(c) for c, idiomas in json.loads(n.group(1)).items()

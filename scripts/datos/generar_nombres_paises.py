@@ -23,8 +23,10 @@ RAIZ = pathlib.Path(__file__).resolve().parents[2]
 JS = RAIZ / "proyecto_maria" / "static" / "v2" / "paises_maria.js"
 
 # Códigos de la tabla sin sigla de dos letras. Afuera: Jersey y Guernsey (telas:
-# «212 NEW JERSEY») y los territorios que la tabla no tiene aparte.
+# «212 NEW JERSEY») y los territorios que la tabla no tiene aparte. Las Antillas
+# Neerlandesas ya no están en la norma vigente: salen de las retiradas.
 TERRITORIOS = {
+    "AN": 241,
     "PR": 223, "CV": 150, "VA": 431, "TL": 358, "AW": 242, "FK": 254, "PS": 357,
     "AI": 652, "AS": 695, "BM": 663, "CC": 673, "CK": 654, "CX": 672, "GI": 665,
     "GL": 666, "GU": 667, "IM": 676, "KY": 671, "MS": 686, "NF": 677, "NU": 687,
@@ -54,6 +56,9 @@ EXTRAS = {
     "CD": (["Democratic Republic of the Congo", "DR Congo"], ["República Democrática del Congo"]),
     "BN": (["Brunei"], ["Brunéi"]),
     "AE": (["UAE", "U.A.E."], ["Emiratos Árabes"]),
+    "AS": ([], ["Samoa Americana"]),
+    "VI": (["United States Virgin Islands", "US Virgin Islands"], []),
+    "AN": ([], ["Antillas Neerlandesas"]),
     "SA": ([], ["Arabia Saudita"]),
     "MO": (["Macau"], []),
     "SH": (["Saint Helena"], []),
@@ -65,6 +70,7 @@ EXTRAS = {
 # Nombres de la norma que no entran, con el porqué.
 EXCLUIDOS = {
     "República de Sudáfrica",           # es el nombre de la tabla del 143, no del 159
+    "Republic of South Africa",          # el mismo, en inglés
     "República Popular Democrática de",  # traducción cortada de Corea del Norte
     "Islas Vírgenes, de EEUU.",          # traducción rota; queda «Islas Vírgenes de los Estados Unidos»
 }
@@ -92,7 +98,7 @@ def main():
     codigos = {**_siglas(js), **TERRITORIOS}
     es = gettext.translation("iso3166-1", pycountry.LOCALES_DIR, languages=["es"]).gettext
     nombres = {}
-    for pais in pycountry.countries:
+    for pais in (*pycountry.countries, pycountry.historic_countries.get(alpha_2="AN")):
         if pais.alpha_2 in codigos:
             en, castellano = _nombres(pais, es)
             nombres[f"{codigos[pais.alpha_2]:03d}"] = {"en": en, "es": castellano}
