@@ -14,7 +14,7 @@ from tests.test_catalogo3 import _de_la_pantalla
 
 def _nombres():
     m = re.search(r"const NOMBRES = (\{.*?\});", maria_generator._PAISES_PANTALLA.read_text(encoding="utf-8"), re.S)
-    return {int(c): idiomas for c, idiomas in json.loads(m.group(1) if m else "{}").items()}
+    return {int(c): idiomas for c, idiomas in json.loads(m.group(1)).items()}
 
 
 def _sigla(codigo):
@@ -102,7 +102,8 @@ DIFICILES = {
     "310 MADE IN USA": None, "426 NORTHERN IRELAND": "GB", "415 NORTHERN IRELAND": None, "IRELAND": "IE",
     "695 AMERICAN SAMOA": "695", "506 AMERICAN SAMOA": None, "506 SAMOA": "WS",
     "218 ESTADOS UNIDOS MEXICANOS": "MX", "212 ESTADOS UNIDOS MEXICANOS": None,
-    "143 REPUBLICA DE SUDAFRICA": "143", "143 SUDAFRICA": None,
+    "143 REPUBLICA DE SUDAFRICA": "143", "143 SUDAFRICA": None, "REPUBLIC OF SOUTH AFRICA": None,
+    "695 SAMOA AMERICANA": "695", "683 UNITED STATES VIRGIN ISLANDS": "683", "241 NETHERLANDS ANTILLES": "241",
 }
 
 
