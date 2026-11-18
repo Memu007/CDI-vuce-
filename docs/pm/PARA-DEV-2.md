@@ -19,7 +19,8 @@ La causa: un nombre de país que ninguna tabla conoce no cuenta, y entonces gana
    corriente, con puntos o sin ellos («U.S.A.», «P.R. CHINA»). Al lado del código de otro país da
    ningún origen, con aviso; al lado de su propio código da ese país. Un caso que recorra la tabla, no
    una lista escrita a mano.
-2. **Países Bajos.** Netherlands, Holland, Holanda y Países Bajos dan 423, con o sin código.
+2. **Países Bajos.** Netherlands, Holland, Holanda y Países Bajos dan 423 solos, con 423 o con 434; al
+   lado de otro código vale el punto 1.
 3. **Letra ancha.** Los dígitos y las letras de ancho completo («３１０ ＢＲ») se leen como los
    comunes.
 4. **Sin países nuevos equivocados.** Ningún origen que hoy da un país pasa a dar otro, ni en el lector
@@ -30,7 +31,8 @@ La causa: un nombre de país que ninguna tabla conoce no cuenta, y entonces gana
    el después de las facturas de prueba del repositorio.
 5. **Lo que queda afuera**, escrito en el informe: un nombre que no está en la lista sigue dejando ganar
    al código (D264 (a) no cambia), y D267 sigue como riesgo.
-6. **Negativo en el mismo SHA,** con los nombres nuevos vaciados: los casos 1 a 3 dan rojo.
+6. **Negativo en el mismo SHA,** con todo el arreglo vaciado (los nombres y la lectura de letra ancha):
+   los casos 1 a 3 dan rojo; y con sólo la letra ancha vaciada, el 3 da rojo.
 
 ### ORIGEN-ETIQUETA (D261), apenas entregues
 
