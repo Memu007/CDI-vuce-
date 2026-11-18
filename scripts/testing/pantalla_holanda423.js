@@ -105,6 +105,7 @@ async function origenFrecuente(page, cid) {
       .catch(async () => falla('el origen frecuente «' + o + '» se ve «' + await page.textContent('#cxKpiOrigen') + '»'));
     if (await page.$eval('#cxKpiOrigen', el => el.children.length)) falla('el origen frecuente «' + o + '» se ve como HTML');
   }
+  if (await page.evaluate(() => window.__xss)) falla('un origen frecuente con HTML se ejecutó');
   console.log('OK origen frecuente: ' + ETIQUETAS.length + ' formas con código y nombre o como vinieron');
 }
 
@@ -158,13 +159,15 @@ async function procedencia(page) {
     if (await page.inputValue('#f_numero_factura') !== '434') falla('la factura «434» del borrador se ve «' + await page.inputValue('#f_numero_factura') + '»');
     const enLaOperacion = await page.evaluate(() => String(CDI.state.operacion.procedencia));
     if (enLaOperacion !== String(o)) falla('procedencia «' + o + '» del borrador queda «' + enLaOperacion + '» en la operación');
+    // Vaciado antes: escribir el mismo valor que se ve no dispara «change».
+    await page.fill('#f_procedencia', '');
+    await page.locator('#f_procedencia').blur();
     await page.fill('#f_procedencia', String(o));
     await page.locator('#f_procedencia').blur();
     if (await page.inputValue('#f_procedencia') !== visto) falla('procedencia «' + o + '» escrita se ve «' + await page.inputValue('#f_procedencia') + '»');
     const escrita = await page.evaluate(() => String(CDI.state.operacion.procedencia));
     if (escrita !== String(o)) falla('procedencia «' + o + '» escrita queda «' + escrita + '» en la operación');
   }
-  if (await page.evaluate(() => window.__xss)) falla('un origen con HTML se ejecutó');
   // Distinta de la del borrador: con el mismo valor no hay «change».
   await page.fill('#f_numero_factura', '0434');
   await page.locator('#f_numero_factura').blur();
