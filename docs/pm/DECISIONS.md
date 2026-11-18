@@ -978,3 +978,16 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   convierte «no se reconoce» en el país correcto; el criterio 4 lo exige y pide el antes y después.
 - Decidido por la PM: D264 (a) no cambia. Un nombre que no está en la lista sigue dejando ganar al
   código; D267 sigue como riesgo escrito.
+
+## 2026-11-18 22:36 UTC — PAISES-NOMBRES (D266): aceptada sobre `fa89e917`
+
+- Aceptada e integrada (merge de `bf787b2d`); acta `REPRODUCCION-PAISES-NOMBRES-2026-11-18.md`.
+  0 país→otro país en las sondas de la PM y en ~137 000 textos del adversario.
+- Decidido por la PM: D273 (a). Código de un par (143/159, 402/438, 341/668, 242/653, 241/659) con el
+  nombre del otro sigue dando ninguno, con aviso; para (b) falta saber qué código de cada par vale en
+  la tabla oficial. Riesgo escrito.
+- Decidido por la PM: D274 (a). «MADE IN U.S.A.» da ninguno, con y sin 212, nunca India.
+- Riesgo escrito, baja: nombres que ISO asigna a un país y la tabla podría separar («Kingdom of the
+  Netherlands» 423, «Kingdom of Denmark» 409, «Saint Helena, Ascension and Tristan da Cunha» 694,
+  «República del Congo» 108).
+- Sigue MARIA con ORIGEN-ETIQUETA (D261). Próxima D de MARIA: D275.

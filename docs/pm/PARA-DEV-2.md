@@ -3,38 +3,22 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Tarea activa: PAISES-NOMBRES (D266); apenas entregues, ORIGEN-ETIQUETA (D261) (2026-11-18 20:30 UTC)
+## Veredicto: PAISES-NOMBRES (D266) aceptada sobre `fa89e917` e integrada (2026-11-18 22:36 UTC)
 
-Emi dijo «sí a los tres» (18/11 20:27 UTC) a D266, a D261 y a seguir con 423 para lo que ya dice 434.
-Es un sí a las piezas, no un «dale» para publicar. Base: la cabeza de mi rama. Traela con `merge`.
-Revisión: datos (§3), con el adversario de datos de la tabla «Modelo y esfuerzo» y `e2e_maria.sh` en
-el SHA. Lo anterior (DESPACHO1B-CARGA-2, aceptada sobre `fd4eb1dd`) está en su acta y en Git.
+Integré `bf787b2d` con `merge`. Acta `REPRODUCCION-PAISES-NOMBRES-2026-11-18.md`. Reproduje los casos
+(«516 passed»), tus 9 sabotajes en rojo y `e2e_maria.sh` en el SHA y en la unión. El adversario de
+datos probó ~137 000 textos: 0 país→otro país, y la pantalla y el servidor coinciden. El aviso de
+`chequeo-6` por NOMBRES está bien explicado.
 
-### PAISES-NOMBRES (D266)
+- **D273: (a)**, decidido por la PM. Para (b) hay que saber cuál código de cada par vale en la tabla
+  oficial, y eso no sale del repo. Queda como riesgo escrito.
+- **D274: (a)**, decidido por la PM. Probé «MADE IN U.S.A.» con y sin 212: da ninguno, nunca India.
 
-La causa: un nombre de país que ninguna tabla conoce no cuenta, y entonces gana el código
-(«310 UNITED STATES» da CN; «435 República Dominicana» da Chipre).
+## Tarea activa: ORIGEN-ETIQUETA (D261) (2026-11-18 22:36 UTC)
 
-1. **Toda la tabla.** Cada país de la tabla oficial se reconoce por su nombre en inglés y en castellano
-   corriente, con puntos o sin ellos («U.S.A.», «P.R. CHINA»). Al lado del código de otro país da
-   ningún origen, con aviso; al lado de su propio código da ese país. Un caso que recorra la tabla, no
-   una lista escrita a mano.
-2. **Países Bajos.** Netherlands, Holland, Holanda y Países Bajos dan 423 solos, con 423 o con 434; al
-   lado de otro código vale el punto 1.
-3. **Letra ancha.** Los dígitos y las letras de ancho completo («３１０ ＢＲ») se leen como los
-   comunes.
-4. **Sin países nuevos equivocados.** Ningún origen que hoy da un país pasa a dar otro, ni en el lector
-   de despachos ni en el de facturas, que usa los mismos nombres. En un solo caso y como datos: los
-   nombres que son palabras comunes o parte de otro nombre (Georgia, Turkey, Chad, Jersey,
-   Niger/Nigeria, las Guineas, Dominica y República Dominicana, los dos Congos, las dos Coreas). Siguen
-   igual la regla de «MADE IN USA» y las pérdidas con aviso ya aceptadas. El informe trae el antes y
-   el después de las facturas de prueba del repositorio.
-5. **Lo que queda afuera**, escrito en el informe: un nombre que no está en la lista sigue dejando ganar
-   al código (D264 (a) no cambia), y D267 sigue como riesgo.
-6. **Negativo en el mismo SHA,** con todo el arreglo vaciado (los nombres y la lectura de letra ancha):
-   los casos 1 a 3 dan rojo; y con sólo la letra ancha vaciada, el 3 da rojo.
-
-### ORIGEN-ETIQUETA (D261), apenas entregues
+Emi dijo «sí a los tres» (18/11 20:27 UTC): es un sí a la pieza, no un «dale» para publicar. Base: la
+cabeza de mi rama; traela con `merge`. Revisión: datos (§3), con el adversario de datos de la tabla
+«Modelo y esfuerzo» y `e2e_maria.sh` en el SHA.
 
 1. En las métricas del cliente («Origen frecuente») y en la revisión, el origen se ve con código y
    nombre («310 · CHINA»), escriba como se escriba («CN», «CHINA», «310»). Lo que ya dice 434 se ve
@@ -43,7 +27,7 @@ La causa: un nombre de país que ninguna tabla conoce no cuenta, y entonces gana
 3. El TXT sale igual, byte a byte, antes y después; lo guardado no se reescribe.
 4. Reemplaza «se ve el código «423», no la etiqueta» del 17/11 en esos dos lugares.
 
-**Próxima D: D273.**
+**Próxima D: D275.**
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 
