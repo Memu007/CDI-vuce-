@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-18 · fix: los países se reconocen por su nombre en inglés y en castellano (D266)
+
+- Cada país de la tabla se reconoce por su nombre corriente («United States», «U.S.A.», «Netherlands», «Holland», «República Dominicana») en el despacho, la factura, la pantalla y el TXT; al lado del código de otro país queda sin origen, con aviso («310 UNITED STATES» daba China). Las cifras y letras de ancho completo («３１０ ＢＲ») se leen como las comunes en el despacho y la factura.
+
 ## 2026-11-17 · fix: los avisos no toman como China un origen que falta (D269)
 
 - Antes de generar, un producto sin origen o con uno no reconocido («XX», «ATLANTIDA») ya no se junta con un renglón de China ni lleva la procedencia y el estado de importado por defecto: el aviso dice el mismo error del origen con que generar frena. Con orígenes válidos, los avisos y el TXT quedan iguales.

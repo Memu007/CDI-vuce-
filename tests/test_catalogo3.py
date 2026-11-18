@@ -313,7 +313,9 @@ def test_holanda_y_paises_bajos_son_423():
                            (origen_iso2, (*PAISES_BAJOS, "434 HOLANDA"))):
         assert {maria_generator.codigo_de_pais(lector(p)) for p in formas} == {423}, lector.__name__
     assert {maria_generator.codigo_de_pais(p) for p in NO_SON_HOLANDA} == {None}
-    assert origen_iso2("４３４") is None
+    # El lector de despachos lee el ancho completo como las cifras comunes; otro alfabeto, no.
+    assert origen_iso2("４３４") == "NL"
+    assert origen_iso2("٤٣٤") is None
     # El selector de la pantalla sale de esta misma tabla, y lo que muestra es 423.
     assert 434 not in maria_generator.codigos_tabla_oficial()
     assert set(_de_la_pantalla(PAISES_BAJOS, "label")) == {"423 · PAISES BAJOS"}
@@ -449,8 +451,8 @@ def test_el_extractor_conserva_el_nombre_del_pais():
 
 
 # Reconocidos con su código MARIA; los demás se guardan sin origen y avisan.
-FAMILIA_ORIGEN = {"CHN": 310, "ITA": 417, "Hong Kong": 341, "MACAO": 344, "Viet Nam": None,
-                  "U.S.A.": None, "PRC": None, "Turkey": None, "TAI": None}
+FAMILIA_ORIGEN = {"CHN": 310, "ITA": 417, "Hong Kong": 341, "MACAO": 344, "Viet Nam": 337,
+                  "U.S.A.": 212, "PRC": None, "Turkey": 336, "TAI": None}
 
 
 @pytest.mark.parametrize("origen", FAMILIA_ORIGEN)

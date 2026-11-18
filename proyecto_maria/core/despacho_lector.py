@@ -282,9 +282,9 @@ def origen_iso2(texto) -> str | None:
     """«310», «310 CHINA», «CHINA» o «CN» → «CN»; un código sin sigla da el código («143»).
     None si no se reconoce o si al lado del código se nombra otro país."""
     from proyecto_maria.core.maria_generator import _normalizar_pais, _tabla_oficial, codigo_de_pais
-    from proyecto_maria.pdf_extractor import _iso2_por_codigo_maria, _origen_desde_factura
+    from proyecto_maria.pdf_extractor import _ANCHO_COMPLETO, _iso2_por_codigo_maria, _origen_desde_factura
 
-    t = re.sub(r"\s+", " ", str(texto or "")).strip(" -/")
+    t = re.sub(r"\s+", " ", str(texto or "").translate(_ANCHO_COMPLETO)).strip(" -/")
     if not t:
         return None
     # «143,00», «143.5» o «143 310» no empiezan con un código.

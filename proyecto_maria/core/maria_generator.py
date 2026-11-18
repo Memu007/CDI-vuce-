@@ -700,12 +700,16 @@ def codigos_tabla_oficial() -> frozenset:
 
 @lru_cache(maxsize=1)
 def _nombres_de_pais() -> dict:
-    """Nombre normalizado -> código: los alias de la pantalla más los del servidor."""
+    """Nombre normalizado -> código: los nombres corrientes, y encima los alias de la pantalla
+    y los del servidor, que mandan."""
     js = _PAISES_PANTALLA.read_text(encoding="utf-8")
     m = re.search(r"const ALIASES = (\{.*?\});", js)
-    if not m:
-        raise RuntimeError(f"No se encontró la tabla de nombres (const ALIASES) en {_PAISES_PANTALLA}")
-    return {**{k: int(v) for k, v in json.loads(m.group(1)).items()}, **_PAISES_NORM}
+    n = re.search(r"const NOMBRES = (\{.*?\});", js, re.S)
+    if not (m and n):
+        raise RuntimeError(f"No se encontraron los nombres de país (const ALIASES y NOMBRES) en {_PAISES_PANTALLA}")
+    corrientes = {_normalizar_pais(nombre): int(c) for c, idiomas in json.loads(n.group(1)).items()
+                  for nombre in (*idiomas["en"], *idiomas["es"])}
+    return {**corrientes, **{k: int(v) for k, v in json.loads(m.group(1)).items()}, **_PAISES_NORM}
 
 
 @lru_cache(maxsize=1)
