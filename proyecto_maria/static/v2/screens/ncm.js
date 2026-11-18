@@ -52,7 +52,7 @@
 
     function getOriginLabel(value) {
         const catalog = getCountryCatalog();
-        return catalog ? (catalog.label(value) || String(value || '').trim()) : String(value || '').trim();
+        return catalog ? catalog.etiqueta(value) : String(value || '').trim();
     }
 
     function splitSimPosition(value) {

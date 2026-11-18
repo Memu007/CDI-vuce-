@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-18 · fix: el origen frecuente y la procedencia de la revisión se ven con código y nombre (D261)
+
+- El «Origen frecuente» del cliente y la procedencia de la revisión muestran el país como sale en el TXT, con código y nombre («310 · CHINA»), se haya escrito «CN», «CHINA» o «310»; un 434 se ve «423 · PAISES BAJOS». Lo que no es un país se ve como vino. El TXT y lo guardado no cambian.
+
 ## 2026-11-18 · fix: los países se reconocen por su nombre en inglés y en castellano (D266)
 
 - Cada país de la tabla se reconoce por su nombre corriente («United States», «U.S.A.», «Netherlands», «Holland», «República Dominicana») en el despacho, la factura, la pantalla y el TXT; al lado del código de otro país queda sin origen, con aviso («310 UNITED STATES» daba China). Las cifras y letras de ancho completo («３１０ ＢＲ») se leen como las comunes en el despacho y la factura.

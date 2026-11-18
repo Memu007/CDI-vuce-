@@ -1136,7 +1136,7 @@
         kpiOps.textContent      = String(metricas.total_operaciones || 0);
         kpiItems.textContent    = String(metricas.total_items || 0);
         kpiPromedio.textContent = String(metricas.promedio_items_por_operacion || 0);
-        kpiOrigen.textContent   = CDI.paisesMaria.mostrar(metricas.origen_frecuente) || '—';
+        kpiOrigen.textContent   = CDI.paisesMaria.etiqueta(metricas.origen_frecuente) || '—';
         const v = Number(metricas.valor_total || 0);
         kpiValor.textContent = v > 0 ? formatMoney(v) : '—';
         kpiUltimo.textContent = metricas.ultimo_movimiento || '—';

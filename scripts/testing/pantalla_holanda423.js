@@ -1,7 +1,9 @@
 // Holanda→423 en el navegador local, contra el servidor local (sin terceros).
 // Un origen guardado o escrito con el código 434 se ve como el 423 que sale en
-// el TXT: en el catálogo del proveedor, en el del cliente y en la procedencia de
-// la revisión. Los nombres y los demás países se ven como se guardaron.
+// el TXT en el catálogo del proveedor y en el del cliente; ahí los nombres y los
+// demás países se ven como se guardaron. El «Origen frecuente» y la procedencia
+// de la revisión muestran el código y el nombre del TXT; lo que no es un país,
+// como vino.
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_holanda423.js
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
@@ -10,6 +12,9 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const CON_434 = ['434', '0434', 434, '434 · HOLANDA', '434 - Holanda', '434 · PAISES BAJOS'];
 const CONTROL = ['HOLANDA', 'Holanda', 'Países Bajos', 'NL', 'CHINA', '310'];
 const esperado = o => (CON_434.includes(o) ? '423' : String(o));
+const PB = '423 · PAISES BAJOS', CHINA = '310 · CHINA', XSS = '<img src=x onerror="window.__xss=1">';
+const ETIQUETAS = [...CON_434.map(o => [o, PB]), ['HOLANDA', PB], ['Holanda', PB], ['Países Bajos', PB],
+  ['NL', PB], ['CHINA', CHINA], ['310', CHINA], ['CN', CHINA], ['ATLANTIDA', 'ATLANTIDA'], [XSS, XSS], ['-', '-']];
 
 // Lo que muestra cada input de origen, por la descripción de su fila.
 async function origenesEnPantalla(page, fila, descripcion) {
@@ -71,12 +76,7 @@ async function catalogoDelCliente(page, base) {
   const items = productos.map(p => ({ ...p, cantidad: 1, valor_unitario: 1, peso_unitario: 1 }));
   const r = await page.request.post(base + '/api/clientes/' + cid + '/catalogo/productos/learn', { data: { items } });
   if (!r.ok()) falla('no se guardó el catálogo del cliente: ' + r.status());
-  // El origen frecuente sale de las operaciones: se responde uno guardado con el 434.
-  await page.route('**/api/clientes/' + cid + '/metricas', ruta => ruta.fulfill({ json: { metricas: { origen_frecuente: '434 · HOLANDA' } } }));
-  await page.evaluate(() => CDI.goTo('clientes'));
-  await page.locator('.cx-card[data-cliente-id="' + cid + '"]').click({ timeout: 10000 });
-  await page.waitForFunction(() => document.getElementById('cxKpiOrigen').textContent === '423', null, { timeout: 5000 })
-    .catch(async () => falla('el origen frecuente «434 · HOLANDA» se ve «' + await page.locator('#cxKpiOrigen').textContent() + '»'));
+  await origenFrecuente(page, cid);
   await page.locator('#cxTabCatalogo').click();
   await page.waitForFunction(n => document.querySelectorAll('.cx-catalogo-producto-row').length === n, origenes.length, { timeout: 10000 })
     .catch(() => falla('el catálogo del cliente no muestra los ' + origenes.length + ' productos'));
@@ -91,6 +91,22 @@ async function catalogoDelCliente(page, base) {
   console.log('OK catálogo del cliente: «434» escrito se ve 423');
   await escritoMientrasGuarda(page, campo);
   await otrosEscritos(page);
+}
+
+// El origen frecuente sale de las operaciones: se responde cada forma guardada.
+async function origenFrecuente(page, cid) {
+  let guardado;
+  await page.route('**/api/clientes/' + cid + '/metricas', ruta => ruta.fulfill({ json: { metricas: { origen_frecuente: guardado } } }));
+  for (const [o, visto] of ETIQUETAS) {
+    guardado = o;
+    await page.evaluate(() => { document.getElementById('cxKpiOrigen').textContent = ''; CDI.goTo('clientes'); });
+    await page.locator('.cx-card[data-cliente-id="' + cid + '"]').click({ timeout: 10000 });
+    await page.waitForFunction(v => document.getElementById('cxKpiOrigen').textContent === v, visto, { timeout: 5000 })
+      .catch(async () => falla('el origen frecuente «' + o + '» se ve «' + await page.textContent('#cxKpiOrigen') + '»'));
+    if (await page.$eval('#cxKpiOrigen', el => el.children.length)) falla('el origen frecuente «' + o + '» se ve como HTML');
+  }
+  if (await page.evaluate(() => window.__xss)) falla('un origen frecuente con HTML se ejecutó');
+  console.log('OK origen frecuente: ' + ETIQUETAS.length + ' formas con código y nombre o como vinieron');
 }
 
 // Lo que se escribe y no lleva el 434, o va en otro campo, se ve como se escribió.
@@ -131,7 +147,7 @@ async function escritoMientrasGuarda(page, campo) {
 
 // Procedencia de la revisión: la del borrador y la que se escribe.
 async function procedencia(page) {
-  for (const o of origenes) {
+  for (const [o, visto] of ETIQUETAS) {
     await page.evaluate(p => {
       CDI.state = CDI.state || {};
       CDI.state.operacion = { numero_factura: '434', moneda: 'DOL', incoterm: 'FOB', procedencia: p };
@@ -139,13 +155,18 @@ async function procedencia(page) {
       CDI.goTo('review');
     }, o);
     await page.waitForSelector('#f_procedencia', { state: 'visible', timeout: 10000 });
-    if (await page.inputValue('#f_procedencia') !== esperado(o)) falla('procedencia «' + o + '» del borrador se ve «' + await page.inputValue('#f_procedencia') + '»');
+    if (await page.inputValue('#f_procedencia') !== visto) falla('procedencia «' + o + '» del borrador se ve «' + await page.inputValue('#f_procedencia') + '»');
     if (await page.inputValue('#f_numero_factura') !== '434') falla('la factura «434» del borrador se ve «' + await page.inputValue('#f_numero_factura') + '»');
     const enLaOperacion = await page.evaluate(() => String(CDI.state.operacion.procedencia));
     if (enLaOperacion !== String(o)) falla('procedencia «' + o + '» del borrador queda «' + enLaOperacion + '» en la operación');
+    // Vaciado antes: escribir el mismo valor que se ve no dispara «change».
+    await page.fill('#f_procedencia', '');
+    await page.locator('#f_procedencia').blur();
     await page.fill('#f_procedencia', String(o));
     await page.locator('#f_procedencia').blur();
-    if (await page.inputValue('#f_procedencia') !== esperado(o)) falla('procedencia «' + o + '» escrita se ve «' + await page.inputValue('#f_procedencia') + '»');
+    if (await page.inputValue('#f_procedencia') !== visto) falla('procedencia «' + o + '» escrita se ve «' + await page.inputValue('#f_procedencia') + '»');
+    const escrita = await page.evaluate(() => String(CDI.state.operacion.procedencia));
+    if (escrita !== String(o)) falla('procedencia «' + o + '» escrita queda «' + escrita + '» en la operación');
   }
   // Distinta de la del borrador: con el mismo valor no hay «change».
   await page.fill('#f_numero_factura', '0434');
@@ -156,7 +177,7 @@ async function procedencia(page) {
   await page.locator('#f_procedencia').pressSequentially('4340');
   await page.locator('#f_procedencia').blur();
   if (await page.inputValue('#f_procedencia') !== '4340') falla('«4340» escrito tecla por tecla se ve «' + await page.inputValue('#f_procedencia') + '»');
-  console.log('OK procedencia: el código 434 del borrador o escrito se ve 423; lo demás, como vino');
+  console.log('OK procedencia: la del borrador o escrita se ve con código y nombre, o como vino, y queda como vino');
 }
 
 (async () => {

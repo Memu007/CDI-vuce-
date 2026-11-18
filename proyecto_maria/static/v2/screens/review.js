@@ -310,7 +310,7 @@
             if (!el) return;
             const normalized = valorEnLaRevision(key, op);
             // La procedencia guardada queda en el estado como vino; sólo se ve distinta.
-            el.value = key === 'procedencia' ? CDI.paisesMaria.mostrar(normalized) : normalized;
+            el.value = key === 'procedencia' ? CDI.paisesMaria.etiqueta(normalized) : normalized;
             // Si el valor viene del default del perfil (no del PDF), NO lo
             // marcamos como "Detectado del PDF" porque seria mentira.
             if (
@@ -670,7 +670,7 @@
         }
         op[el.name] = value;
         // Mientras se escribe no se toca: «434» es el comienzo de «4340».
-        if (el.name === 'procedencia' && ev.type === 'change') el.value = CDI.paisesMaria.mostrar(value);
+        if (el.name === 'procedencia' && ev.type === 'change') el.value = CDI.paisesMaria.etiqueta(value);
         // Un seguro escrito a mano deja de ser el calculado o el dejado; el
         // borrado, sólo si queda un valor: vaciado sigue siendo el borrado.
         if (el.name === 'seguro') {

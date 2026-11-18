@@ -367,8 +367,7 @@ def test_un_codigo_sin_sigla_entra_por_el_despacho():
 def test_un_codigo_con_otro_pais_al_lado_no_da_ninguno():
     from proyecto_maria.pdf_extractor import _iso2_por_codigo_maria
     tabla = maria_generator._tabla_oficial()
-    js = maria_generator._PAISES_PANTALLA.read_text(encoding="utf-8")
-    paises = json.loads(re.search(r"const COUNTRIES = (\[.*?\]);", js).group(1))
+    paises = _paises_de_la_pantalla()
     # Los nombres de la tabla con paréntesis o punto, tal como están escritos.
     con_signos = [(int(p["code"]), p["name"]) for p in paises if re.search(r"[(.]", p["name"])]
     assert len(con_signos) > 40
@@ -550,6 +549,12 @@ ESPACIOS_RAROS = ["𝐁𝐑", "\ufeffCHINA", "CHINA\ufeff", "CHINA\x85", "\x1cBR
                   "302\u2028·\u2028ARABIA\u2028SAUDITA"]
 
 
+def _paises_de_la_pantalla():
+    # Los nombres como están escritos en la tabla: _tabla_oficial los normaliza.
+    js = maria_generator._PAISES_PANTALLA.read_text(encoding="utf-8")
+    return json.loads(re.search(r"const COUNTRIES = (\[.*?\]);", js).group(1))
+
+
 def _de_la_pantalla(valores, funcion="resolve"):
     js = maria_generator._PAISES_PANTALLA
     codigo = (f"global.window = {{}}; require({str(js)!r}); const v = JSON.parse(require('fs')"
@@ -570,6 +575,19 @@ def test_la_pantalla_y_el_servidor_reconocen_los_mismos_paises():
     distintos = [(v, p, s) for v, p, s in zip(valores, _de_la_pantalla(valores), servidor) if p != s]
     assert distintos == []
     assert [s for v, s in zip(valores, servidor) if v in NO_SON_PAISES] == [""] * len(NO_SON_PAISES)
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="sin node")
+def test_la_etiqueta_es_la_del_txt():
+    # Lo que muestran el «Origen frecuente» y la procedencia de la revisión; lo que no es un país, como vino.
+    nombres = {int(p["code"]): p["name"] for p in _paises_de_la_pantalla()}
+    valores = [*FAMILIA_ORIGEN, *PAISES_BAJOS, *NO_SON_HOLANDA, *LECTURA_PAIS, *NO_SON_PAISES, *ESPACIOS_RAROS,
+               *(str(c) for c in nombres), *(f"{c} · {n}" for c, n in nombres.items()), "CN", "cn", "CHINA",
+               "", "   ", "-", "—", " ATLANTIDA ", "<img src=x onerror=alert(1)>", 434, 0, None]
+    # Sin los blancos de los bordes, como el trim de JS, que también saca la marca U+FEFF.
+    esperado = [f"{c:03d} · {nombres[c]}" if (c := maria_generator.codigo_de_pais(v))
+                else str(v or "").strip().strip("\ufeff") for v in valores]
+    assert [(v, p, e) for v, p, e in zip(valores, _de_la_pantalla(valores, "etiqueta"), esperado) if p != e] == []
 
 
 def test_el_txt_usa_el_codigo_de_cada_forma_reconocida():

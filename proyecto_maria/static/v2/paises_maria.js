@@ -280,10 +280,15 @@
         return (code && REEMPLAZOS[code[1]] && resolve(value)) || String(value ?? '');
     }
 
+    // Un país se ve con el código y el nombre que salen en el TXT; lo demás, como vino, sin blancos en los bordes.
+    function etiqueta(value) {
+        return label(value) || String(value || '').trim();
+    }
+
     function optionMarkup() {
         return COUNTRIES.map(country => '<option value="' + country.code + ' · ' + country.name.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '"></option>').join('');
     }
 
-    CDI.paisesMaria = Object.freeze({ countries: COUNTRIES, resolve, label, mostrar, optionMarkup });
+    CDI.paisesMaria = Object.freeze({ countries: COUNTRIES, resolve, label, mostrar, etiqueta, optionMarkup });
 })();
 
