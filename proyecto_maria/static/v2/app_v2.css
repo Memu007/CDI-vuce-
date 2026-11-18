@@ -4123,6 +4123,7 @@ tr:hover .ncm-note-pill.is-empty {
     margin-bottom: var(--s-5);
 }
 .cx-kpi {
+    min-width: 0;
     background: var(--c-surface-2);
     border-radius: 10px;
     padding: var(--s-3) var(--s-4);
@@ -4142,6 +4143,7 @@ tr:hover .ncm-note-pill.is-empty {
     font-weight: var(--w-semibold);
     color: var(--c-text);
     font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
 }
 
 /* Tabs */

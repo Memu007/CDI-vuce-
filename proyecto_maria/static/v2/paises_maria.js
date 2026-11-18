@@ -280,9 +280,9 @@
         return (code && REEMPLAZOS[code[1]] && resolve(value)) || String(value ?? '');
     }
 
-    // Un país se ve con el código y el nombre que salen en el TXT; lo demás, como vino.
+    // Un país se ve con el código y el nombre que salen en el TXT; lo demás, como vino, sin blancos en los bordes.
     function etiqueta(value) {
-        return label(value) || String(value ?? '');
+        return label(value) || String(value || '').trim();
     }
 
     function optionMarkup() {
