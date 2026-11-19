@@ -58,8 +58,8 @@ sabotaje pantalla $CLI "el catálogo del cliente corta el origen en 3" \
   "CDI.paisesMaria.etiqueta(p.origen || 'XX')) + '\" title=\"Origen\" maxlength=\"3\">'" \
   "FALLA: «CHINA» escrito en origen del catálogo del cliente se ve «CHI»"
 sabotaje pantalla $CSS "el origen del catálogo del cliente en el ancho de un código" \
-  '.cx-catalogo-producto-input[data-field="origen"] { width: 22ch;' '.cx-catalogo-producto-input[data-field="origen"] { width: 36px;' \
-  "FALLA: catálogo del cliente: «310 · CHINA» no entra en el campo"
+  '.cx-catalogo-producto-input[data-field="origen"] { width: 24ch;' '.cx-catalogo-producto-input[data-field="origen"] { width: 22ch;' \
+  "FALLA: catálogo del cliente: «309 · COREA REPUBLICANA» no entra en el campo"
 sabotaje pantalla $CSS "el origen del catálogo del proveedor en el ancho de un código" \
   "    grid-template-columns: 1fr 2fr;
     gap: var(--s-2);
