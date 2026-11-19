@@ -190,7 +190,7 @@ def confirmada(row) -> tuple:
     return row.ultima_vez is not None, row.ultima_vez
 
 
-def _ultima_confirmada(row) -> tuple:
+def _desempate_del_catalogo(row) -> tuple:
     # Una fila a la que se le borró el NCM no tiene qué sugerir: pierde el empate. A la misma hora
     # (o sin fecha) decide la clave, única en el catálogo del proveedor.
     return (bool(row.ncm), *confirmada(row), row.product_key)
@@ -413,7 +413,7 @@ async def match_items(
             n_matched += 1
         else:
             best_score, best = el_mas_parecido(
-                desc_key, rows, lambda r: r.product_key, _ultima_confirmada, FUZZY_THRESHOLD)
+                desc_key, rows, lambda r: r.product_key, _desempate_del_catalogo, FUZZY_THRESHOLD)
             if best is not None:
                 best_key = best.product_key
                 prod = productos[best_key]
