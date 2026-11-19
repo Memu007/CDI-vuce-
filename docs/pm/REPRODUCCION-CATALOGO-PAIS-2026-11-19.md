@@ -4,8 +4,12 @@ Entrega `4904e5a1` (informe `997e3dd8`), base `695a5377`. Producto `+8/−12`, s
 pantalla (`app_v2.css`, `paises_maria.js`, `catalogo.js`, `clientes.js`). La rama de PM, desde la
 base de la entrega, sólo tocó `docs/pm`: la unión tiene el mismo producto que `4904e5a1`.
 
-**Borrador: el veredicto espera a `catalogo3.sh`.** Hasta acá, los seis criterios se cumplen y cada
-cambio de producto tiene su rojo.
+**Devolución sobre `4904e5a1`.** Las puertas y los rojos están bien, pero la fila del catálogo del
+cliente se rompe en dos renglones entre 850 y 1010 px de ancho de ventana (y crece de 82 a 87 px de
+alto entre 1020 y 1040, con 1024 adentro). Con el ancho de la base (36 px) queda en un renglón y 82 px
+de 700 a 1600. Camino de hoy: una ventana en media pantalla de 1920 (960 px) o con zoom. Además el
+campo del cliente muestra en mayúsculas lo que no es un país («Narnia» se ve «NARNIA»), y `learn`
+guarda «Narnia» así: falla el criterio 4 («se ve como se escribió»).
 
 ## Lo que corrí, sobre `4904e5a1`, en un worktree limpio
 
@@ -15,10 +19,13 @@ cambio de producto tiene su rojo.
 | vecinos (`test_catalogo3`, `test_catalogo4`, `test_catalogo_largo1/2`, `test_guardar1/2`) | «218 passed» |
 | `holanda423.sh` | BASE casos «113 passed», BASE pantalla «OK: pantalla Holanda→423», 28 ROJO, «sabotajes sin rojo: 0» |
 | `paises_nombres.sh` | 9 ROJO, «OK: todos los sabotajes en rojo» |
-| `catalogo3.sh` | PENDIENTE |
+| `catalogo3.sh` | 65 ROJO, «fallas: 0», de 21:47 a 22:55 UTC |
 | `e2e_maria.sh` | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.» |
 | negativos PM (abajo) | «2 passed»; con el PUT del cliente saboteado, «1 failed, 3 passed» |
-| capturas de los dos catálogos, 1280 y 800 px | el texto largo se corta dentro del campo; la fila no se rompe ni se pisa |
+| capturas de los dos catálogos, 1280 y 800 px | el texto largo se corta dentro del campo; a esos dos anchos la fila no se rompe |
+| barrido de 1600 a 700 px cada 10, fila del cliente | 850–1010: dos renglones (alto 93, y 114 a 850); 1020–1040: alto 87; el resto, 82 y un renglón. Con etiqueta corta («310 · CHINA») también: a 1024 baja «kg», a 960 baja el peso |
+| el mismo barrido con el campo en 36 px (ancho de la base) | un renglón y alto 82 en todos los anchos |
+| barrido del proveedor | 340 px de cajón fijo, un renglón y alto 156 en todos los anchos |
 | `git status` del worktree al final | limpio |
 | suite completa | no la corrí: la de MARIA dio «6228 passed, 110 skipped, 3 xfailed» y no hay rojo que la contradiga |
 
@@ -62,9 +69,12 @@ Nada rompe los criterios 1 a 5. Notas, ninguna causada por este diff:
 
 ## Lo decidido por la PM
 
-- **Riesgo 1, etiquetas largas** (unas cuarenta de 308): aceptado. En las capturas, «670 · ISLAS DEL
-  CANAL (GUERNESEY…» se corta dentro del campo en los dos catálogos, a 1280 y a 800 px, y la fila queda
-  entera.
-- **Mayúsculas en el cliente**: el campo ya tenía `text-transform: uppercase`. «Narnia» se ve «NARNIA»,
-  pero lo guardado y lo que se manda queda como vino. Riesgo escrito, sin código.
-- **Riesgo 7, `catalogo3.sh` tarda ~80 min**: a la cola de limpieza.
+- **Devolución, por la causa:** la fila del cliente no deja achicarse al campo del origen (ancho fijo
+  de `30ch`) y el chequeo de pantalla mide el ancho sólo a 1280. Va en `PARA-DEV-2.md`.
+- **Mayúsculas en el cliente:** entran en la devolución. Antes de este diff el campo mostraba códigos;
+  ahora muestra nombres y lo que no es un país, y `text-transform: uppercase` los cambia a la vista.
+- **Riesgo 1, etiquetas largas** (unas cuarenta de 308): aceptado aparte. El texto largo se corta
+  dentro del campo; eso no es lo que se devuelve.
+- **Riesgo 7, `catalogo3.sh` tarda ~70–80 min**: a la cola de limpieza.
+- **Hueco del caso de MARIA** (sólo siembra códigos; con el PUT del cliente saboteado su caso pasa y
+  el mío falla): a la cola de limpieza, las formas viejas como datos en su caso.

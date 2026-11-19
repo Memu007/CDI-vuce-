@@ -3,26 +3,47 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Veredicto: CATALOGO-4 aceptada sobre `f5395b9f` (informe `7cbdf2f8`) (2026-11-19 19:27 UTC)
+## Devolución de CATALOGO-PAIS sobre `4904e5a1` (informe `997e3dd8`) (2026-11-19 23:02 UTC)
 
-Acta: `REPRODUCCION-CATALOGO-4-2026-11-19.md`, sección «Vuelta». Integrada en mi rama. Aceptada no es
-publicada: publicar espera el «dale» de Emi para un SHA.
+Acta: `REPRODUCCION-CATALOGO-PAIS-2026-11-19.md`. No la integro. Reproduje chequeo-6 («avisos: 0»),
+los vecinos («218 passed»), `holanda423.sh` (28 ROJO), `paises_nombres.sh` (9 ROJO), `catalogo3.sh`
+(65 ROJO, «fallas: 0») y `e2e_maria.sh` OK. Lo que devuelvo es la pantalla.
 
-Reproduje tus casos, tus 11 sabotajes y los 65 de `catalogo3.sh` en rojo, Postgres «fallas: 0»,
-chequeo-6 «avisos: 0» y `e2e_maria.sh` OK. Mi ejemplo de la devolución ahora pasa, y uno nuevo (cuatro
-empatadas, en los 24 órdenes, borrando el NCM a las dos últimas con espacios) pasa y da rojo con la
-regla vaciada.
+**1. La fila del catálogo del cliente se rompe en ventanas medianas.** A 960 px (media pantalla de un
+monitor de 1920, o zoom) los campos de la fila bajan a un segundo renglón, también con una etiqueta
+corta («310 · CHINA»: baja el peso). Con el ancho de la base el mismo campo queda en un renglón a
+cualquier ancho. A 1280 y a 800 está bien: por eso no se vio.
+- **Causa:** el campo del origen del cliente tiene un ancho fijo que la fila no puede achicar, y el
+  chequeo de pantalla mide el ancho sólo a 1280.
+- **Lo que pido, para la familia:** en la fila del cliente y en la del proveedor, los campos quedan en
+  un renglón en todo ancho de ventana en que esa fila se dibuja en un renglón en la base. El chequeo de
+  pantalla mide cada fila en su ancho más angosto de cada disposición (los anchos van como datos en un
+  solo caso), y da rojo con el ancho fijo de `4904e5a1`.
+- *Sugerencia, no criterio:* que el campo pueda achicarse (por ejemplo, un ancho mínimo y uno máximo en
+  vez de uno fijo). Cómo, decidís vos.
+
+**2. Lo que no es un país no se ve como se escribió.** «Narnia» guardado (así lo guarda `learn`) se ve
+«NARNIA» en el catálogo del cliente, por el `text-transform: uppercase` del campo. Antes de tu diff el
+campo mostraba sólo códigos; ahora muestra nombres y textos libres, así que el criterio 4 ahora lo toca.
+- **Lo que pido:** el texto que se ve en el campo es el guardado, sin mayúsculas forzadas, en los dos
+  catálogos; el chequeo de pantalla lee el texto dibujado (no sólo el `value`) con formas mezcladas
+  como datos, y da rojo con el `uppercase` de vuelta.
+
+**Puertas de la vuelta, si sólo cambia CSS o JS de pantalla:** chequeo-6, `holanda423.sh` y
+`paises_nombres.sh` con todos sus sabotajes en rojo, el chequeo de pantalla nuevo con su rojo,
+`e2e_maria.sh` y capturas de los dos catálogos a 960 y a 1280. `catalogo3.sh` y la suite completa sólo
+si tocás el servidor o `test_catalogo3`.
 
 **Decidido por la PM:**
-- Riesgo 1 (el camino exacto no mira el NCM), aceptado como riesgo: es «lo idéntico gana primero».
-- Riesgo 2 (el sabotaje de la hora de la base depende del segundo de SQLite), aceptado como riesgo del
-  arnés. Nace en esta pieza, no en la base: queda en `COLA-LIMPIEZA.md`.
-- Riesgo 3 (una fila sin NCM cuenta como reconocida), aceptado como riesgo: viene de antes.
-- Mi adversario: el editor y `POST …/productos` guardan cualquier texto como NCM («n/a»), y en un
-  empate ese texto le gana a una fila sin NCM. Riesgo escrito: «tener NCM» es texto no vacío; en la base
-  ese ejemplo ya sugería «n/a», y validar el NCM del catálogo sería otra pieza.
+- Riesgo 1 (unas cuarenta etiquetas largas se cortan dentro del campo): aceptado como riesgo.
+- Riesgo 7 (`catalogo3.sh` tarda ~70–80 min): a `COLA-LIMPIEZA.md`.
+- Mi negativo: con un sabotaje en el PUT del cliente que normaliza el origen en cualquier guardado, tu
+  `test_cada_pais_del_catalogo_vuelve_a_su_codigo` pasa porque sólo siembra códigos. No es devolución:
+  va a la cola (formas viejas guardadas como nombre, como datos en tu caso).
+- Adversario: `calculadora.js:112` no precarga un origen guardado como etiqueta o nombre. Va al riesgo
+  de la calculadora de ORIGEN-2 (abajo, punto 5).
 
-## Tarea activa: CATALOGO-PAIS; después ORIGEN-2 (2026-11-19 19:27 UTC)
+## Tarea activa: CATALOGO-PAIS (la devolución de arriba); después ORIGEN-2 (2026-11-19 19:27 UTC)
 
 Emi dijo «sí a las dos y al país con nombre» (19/11, antes de las 14:45 UTC) a CATALOGO-4, a ORIGEN-2 y
 a que los catálogos muestren el país con nombre. Es un sí a las piezas, no un «dale» para publicar.
@@ -51,12 +72,14 @@ migración: revisión más fuerte (§3) y sabotajes.
 1. El origen habitual acepta el nombre o el código, validado igual que en el catálogo. Lo que no es un
    país de la tabla no se guarda recortado ni en silencio: la pantalla dice por qué.
 2. La ficha del cliente (la etiqueta de arriba y «Origen habitual») lo muestra con código y nombre.
-3. Migración probada en Postgres descartable: las filas que ya existen («CN» y vacías) quedan iguales.
+3. Migración probada en Postgres descartable: las filas que ya existen («CN» y vacías) quedan iguales,
+   y también las ya recortadas a 3 de un nombre («CHI», «HOL»), como datos en el mismo caso.
    El caso del largo corre en Postgres, que hace cumplir el `VARCHAR`; SQLite no.
 4. Negativo en el mismo SHA con el recorte de vuelta: rojo.
 5. **Afuera, decidido por la PM:** la calculadora (`/api/ncm/calcular`) también recorta a 3, y ahí
    «BRASIL» dejaría de contar como Mercosur. Su pantalla sólo ofrece una lista de códigos de dos letras,
-   así que hoy no hay camino que lo rompa: queda como riesgo escrito, sin código.
+   así que hoy no hay camino que lo rompa: queda como riesgo escrito, sin código. Junto a ese riesgo:
+   `calculadora.js:112` no precarga un origen guardado como nombre o etiqueta.
 
 **Próxima D: D275.**
 

@@ -1028,3 +1028,16 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   de la hora de la base depende del segundo de SQLite (a `COLA-LIMPIEZA.md`); una fila sin NCM cuenta
   como reconocida; el catálogo guarda cualquier texto como NCM y ese texto gana el empate (en la base, el ejemplo medido ya sugería ese texto).
 - Activa CATALOGO-PAIS, con negativo en el mismo SHA.
+
+## 2026-11-19 23:02 UTC — CATALOGO-PAIS: devolución sobre `4904e5a1`
+
+- La fila del catálogo del cliente se rompe en dos renglones en ventanas medianas (a 960 px, media
+  pantalla de 1920), también con etiquetas cortas; con el ancho de la base no. Causa: el campo del
+  origen tiene ancho fijo y el chequeo de pantalla mide sólo a 1280. Se pide la familia: cada fila en su
+  ancho más angosto de cada disposición, con rojo. Acta `REPRODUCCION-CATALOGO-PAIS-2026-11-19.md`.
+- Lo que no es un país se ve en mayúsculas («Narnia» → «NARNIA») y `learn` lo guarda así: entra en la
+  devolución (criterio 4).
+- Decidido por la PM, con el consejero: el texto largo cortado dentro del campo, aceptado como riesgo;
+  `catalogo3.sh` (~70–80 min) y el caso que sólo siembra códigos, a `COLA-LIMPIEZA.md`. A ORIGEN-2 se
+  le suman los valores ya recortados a 3 («CHI», «HOL») en el caso de la migración y el riesgo de
+  `calculadora.js:112`.
