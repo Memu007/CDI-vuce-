@@ -4322,7 +4322,7 @@ tr:hover .ncm-note-pill.is-empty {
     background: var(--c-surface-2);
     border-radius: 8px;
 }
-.cx-catalogo-producto-main { min-width: 0; }
+.cx-catalogo-producto-main { flex: 1; min-width: 0; }
 .cx-catalogo-producto-desc {
     font-size: var(--t-13);
     font-weight: 500;
@@ -4350,7 +4350,7 @@ tr:hover .ncm-note-pill.is-empty {
     color: var(--c-text);
 }
 .cx-catalogo-producto-input[data-field="ncm"] { width: 80px; }
-.cx-catalogo-producto-input[data-field="origen"] { width: 30ch; text-transform: uppercase; }
+.cx-catalogo-producto-input[data-field="origen"] { flex: 1 1 36px; min-width: 36px; max-width: 30ch; }
 .cx-catalogo-producto-input[data-field="peso_unitario_avg"] { width: 58px; }
 .cx-catalogo-producto-delete {
     margin-left: 6px;
