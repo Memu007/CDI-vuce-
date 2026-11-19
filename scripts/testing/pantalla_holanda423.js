@@ -13,8 +13,9 @@ const baseLocal = process.env.CDI_DB || falla('falta CDI_DB: la base sqlite loca
 const CON_434 = ['434', '0434', 434, '434 · HOLANDA', '434 - Holanda', '434 · PAISES BAJOS'];
 const PB = '423 · PAISES BAJOS', CHINA = '310 · CHINA', XSS = '<img src=x onerror="window.__xss=1">';
 const ETIQUETAS = [...CON_434.map(o => [o, PB]), ['HOLANDA', PB], ['Holanda', PB], ['Países Bajos', PB],
-  ['NL', PB], ['CHINA', CHINA], ['310', CHINA], ['CN', CHINA], ['ATLANTIDA', 'ATLANTIDA'], [XSS, XSS], ['-', '-']];
-const NO_SON_PAISES = ['ATLANTIDA', XSS, '-'];
+  ['NL', PB], ['CHINA', CHINA], ['310', CHINA], ['CN', CHINA], ['ATLANTIDA', 'ATLANTIDA'], ['Narnia', 'Narnia'],
+  ['tierra media', 'tierra media'], [XSS, XSS], ['-', '-']];
+const NO_SON_PAISES = ['Narnia', 'tierra media', 'ATLANTIDA', XSS, '-'];
 // Lo guardado en los catálogos y cómo se ve: la familia de arriba y cada país de la tabla con su código.
 let ORIGENES, USUARIO;
 const fila = o => 'Producto ' + ORIGENES.findIndex(([g]) => g === o);
@@ -49,6 +50,44 @@ async function enteras(donde, filaDe) {
   }
 }
 
+// Lo que no es un país se ve con las letras con que se guardó: el campo no las cambia.
+async function comoSeGuardo(donde, filaDe) {
+  for (const o of NO_SON_PAISES) {
+    if (await filaDe(o).locator('input[data-field="origen"]').evaluate(i => getComputedStyle(i).textTransform !== 'none' || getComputedStyle(i).fontVariantCaps !== 'normal'))
+      falla(donde + ': «' + o + '» guardado no se ve con sus letras');
+  }
+}
+
+// Ninguna fila baja de renglón ni cambia de alto en el ancho más angosto de cada disposición de la
+// página (cada `max-width` de sus estilos, más uno), hasta `desde`: lo más angosto en que la base
+// todavía dibuja la fila en un renglón.
+async function enUnRenglon(page, donde, filas, partes, desde) {
+  const anchos = await page.evaluate(desde => {
+    const cortes = new Set([desde]);
+    for (const hoja of document.styleSheets) {
+      let reglas;
+      try { reglas = [...hoja.cssRules]; } catch { continue; }
+      for (const r of reglas) for (const m of (r.media ? r.media.mediaText : '').matchAll(/max-width:\s*(\d+)px/g)) if (+m[1] >= desde) cortes.add(+m[1] + 1);
+    }
+    return [...cortes].sort((a, b) => b - a);
+  }, desde);
+  const medir = () => page.$$eval(filas, (fs, partes) => fs.map(f => {
+    const rs = [...f.querySelectorAll(partes)].map(e => e.getBoundingClientRect());
+    return { origen: f.querySelector('input[data-field="origen"]').value, alto: Math.round(f.getBoundingClientRect().height),
+      unRenglon: Math.max(...rs.map(r => r.top)) < Math.min(...rs.map(r => r.bottom)) };
+  }), partes);
+  const antes = await medir();
+  for (const ancho of anchos) {
+    await page.setViewportSize({ width: ancho, height: 1000 });
+    for (const [i, f] of (await medir()).entries()) {
+      if (!f.unRenglon) falla(donde + ' a ' + ancho + ' px: baja de renglón la fila de «' + f.origen + '»');
+      if (f.alto !== antes[i].alto) falla(donde + ' a ' + ancho + ' px: cambia de alto la fila de «' + f.origen + '» (' + antes[i].alto + ' → ' + f.alto + ')');
+    }
+  }
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  console.log('OK ' + donde + ': ' + antes.length + ' filas en un renglón y con su alto a ' + anchos.join(', ') + ' px');
+}
+
 const productos = () => ORIGENES.map(([origen], i) => ({ descripcion: 'Producto ' + i, ncm: '84714900', origen }));
 
 // Lo que la API ya no guarda, como pudo quedar de antes.
@@ -70,7 +109,9 @@ async function catalogoDelProveedor(page, base) {
     .catch(() => falla('el catálogo del proveedor no muestra los ' + deTexto.length + ' productos'));
   comparar('catálogo del proveedor', await origenesEnPantalla(page, '.catalogo-product-row', '.catalogo-product-desc'));
   const filaChina = delProveedor(page, 'CHINA');
+  await enUnRenglon(page, 'catálogo del proveedor', '.catalogo-product-row', '.catalogo-product-field', 320);
   await enteras('catálogo del proveedor', o => delProveedor(page, o));
+  await comoSeGuardo('catálogo del proveedor', o => delProveedor(page, o));
   const conPB = () => page.$$eval('.catalogo-product-row input[data-field="origen"]', (c, pb) => c.filter(i => i.value === pb).length, PB);
   const antes = await conPB();
   await filaChina.locator('input[data-field="origen"]').fill('0434');
@@ -115,7 +156,9 @@ async function catalogoDelCliente(page, base) {
   comparar('catálogo del cliente', await origenesEnPantalla(page, '.cx-catalogo-producto-row', '.cx-catalogo-producto-desc'));
   if (await page.evaluate(() => window.__xss)) falla('un origen del catálogo del cliente con HTML se ejecutó');
   const campo = delCliente(page, '310').locator('input[data-field="origen"]');
+  await enUnRenglon(page, 'catálogo del cliente', '.cx-catalogo-producto-row', '.cx-catalogo-producto-sub > *', 460);
   await enteras('catálogo del cliente', o => delCliente(page, o));
+  await comoSeGuardo('catálogo del cliente', o => delCliente(page, o));
   const guardado = page.waitForResponse(x => x.request().method() === 'PUT' && x.url().includes('/catalogo/productos/'), { timeout: 10000 });
   await campo.fill('434');
   await campo.press('Enter');

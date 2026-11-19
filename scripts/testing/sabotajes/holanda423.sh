@@ -57,9 +57,39 @@ sabotaje pantalla $CLI "el catálogo del cliente corta el origen en 3" \
   "CDI.paisesMaria.etiqueta(p.origen || 'XX')) + '\" title=\"Origen\">'" \
   "CDI.paisesMaria.etiqueta(p.origen || 'XX')) + '\" title=\"Origen\" maxlength=\"3\">'" \
   "FALLA: «CHINA» escrito en origen del catálogo del cliente se ve «CHI»"
+ORIGEN_CLI='.cx-catalogo-producto-input[data-field="origen"] { flex: 1 1 36px; min-width: 36px; max-width: 30ch; }'
 sabotaje pantalla $CSS "el origen del catálogo del cliente no llega a Emiratos" \
-  '.cx-catalogo-producto-input[data-field="origen"] { width: 30ch;' '.cx-catalogo-producto-input[data-field="origen"] { width: 22ch;' \
+  "$ORIGEN_CLI" '.cx-catalogo-producto-input[data-field="origen"] { flex: 1 1 36px; min-width: 36px; max-width: 22ch; }' \
   "FALLA: catálogo del cliente: «331 · EMIRATOS ARABES,UNID» no entra en el campo"
+sabotaje pantalla $CSS "el origen del catálogo del cliente no crece con la fila" \
+  ".cx-catalogo-producto-main { flex: 1; min-width: 0; }" ".cx-catalogo-producto-main { min-width: 0; }" \
+  "FALLA: catálogo del cliente: «331 · EMIRATOS ARABES,UNID» no entra en el campo"
+sabotaje pantalla $CSS "el origen del catálogo del cliente con ancho fijo" \
+  "$ORIGEN_CLI" '.cx-catalogo-producto-input[data-field="origen"] { width: 30ch; }' \
+  "FALLA: catálogo del cliente a 841 px: baja de renglón la fila de «"
+sabotaje pantalla $CSS "el origen del catálogo del cliente no se achica hasta el ancho de la base" \
+  "$ORIGEN_CLI" '.cx-catalogo-producto-input[data-field="origen"] { flex: 1 1 36px; min-width: 48px; max-width: 30ch; }' \
+  "FALLA: catálogo del cliente a 460 px: baja de renglón la fila de «"
+sabotaje pantalla $CSS "el origen del catálogo del cliente en mayúsculas" \
+  "$ORIGEN_CLI" '.cx-catalogo-producto-input[data-field="origen"] { flex: 1 1 36px; min-width: 36px; max-width: 30ch; text-transform: uppercase; }' \
+  "FALLA: catálogo del cliente: «Narnia» guardado no se ve con sus letras"
+sabotaje pantalla $CSS "el origen del catálogo del proveedor en mayúsculas" \
+  "    width: 100%;
+    min-width: 0;
+    padding: 6px 8px;" "    width: 100%;
+    min-width: 0;
+    text-transform: uppercase;
+    padding: 6px 8px;" \
+  "FALLA: catálogo del proveedor: «Narnia» guardado no se ve con sus letras"
+sabotaje pantalla $CSS "los campos del catálogo del proveedor bajan de renglón en el teléfono" \
+  "    grid-template-columns: 1fr 2fr;
+    gap: var(--s-2);
+}
+.catalogo-product-field {" "    grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+    gap: var(--s-2);
+}
+.catalogo-product-field {" \
+  "FALLA: catálogo del proveedor a 320 px: baja de renglón la fila de «"
 sabotaje pantalla $CSS "el origen del catálogo del proveedor en el ancho de un código" \
   "    grid-template-columns: 1fr 2fr;
     gap: var(--s-2);
