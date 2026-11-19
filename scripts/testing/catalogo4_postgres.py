@@ -48,7 +48,7 @@ try:
     from fastapi.testclient import TestClient  # noqa: E402
     import proyecto_maria.main as main_mod  # noqa: E402
     from proyecto_maria.core.rate_limit import limiter  # noqa: E402
-    from tests.test_catalogo4 import errores, sugeridos  # noqa: E402
+    from tests.test_catalogo4 import errores, sin_ncm_mal, sugeridos  # noqa: E402
     limiter.enabled = False
     motor = create_engine(URL_BASE)
 
@@ -63,7 +63,7 @@ try:
         if r.status_code != 200:
             sys.exit(f"FALLA | no se pudo registrar el usuario: {r.status_code} {r.text[:200]}")
         assert c.post("/auth/login", json={"username": u, "password": CLAVE}).status_code == 200
-        malos = errores(sugeridos(c, escribir))
+        malos = errores(sugeridos(c, escribir)) + sin_ncm_mal(c)
     motor.dispose()
 finally:
     try:

@@ -72,3 +72,45 @@ def errores(vistos):
 
 def test_un_empate_de_parecido_no_depende_del_orden_de_las_filas(client):
     assert errores(sugeridos(client, _escribir)) == []
+
+
+_M8 = "Tornillo acero inox M8"
+_TRES = [f"{_M8} {x}" for x in ("zincado", "hexagonal", "largo")]
+# (leído, filas cargadas en orden, a cuáles el editor les borra el NCM, empatan): en un empate gana
+# la última cargada que conserva el NCM; sin ninguna con NCM, o sin empate, no hay NCM.
+SIN_NCM = [
+    (_M8, _TRES[:2], _TRES[:1], True),
+    (_M8, _TRES[:2], _TRES[1:2], True),
+    (_M8, _TRES, _TRES[1:2], True),
+    (_M8, _TRES, _TRES[::2], True),
+    (_M8, _TRES[:2], _TRES[:2], True),
+    (_TRES[0], [_TRES[0] + " largo", _M8], [_TRES[0] + " largo"], False),
+]
+
+
+def sin_ncm_mal(client):
+    """Lo que no sale como se espera en SIN_NCM, en los dos órdenes de carga: (leído, orden, borrados,
+    sugerido, esperado)."""
+    malos = []
+    for leido, filas, borrados, empatan in SIN_NCM:
+        ncm = dict(zip(filas, (NCM, OTRO, "39269090")))
+        for orden in (filas, filas[::-1]):
+            vendor = f"Proveedor catalogo4 {uuid.uuid4().hex[:8]}"
+            for desc in orden:
+                r = client.post("/api/ncm/guardar-uso",
+                                json={"descripcion": desc, "ncm": ncm[desc], "vendor_name": vendor})
+                assert r.status_code == 200, r.text
+            for desc in borrados:
+                r = client.put(f"/api/catalog/{_vendor_key(vendor)}/productos/{clave_de_producto(desc)}",
+                               json={"ncm": ""})
+                assert r.status_code == 200, r.text
+            con_ncm = [d for d in orden if d not in borrados]
+            esperado = ncm[con_ncm[-1]] if empatan and con_ncm else None
+            sugerido = _match(client, vendor, leido)["ncm"]
+            if sugerido != esperado:
+                malos.append((leido, orden, borrados, sugerido, esperado))
+    return malos
+
+
+def test_en_un_empate_no_gana_una_fila_sin_ncm(client):
+    assert sin_ncm_mal(client) == []
