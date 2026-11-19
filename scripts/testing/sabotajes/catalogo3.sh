@@ -143,8 +143,8 @@ sabotaje $M "la migración no salta la fila que choca" \
 # D78: memoria y NCM recordado
 CM=proyecto_maria/services/client_memory.py
 sabotaje $CM "la memoria del cliente compara sin las letras no latinas" \
-  'parecido(clave, clave_de_producto(row.descripcion or ""))' \
-  'parecido(clave.partition("~")[0], clave_de_producto(row.descripcion or "").partition("~")[0])' \
+  'clave, candidates, lambda row: clave_de_producto(row.descripcion or "")' \
+  'clave.partition("~")[0], candidates, lambda row: clave_de_producto(row.descripcion or "").partition("~")[0]' \
   "FAILED $T::test_la_memoria_del_cliente_usa_la_misma_clave"
 sabotaje $CM "ante un empate vuelve a no preferir el texto idéntico" \
   'propia is not None and propia[2] == row.clave,' \
@@ -155,7 +155,7 @@ sabotaje $CM "el texto idéntico vuelve a distinguir mayúsculas y espacios" \
   'propia is not None and propia[1] == (row.descripcion or ""),' \
   'FAILED tests/test_catalogo3.py::test_ante_un_empate_gana_el_texto_identico[Cable 2,5mm\xb2-Cable 2,5mm2-buscados2-'
 sabotaje $CM "ante un empate vuelve a ganar una fila fija" \
-  $'row.ultima_vez is not None,\n                row.ultima_vez, row.ncm, row.descripcion or "", row.id)' \
+  $'*confirmada(row),\n                row.ncm, row.descripcion or "", row.id)' \
   'row.id)' \
   "FAILED $T::test_ante_un_empate_gana_la_ultima_confirmada"
 sabotaje $CM "a la misma hora vuelve a decidir el id de la fila" \
@@ -163,8 +163,8 @@ sabotaje $CM "a la misma hora vuelve a decidir el id de la fila" \
   'row.id)' \
   "FAILED $T::test_un_empate_a_la_misma_hora_no_depende_del_orden"
 sabotaje $CM "ante un empate vuelve a quedarse la primera fila que trae la base" \
-  'key=desempate)' \
-  'key=lambda row: 0)' \
+  'or ""), desempate, FUZZY_THRESHOLD)' \
+  'or ""), lambda row: 0, FUZZY_THRESHOLD)' \
   "FAILED $T::test_ante_un_empate_gana"
 sabotaje $M "el NCM recordado vuelve a comparar con la clave vieja" \
   'catalog_svc.clave_de_producto(recordado.get("descripcion") or "")' \

@@ -105,8 +105,10 @@ def test_productos_sin_letras_latinas_con_la_misma_medida_no_se_pisan(client, a,
     assert _guardar(client, VENDOR, b, ncm="84714900").status_code == 200
     assert sorted(d for _, _, d in _ids(owner)) == sorted([a, b])
     assert (_match(client, VENDOR, a)["ncm"], _match(client, VENDOR, b)["ncm"]) == (NCM, "84714900")
-    otro = _match(client, VENDOR, b + " 新")
-    assert otro["ncm"] != NCM, otro
+    # Con una letra más ninguno toma el NCM del otro: si empatan, uno de los dos lo toma.
+    for desc, ajeno in ((a, "84714900"), (b, NCM)):
+        otro = _match(client, VENDOR, desc + " 新")
+        assert otro["ncm"] != ajeno, otro
 
 
 def test_la_memoria_del_cliente_usa_la_misma_clave(client):

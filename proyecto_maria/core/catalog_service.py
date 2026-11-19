@@ -175,6 +175,27 @@ def parecido(clave_a: str, clave_b: str) -> float:
     return min(_similarity(base_a, base_b), FUZZY_THRESHOLD)
 
 
+def el_mas_parecido(clave: str, filas, clave_de_fila, desempate, umbral: float) -> tuple:
+    """(parecido, fila) de la fila más parecida a `clave`, con fila None si no llega a
+    `umbral`; un empate lo decide `desempate`, no el orden en que la base devuelve las filas."""
+    puntajes = [(parecido(clave, clave_de_fila(f)), f) for f in filas]
+    mejor = max((p for p, _ in puntajes), default=0.0)
+    if mejor < umbral:
+        return mejor, None
+    return mejor, max((f for p, f in puntajes if p == mejor), key=desempate)
+
+
+def confirmada(row) -> tuple:
+    """Para ordenar por la última confirmación: sin fecha queda antes que cualquier fecha."""
+    return row.ultima_vez is not None, row.ultima_vez
+
+
+def _desempate_del_catalogo(row) -> tuple:
+    # Una fila a la que se le borró el NCM no tiene qué sugerir: pierde el empate. A la misma hora
+    # (o sin fecha) decide la clave, única en el catálogo del proveedor.
+    return (bool(row.ncm), *confirmada(row), row.product_key)
+
+
 _MAX_VENDOR_ID = 60
 
 
@@ -391,15 +412,10 @@ async def match_items(
             })
             n_matched += 1
         else:
-            best_score = 0.0
-            best_key = None
-            for prod_key in productos.keys():
-                score = parecido(desc_key, prod_key)
-                if score > best_score:
-                    best_score = score
-                    best_key = prod_key
-
-            if best_score >= FUZZY_THRESHOLD and best_key:
+            best_score, best = el_mas_parecido(
+                desc_key, rows, lambda r: r.product_key, _desempate_del_catalogo, FUZZY_THRESHOLD)
+            if best is not None:
+                best_key = best.product_key
                 prod = productos[best_key]
                 result.update({
                     "match_type": "fuzzy",
@@ -502,6 +518,9 @@ async def save_products(
 
     saved = 0
     updated = 0
+    # La hora de la app y no la de la base: en SQLite va al segundo y dos confirmaciones
+    # seguidas empatarían. Todo el lote se confirma a la misma hora.
+    ahora = datetime.now(timezone.utc)
 
     for desc, ncm, origen, unidad, precio, _aviso in validos:
         product_key = clave_de_producto(desc)
@@ -527,6 +546,7 @@ async def save_products(
                 peso_unitario=None,
                 usos=1,
                 extra=extra_blob,
+                ultima_vez=ahora,
             )
             db.add(row)
             saved += 1
@@ -544,7 +564,7 @@ async def save_products(
                 merged.update(extra_blob)
                 existing.extra = merged
             existing.usos = (existing.usos or 0) + 1
-            existing.ultima_vez = datetime.now(timezone.utc)
+            existing.ultima_vez = ahora
             updated += 1
 
     await db.commit()

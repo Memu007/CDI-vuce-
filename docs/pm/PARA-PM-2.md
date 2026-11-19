@@ -2,203 +2,154 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## Entrega ORIGEN-ETIQUETA (D261): sobre `5a28c13c` (2026-11-18 23:13 UTC)
+## Vuelta de CATALOGO-4: la fila sin NCM no gana el empate, sobre `f5395b9f` (2026-11-19 18:43 UTC)
 
-**Resultado.** Base `bf787b2d`. Están los cuatro criterios. Incluye `dfa1b08d`, el merge de tu rama, que sólo
-trae `docs/pm/`. Los números salen de los logs de abajo. No hay D nuevas: lo que
-decidís vos es el supuesto 1 y si aceptás el riesgo 1.
+**Resultado.** La devolución sobre `631bed21` está atendida. Los tres criterios se cumplen en `f5395b9f`.
+Lo de la entrega anterior sigue en pie y lo volví a correr sobre este SHA (abajo).
 
-- **1. Código y nombre.** El «Origen frecuente» del cliente y la procedencia de la revisión usan una
-  función nueva, `etiqueta` (en `paises_maria.js`). Muestra `label` («310 · CHINA») si el valor es un
-  país y, si no, lo escrito. «CN», «CHINA», «CHN», «310» y «Hong Kong» se ven con código y nombre.
-  «434», «0434», 434 como número, «434 · HOLANDA», «HOLANDA» y «NL» se ven «423 · PAISES BAJOS».
-- **2. Lo que no se reconoce** se ve como se escribió, sin los blancos de los bordes. El KPI lo pone
-  con `textContent` y la revisión con `input.value`. La pantalla prueba un `<img onerror>`: no se
-  ejecuta y no crea elementos.
-- **3. TXT igual byte a byte.** Generé el TXT de la misma operación en la base y en `7a02d2ca`, desde
-  la pantalla de revisión. Fueron 14 formas de procedencia, cada una dejada como venía del borrador y
-  escrita a mano:
-  ```
-  28 operaciones; 28 TXT iguales byte a byte; 22 se ven distinto
-  ```
-  Las 6 que se ven igual en la base y ahora son «222 · PERU», «423 · PAISES BAJOS» y la vacía, en sus
-  dos modos. Lo guardado no se reescribe: la operación conserva lo escrito. La pantalla lo comprueba
-  con cada forma, en el borrador y escrita. Hay un sabotaje que guarda lo que se ve y da rojo.
-- **4. Reemplaza «se ve el código «423»» en esos dos lugares.** Los catálogos del proveedor y del
-  cliente siguen con `mostrar` y «423» (supuesto 1).
+- Esta vuelta: `producto +5/−4`. La pieza entera, contra la base `f3c84f7d`: `producto +37/−19`. chequeo-6
+  «avisos: 0» en los dos.
+- No hay D nuevas.
+- Lo que decidís vos: el riesgo 1, el camino exacto. Viene de antes y no lo toqué.
 
-## Supuestos
+**El arreglo.** Usé tu sugerencia: entre las filas empatadas, primero las que tienen NCM, y después la
+regla de hoy (el último confirmado y, a la misma hora, la clave). La función pasó a llamarse
+`_desempate_del_catalogo`, porque ya no ordena sólo por la fecha. Lo marcó `/code-review`.
 
-1. «La revisión» es el campo de procedencia de la pantalla de revisión, el único de esa pantalla que
-   tiene país. El origen de cada ítem se edita en la grilla del NCM, que ya mostraba código y nombre con
-   su propia copia de la regla. Esa copia ahora llama a `etiqueta` (§6: un chequeo, un lugar). Para el
-   NCM no cambia nada, porque la regla era la misma. Los catálogos no entran: si los querés con
-   etiqueta, es otra pieza. Tienen `maxlength="3"` y la grilla del cliente es angosta.
-2. Lo que no es un país se ve sin los blancos de los bordes (« ATLANTIDA » se ve «ATLANTIDA»). Lo tomé
-   de la regla del NCM, para que las tres pantallas se vean igual. Un origen frecuente de sólo
-   espacios ahora se ve «—»; antes quedaba en blanco.
+- **1. En un empate trae un NCM si alguna lo tiene.** Gana la última confirmada entre las que lo
+  tienen. El orden de la clave sólo cuenta entre las que ya empataron en parecido, así que una fila
+  sin NCM que es la única más parecida sigue sin NCM, como hoy.
+- **2. La familia, como datos de un caso.** Es `SIN_NCM` en `tests/test_catalogo4.py`, por el editor
+  (`PUT …/productos/<clave>` con `ncm: ""`). Cada fila se carga en todas las permutaciones de orden:
+  - dos empatadas, con el NCM borrado a la primera y, en otra fila, a la segunda;
+  - tres empatadas, con el NCM borrado a la del medio y, en otra fila, a las de las puntas;
+  - todas sin NCM: sin NCM;
+  - sin empate, con la más parecida sin NCM: sin NCM.
 
-## Commits
+  `catalogo4_postgres.py` corre también este caso: Postgres 16 «fallas: 0».
+- **3. Negativo en el mismo SHA, con la regla vaciada** (sin `bool(row.ncm),`):
+  - SQLite: «1 failed, 1 passed». Fallan 16 de las 20 corridas: sugiere `None` donde había un NCM.
+    Las 4 que pasan son las de todas sin NCM y las sin empate, que no cambian.
+  - Postgres: salida 1, «fallas: 16».
+  - Tres sabotajes nuevos en `catalogo4.sh`:
+    - sin la regla;
+    - la fecha antes que el NCM;
+    - las filas sin NCM afuera antes de medir el parecido. Éste lo atrapa la fila sin empate.
+
+**Lo que cambió en el arnés por la revisión.**
+- **El sabotaje de la hora de la base.** `/code-review` vio que, en el caso nuevo, este sabotaje daba
+  rojo sólo si dos altas caían en el mismo segundo de SQLite. Ahora el caso confirma cada fila dos
+  veces, en el orden de carga, y el resultado no depende de cómo se fecha un alta. Ese sabotaje espera
+  sólo el caso de antes.
+- **El caso de antes también depende del segundo** (`/code-review`, menor): da rojo si dos altas
+  seguidas caen en el mismo segundo. El adversario lo midió: rojo en 15 de 15 corridas. Ya era así en
+  `631bed21`, y lo dejo como riesgo 2.
+
+## Commits desde el informe anterior
 
 | commit | qué |
 |---|---|
-| `30f5786a` fix | `etiqueta`; el KPI y la procedencia la usan; CHANGELOG |
-| `9288fc56` test | el caso de la etiqueta; la pantalla recorre 16 formas en el KPI y en la revisión |
-| `9b51ab54` test | `holanda423.sh`: los sabotajes siguen a la línea nueva; siete nuevos |
-| `876bc666` fix | lo que marcó `/code-review`: una sola etiqueta para el NCM, el KPI y la revisión; el nombre largo no ensancha el KPI |
-| `1fb6804f` test | el recorte en el caso; vaciar antes de escribir, para que dispare «change»; el chequeo de HTML en el KPI; un ayudante para la tabla |
-| `7a02d2ca` test | los sabotajes siguen al recorte |
-| `dfa1b08d` merge | tu rama (sólo `docs/pm/`) |
-| `5a28c13c` test | el sabotaje de «cada tecla» espera el rojo que ahora da antes (abajo). **Lo que se entrega** |
+| `bdb1974b` fix | en un empate, las filas con NCM primero; CHANGELOG |
+| `55ac0a8c` test | `SIN_NCM` y `test_en_un_empate_no_gana_una_fila_sin_ncm`; `catalogo4_postgres.py` lo corre |
+| `08546368` test | tres sabotajes nuevos; los que deshacen el empate o el umbral también esperan el caso nuevo |
+| `71f17acf` fix | `_ultima_confirmada` pasa a `_desempate_del_catalogo` |
+| `3379cf35` test | todas las permutaciones; cada fila confirmada dos veces |
+| `f5395b9f` test | el comentario de la segunda confirmación. **Lo que se entrega** |
 | informe | el commit siguiente |
 
-## Pruebas
+## Pruebas, todas sobre `f5395b9f`
 
-| qué | SHA | resultado |
-|---|---|---|
-| `test_catalogo3.py` y `test_paises_nombres.py` | `7a02d2ca` (los mismos en `5a28c13c`) | «134 passed, 3 warnings in 26.25s» |
-| suite completa, desde un worktree limpio | `5a28c13c` | «6225 passed, 110 skipped, 3 xfailed, 105 warnings in 1098.28s (0:18:18)» |
-| `holanda423.sh` | `5a28c13c` | 24 «ROJO», «sabotajes sin rojo: 0» (abajo) |
-| `pantalla_holanda423.js` | `5a28c13c` | «OK: pantalla Holanda→423» (la base de `holanda423.sh`) |
-| `e2e_maria.sh`, desde un worktree limpio | `5a28c13c` | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.» |
-| TXT antes y después | `bf787b2d` y `7a02d2ca` | arriba |
-| KPI a 390 px con nombres largos | `9b51ab54` y `7a02d2ca` | abajo |
-| chequeo-6 | `bf787b2d..5a28c13c` | abajo, entero |
+| qué | resultado |
+|---|---|
+| suite completa, desde un worktree limpio | «6227 passed, 110 skipped, 3 xfailed, 112 warnings in 1303.35s (0:21:43)», worktree sin cambios |
+| `e2e_maria.sh`, desde ese worktree | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.» |
+| `catalogo4.sh` | 11 «ROJO», «sabotajes sin rojo: 0» |
+| `catalogo3.sh` | 65 «ROJO», «fallas: 0» |
+| `catalogo4_postgres.py` en PG16 | «fallas: 0» |
+| negativo en SQLite, regla vaciada | «1 failed, 1 passed», 16 de 20 corridas |
+| negativo en PG16, regla vaciada | salida 1, «fallas: 16» |
+| chequeo-6 | abajo, entero |
 
-**Rojo antes del arreglo.**
-- La pantalla de `7a02d2ca` sobre el producto de `bf787b2d` da «FALLA: el origen frecuente «434» se ve
-  «423»».
-- El caso nuevo en la base no tiene `etiqueta`. Medido con `mostrar`, que es lo que se veía, da «353
-  distintos de 693». Por ejemplo: «('CHN', 'CHN', '310 · CHINA'), ('ITA', 'ITA', '417 · ITALIA'),
-  ('Hong Kong', 'Hong Kong', '341 · HONG KONG')».
-
-`holanda423.sh`:
+`catalogo4.sh`:
 ```
-BASE  | casos: ======================= 112 passed, 5 warnings in 25.78s =======================
-BASE  | pantalla: OK: pantalla Holanda→423
-ROJO  | la etiqueta es lo que muestra el catálogo: «AssertionError», 1 casos
-ROJO  | la etiqueta es lo que muestra el catálogo: «FALLA: el origen frecuente «434» se ve «423»»
-ROJO  | la etiqueta es sólo el código: «AssertionError», 1 casos
-ROJO  | la etiqueta escribe «null» por lo que falta: «AssertionError», 1 casos
-ROJO  | la etiqueta deja los blancos de los bordes: «AssertionError», 1 casos
-ROJO  | el origen frecuente se ve como HTML: «FALLA: el origen frecuente «<img»
-ROJO  | mostrar devuelve lo que vino: «At index 0 diff: '434' != '423'», 1 casos
-ROJO  | mostrar escribe «null» por lo que falta: «'null' != ''», 1 casos
-ROJO  | mostrar recorta lo que no es el 434: «'Holanda' != ' Holanda '», 1 casos
-ROJO  | mostrar devuelve lo que vino: «FALLA: catálogo del proveedor: «434» guardado se ve «434»»
-ROJO  | el catálogo del proveedor muestra lo guardado: «FALLA: catálogo del proveedor: «434» guardado se ve «434»»
-ROJO  | el catálogo del cliente muestra lo guardado: «FALLA: catálogo del cliente: «434» guardado se ve «434»»
-ROJO  | el catálogo del cliente deja lo escrito: «FALLA: «434» escrito en el catálogo del cliente se ve «434»»
-ROJO  | la procedencia del borrador se ve como vino: «FALLA: procedencia «434» del borrador se ve «434»»
-ROJO  | la procedencia escrita queda como se escribió: «FALLA: procedencia «434» escrita se ve «434»»
-ROJO  | la procedencia del borrador cambia en la operación: «FALLA: procedencia «434» del borrador queda «423 · PAISES BAJOS» en la operación»
-ROJO  | la procedencia escrita se guarda como se ve: «FALLA: procedencia «434» escrita queda «423 · PAISES BAJOS» en la operación»
-ROJO  | el catálogo del proveedor manda el origen sin tocar: «FALLA: cambiar sólo el NCM reescribe el origen guardado»
-ROJO  | el catálogo del cliente pisa lo que se sigue escribiendo: «FALLA: lo escrito mientras se guardaba «434» quedó «423»»
-ROJO  | el borrador muestra cada campo con su etiqueta: «FALLA: la factura «434» del borrador se ve «423 · PAISES BAJOS»»
-ROJO  | lo escrito en cualquier campo pasa por la etiqueta: «FALLA: la factura «0434» escrita se ve «423 · PAISES BAJOS»»
-ROJO  | el catálogo del cliente muestra el código de lo escrito: «FALLA: «nl» escrito en origen del catálogo del cliente se ve «423»»
-ROJO  | la procedencia cambia en cada tecla: «FALLA: procedencia «434» escrita queda «423 · PAISES BAJOS» en la operación»
-ROJO  | el origen frecuente se ve como vino: «FALLA: el origen frecuente «434» se ve «434»»
+BASE  | casos: ======================== 2 passed, 5 warnings in 4.40s =========================
+ROJO  | el empate lo decide el orden de las filas: «AssertionError», 2 casos
+ROJO  | el último confirmado le gana a lo más parecido: «AssertionError», 2 casos
+ROJO  | a la misma hora decide el orden de las filas: «AssertionError», 1 casos
+ROJO  | una fila sin fecha le gana a una fechada: «AssertionError», 1 casos
+ROJO  | lo que llega justo al umbral no se sugiere: «AssertionError», 2 casos
+ROJO  | un producto nuevo toma la hora de la base, al segundo en SQLite: «AssertionError», 1 casos
+ROJO  | cada producto nuevo del lote con su hora: «AssertionError», 1 casos
+ROJO  | cada producto del lote que ya estaba con su hora: «AssertionError», 1 casos
+ROJO  | una fila sin NCM gana el empate: «AssertionError», 1 casos
+ROJO  | la última confirmada antes que la que tiene NCM: «AssertionError», 1 casos
+ROJO  | una fila con NCM le gana a la más parecida sin NCM: «AssertionError», 1 casos
 sabotajes sin rojo: 0
 ```
-«La procedencia cambia en cada tecla» daba rojo en `7a02d2ca`, pero con otra frase: «procedencia «434»
-escrita queda «423 · PAISES BAJOS» en la operación». Es la misma causa. Ahora la ve antes el bucle, que
-vacía y escribe cada forma; `5a28c13c` espera esa frase. El chequeo de «4340» tecla por tecla sigue en la
-pantalla.
 
-El KPI a 390 px de ancho, con los nombres más largos de la tabla. Los números son el ancho de la grilla
-(`scrollWidth`/`clientWidth`) y el alto de la tarjeta:
+chequeo-6 de la pieza y de esta vuelta, enteros:
 ```
-antes del CSS (9b51ab54)  109 · REP.DEMOCRAT.DEL CONGO EX ZAIRE   grilla [311, 308]  alto 66
-ahora (7a02d2ca)          109 · REP.DEMOCRAT.DEL CONGO EX ZAIRE   grilla [308, 308]  alto 88
-ahora (7a02d2ca)          682 · ISLAS VIRGENES BRITANICAS (TERRITORIO NO AUTONOMO DEL REINO UNIDO)  alto 176
-```
-La página entera ya mide 523 px de ancho a 390 px de vista, con cualquier origen (también con «310 ·
-CHINA»). Eso no es de esta pieza: va a riesgos.
-
-chequeo-6, entero:
-```
-chequeo-6 bf787b2d..5a28c13c: avisos para mirar, no un veredicto
-producto +12/−5
-arnés +89/−30
+chequeo-6 f3c84f7d..f5395b9f: avisos para mirar, no un veredicto
+producto +37/−19
+arnés +250/−7
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/static/v2/paises_maria.js: 289 → 294
-  AVISO creció una función de más de 150: proyecto_maria/static/v2/paises_maria.js:2 <anónima> 287 → 292, 2 en su propio cuerpo (§6: lo nuevo va aparte)
-  proyecto_maria/static/v2/screens/clientes.js: 2213 → 2213
-  proyecto_maria/static/v2/screens/ncm.js: 2351 → 2351
-  proyecto_maria/static/v2/screens/review.js: 1198 → 1198
-avisos: 1
+  proyecto_maria/core/catalog_service.py: 732 → 752
+  proyecto_maria/services/client_memory.py: 308 → 306
+avisos: 0
+
+chequeo-6 631bed21..f5395b9f: avisos para mirar, no un veredicto
+producto +5/−4
+arnés +62/−9
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/core/catalog_service.py: 751 → 752
+avisos: 0
 ```
-- **AVISO «creció una función de más de 150».** La «función» es el envoltorio del módulo
-  (`(function () {…})()`). `etiqueta` es una función aparte de tres líneas, como `mostrar` y `label`,
-  que están en el mismo envoltorio.
 
 ## Revisiones
 
 | quién | sobre | hallazgos | qué hice |
 |---|---|---|---|
-| `adversario-sonnet-alto` (datos) | `9b51ab54` | 0 que rompan un criterio; 3 menores | abajo |
-| `/code-review high` | `bf787b2d..9b51ab54` | 7 | arreglé 5; abajo |
-| `/security-review` | — | no corrió | el comando falla porque el repositorio no tiene `origin/HEAD`. La hice a mano: abajo |
+| `adversario-sonnet-alto` | `08546368` | 1 medio, 2 bajos, 1 informativo | el medio es el riesgo 1; los bajos, abajo |
+| `/code-review high` | `631bed21..08546368` | 1 importante, 1 previo, 3 menores | arreglé el importante y 2 menores (permutaciones, nombre) en `71f17acf` y `3379cf35`; el tercero pedía este informe; el previo es el riesgo 3 |
+| `adversario-sonnet-alto` | `08546368..3379cf35` | ninguno | — |
+| `/code-review high` | `08546368..3379cf35` | 2 menores | arreglé el comentario en `f5395b9f`; el otro es el riesgo 2 |
 
-El adversario:
-- Comparó `etiqueta` con `codigo_de_pais` del servidor en 30 000 cadenas al azar (separadores raros,
-  saltos, combinantes, mayúsculas): **0 diferencias**.
-- Comprobó en el navegador que enfocar y salir no cambia el estado, que lo escrito queda en la
-  operación y que el HTML se ve como texto.
-- Comprobó que nada más lee `#f_procedencia` y que `finalize.js` arma el TXT desde la operación.
-- Los tres menores:
-  1. Un arreglo `['CN']` se vería «310 · CHINA». No llega: el valor viene de JSON como texto.
-  2. Un origen frecuente de sólo espacios se veía en blanco. Queda arreglado por el supuesto 2.
-  3. Los catálogos siguen con `mostrar`. Es el supuesto 1.
-
-El `/code-review`:
-1. **ncm.js tenía la misma regla duplicada.** Arreglado en `876bc666`: ahora llama a `etiqueta`.
-2. **Escribir lo mismo que se ve no dispara «change»**, así que ATLANTIDA, el HTML y «-» no probaban
-   lo escrito. Arreglado en `1fb6804f`: se vacía antes de escribir.
-3. **Un nombre largo ensanchaba el KPI.** Arreglado con `min-width: 0` y `overflow-wrap: anywhere`;
-   las medidas están arriba.
-4. **El campo muestra la etiqueta y la operación guarda lo escrito.** Eso es lo que pide el criterio
-   3. Nada compara el campo con la operación (lo verificó el adversario), y el campo no tiene la pista
-   «Detectado del PDF». Sin cambio.
-5. **El caso leía la tabla con su propia expresión.** Ahora hay un ayudante, `_paises_de_la_pantalla`,
-   que también usa el caso que ya la leía igual. No usa `_tabla_oficial` porque esa normaliza los
-   nombres y la etiqueta lleva el nombre como está escrito.
-6. **El chequeo de HTML ejecutado estaba en la revisión, donde no puede pasar.** Pasó al KPI.
-7. **El nombre del caso era largo.** Ahora es `test_la_etiqueta_es_la_del_txt`.
-
-La revisión de seguridad a mano:
-- Lo nuevo llega a la pantalla sólo por `textContent` (el KPI) y por `input.value` (la procedencia).
-  Hay un sabotaje que pasa el KPI a `innerHTML` y la pantalla da rojo.
-- En el NCM, `getOriginLabel` devuelve lo mismo que antes y sigue pasando por `CDI.escapeHtml` donde
-  arma HTML.
-- No cambia nada del servidor, de lo guardado ni del TXT.
+Lo bajo del primer adversario, sin cambio:
+- **Un NCM de puros espacios guardado en la fila gana igual.** Lo probó con SQL directo. Por la API no
+  se puede guardar: todos los caminos que escriben NCM le sacan los espacios, y el editor guarda `None`.
+- **Un desempate por el largo del NCM pasaría el caso**, porque los NCM de los datos tienen todos 8
+  cifras. No es una implementación plausible.
 
 ## Comandos
 
 ```bash
 VENV=/ruta/al/venv
 PT="env -u DATABASE_URL -u ENVIRONMENT GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=. $VENV/bin/python -B -m pytest -q --no-cov -p no:cacheprovider --timeout=300"
-# 1. los casos, en 5a28c13c                                         → «134 passed»
-$PT tests/test_catalogo3.py tests/test_paises_nombres.py | tail -1
-# 2. los negativos y la pantalla (unos 25 min)          → 24 «ROJO», «sabotajes sin rojo: 0»
-PY=$VENV/bin/python scripts/testing/sabotajes/holanda423.sh 5a28c13c | grep -E "^(BASE|ROJO|VERDE|ROTO)|sin rojo"
-# 3. §6                                                 → «producto +12/−5», «avisos: 1» (el de arriba)
-python3 docs/pm/herramientas/chequeo-6.py bf787b2d 5a28c13c
+# 1. los dos casos, en f5395b9f                                        → «2 passed»
+$PT tests/test_catalogo4.py | tail -1
+# 2. los negativos (1 min)                             → 11 «ROJO», «sabotajes sin rojo: 0»
+PY=$VENV/bin/python scripts/testing/sabotajes/catalogo4.sh f5395b9f | grep -E "^(BASE|ROJO|VERDE|ROTO|ANCHO)|sin rojo"
+# 3. los dos escenarios en un Postgres 16 descartable                  → «fallas: 0»
+PY=$VENV/bin/python scripts/testing/con_pg16.sh sh -c '"$PY" scripts/testing/catalogo4_postgres.py "$BACKUP1A_PG_URL"' | tail -1
+# 4. §6                                                → «producto +37/−19», «avisos: 0»
+python3 docs/pm/herramientas/chequeo-6.py f3c84f7d f5395b9f
 ```
-Ya corrí los tres y dieron esa salida. El TXT antes y después y el KPI a 390 px salen de guiones de mi
-scratchpad: no te los pido, los resultados están arriba.
+Ya corrí los cuatro y dieron esa salida.
 
 ## Riesgos
 
-1. **El 682 ocupa 176 px de alto en el KPI** a 390 px de ancho. Es un país raro y no rompe la grilla.
-   Si preferís cortarlo con «…», es una línea de CSS.
-2. **La página de clientes ya era más ancha que un celular** (523 px a 390 px de vista), con cualquier
-   origen. Viene de antes; no lo toqué.
-3. **Un mismo país se ve distinto según la pantalla:** con código y nombre en el KPI, la revisión y el
-   NCM, y como se escribió en los catálogos (supuesto 1).
-4. **Lo que no corrí:** nada de lo que pide la tarea.
+1. **El camino exacto no mira el NCM.** Lo encontró el adversario. Si lo leído tiene la misma clave
+   que una fila a la que se le borró el NCM, se sugiere esa fila, sin NCM, aunque otra fila con las
+   mismas palabras en otro orden («M8 Tornillo») tenga NCM. Es «lo idéntico gana primero», el criterio
+   1 de la tarea, y en la base pasaba lo mismo. Si querés que lo idéntico sin NCM ceda ante otra con
+   NCM, es otra pieza.
+2. **El rojo del sabotaje de la hora de la base depende de que dos altas caigan en el mismo segundo.**
+   El adversario lo midió: 15 de 15 rojo. Ya era así en `631bed21`.
+3. **Una fila sin NCM cuenta como reconocida.** Por el camino exacto, o como la única más parecida,
+   suma en `tasa_reconocimiento` y no en `items_nuevos`. Viene de antes y no lo toqué.
+4. **El nombre del proveedor sale de la primera fila.** Es el riesgo que aceptaste.
+5. **Lo que no corrí:** nada de lo que pide la devolución.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`; rutina trig_01Ukttby1fc4sGVQfSn1jC9U (/respondio cada 2 h). PM principal session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `04cdc9c0`. Aceptadas: las de antes (… PAISES-NOMBRES (D266) sobre `fa89e917`, D273 (a) y D274 (a)). Entregada, en revisión: ORIGEN-ETIQUETA (D261) sobre `5a28c13c`, sin D nuevas; supuestos 1 (la revisión es la procedencia; los catálogos siguen con «423») y 2 (recorte de bordes). No hay pieza marcada «apenas entregues»: espero el veredicto. Próxima D: D275. Lecciones (además de las del historial de este archivo): el negativo de un arreglo va en el mismo SHA con el arreglo vaciado; una tasa «después» sin ese negativo no distingue; cada número del informe sale de un log, y el que no está, se mide o se saca; lo que marca un adversario se reproduce antes de proponerlo; un congelado del recolector sin `gc.collect()` antes mueve los finalizadores al caso siguiente; una tarea en segundo plano muere a las 2 h: puertas con `setsid nohup` y un vigía de timeout largo; horas, sólo de `date -u` en el momento de escribirlas, también la del encabezado; los comandos para la PM se prueban antes de escribirlos. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe. Letra ancha: tabla U+FF01..FF5E, no NFKC («№» da Noruega).
+/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`; rutina trig_01Ukttby1fc4sGVQfSn1jC9U (/respondio). PM principal session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `fcf1ef7f`. Aceptadas: las de antes (… PAISES-NOMBRES (D266) sobre `fa89e917`, D273 (a) y D274 (a); ORIGEN-ETIQUETA (D261) sobre `5a28c13c`). Pieza activa: CATALOGO-4, vuelta de la devolución «la fila sin NCM gana el empate» entregada sobre `f5395b9f`, espero el veredicto; supuestos 1 y 2 y riesgo del nombre del proveedor ya aceptados por la PM. Después, una a la vez y sólo con la anterior aceptada: CATALOGO-PAIS (origen con `etiqueta` en catalogo.js y clientes.js, TXT sin cambio), y ORIGEN-2 (migración VARCHAR(3), revisión fuerte, calculadora fuera). Próxima D: D275. Lecciones (además de las del historial de este archivo): el negativo de un arreglo va en el mismo SHA con el arreglo vaciado; cada número del informe sale de un log; un cambio de desempate puede dejar verde un sabotaje viejo: correr los guiones de sabotaje vecinos sobre el SHA final; un sabotaje que espera rojo de un caso cuya falla depende del reloj de la base es intermitente: el caso fija el orden con confirmaciones de la app; en una vuelta de datos, un adversario Sonnet alto y `/code-review high` hasta el SHA final, y otra pasada de los dos sobre los commits que nacen de ellos; puertas con `setsid nohup`; horas, sólo de `date -u`; los comandos para la PM se prueban antes de escribirlos. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe. Letra ancha: tabla U+FF01..FF5E, no NFKC («№» da Noruega).
