@@ -1002,3 +1002,11 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   sale igual.
 - La cola de MARIA queda vacía; su rutina, apagada. Próxima D de MARIA: D275.
 
+## 2026-11-19 14:45 UTC — Sí de Emi a CATALOGO-4, ORIGEN-2 y CATALOGO-PAIS
+
+- Emi: «sí a las dos y al país con nombre». Es un sí a las piezas, no un «dale» para publicar.
+- MARIA, una a la vez: CATALOGO-4, CATALOGO-PAIS y ORIGEN-2. Las tres van al `ROADMAP.md`.
+- Decidido por la PM, con el consejero: la calculadora (`/api/ncm/calcular`) sale de ORIGEN-2 (D159).
+  Recorta el origen a 3 y ahí «BRASIL» dejaría de ser Mercosur, pero su pantalla sólo ofrece códigos
+  de dos letras: sin camino de hoy, queda como riesgo escrito.
+- ORIGEN-2 lleva migración: copia de la base antes de publicarla.
