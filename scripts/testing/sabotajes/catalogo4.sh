@@ -12,16 +12,19 @@ source "$(dirname "$0")/_casos_y_pantalla.sh"
 C=proyecto_maria/core/catalog_service.py
 CASO=test_un_empate_de_parecido_no_depende_del_orden_de_las_filas
 EMPATADAS="(f for p, f in puntajes if p == mejor), key=desempate"
-ULTIMA="return row.ultima_vez is not None, row.ultima_vez, row.product_key"
+MISMA_HORA="return (*confirmada(row), row.product_key)"
+SIN_FECHA="return row.ultima_vez is not None, row.ultima_vez"
 
 sabotaje casos $C "el empate lo decide el orden de las filas" "$EMPATADAS" \
   "(f for p, f in puntajes if p == mejor), key=lambda f: 0" "AssertionError" $CASO
 sabotaje casos $C "el último confirmado le gana a lo más parecido" "$EMPATADAS" \
-  "(f for p, f in puntajes if p >= FUZZY_THRESHOLD), key=desempate" "AssertionError" $CASO
-sabotaje casos $C "a la misma hora decide el orden de las filas" "$ULTIMA" \
-  "return row.ultima_vez is not None, row.ultima_vez" "AssertionError" $CASO
-sabotaje casos $C "una fila sin fecha le gana a una fechada" "$ULTIMA" \
-  "return row.ultima_vez is None, row.ultima_vez, row.product_key" "AssertionError" $CASO
+  "(f for p, f in puntajes if p >= umbral), key=desempate" "AssertionError" $CASO
+sabotaje casos $C "a la misma hora decide el orden de las filas" "$MISMA_HORA" \
+  "return confirmada(row)" "AssertionError" $CASO
+sabotaje casos $C "una fila sin fecha le gana a una fechada" "$SIN_FECHA" \
+  "return row.ultima_vez is None, row.ultima_vez" "AssertionError" $CASO
+sabotaje casos $C "lo que llega justo al umbral no se sugiere" "if mejor < umbral:" \
+  "if mejor <= umbral:" "AssertionError" $CASO
 sabotaje casos $C "un producto nuevo toma la hora de la base, al segundo en SQLite" \
   $'                ultima_vez=ahora,\n' "" "AssertionError" $CASO
 sabotaje casos $C "cada producto nuevo del lote con su hora" "ultima_vez=ahora," \
