@@ -32,7 +32,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database.models import ClientProductHistory
-from ..core.catalog_service import _MEDIO_PAR, AVISO_MEDIO_PAR, _normalize, clave_de_producto, el_mas_parecido, validar_largo
+from ..core.catalog_service import _MEDIO_PAR, AVISO_MEDIO_PAR, _normalize, clave_de_producto, confirmada, el_mas_parecido, validar_largo
 
 FUZZY_THRESHOLD = 0.80
 # Lo que se guarda como promedio: más grande no es un valor de verdad.
@@ -284,12 +284,12 @@ async def lookup_client_memory(
     # última confirmada; a la misma hora decide el contenido de la fila, no su orden.
     def desempate(row):
         propia = identidad_del_producto(row.ncm, descripcion)
-        return (propia is not None and propia[2] == row.clave, row.ultima_vez is not None,
-                row.ultima_vez, row.ncm, row.descripcion or "", row.id)
+        return (propia is not None and propia[2] == row.clave, *confirmada(row),
+                row.ncm, row.descripcion or "", row.id)
 
     best_score, best_row = el_mas_parecido(
-        clave, candidates, lambda row: clave_de_producto(row.descripcion or ""), desempate)
-    if best_score < FUZZY_THRESHOLD:
+        clave, candidates, lambda row: clave_de_producto(row.descripcion or ""), desempate, FUZZY_THRESHOLD)
+    if best_row is None:
         return None
 
     return {

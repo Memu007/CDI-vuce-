@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-19 · fix: el catálogo del proveedor desempata por el último confirmado (CATALOGO-4)
+
+- Si dos productos del proveedor se parecen igual a lo leído, se sugiere el NCM del último confirmado y, a la misma hora o sin fecha, siempre el mismo, sin importar el orden en que la base devuelve las filas. Antes ganaba el primero cargado, aunque se hubiera confirmado el otro después. Lo idéntico y lo que no empata no cambian.
+
 ## 2026-11-18 · fix: el origen frecuente y la procedencia de la revisión se ven con código y nombre (D261)
 
 - El «Origen frecuente» del cliente y la procedencia de la revisión muestran el país como sale en el TXT, con código y nombre («310 · CHINA»), se haya escrito «CN», «CHINA» o «310»; un 434 se ve «423 · PAISES BAJOS». Lo que no es un país se ve como vino. El TXT y lo guardado no cambian.

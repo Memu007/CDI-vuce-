@@ -175,17 +175,24 @@ def parecido(clave_a: str, clave_b: str) -> float:
     return min(_similarity(base_a, base_b), FUZZY_THRESHOLD)
 
 
-def el_mas_parecido(clave: str, filas, clave_de_fila, desempate) -> tuple:
-    """(parecido, fila) de la fila más parecida a `clave`; un empate lo decide
-    `desempate`, no el orden en que la base devuelve las filas."""
+def el_mas_parecido(clave: str, filas, clave_de_fila, desempate, umbral: float) -> tuple:
+    """(parecido, fila) de la fila más parecida a `clave`, con fila None si no llega a
+    `umbral`; un empate lo decide `desempate`, no el orden en que la base devuelve las filas."""
     puntajes = [(parecido(clave, clave_de_fila(f)), f) for f in filas]
     mejor = max((p for p, _ in puntajes), default=0.0)
-    return mejor, max((f for p, f in puntajes if p == mejor), key=desempate, default=None)
+    if mejor < umbral:
+        return mejor, None
+    return mejor, max((f for p, f in puntajes if p == mejor), key=desempate)
+
+
+def confirmada(row) -> tuple:
+    """Para ordenar por la última confirmación: sin fecha queda antes que cualquier fecha."""
+    return row.ultima_vez is not None, row.ultima_vez
 
 
 def _ultima_confirmada(row) -> tuple:
     # A la misma hora (o sin fecha) decide la clave, única en el catálogo del proveedor.
-    return row.ultima_vez is not None, row.ultima_vez, row.product_key
+    return (*confirmada(row), row.product_key)
 
 
 _MAX_VENDOR_ID = 60
@@ -404,8 +411,9 @@ async def match_items(
             })
             n_matched += 1
         else:
-            best_score, best = el_mas_parecido(desc_key, rows, lambda r: r.product_key, _ultima_confirmada)
-            if best_score >= FUZZY_THRESHOLD:
+            best_score, best = el_mas_parecido(
+                desc_key, rows, lambda r: r.product_key, _ultima_confirmada, FUZZY_THRESHOLD)
+            if best is not None:
                 best_key = best.product_key
                 prod = productos[best_key]
                 result.update({
