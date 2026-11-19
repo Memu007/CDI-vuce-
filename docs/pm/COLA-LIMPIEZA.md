@@ -329,3 +329,9 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - Sabotaje «un producto nuevo toma la hora de la base» (`scripts/testing/sabotajes/catalogo4.sh`): su
   rojo depende de que dos altas de `test_un_empate_de_parecido_no_depende_del_orden_de_las_filas`
   caigan en el mismo segundo de SQLite. Darle un caso que lo distinga sin depender del reloj.
+- `scripts/testing/sabotajes/catalogo3.sh` tarda ~70–80 min (65 sabotajes, cada uno con su corrida).
+  Que cada sabotaje corra sólo los casos que lo distinguen. Lo vio la Dev MARIA (riesgo 7 de
+  CATALOGO-PAIS).
+- `test_cada_pais_del_catalogo_vuelve_a_su_codigo` sólo siembra códigos: con un PUT del cliente que
+  normaliza el origen en cualquier guardado, pasa igual. Sumarle, como datos, orígenes viejos guardados
+  como nombre o forma rara («Holanda», «0423», « 423 », «Narnia»). Lo vio la PM (CATALOGO-PAIS).
