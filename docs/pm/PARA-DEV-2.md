@@ -3,24 +3,55 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Veredicto: ORIGEN-ETIQUETA (D261) aceptada sobre `5a28c13c` e integrada (2026-11-18 23:23 UTC)
+## Tarea activa: CATALOGO-4; después CATALOGO-PAIS y ORIGEN-2, una a la vez (2026-11-19 14:45 UTC)
 
-Integré `e13f0ccf` con `merge`. Acta `REPRODUCCION-ORIGEN-ETIQUETA-2026-11-18.md`. Reproduje los casos
-(«134 passed»), tus 24 sabotajes en rojo y `e2e_maria.sh` en el SHA (también es la unión). Las 309
-etiquetas de la tabla vuelven por el servidor al mismo código. El aviso de `chequeo-6` está bien
-explicado: es el envoltorio del módulo.
+Emi dijo «sí a las dos y al país con nombre» (19/11, antes de las 14:45 UTC) a CATALOGO-4, a ORIGEN-2 y
+a que los catálogos muestren el país con nombre. Es un sí a las piezas, no un «dale» para publicar.
+Base: la cabeza de mi rama; traela con `merge`. Una pieza a la vez: la siguiente arranca recién con la
+anterior aceptada. ORIGEN-ETIQUETA (D261) quedó aceptada sobre `5a28c13c`; su acta y Git la guardan.
 
-- **Supuesto 1: aceptado.** La procedencia es el único campo de origen de la revisión. Ponerles la
-  etiqueta a los catálogos sería otra pieza: va a Emi.
-- **Supuesto 2: aceptado**, decidido por la PM. Es sólo lo que se ve.
-- **Riesgo 1: aceptado sin «…»**, decidido por la PM. Cortarlo escondería el nombre.
-- **Riesgo escrito (del adversario):** si la persona toca la procedencia y la deja igual, queda
-  «310 · CHINA» en la operación en vez de «310». El TXT sale igual (`CARTPAYPRC=310`). Sin devolución.
+### CATALOGO-4 (activa)
 
-## Sin tarea activa (2026-11-18 23:23 UTC)
+La causa: en el catálogo del proveedor (`match_items`), dos productos que se parecen igual a lo leído
+se desempatan por el orden en que la base devuelve las filas, que no está fijado.
 
-Tu cola está vacía: lo que sigue espera a Emi (CATALOGO-4, ORIGEN-2 y lo demás de `NOW.md`). Apagué tu
-rutina; te despierto con `send_message` cuando haya pieza. No empieces nada por tu cuenta.
+1. Lo idéntico sigue ganando primero, como hoy.
+2. Ante un empate de parecido gana el último confirmado y, a la misma hora (o sin fecha), decide el
+   contenido de la fila, no su orden. El ganador es el mismo con las filas cargadas en cualquier orden,
+   en SQLite y en Postgres. La familia de empates va como datos de un solo caso.
+3. Nada que hoy no empata cambia de ganador.
+4. Negativo: con el arreglo revertido, al menos un orden de carga da rojo.
+
+*Sugerencia:* la memoria del cliente ya desempata así (`desempate` en `client_memory.py`); si sirve,
+un solo lugar para los dos.
+
+### CATALOGO-PAIS, apenas te acepte CATALOGO-4
+
+En los catálogos del proveedor (`catalogo.js`) y del cliente (`clientes.js`), el origen de cada producto
+se ve con código y nombre («423 · PAISES BAJOS»), con la misma `etiqueta` de ORIGEN-ETIQUETA.
+
+1. Guardar otro campo del producto deja el origen guardado igual, byte a byte.
+2. Toda la tabla de países va y vuelve al mismo código al guardar sin tocar el origen y al escribirlo.
+3. La persona puede corregir el origen escribiendo nombre o código (hoy el del cliente tiene
+   `maxlength="3"`).
+4. Un origen que no se reconoce se ve como se escribió, escapado.
+5. El TXT sale igual antes y después.
+
+### ORIGEN-2, apenas te acepte CATALOGO-PAIS
+
+La causa: el origen habitual del cliente se recorta a 3 caracteres en el servidor (alta y edición) y en
+la base (`VARCHAR(3)`), mientras el resto del producto acepta el nombre o el código del país. Es
+migración: revisión más fuerte (§3) y sabotajes.
+
+1. El origen habitual acepta el nombre o el código, validado igual que en el catálogo. Lo que no es un
+   país de la tabla no se guarda recortado ni en silencio: la pantalla dice por qué.
+2. La ficha del cliente (la etiqueta de arriba y «Origen habitual») lo muestra con código y nombre.
+3. Migración probada en Postgres descartable: las filas que ya existen («CN» y vacías) quedan iguales.
+   El caso del largo corre en Postgres, que hace cumplir el `VARCHAR`; SQLite no.
+4. Negativo en el mismo SHA con el recorte de vuelta: rojo.
+5. **Afuera, decidido por la PM:** la calculadora (`/api/ncm/calcular`) también recorta a 3, y ahí
+   «BRASIL» dejaría de contar como Mercosur. Su pantalla sólo ofrece una lista de códigos de dos letras,
+   así que hoy no hay camino que lo rompa: queda como riesgo escrito, sin código.
 
 **Próxima D: D275.**
 
