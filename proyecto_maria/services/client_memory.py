@@ -32,7 +32,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database.models import ClientProductHistory
-from ..core.catalog_service import _MEDIO_PAR, AVISO_MEDIO_PAR, _normalize, clave_de_producto, parecido, validar_largo
+from ..core.catalog_service import _MEDIO_PAR, AVISO_MEDIO_PAR, _normalize, clave_de_producto, el_mas_parecido, validar_largo
 
 FUZZY_THRESHOLD = 0.80
 # Lo que se guarda como promedio: más grande no es un valor de verdad.
@@ -280,11 +280,6 @@ async def lookup_client_memory(
     result = await db.execute(q)
     candidates = result.scalars().all()
 
-    puntajes = [(parecido(clave, clave_de_producto(row.descripcion or "")), row) for row in candidates]
-    best_score = max((p for p, _ in puntajes), default=0.0)
-    if best_score < FUZZY_THRESHOLD:
-        return None
-
     # Ante un empate gana el texto idéntico (la misma clave guardada) y después la
     # última confirmada; a la misma hora decide el contenido de la fila, no su orden.
     def desempate(row):
@@ -292,7 +287,10 @@ async def lookup_client_memory(
         return (propia is not None and propia[2] == row.clave, row.ultima_vez is not None,
                 row.ultima_vez, row.ncm, row.descripcion or "", row.id)
 
-    best_row = max((row for p, row in puntajes if p == best_score), key=desempate)
+    best_score, best_row = el_mas_parecido(
+        clave, candidates, lambda row: clave_de_producto(row.descripcion or ""), desempate)
+    if best_score < FUZZY_THRESHOLD:
+        return None
 
     return {
         "ncm": best_row.ncm,
