@@ -4350,7 +4350,7 @@ tr:hover .ncm-note-pill.is-empty {
     color: var(--c-text);
 }
 .cx-catalogo-producto-input[data-field="ncm"] { width: 80px; }
-.cx-catalogo-producto-input[data-field="origen"] { width: 24ch; text-transform: uppercase; }
+.cx-catalogo-producto-input[data-field="origen"] { width: 30ch; text-transform: uppercase; }
 .cx-catalogo-producto-input[data-field="peso_unitario_avg"] { width: 58px; }
 .cx-catalogo-producto-delete {
     margin-left: 6px;
