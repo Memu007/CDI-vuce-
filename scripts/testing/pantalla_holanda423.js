@@ -38,7 +38,7 @@ function comparar(donde, vistos) {
   console.log('OK ' + donde + ': ' + Object.keys(vistos).length + ' orígenes con código y nombre o como vinieron');
 }
 
-// El campo muestra la etiqueta entera de los orígenes corrientes, hasta los de 26 letras (Emiratos),
+// El campo muestra la etiqueta entera de los orígenes corrientes, hasta «331 · EMIRATOS ARABES UNIDOS»,
 // sin cortarla ni salirse de su fila.
 async function enteras(donde, filaDe) {
   for (const o of ['CHINA', 'HOLANDA', '212', '309', '438', '331']) {
