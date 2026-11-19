@@ -38,14 +38,14 @@ function comparar(donde, vistos) {
   console.log('OK ' + donde + ': ' + Object.keys(vistos).length + ' orígenes con código y nombre o como vinieron');
 }
 
-// El campo muestra la etiqueta entera de los orígenes corrientes, hasta «331 · EMIRATOS ARABES UNIDOS»,
-// sin cortarla ni salirse de su fila.
+// El campo muestra entera la etiqueta de los orígenes corrientes, sin salirse de su fila. Emiratos va
+// primero porque es la más ancha: un campo angosto falla ahí, con cualquier fuente.
 async function enteras(donde, filaDe) {
-  for (const o of ['CHINA', 'HOLANDA', '212', '309', '438', '331']) {
+  for (const o of ['331', 'CHINA', 'HOLANDA', '212', '309', '438']) {
     const campo = filaDe(o).locator('input[data-field="origen"]');
-    if (await campo.evaluate(i => i.scrollWidth > i.clientWidth)) falla(donde + ': «' + await campo.inputValue() + '» no entra en el campo');
     if (await campo.evaluate(i => i.getBoundingClientRect().right > i.closest('.catalogo-product-row, .cx-catalogo-producto-row').getBoundingClientRect().right))
       falla(donde + ': el campo de origen se sale de su fila');
+    if (await campo.evaluate(i => i.scrollWidth > i.clientWidth)) falla(donde + ': «' + await campo.inputValue() + '» no entra en el campo');
   }
 }
 

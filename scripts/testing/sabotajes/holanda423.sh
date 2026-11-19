@@ -59,7 +59,7 @@ sabotaje pantalla $CLI "el catálogo del cliente corta el origen en 3" \
   "FALLA: «CHINA» escrito en origen del catálogo del cliente se ve «CHI»"
 sabotaje pantalla $CSS "el origen del catálogo del cliente no llega a Emiratos" \
   '.cx-catalogo-producto-input[data-field="origen"] { width: 30ch;' '.cx-catalogo-producto-input[data-field="origen"] { width: 22ch;' \
-  "» no entra en el campo"
+  "FALLA: catálogo del cliente: «331 · EMIRATOS ARABES,UNID» no entra en el campo"
 sabotaje pantalla $CSS "el origen del catálogo del proveedor en el ancho de un código" \
   "    grid-template-columns: 1fr 2fr;
     gap: var(--s-2);
@@ -68,7 +68,7 @@ sabotaje pantalla $CSS "el origen del catálogo del proveedor en el ancho de un 
     gap: var(--s-2);
 }
 .catalogo-product-field {" \
-  "FALLA: catálogo del proveedor: «423 · PAISES BAJOS» no entra en el campo"
+  "FALLA: catálogo del proveedor: «331 · EMIRATOS ARABES,UNID» no entra en el campo"
 sabotaje pantalla $CSS "el origen del catálogo del proveedor con su ancho propio" \
   "    width: 100%;
     min-width: 0;
