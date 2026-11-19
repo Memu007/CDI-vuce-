@@ -58,9 +58,8 @@ async function comoSeGuardo(donde, filaDe) {
   }
 }
 
-// Ninguna fila baja de renglón ni cambia de alto en el ancho más angosto de cada disposición de la
-// página (cada `max-width` de sus estilos, más uno), hasta `desde`: lo más angosto en que la base
-// todavía dibuja la fila en un renglón.
+// Una fila baja de renglón primero en el ancho más angosto de cada disposición: cada `max-width` de
+// la página, más uno, hasta `desde`.
 async function enUnRenglon(page, donde, filas, partes, desde) {
   const anchos = await page.evaluate(desde => {
     const cortes = new Set([desde]);
@@ -73,10 +72,11 @@ async function enUnRenglon(page, donde, filas, partes, desde) {
   }, desde);
   const medir = () => page.$$eval(filas, (fs, partes) => fs.map(f => {
     const rs = [...f.querySelectorAll(partes)].map(e => e.getBoundingClientRect());
-    return { origen: f.querySelector('input[data-field="origen"]').value, alto: Math.round(f.getBoundingClientRect().height),
+    return { origen: f.querySelector('input[data-field="origen"]').value, alto: Math.round(f.getBoundingClientRect().height), partes: rs.length,
       unRenglon: Math.max(...rs.map(r => r.top)) < Math.min(...rs.map(r => r.bottom)) };
   }), partes);
   const antes = await medir();
+  if (!antes.length || antes.some(f => f.partes < 2)) falla(donde + ': no encuentra las filas o sus partes');
   for (const ancho of anchos) {
     await page.setViewportSize({ width: ancho, height: 1000 });
     for (const [i, f] of (await medir()).entries()) {
