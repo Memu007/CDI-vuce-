@@ -39,7 +39,7 @@ function comparar(donde, vistos) {
 }
 
 // El campo muestra entera la etiqueta de los orígenes corrientes, sin salirse de su fila. Emiratos va
-// primero porque es la más ancha: un campo angosto falla ahí, con cualquier fuente.
+// primero porque es la más ancha de los seis: un campo angosto falla ahí, con Inter y con Arial.
 async function enteras(donde, filaDe) {
   for (const o of ['331', 'CHINA', 'HOLANDA', '212', '309', '438']) {
     const campo = filaDe(o).locator('input[data-field="origen"]');
