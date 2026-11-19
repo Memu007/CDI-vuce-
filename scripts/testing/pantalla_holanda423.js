@@ -16,7 +16,7 @@ const ETIQUETAS = [...CON_434.map(o => [o, PB]), ['HOLANDA', PB], ['Holanda', PB
   ['NL', PB], ['CHINA', CHINA], ['310', CHINA], ['CN', CHINA], ['ATLANTIDA', 'ATLANTIDA'], [XSS, XSS], ['-', '-']];
 const NO_SON_PAISES = ['ATLANTIDA', XSS, '-'];
 // Lo guardado en los catálogos y cómo se ve: la familia de arriba y cada país de la tabla con su código.
-let ORIGENES;
+let ORIGENES, USUARIO;
 const fila = o => 'Producto ' + ORIGENES.findIndex(([g]) => g === o);
 // La fila de ese origen, por su descripción entera: «Producto 1» no es «Producto 10».
 const enFila = (page, filas, desc, o) => page.locator(filas).filter({ has: page.locator(desc, { hasText: new RegExp('^' + fila(o) + '$') }) });
@@ -38,9 +38,10 @@ function comparar(donde, vistos) {
   console.log('OK ' + donde + ': ' + Object.keys(vistos).length + ' orígenes con código y nombre o como vinieron');
 }
 
-// El campo muestra la etiqueta entera de los nombres corrientes, sin cortarla ni salirse de su fila.
+// El campo muestra la etiqueta entera de los orígenes corrientes, hasta los de 23 letras (Corea, Alemania),
+// sin cortarla ni salirse de su fila.
 async function enteras(donde, filaDe) {
-  for (const o of ['CHINA', 'HOLANDA', '212']) {
+  for (const o of ['CHINA', 'HOLANDA', '212', '309', '438']) {
     const campo = filaDe(o).locator('input[data-field="origen"]');
     if (await campo.evaluate(i => i.scrollWidth > i.clientWidth)) falla(donde + ': «' + await campo.inputValue() + '» no entra en el campo');
     if (await campo.evaluate(i => i.getBoundingClientRect().right > i.closest('.catalogo-product-row, .cx-catalogo-producto-row').getBoundingClientRect().right))
@@ -53,8 +54,8 @@ const productos = () => ORIGENES.map(([origen], i) => ({ descripcion: 'Producto 
 // Lo que la API ya no guarda, como pudo quedar de antes.
 function sembrarOrigen(vendorId, descripcion, origen) {
   execFileSync('python3', ['-c',
-    'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); n=c.execute("UPDATE vendor_catalog_products SET origen=? WHERE vendor_id=? AND descripcion=?", sys.argv[2:]).rowcount; c.commit(); sys.exit(0 if n == 1 else 1)',
-    baseLocal, origen, vendorId, descripcion]);
+    'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); n=c.execute("UPDATE vendor_catalog_products SET origen=? WHERE owner_username=? AND vendor_id=? AND descripcion=?", sys.argv[2:]).rowcount; c.commit(); sys.exit(0 if n == 1 else 1)',
+    baseLocal, origen, USUARIO, vendorId, descripcion]);
 }
 
 // Catálogo del proveedor: lo guardado y lo que se escribe y se guarda.
@@ -87,12 +88,14 @@ async function soloElNcm(page, base, vendorId, origen) {
     .map(p => [p.descripcion_original, p.origen]));
   const antes = await guardados();
   const filaGuardada = delProveedor(page, origen);
+  await filaGuardada.evaluate(f => { f.dataset.antesDeGuardar = '1'; });
   const guardado = page.waitForResponse(x => x.request().method() === 'PUT' && x.url().includes('/productos/'), { timeout: 10000 });
   await filaGuardada.locator('input[data-field="ncm"]').fill('84713000');
   await filaGuardada.locator('[data-action="save-product"]').click();
   if (!(await guardado).ok()) falla('cambiar el NCM en el catálogo del proveedor no se guarda con el origen «' + origen + '»');
-  // El detalle se vuelve a pedir después de guardar: se espera que la fila vuelva a estar.
-  await delProveedor(page, origen).waitFor({ timeout: 10000 });
+  // El detalle se vuelve a pedir después de guardar: se espera la fila nueva, no la de antes.
+  await enFila(page, '.catalogo-product-row:not([data-antes-de-guardar])', '.catalogo-product-desc', origen).waitFor({ timeout: 10000 })
+    .catch(() => falla('guardar el NCM en el catálogo del proveedor no vuelve a mostrar la fila de «' + origen + '»'));
   const despues = await guardados();
   if (JSON.stringify(despues) !== JSON.stringify(antes)) falla('cambiar sólo el NCM reescribe el origen guardado «' + origen + '» → «' + despues[fila(origen)] + '»');
   console.log('OK catálogo del proveedor: cambiar sólo el NCM deja el origen guardado ' + JSON.stringify(antes[fila(origen)]));
@@ -146,7 +149,7 @@ async function otrosEscritos(page, base, cid) {
   const guardados = async () => Object.fromEntries((await (await page.request.get(base + '/api/clientes/' + cid + '/catalogo/productos')).json())
     .productos.map(p => [p.descripcion, p.origen]));
   // (fila, campo, lo escrito, cómo se ve, el origen que queda guardado; sin él, el que estaba)
-  const escritos = [['CHINA', 'origen', 'CHINA', CHINA, 'CHINA'], ['CHINA', 'origen', 'nl', PB, 'NL'],
+  const escritos = [['CHINA', 'origen', 'nl', PB, 'NL'], ['CHINA', 'origen', 'CHINA', CHINA, 'CHINA'],
     ['CHINA', 'peso_unitario_avg', '434', '434'], ...NO_SON_PAISES.map(o => [o, 'peso_unitario_avg', '2.5', '2.5'])];
   for (const [o, campo, valor, visto, origen] of escritos) {
     const input = delCliente(page, o).locator('input[data-field="' + campo + '"]');
@@ -225,7 +228,8 @@ async function procedencia(page) {
   const page = await (await b.newContext({ viewport: { width: 1280, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
-  await registrarCuenta(page.request, base, { data: { username: 'h423_' + id, password: 'Clave-Inventada-123', email: 'h423' + id + '@ejemplo.test' } });
+  USUARIO = 'h423_' + id;
+  await registrarCuenta(page.request, base, { data: { username: USUARIO, password: 'Clave-Inventada-123', email: 'h423' + id + '@ejemplo.test' } });
   await page.goto(base + '/dashboard');
   await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.api && CDI.paisesMaria);
   const tabla = await page.evaluate(() => CDI.paisesMaria.countries.map(c => [c.code, c.code + ' · ' + c.name]));
