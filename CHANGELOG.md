@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-19 · fix: los catálogos muestran el origen con código y nombre (CATALOGO-PAIS)
 
-- En el catálogo del proveedor y en el del cliente, un origen que es un país se ve como sale en el TXT («423 · PAISES BAJOS»); lo que no es un país, como se escribió. Guardar otro campo no toca el origen guardado. El campo del cliente ya no corta en tres caracteres: se puede corregir escribiendo un nombre o un código. Unos cuarenta de los 308 nombres, los más largos (casi todos territorios e islas; con Arial, también Sudáfrica y Camboya), se corren dentro del campo.
+- En el catálogo del proveedor y en el del cliente, un origen que es un país se ve como sale en el TXT («423 · PAISES BAJOS»); lo que no es un país, como se escribió. Guardar otro campo no toca el origen guardado. El campo del cliente ya no corta en tres caracteres: se puede corregir escribiendo un nombre o un código. Unos cuarenta de los 308 nombres, los más largos, se corren dentro del campo.
 
 ## 2026-11-19 · fix: el catálogo del proveedor desempata por el último confirmado (CATALOGO-4)
 
