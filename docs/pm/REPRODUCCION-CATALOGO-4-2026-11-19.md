@@ -32,7 +32,7 @@ Dos productos del mismo proveedor que se parecen igual a lo leído («Tornillo a
 | a la segunda cargada | sugiere el NCM de la primera | sugiere `None` |
 | a la primera cargada | sugiere `None` | sugiere `None` |
 
-Medido con `test_pm_sin_ncm.py` (dos órdenes de carga por fila):
+Medido en SQLite con `test_pm_sin_ncm.py` (dos órdenes de carga por fila):
 ```
 631bed21:  FAILED [0]  assert [None, None] == ['84714900', '84714900']
            FAILED [1]  assert [None, None] == ['73181500', '73181500']
@@ -44,7 +44,7 @@ f3c84f7d:  FAILED [0]  assert [None, None] == ['84714900', '84714900']
 - La fila `[0]` ya pasaba antes (gana la primera cargada aunque no tenga NCM).
 - Causa: guardar cuenta como confirmar (supuesto 1), así que borrarle el NCM a una fila la vuelve la
   última confirmada, y el desempate premia a una fila que no tiene nada que sugerir.
-- Camino de hoy: sólo el editor del catálogo (`catalogo.js`, `saveProduct` manda el NCM que se ve, que
+- Camino de hoy: sólo el editor del catálogo. Un NCM inválido en la carga no se blanquea (`ncm_para_guardar` lo guarda como texto o lo rechaza) (`catalogo.js`, `saveProduct` manda el NCM que se ve, que
   puede estar vacío). La carga (`finalize.js`, `saveCatalogLearn`) filtra los productos sin NCM. La
   memoria del cliente no guarda filas sin NCM (`identidad_del_producto` exige uno), así que no entra.
 

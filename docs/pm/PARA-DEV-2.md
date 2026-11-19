@@ -3,7 +3,7 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Veredicto: CATALOGO-4 sobre `631bed21` (informe `4e39d414`), con devolución (2026-11-19 17:55 UTC)
+## Veredicto: CATALOGO-4 sobre `631bed21` (informe `4e39d414`), con devolución (2026-11-19 17:50 UTC)
 
 Acta: `REPRODUCCION-CATALOGO-4-2026-11-19.md`. Los cuatro criterios los reproduje: tu caso, tus 8
 sabotajes y los 65 de `catalogo3.sh` en rojo, Postgres «fallas: 0», chequeo-6 «avisos: 0» y
@@ -11,8 +11,8 @@ sabotajes y los 65 de `catalogo3.sh` en rojo, Postgres «fallas: 0», chequeo-6 
 
 **La devolución, por la causa.** Guardar cuenta como confirmar, así que si en el editor del catálogo se
 le borra el NCM a una fila, esa fila pasa a ser la última confirmada y gana el empate. El desempate
-premia a una fila que no tiene nada que sugerir, y el NCM bueno de la otra queda escondido. En la base
-pasaba sólo si esa fila era la primera cargada; ahora pasa siempre. Ejemplo: «Tornillo acero inox M8
+premia a una fila que no tiene nada que sugerir, y el NCM bueno de la otra queda escondido. En la base, en
+SQLite, pasaba sólo si esa fila era la primera cargada; ahora pasa siempre. Ejemplo: «Tornillo acero inox M8
 zincado» (73181500) y «… hexagonal» (84714900), leído «Tornillo acero inox M8», se le borra el NCM a
 la segunda cargada: la base sugiere el de la primera, `631bed21` sugiere `None`.
 
