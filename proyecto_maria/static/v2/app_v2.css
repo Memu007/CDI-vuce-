@@ -3303,7 +3303,7 @@ select.input {
 }
 .catalogo-product-fields {
     display: grid;
-    grid-template-columns: 1fr 90px;
+    grid-template-columns: 1fr 2fr;
     gap: var(--s-2);
 }
 .catalogo-product-field {
@@ -3314,6 +3314,8 @@ select.input {
     color: var(--c-text-3);
 }
 .catalogo-product-field input {
+    width: 100%;
+    min-width: 0;
     padding: 6px 8px;
     border: 1px solid var(--c-border);
     border-radius: var(--r-1);
@@ -4348,7 +4350,7 @@ tr:hover .ncm-note-pill.is-empty {
     color: var(--c-text);
 }
 .cx-catalogo-producto-input[data-field="ncm"] { width: 80px; }
-.cx-catalogo-producto-input[data-field="origen"] { width: 36px; text-transform: uppercase; }
+.cx-catalogo-producto-input[data-field="origen"] { width: 22ch; text-transform: uppercase; }
 .cx-catalogo-producto-input[data-field="peso_unitario_avg"] { width: 58px; }
 .cx-catalogo-producto-delete {
     margin-left: 6px;
