@@ -38,10 +38,10 @@ function comparar(donde, vistos) {
   console.log('OK ' + donde + ': ' + Object.keys(vistos).length + ' orígenes con código y nombre o como vinieron');
 }
 
-// El campo muestra la etiqueta entera de los orígenes corrientes, hasta los de 23 letras (Corea, Alemania),
+// El campo muestra la etiqueta entera de los orígenes corrientes, hasta los de 26 letras (Emiratos),
 // sin cortarla ni salirse de su fila.
 async function enteras(donde, filaDe) {
-  for (const o of ['CHINA', 'HOLANDA', '212', '309', '438']) {
+  for (const o of ['CHINA', 'HOLANDA', '212', '309', '438', '331']) {
     const campo = filaDe(o).locator('input[data-field="origen"]');
     if (await campo.evaluate(i => i.scrollWidth > i.clientWidth)) falla(donde + ': «' + await campo.inputValue() + '» no entra en el campo');
     if (await campo.evaluate(i => i.getBoundingClientRect().right > i.closest('.catalogo-product-row, .cx-catalogo-producto-row').getBoundingClientRect().right))
