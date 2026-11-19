@@ -97,7 +97,7 @@ def sin_ncm_mal(client):
         ncm = dict(zip(filas, (NCM, OTRO, "39269090")))
         for orden in itertools.permutations(filas):
             vendor = f"Proveedor catalogo4 {uuid.uuid4().hex[:8]}"
-            # La segunda vuelta confirma con la hora de la app: el orden no depende del segundo de la base.
+            # Cada fila se confirma otra vez: el orden no depende de cómo se fecha un alta.
             for desc in orden * 2:
                 r = client.post("/api/ncm/guardar-uso",
                                 json={"descripcion": desc, "ncm": ncm[desc], "vendor_name": vendor})
