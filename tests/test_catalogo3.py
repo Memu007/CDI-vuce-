@@ -322,10 +322,6 @@ def test_holanda_y_paises_bajos_son_423():
     assert 434 not in maria_generator.codigos_tabla_oficial()
     assert set(_de_la_pantalla(PAISES_BAJOS, "label")) == {"423 · PAISES BAJOS"}
     assert [o for o in _de_la_pantalla([None], "optionMarkup")[0].split("<option") if "434" in o or "HOLANDA" in o] == []
-    # Lo guardado o escrito con el código 434 se ve como sale; los nombres y lo que no es Holanda, como vino.
-    con_434 = [p for p in PAISES_BAJOS if re.match(r"0?434\b", p)] + [434, " 434 "]
-    otras = [p for p in PAISES_BAJOS + NO_SON_HOLANDA if p not in con_434] + ["", "XX", "0310", "0423", " Holanda ", "Países  Bajos"]
-    assert _de_la_pantalla(con_434 + otras + [None], "mostrar") == ["423"] * len(con_434) + otras + [""]
     formas = (*PAISES_BAJOS, 434)
     items = [{"pieza": "84713000", "descripcion": f"Producto {i}", "cantidad": 1, "valor_unitario": 10,
               "peso_unitario": 1, "origen": o, "procedencia": o, "unidad": "07", "grupo_id": i}
@@ -581,7 +577,8 @@ def test_la_pantalla_y_el_servidor_reconocen_los_mismos_paises():
 
 @pytest.mark.skipif(not shutil.which("node"), reason="sin node")
 def test_la_etiqueta_es_la_del_txt():
-    # Lo que muestran el «Origen frecuente» y la procedencia de la revisión; lo que no es un país, como vino.
+    # Lo que muestran los catálogos, el «Origen frecuente» y la procedencia de la revisión; lo que no es un
+    # país, como vino.
     nombres = {int(p["code"]): p["name"] for p in _paises_de_la_pantalla()}
     valores = [*FAMILIA_ORIGEN, *PAISES_BAJOS, *NO_SON_HOLANDA, *LECTURA_PAIS, *NO_SON_PAISES, *ESPACIOS_RAROS,
                *(str(c) for c in nombres), *(f"{c} · {n}" for c, n in nombres.items()), "CN", "cn", "CHINA",
@@ -590,6 +587,41 @@ def test_la_etiqueta_es_la_del_txt():
     esperado = [f"{c:03d} · {nombres[c]}" if (c := maria_generator.codigo_de_pais(v))
                 else str(v or "").strip().strip("\ufeff") for v in valores]
     assert [(v, p, e) for v, p, e in zip(valores, _de_la_pantalla(valores, "etiqueta"), esperado) if p != e] == []
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="sin node")
+def test_cada_pais_del_catalogo_vuelve_a_su_codigo(client):
+    """Cada país de la tabla, guardado con su código: guardar otro campo deja el origen byte a byte, y
+    lo que muestra el catálogo, guardado como lo manda su pantalla, sale con el mismo código y se ve igual."""
+    cid = _cliente(client)
+    codigos = [p["code"] for p in _paises_de_la_pantalla()]
+    vistos = _de_la_pantalla(codigos, "etiqueta")
+    productos = [{"descripcion": f"Producto {c}", "ncm": NCM, "origen": c} for c in codigos]
+    vid = client.post("/api/catalog/proveedor/productos", json={"vendor_name": VENDOR, "productos": productos}).json()["vendor_id"]
+    assert client.post(f"/api/clientes/{cid}/catalogo/productos/learn", json={"items": productos}).status_code == 200
+
+    def proveedor():
+        return {p["descripcion_original"]: (f"/api/catalog/{vid}/productos/{k}", p["origen"])
+                for k, p in client.get(f"/api/catalog/{vid}").json()["productos"].items()}
+
+    def cliente():
+        return {p["descripcion"]: (f"/api/clientes/{cid}/catalogo/productos/{p['id']}", p["origen"])
+                for p in client.get(f"/api/clientes/{cid}/catalogo/productos").json()["productos"]}
+
+    # (filas, otro campo, el origen como lo manda la pantalla de ese catálogo)
+    for filas, otro, manda in ((proveedor, {"ncm": "84714900"}, lambda v: v.strip().upper()),
+                               (cliente, {"peso_unitario_avg": 2.5}, str.strip)):
+        antes = filas()
+        assert [antes[f"Producto {c}"][1] for c in codigos] == codigos, filas.__name__
+        for url, _ in antes.values():
+            assert client.put(url, json=otro).status_code == 200, url
+        assert filas() == antes, filas.__name__
+        for c, visto in zip(codigos, vistos):
+            r = client.put(antes[f"Producto {c}"][0], json={"origen": manda(visto)})
+            assert r.status_code == 200, (filas.__name__, visto, r.text)
+        guardados = [filas()[f"Producto {c}"][1] for c in codigos]
+        assert [str(maria_generator.codigo_de_pais(g) or "").zfill(3) for g in guardados] == codigos, filas.__name__
+        assert _de_la_pantalla(guardados, "etiqueta") == vistos, filas.__name__
 
 
 def test_el_txt_usa_el_codigo_de_cada_forma_reconocida():
