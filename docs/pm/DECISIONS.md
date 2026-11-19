@@ -1010,3 +1010,12 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   Recorta el origen a 3 y ahí «BRASIL» dejaría de ser Mercosur, pero su pantalla sólo ofrece códigos
   de dos letras: sin camino de hoy, queda como riesgo escrito.
 - ORIGEN-2 lleva migración: copia de la base antes de publicarla.
+
+## 2026-11-19 17:50 UTC — CATALOGO-4: devolución sobre `631bed21`
+
+- Devolución: en un empate, la fila a la que el editor le borró el NCM gana y esconde el NCM de la otra.
+  Se pide que, si alguna empatada tiene NCM, la sugerencia lo traiga. Acta `REPRODUCCION-CATALOGO-4-2026-11-19.md`.
+- Decidido por la PM, con el consejero: cualquier guardado del producto confirma (supuesto 1); a la misma
+  hora gana la clave mayor (supuesto 2); tener NCM va antes que la fecha en el desempate.
+- Riesgos escritos, sin código: el nombre del proveedor sale de la primera fila (ya estaba); el tope 0,8
+  de un texto con mitad de letras no latinas empata con un 4/5 real; fechas con y sin zona en una sesión.

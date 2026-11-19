@@ -4,7 +4,7 @@ Entrega `631bed21` (informe `4e39d414`), base `f3c84f7d`. Producto `+36/−19` e
 y `client_memory.py`. La rama de PM, desde la base de la entrega, sólo tocó `docs/pm`: la unión tiene
 el mismo producto que `631bed21`.
 
-**Borrador; veredicto probable: devolución.** Los cuatro criterios se cumplen, pero el desempate nuevo le da el empate a
+**Veredicto: devolución.** Los cuatro criterios se cumplen, pero el desempate nuevo le da el empate a
 una fila sin NCM y esconde el NCM de la otra en un caso donde la base lo sugería.
 
 ## Lo que corrí, sobre `631bed21`, en un worktree limpio
@@ -15,9 +15,9 @@ una fila sin NCM y esconde el NCM de la otra en un caso donde la base lo sugerí
 | negativo PM: tres filas empatadas, 6 órdenes de carga × cada una confirmada última | «1 passed»; con el arreglo vaciado, «1 failed» |
 | vecinos (`test_catalogo3`, `test_catalogo_largo1/2`, `test_guardar1/2`) | «215 passed» |
 | `catalogo4.sh` | 8 ROJO, «sabotajes sin rojo: 0» |
-| `catalogo3.sh` | 65 ROJO en la primera vuelta; la de VERDE y fallas, corriendo |
-| `catalogo4_postgres.py` en Postgres 16 descartable | corriendo |
-| `chequeo-6.py f3c84f7d 631bed21` | corriendo |
+| `catalogo3.sh` | 65 ROJO, «fallas: 0» |
+| `catalogo4_postgres.py` en Postgres 16 descartable | «fallas: 0» |
+| `chequeo-6.py f3c84f7d 631bed21` | «producto +36/−19», «arnés +197/−7», historia vacía, «avisos: 0» |
 | `e2e_maria.sh` | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.» |
 | suite completa | no la corrí: la de MARIA dio «6226 passed, 110 skipped, 3 xfailed» y no hay rojo que la contradiga |
 
@@ -32,7 +32,7 @@ Dos productos del mismo proveedor que se parecen igual a lo leído («Tornillo a
 | a la segunda cargada | sugiere el NCM de la primera | sugiere `None` |
 | a la primera cargada | sugiere `None` | sugiere `None` |
 
-Medido con `test_pm_sin_ncm.py` (dos órdenes de carga por fila):
+Medido en SQLite con `test_pm_sin_ncm.py` (dos órdenes de carga por fila):
 ```
 631bed21:  FAILED [0]  assert [None, None] == ['84714900', '84714900']
            FAILED [1]  assert [None, None] == ['73181500', '73181500']
@@ -44,7 +44,7 @@ f3c84f7d:  FAILED [0]  assert [None, None] == ['84714900', '84714900']
 - La fila `[0]` ya pasaba antes (gana la primera cargada aunque no tenga NCM).
 - Causa: guardar cuenta como confirmar (supuesto 1), así que borrarle el NCM a una fila la vuelve la
   última confirmada, y el desempate premia a una fila que no tiene nada que sugerir.
-- Camino de hoy: sólo el editor del catálogo (`catalogo.js`, `saveProduct` manda el NCM que se ve, que
+- Camino de hoy: sólo el editor del catálogo. Un NCM inválido en la carga no se blanquea (`ncm_para_guardar` lo guarda como texto o lo rechaza) (`catalogo.js`, `saveProduct` manda el NCM que se ve, que
   puede estar vacío). La carga (`finalize.js`, `saveCatalogLearn`) filtra los productos sin NCM. La
   memoria del cliente no guarda filas sin NCM (`identidad_del_producto` exige uno), así que no entra.
 
