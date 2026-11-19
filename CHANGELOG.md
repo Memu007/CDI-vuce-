@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-19 · fix: el catálogo del proveedor desempata por el último confirmado (CATALOGO-4)
 
-- Si dos productos del proveedor se parecen igual a lo leído, se sugiere el NCM del último confirmado y, a la misma hora o sin fecha, siempre el mismo, sin importar el orden en que la base devuelve las filas. Antes ganaba el primero cargado, aunque se hubiera confirmado el otro después. Lo idéntico y lo que no empata no cambian.
+- Si dos productos del proveedor se parecen igual a lo leído, se sugiere el NCM del último confirmado y, a la misma hora o sin fecha, siempre el mismo, sin importar el orden en que la base devuelve las filas. Antes ganaba el primero cargado, aunque se hubiera confirmado el otro después. Una fila a la que se le borró el NCM no le gana el empate a una que lo tiene. Lo idéntico y lo que no empata no cambian.
 
 ## 2026-11-18 · fix: el origen frecuente y la procedencia de la revisión se ven con código y nombre (D261)
 

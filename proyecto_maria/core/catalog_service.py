@@ -191,8 +191,9 @@ def confirmada(row) -> tuple:
 
 
 def _ultima_confirmada(row) -> tuple:
-    # A la misma hora (o sin fecha) decide la clave, única en el catálogo del proveedor.
-    return (*confirmada(row), row.product_key)
+    # Una fila a la que se le borró el NCM no tiene qué sugerir: pierde el empate. A la misma hora
+    # (o sin fecha) decide la clave, única en el catálogo del proveedor.
+    return (bool(row.ncm), *confirmada(row), row.product_key)
 
 
 _MAX_VENDOR_ID = 60
