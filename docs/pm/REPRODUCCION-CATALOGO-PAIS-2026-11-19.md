@@ -48,7 +48,8 @@ De los 28 ROJO de `holanda423.sh`:
 `tests/test_pm_cpais.py` (fuera del repo), en los dos catálogos, siembra por SQL «Holanda», «paises
 bajos», «CHINA», «CHN», «0423», « 423 », «Hong Kong», «Türkiye», «Narnia», «<b>Z</b>», «XX» y «cn»:
 - guardar otro campo los deja byte a byte;
-- lo que no es un país se ve como vino, sin blancos de los bordes;
+- lo que no es un país vuelve como vino, sin blancos de los bordes (mira el valor del campo, no lo que
+  se pinta: las mayúsculas del CSS no las ve);
 - volver a mandar la etiqueta que se ve deja el mismo país.
 
 Otro caso escribe en el cliente «paises bajos», «Holanda», «Países Bajos», «423 · PAISES BAJOS»,
@@ -61,7 +62,8 @@ limpieza; no es devolución.
 
 ## Adversario (sonnet alto, sin red)
 
-Nada rompe los criterios 1 a 5. Notas, ninguna causada por este diff:
+Sin navegador, no encontró nada que rompa los criterios 1 a 5 en el código (lo de la pantalla lo
+encontré yo, arriba). Notas, ninguna causada por este diff:
 - «XX» escrito a mano da 400 en el cliente y 200 en el proveedor. Ya estaba.
 - `calculadora.js:112` no precarga un origen guardado como etiqueta o nombre. Va junto al riesgo de la
   calculadora de ORIGEN-2.
@@ -71,8 +73,8 @@ Nada rompe los criterios 1 a 5. Notas, ninguna causada por este diff:
 
 - **Devolución, por la causa:** la fila del cliente no deja achicarse al campo del origen (ancho fijo
   de `30ch`) y el chequeo de pantalla mide el ancho sólo a 1280. Va en `PARA-DEV-2.md`.
-- **Mayúsculas en el cliente:** entran en la devolución. Antes de este diff el campo mostraba códigos;
-  ahora muestra nombres y lo que no es un país, y `text-transform: uppercase` los cambia a la vista.
+- **Mayúsculas en el cliente:** entran en la devolución por el criterio 4 de esta pieza; `learn`
+  guarda «Narnia» así (camino de hoy). Medido en el catálogo del cliente; el del proveedor, no.
 - **Riesgo 1, etiquetas largas** (unas cuarenta de 308): aceptado aparte. El texto largo se corta
   dentro del campo; eso no es lo que se devuelve.
 - **Riesgo 7, `catalogo3.sh` tarda ~70–80 min**: a la cola de limpieza.

@@ -15,19 +15,19 @@ corta («310 · CHINA»: baja el peso). Con el ancho de la base el mismo campo q
 cualquier ancho. A 1280 y a 800 está bien: por eso no se vio.
 - **Causa:** el campo del origen del cliente tiene un ancho fijo que la fila no puede achicar, y el
   chequeo de pantalla mide el ancho sólo a 1280.
-- **Lo que pido, para la familia:** en la fila del cliente y en la del proveedor, los campos quedan en
-  un renglón en todo ancho de ventana en que esa fila se dibuja en un renglón en la base. El chequeo de
+- **Lo que pido, para la familia:** en la fila del cliente y en la del proveedor, nada de la fila baja
+  de renglón (la unidad «kg» incluida) y la fila tiene el alto de la base, en todo ancho de ventana en
+  que la base la dibuja así. El chequeo de
   pantalla mide cada fila en su ancho más angosto de cada disposición (los anchos van como datos en un
   solo caso), y da rojo con el ancho fijo de `4904e5a1`.
 - *Sugerencia, no criterio:* que el campo pueda achicarse (por ejemplo, un ancho mínimo y uno máximo en
   vez de uno fijo). Cómo, decidís vos.
 
 **2. Lo que no es un país no se ve como se escribió.** «Narnia» guardado (así lo guarda `learn`) se ve
-«NARNIA» en el catálogo del cliente, por el `text-transform: uppercase` del campo. Antes de tu diff el
-campo mostraba sólo códigos; ahora muestra nombres y textos libres, así que el criterio 4 ahora lo toca.
-- **Lo que pido:** el texto que se ve en el campo es el guardado, sin mayúsculas forzadas, en los dos
-  catálogos; el chequeo de pantalla lee el texto dibujado (no sólo el `value`) con formas mezcladas
-  como datos, y da rojo con el `uppercase` de vuelta.
+«NARNIA» en el catálogo del cliente, por el `text-transform: uppercase` del campo. El criterio 4 de
+esta pieza pide que se vea como se escribió. Lo medí en el del cliente; el del proveedor no lo medí.
+- **Lo que pido:** lo que no es un país se ve como se guardó, sin mayúsculas forzadas, en los dos
+  catálogos, con formas mezcladas como datos, y el chequeo da rojo con el `uppercase` de vuelta.
 
 **Puertas de la vuelta, si sólo cambia CSS o JS de pantalla:** chequeo-6, `holanda423.sh` y
 `paises_nombres.sh` con todos sus sabotajes en rojo, el chequeo de pantalla nuevo con su rojo,
