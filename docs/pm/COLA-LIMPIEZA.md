@@ -326,3 +326,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - Tres reconocedores de país por nombre: `codigo_de_pais` con nombre (`maria_generator.py`),
   `_origen_desde_factura` (`pdf_extractor.py`) y `_paises_nombrados` (`despacho_lector.py`); uno
   solo, que usen los tres. Lo vio la Dev MARIA (D239 a).
+- Sabotaje «un producto nuevo toma la hora de la base» (`scripts/testing/sabotajes/catalogo4.sh`): su
+  rojo depende de que dos altas de `test_un_empate_de_parecido_no_depende_del_orden_de_las_filas`
+  caigan en el mismo segundo de SQLite. Darle un caso que lo distinga sin depender del reloj.

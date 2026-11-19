@@ -186,8 +186,8 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | ✅ PRESUPUESTO-CLIENTE-1 | Dev MARIA, aceptada sobre `f45243a` e integrada (`8669b43`) | Sí de Emi el 09/11 (D141 a): al pasar una operación a otro cliente, el link de presupuesto compartido con los datos del cliente anterior deja de andar |
 | ✅ INTEGRAR-1 | Dev técnica | Sumada por la PM el 08/11: unir las ramas de las dos Devs sobre la de la PM; aceptada el 10/11 sobre `4555f7c4` |
 | ✅ BORRADOR-1 | Dev técnica, aceptada sobre `c8733be` (producto de `22163cec`) e integrada | Sí de Emi el 09/11 (D143 a): recuperar el borrador no saca a la usuaria de la pantalla donde está (Clientes) |
-| 🔵 CATALOGO-4 | Dev MARIA | Sí de Emi el 19/11: ante dos productos del catálogo del proveedor igual de parecidos a lo leído, gana el último confirmado y no el orden en que la base devuelve las filas |
-| ⚪ CATALOGO-PAIS | Dev MARIA | Sí de Emi el 19/11: los catálogos del proveedor y del cliente muestran el origen con código y nombre («423 · PAISES BAJOS») sin cambiar lo guardado |
+| ✅ CATALOGO-4 | Dev MARIA, aceptada sobre `f5395b9f` e integrada | Sí de Emi el 19/11: ante dos productos del catálogo del proveedor igual de parecidos a lo leído, gana el último confirmado y no el orden en que la base devuelve las filas |
+| 🔵 CATALOGO-PAIS | Dev MARIA | Sí de Emi el 19/11: los catálogos del proveedor y del cliente muestran el origen con código y nombre («423 · PAISES BAJOS») sin cambiar lo guardado |
 | ⚪ ORIGEN-2 | Dev MARIA | Sí de Emi el 19/11: el origen habitual del cliente acepta nombre o código como el resto del producto, sin recortarse a 3 caracteres; con migración probada en Postgres descartable |
 | ⚪ AUDITORIA-FINAL | PM | Ver `AUDITORIA-2026-10-06.md` |
 

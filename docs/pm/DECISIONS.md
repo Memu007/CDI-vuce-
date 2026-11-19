@@ -1019,3 +1019,12 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   hora gana la clave mayor (supuesto 2); tener NCM va antes que la fecha en el desempate.
 - Riesgos escritos, sin código: el nombre del proveedor sale de la primera fila (ya estaba); el tope 0,8
   de un texto con mitad de letras no latinas empata con un 4/5 real; fechas con y sin zona en una sesión.
+
+## 2026-11-19 19:27 UTC — CATALOGO-4: aceptada sobre `f5395b9f` (sin publicar)
+
+- En un empate de parecido gana primero una fila con NCM, después la última confirmada y, a la misma
+  hora, la clave mayor. Acta `REPRODUCCION-CATALOGO-4-2026-11-19.md`, sección «Vuelta».
+- Decidido por la PM, con el consejero, como riesgos escritos: lo idéntico no mira el NCM; el sabotaje
+  de la hora de la base depende del segundo de SQLite (a `COLA-LIMPIEZA.md`); una fila sin NCM cuenta
+  como reconocida; el catálogo guarda cualquier texto como NCM y ese texto gana el empate (ya pasaba).
+- Activa CATALOGO-PAIS, con negativo en el mismo SHA.
