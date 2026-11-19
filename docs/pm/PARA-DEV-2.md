@@ -3,6 +3,38 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
+## Veredicto: CATALOGO-4 sobre `631bed21` (informe `4e39d414`), con devolución (2026-11-19 17:55 UTC)
+
+Acta: `REPRODUCCION-CATALOGO-4-2026-11-19.md`. Los cuatro criterios los reproduje: tu caso, tus 8
+sabotajes y los 65 de `catalogo3.sh` en rojo, Postgres «fallas: 0», chequeo-6 «avisos: 0» y
+`e2e_maria.sh` OK. Un negativo mío de tres filas empatadas en los 6 órdenes también da lo esperado.
+
+**La devolución, por la causa.** Guardar cuenta como confirmar, así que si en el editor del catálogo se
+le borra el NCM a una fila, esa fila pasa a ser la última confirmada y gana el empate. El desempate
+premia a una fila que no tiene nada que sugerir, y el NCM bueno de la otra queda escondido. En la base
+pasaba sólo si esa fila era la primera cargada; ahora pasa siempre. Ejemplo: «Tornillo acero inox M8
+zincado» (73181500) y «… hexagonal» (84714900), leído «Tornillo acero inox M8», se le borra el NCM a
+la segunda cargada: la base sugiere el de la primera, `631bed21` sugiere `None`.
+
+1. En un empate, si alguna de las filas empatadas tiene NCM, la sugerencia trae un NCM, el de la que
+   gana por la regla de hoy entre las que lo tienen. Sólo en empates: si la única más parecida no tiene
+   NCM, queda como hoy.
+2. La familia como datos de un caso: filas sin NCM en distintos lugares del empate y en los dos órdenes
+   de carga, por el camino de hoy, que es el editor (`PUT …/productos/<clave>` con `ncm` vacío). La carga
+   filtra los productos sin NCM y la memoria del cliente no guarda filas sin NCM: quedan afuera.
+3. Negativo en el mismo SHA con la regla nueva vaciada: rojo.
+
+*Sugerencia:* `bool(row.ncm)` adelante en `_ultima_confirmada`.
+
+**Decidido por la PM:**
+- Supuesto 1, aceptado: cualquier guardado del producto confirma. La regla del NCM va antes de la
+  fecha, así que no lo reabre.
+- Supuesto 2, aceptado: a la misma hora gana la clave mayor.
+- Riesgo 1 (el nombre del proveedor sale de la primera fila), aceptado como riesgo: ya estaba antes.
+- Quedan como riesgos escritos, sin código: el tope 0,8 de un texto con mitad de letras no latinas
+  empata con un parecido real de 4/5 (coherente con la definición de empate), y mezclar fechas con y
+  sin zona en una misma sesión da `TypeError`, pero no hay endpoint que lo haga.
+
 ## Tarea activa: CATALOGO-4; después CATALOGO-PAIS y ORIGEN-2, una a la vez (2026-11-19 14:45 UTC)
 
 Emi dijo «sí a las dos y al país con nombre» (19/11, antes de las 14:45 UTC) a CATALOGO-4, a ORIGEN-2 y
@@ -10,7 +42,7 @@ a que los catálogos muestren el país con nombre. Es un sí a las piezas, no un
 Base: la cabeza de mi rama; traela con `merge`. Una pieza a la vez: la siguiente arranca recién con la
 anterior aceptada. ORIGEN-ETIQUETA (D261) quedó aceptada sobre `5a28c13c`; su acta y Git la guardan.
 
-### CATALOGO-4 (activa)
+### CATALOGO-4 (activa, con la devolución de arriba)
 
 La causa: en el catálogo del proveedor (`match_items`), dos productos que se parecen igual a lo leído
 se desempatan por el orden en que la base devuelve las filas, que no está fijado.
