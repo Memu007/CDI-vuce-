@@ -3,6 +3,7 @@ misma hora o sin fecha, el contenido de la fila: no el orden en que la base las 
 
 El mismo escenario corre en Postgres con scripts/testing/catalogo4_postgres.py.
 """
+import itertools
 import uuid
 
 from proyecto_maria.core.catalog_service import _vendor_key, clave_de_producto
@@ -76,8 +77,8 @@ def test_un_empate_de_parecido_no_depende_del_orden_de_las_filas(client):
 
 _M8 = "Tornillo acero inox M8"
 _TRES = [f"{_M8} {x}" for x in ("zincado", "hexagonal", "largo")]
-# (leído, filas cargadas en orden, a cuáles el editor les borra el NCM, empatan): en un empate gana
-# la última cargada que conserva el NCM; sin ninguna con NCM, o sin empate, no hay NCM.
+# (leído, filas, a cuáles el editor les borra el NCM, empatan): en un empate gana la última
+# confirmada que conserva el NCM; sin ninguna con NCM, o sin empate, no hay NCM.
 SIN_NCM = [
     (_M8, _TRES[:2], _TRES[:1], True),
     (_M8, _TRES[:2], _TRES[1:2], True),
@@ -89,14 +90,15 @@ SIN_NCM = [
 
 
 def sin_ncm_mal(client):
-    """Lo que no sale como se espera en SIN_NCM, en los dos órdenes de carga: (leído, orden, borrados,
+    """Lo que no sale como se espera en SIN_NCM, en cada orden de carga: (leído, orden, borrados,
     sugerido, esperado)."""
     malos = []
     for leido, filas, borrados, empatan in SIN_NCM:
         ncm = dict(zip(filas, (NCM, OTRO, "39269090")))
-        for orden in (filas, filas[::-1]):
+        for orden in itertools.permutations(filas):
             vendor = f"Proveedor catalogo4 {uuid.uuid4().hex[:8]}"
-            for desc in orden:
+            # La segunda vuelta confirma con la hora de la app: el orden no depende del segundo de la base.
+            for desc in orden * 2:
                 r = client.post("/api/ncm/guardar-uso",
                                 json={"descripcion": desc, "ncm": ncm[desc], "vendor_name": vendor})
                 assert r.status_code == 200, r.text

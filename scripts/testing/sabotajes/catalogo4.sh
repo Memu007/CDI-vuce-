@@ -28,7 +28,7 @@ sabotaje casos $C "una fila sin fecha le gana a una fechada" "$SIN_FECHA" \
 sabotaje casos $C "lo que llega justo al umbral no se sugiere" "if mejor < umbral:" \
   "if mejor <= umbral:" "AssertionError" $CASO $SIN_NCM
 sabotaje casos $C "un producto nuevo toma la hora de la base, al segundo en SQLite" \
-  $'                ultima_vez=ahora,\n' "" "AssertionError" $CASO $SIN_NCM
+  $'                ultima_vez=ahora,\n' "" "AssertionError" $CASO
 sabotaje casos $C "cada producto nuevo del lote con su hora" "ultima_vez=ahora," \
   "ultima_vez=datetime.now(timezone.utc)," "AssertionError" $CASO
 sabotaje casos $C "cada producto del lote que ya estaba con su hora" "existing.ultima_vez = ahora" \
