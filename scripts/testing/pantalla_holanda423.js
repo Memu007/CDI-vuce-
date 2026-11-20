@@ -140,7 +140,7 @@ async function alPasarElMouse(page, donde, filas, campo, guardar) {
     const [visto, alPasar] = await campo().evaluate(c => [c.value, c.getAttribute('title')]);
     if ((alPasar || '') !== visto) falla(donde + ': ' + que + ' se ve «' + visto + '» y al pasar el mouse «' + alPasar + '»');
   };
-  for (const escrito of ['Países Bajos', 'Ñandú del Perú', 'CHI', XSS, '']) {
+  for (const escrito of ['Países Bajos', '  Ñandú del Perú  ', 'CHI', XSS, '']) {
     await campo().fill(escrito);
     await igual('«' + escrito + '» escrito');
   }
