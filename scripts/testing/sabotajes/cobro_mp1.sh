@@ -602,7 +602,7 @@ if ! correr >/dev/null; then
 else
   echo "BASE  | la carrera de D en Postgres, en verde"
   sabotaje $M "D: el checkout no bloquea la cuenta" \
-    $'.order_by(User.username)\n        .with_for_update()' \
+    $'.order_by(User.username)\n        .with_for_update(key_share=True, of=User)' \
     '.order_by(User.username)' \
     "FALLA | sin suscripción anterior: los dos pedidos se cruzaron"
   sabotaje $M "D: cancelar no espera al checkout en curso" \

@@ -2,7 +2,7 @@
 
 Cada par va en los dos órdenes, con usuario y con org, con créditos extra
 vencidos y al día. Antes mira qué candados le llegan a Postgres de _cuenta_con_suscripciones
-y de _cuenta_bloqueada, la segunda después de que la primera compiló los suyos.
+y de _cuenta_bloqueada en los dos órdenes: la cache de SQL va cargada por la anterior.
 Una recarga junto a un guardado, a MARIA, a cancelar o a reactivar tiene que armarse,
 dar 200 a los dos y dejar los créditos vigentes; si no, la fila dice «MAL».
 uso: scripts/testing/con_pg16.sh python scripts/testing/conexiones1_pares.py
@@ -31,7 +31,7 @@ ESPERADOS = {"_cuenta_con_suscripciones": ["FOR NO KEY UPDATE OF users", "FOR UP
 
 
 def candados(c):
-    """Los FOR ... que manda cada función, en el orden de ESPERADOS."""
+    """Los FOR ... que manda cada función, por orden de llamada."""
     _, _, _, (_, _, org) = preparar(c, True)
     usuario = sql("select owner_username from organizations where id = %s", org)[0][0]
     vistos = []
@@ -40,14 +40,15 @@ def candados(c):
         vistos.extend(re.findall(r"FOR (?:NO KEY )?UPDATE(?: OF \w+)?(?: NOWAIT| SKIP LOCKED)?", sentencia))
 
     async def pedir():
-        por_funcion = {}
-        for nombre in ESPERADOS:
-            async with AsyncSessionLocal() as db:
-                vistos.clear()
-                await getattr(m, nombre)(db, usuario)
-                await db.rollback()
-            por_funcion[nombre] = list(vistos)
-        return por_funcion
+        filas = []
+        for orden, nombres in enumerate((list(ESPERADOS), list(ESPERADOS)[::-1]), 1):
+            for nombre in nombres:
+                async with AsyncSessionLocal() as db:
+                    vistos.clear()
+                    await getattr(m, nombre)(db, usuario)
+                    await db.rollback()
+                filas.append((orden, nombre, list(vistos)))
+        return filas
     event.listen(engine.sync_engine, "before_cursor_execute", anotar)
     try:
         return c.portal.call(pedir)
@@ -59,10 +60,9 @@ def main():
     total, sin_armar, malas = 0, 0, 0
     with TestClient(m.app, raise_server_exceptions=False) as c:
         bien = True
-        for nombre, vistos in candados(c).items():
+        for orden, nombre, vistos in candados(c):
             bien &= vistos == ESPERADOS[nombre]
-            print(f"{nombre}{' después del aviso' * (nombre == '_cuenta_bloqueada')}:", " | ".join(vistos),
-                  "" if vistos == ESPERADOS[nombre] else "| MAL")
+            print(f"orden {orden}, {nombre}:", " | ".join(vistos), "" if vistos == ESPERADOS[nombre] else "| MAL")
         for (x, y), orden, de_org, vencidos in itertools.product(PARES, (1, -1), (False, True), (True, False)):
             a, b = (x, y)[::orden]
             ajuste = f"billing_status = '{'canceled' if 'reactivar' in (a, b) else 'active'}'"

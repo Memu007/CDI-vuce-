@@ -65,9 +65,9 @@ S='.order_by(User.username)
         .with_for_update(key_share=True, of=User)'
 O='.with_for_update(key_share=True, of=Organization)'
 
-NO='\| MAL' corrida "sin sabotaje" 0 \
-  "_cuenta_con_suscripciones: FOR NO KEY UPDATE OF users | FOR UPDATE" \
-  "_cuenta_bloqueada después del aviso: FOR NO KEY UPDATE OF users | FOR NO KEY UPDATE OF organizations"
+SUS='_cuenta_con_suscripciones: FOR NO KEY UPDATE OF users | FOR UPDATE'
+BLO='_cuenta_bloqueada: FOR NO KEY UPDATE OF users | FOR NO KEY UPDATE OF organizations'
+NO='\| MAL' corrida "sin sabotaje" 0 "orden 1, $SUS" "orden 1, $BLO" "orden 2, $BLO" "orden 2, $SUS"
 # Sin el arreglo: las dos consultas vuelven a FOR UPDATE y la recarga choca.
 en_codigo "$M" "$U" "$B.with_for_update()" "$O" '.with_for_update()' &&
   corrida "sin key_share ni of=" 1 "FOR UPDATE | FOR UPDATE | MAL" \
