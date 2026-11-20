@@ -2,7 +2,7 @@
 Admin Router - Endpoints administrativos para monitoreo y debugging
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
 import psutil
 import time
@@ -10,9 +10,11 @@ from datetime import datetime
 from typing import Dict, Any, List
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc, text
+from sqlalchemy import select, func, desc, text, or_
 from proyecto_maria.auth.dependencies import get_db
-from proyecto_maria.database.models import User, Operation
+from proyecto_maria.auth.roles import roles_de
+from proyecto_maria.database.models import User, Operation, Organization
+from proyecto_maria.services import billing_service
 
 router = APIRouter(prefix='/api/admin', tags=['admin'])
 
@@ -401,3 +403,63 @@ async def get_cohort_retention(
         "success": True,
         "cohorts": cohort_data
     }
+
+
+# Lo que paga: la cuenta o, si es de un estudio, el estudio. Se leen sólo estas
+# columnas, así ningún secreto llega a la ruta y no hay objeto que guardar.
+_SALDO = ("plan", "billing_status", "trial_ends_at", "ops_used_this_period",
+          "extra_ops_remaining", "extra_ops_expires_at", "last_topup_at")
+
+
+def _iso(fecha):
+    return fecha and billing_service.como_utc(fecha).isoformat()
+
+
+def _cuenta_en_la_lista(fila) -> Dict[str, Any]:
+    del_estudio = fila.org_id is not None
+    saldo = {c: getattr(fila, ("org_" if del_estudio else "") + c) for c in _SALDO}
+    vencidos = billing_service.extra_vencidos(saldo["extra_ops_expires_at"])
+    return {
+        "usuario": fila.username,
+        "email": fila.email,
+        "admin": "admin" in roles_de({"roles": fila.roles}),
+        "estudio": fila.org_name,
+        "saldo_del_estudio": del_estudio,
+        "plan": saldo["plan"],
+        "cobro": saldo["billing_status"],
+        "cobro_hasta": _iso(saldo["trial_ends_at"]),
+        "operaciones_del_periodo": saldo["ops_used_this_period"] or 0,
+        "creditos_extra": 0 if vencidos else saldo["extra_ops_remaining"] or 0,
+        "creditos_vencen": None if vencidos else _iso(saldo["extra_ops_expires_at"]),
+        "ultima_recarga": _iso(saldo["last_topup_at"]),
+    }
+
+
+@router.get('/usuarios')
+async def listar_usuarios(
+    buscar: str = Query("", max_length=100),
+    desde: int = Query(0, ge=0, le=1_000_000),
+    cuantos: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """Las cuentas con su plan y sus créditos, por páginas. Sólo lee.
+    El control de admin lo pone el router al montarse (require_admin)."""
+    filtro = []
+    if buscar.strip():
+        # Las dos minúsculas en la base: Python y Postgres no bajan igual todas las letras.
+        filtro.append(or_(User.username.icontains(buscar.strip(), autoescape=True),
+                          User.email.icontains(buscar.strip(), autoescape=True)))
+    total = (await db.execute(select(func.count()).select_from(User).where(*filtro))).scalar_one()
+    columnas = [User.username, User.email, User.roles, Organization.id.label("org_id"),
+                Organization.name.label("org_name")]
+    columnas += [getattr(User, c) for c in _SALDO] + [getattr(Organization, c).label("org_" + c) for c in _SALDO]
+    filas = await db.execute(
+        select(*columnas)
+        .outerjoin(Organization, Organization.id == User.organization_id)
+        .where(*filtro)
+        .order_by(User.username)
+        .offset(desde)
+        .limit(cuantos)
+    )
+    return {"total": total, "desde": desde, "cuantos": cuantos,
+            "usuarios": [_cuenta_en_la_lista(f) for f in filas]}
