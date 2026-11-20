@@ -150,6 +150,7 @@ def rutas():
     assert ("POST", "/api/admin/errors/clear-old") in rutas, rutas
     assert ("POST", "/api/ncm/cache/refresh") in rutas, rutas
     assert ("GET", "/api/dev/stats") in rutas, rutas
+    assert ("GET", "/api/admin/usuarios") in rutas, rutas
     # Lo mismo con el recorrido de los routers incluidos (WebSockets y ocultas).
     assert "/api/admin/health/detailed" in {r.path for r in _rutas_de_la_app()}
     return rutas
@@ -232,6 +233,7 @@ RUTAS_ADMIN_LECTURA = [
     "/api/admin/logs/recent/5",
     "/api/admin/stats/summary",
     "/api/admin/cohort-retention",
+    "/api/admin/usuarios",
 ]
 
 
