@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-20 · fix: con créditos vencidos, una recarga ya no choca con un guardado ni con MARIA (CONEXIONES-1-NOKEY)
+
+- Con los créditos extra vencidos, una recarga al mismo tiempo que un guardado o que una consulta a MARIA ya no termina en error ni deja la recarga sin acreditar. Siguen pendientes los choques del alta de un integrante con el guardado, cancelar y reactivar.
+
 ## 2026-11-20 · fix: el origen habitual del cliente acepta el nombre o el código del país (ORIGEN-2)
 
 - El origen habitual se escribe con el nombre o el código del país, con la lista de la tabla para elegir, y se guarda entero (la pantalla ofrecía diez siglas y lo escrito se cortaba a tres letras: «Brasil» quedaba «BRA»). Lo que no es un país no se guarda y la pantalla dice por qué. La ficha lo muestra con código y nombre («203 · BRASIL»); lo ya recortado que no es un país («CHI») se ve como quedó, y editar otro dato no toca el origen.
