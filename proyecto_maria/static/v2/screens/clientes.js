@@ -1468,7 +1468,11 @@
             });
             if (!res || !res.ok) throw new Error('No se pudo guardar');
             // Si se siguió escribiendo mientras se guardaba, no se pisa.
-            if (field === 'origen' && input.value.trim() === value) input.title = input.value = CDI.paisesMaria.etiqueta(value);
+            if (field === 'origen' && input.value.trim() === value) {
+                input.value = CDI.paisesMaria.etiqueta(value);
+                // Un valor puesto por código no dispara «input»: se avisa a lo que sigue el campo.
+                input.dispatchEvent(new Event('input'));
+            }
             CDI.toast && CDI.toast.success('Producto actualizado');
             CDI.track && CDI.track('catalogo_producto_updated', { cliente_id: detailClienteId, producto_id: productoId, field });
         } catch (err) {
