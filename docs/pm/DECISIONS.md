@@ -1126,3 +1126,7 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   después del último arranque y no entró se ve con el estado viejo. Mostrar el efectivo y el plan
   que se cobra pasa a criterio antes de dar créditos: pide tocar `main.py`, que espera a
   CONEXIONES-1-PRODUCTO.
+- Emi, 20/11 21:42: «sí a los tres». Los créditos dados desde el panel vencen a 30 días como una
+  recarga pagada, respetan el tope `EXTRA_OPS_MAX` (100) y cada carga queda registrada (quién, a
+  quién, cuánto, cuándo) en una tabla nueva: es migración, pide copia de la base antes de publicar.
+  La pieza sigue esperando CONEXIONES-1-PRODUCTO.
