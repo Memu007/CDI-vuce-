@@ -3,6 +3,17 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## Vencido `limpieza1.sh`: reescribir el ancla (2026-11-20 14:07 UTC)
+
+Chica, en un commit aparte, **con tu próxima entrega** (no desplaza CONEXIONES-1-NOKEY).
+CI-TOPE (`c721f7fc`) pasó `.github/workflows/ci.yml` a `timeout-minutes: 30`, y el sabotaje
+«el job con continue-on-error» de `scripts/testing/sabotajes/limpieza1.sh` sigue buscando
+`    timeout-minutes: 20`: hoy no puede dar rojo. La PM corre fuera del árbol una copia con 30
+sobre `0d7401ed`. Sugerencia: un ancla que no dependa del número del tope.
+Criterio: ese sabotaje da rojo sobre tu SHA, y `scripts/testing/anclas_perdidas.py <SHA>`
+ya no nombra `limpieza1.sh`. Al aceptarla, la PM saca su línea de
+`docs/pm/herramientas/sabotajes-conocidos.txt`.
+
 ## Tarea activa: CONEXIONES-1, el arreglo de producto, en dos piezas (2026-11-20 13:56 UTC)
 
 **Sí de Emi (20/11, leído 13:53 UTC: «Dale a todo» al punto 20: D206 (a), y D182 con D183 y D188).**
