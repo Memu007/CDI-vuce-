@@ -45,9 +45,9 @@ pg $M "la migración no toca el cliente" '                            ("operatio
   "FALLA | primer arranque: el origen es text"
 
 # 2. Lo escrito se valida como en el catálogo.
-sabotaje casos $M "lo que no es un país se guarda" '        if problema:
-            raise HTTPException(status_code=400, detail=problema)' '        if False:
-            raise HTTPException(status_code=400, detail=problema)' \
+sabotaje casos $M "lo que no es un país se guarda" '        origen, problema = origen_para_catalogo(limpio["default_origin"])
+        if problema:' '        origen, problema = origen_para_catalogo(limpio["default_origin"])
+        if False:' \
   "AssertionError: Narnia" "$ES_PAIS[alta]" "$ES_PAIS[edicion]"
 sabotaje casos $M "lo escrito se guarda sin normalizar" '        limpio["default_origin"] = origen
 ' '' "AssertionError: países  bajos" "$ES_PAIS[alta]" "$ES_PAIS[edicion]"
@@ -59,33 +59,30 @@ sabotaje casos $M "guardar otro dato borra el origen" '    if "default_origin" i
 
 # 3. La ficha muestra la etiqueta, escapada.
 sabotaje pantalla $CLI "la etiqueta de arriba muestra lo guardado" \
-  "'Origen ' + CDI.escapeHtml(CDI.paisesMaria.etiqueta(c.default_origin))" "'Origen ' + CDI.escapeHtml(c.default_origin)" \
-  "FALLA: la ficha muestra «Origen 109» y «109 · REP.DEMOCRAT.DEL CONGO EX ZAIRE»"
+  "Origen ' + CDI.escapeHtml(CDI.paisesMaria.etiqueta(c.default_origin))" "Origen ' + CDI.escapeHtml(c.default_origin)" \
+  "FALLA: la ficha muestra «Origen 101» y «101 · BURKINA FASO»"
 sabotaje pantalla $CLI "la etiqueta de arriba muestra HTML" \
-  "'Origen ' + CDI.escapeHtml(CDI.paisesMaria.etiqueta(c.default_origin))" "'Origen ' + CDI.paisesMaria.etiqueta(c.default_origin)" \
+  "Origen ' + CDI.escapeHtml(CDI.paisesMaria.etiqueta(c.default_origin))" "Origen ' + CDI.paisesMaria.etiqueta(c.default_origin)" \
   "no «<img src=x"
 sabotaje pantalla $CLI "«Origen habitual» muestra lo guardado" \
   "['Origen habitual', CDI.paisesMaria.etiqueta(c.default_origin) || '—']" "['Origen habitual', c.default_origin || '—']" \
-  "FALLA: la ficha muestra «Origen 109 · REP.DEMOCRAT.DEL CONGO EX ZAIRE» y «109»"
+  "FALLA: la ficha muestra «Origen 101 · BURKINA FASO» y «101»"
 
 # 4. La etiqueta de arriba: sus letras, un renglón, adentro y con «…» si no entra.
-ORIGEN_CSS='.cx-hero-tag.is-origen { text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }'
+ORIGEN_CSS='.cx-hero-tag.is-origen { text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }'
 TAGS_CSS='.cx-hero-tags { display: inline-flex; flex-wrap: wrap; gap: var(--s-1); max-width: 100%; }'
 sabotaje pantalla $CSS "la etiqueta de arriba en mayúsculas" "$ORIGEN_CSS" \
-  '.cx-hero-tag.is-origen { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }' \
+  '.cx-hero-tag.is-origen { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }' \
   "la ficha fuerza las letras del origen"
 sabotaje pantalla $CSS "la etiqueta de arriba baja de renglón" "$ORIGEN_CSS" \
-  '.cx-hero-tag.is-origen { text-transform: none; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }' \
+  '.cx-hero-tag.is-origen { text-transform: none; overflow: hidden; text-overflow: ellipsis; }' \
   "la etiqueta del origen baja de renglón"
 sabotaje pantalla $CSS "lo que no entra se dibuja afuera" "$ORIGEN_CSS" \
-  '.cx-hero-tag.is-origen { text-transform: none; white-space: nowrap; text-overflow: ellipsis; max-width: 100%; }' \
+  '.cx-hero-tag.is-origen { text-transform: none; white-space: nowrap; text-overflow: ellipsis; }' \
   "lo que no entra en la etiqueta se sale o se corta sin «…»"
 sabotaje pantalla $CSS "lo que no entra se corta sin «…»" "$ORIGEN_CSS" \
-  '.cx-hero-tag.is-origen { text-transform: none; white-space: nowrap; overflow: hidden; max-width: 100%; }' \
+  '.cx-hero-tag.is-origen { text-transform: none; white-space: nowrap; overflow: hidden; }' \
   "lo que no entra en la etiqueta se sale o se corta sin «…»"
-sabotaje pantalla $CSS "la etiqueta de arriba crece fuera de la ficha" "$ORIGEN_CSS" \
-  '.cx-hero-tag.is-origen { text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }' \
-  "el origen se sale de la ficha"
 sabotaje pantalla $CSS "las etiquetas de arriba crecen fuera de la ficha" "$TAGS_CSS" \
   '.cx-hero-tags { display: inline-flex; flex-wrap: wrap; gap: var(--s-1); }' \
   "el origen se sale de la ficha"
@@ -98,8 +95,11 @@ sabotaje pantalla $CLI "el formulario manda el origen aunque no se toque" \
   "        if (origen !== origenVisto) body.default_origin = origen;" "        body.default_origin = origen;" \
   "FALLA: guardar otro dato reescribe «CN» → «310 · CHINA»"
 sabotaje pantalla $CLI "el formulario muestra lo guardado" \
-  "        origenVisto = CDI.paisesMaria.etiqueta(c.default_origin);" "        origenVisto = c.default_origin || '';" \
+  "        if (fOrigen) fOrigen.value = CDI.paisesMaria.etiqueta(c.default_origin);" "        if (fOrigen) fOrigen.value = c.default_origin || '';" \
   "FALLA: el formulario muestra «CN» para «CN»"
+sabotaje pantalla $CLI "el formulario compara con lo guardado y no con lo que muestra" \
+  "        origenVisto = fOrigen ? fOrigen.value : '';" "        origenVisto = CDI.paisesMaria.etiqueta(c.default_origin);" \
+  "FALLA: guardar otro dato con «A↵B» guardado da 400"
 sabotaje pantalla $CLI "el formulario no ofrece los países" \
   "        \$('cfOrigenPaises').innerHTML = CDI.paisesMaria.optionMarkup();
 " "" "FALLA: el formulario ofrece 0 países"

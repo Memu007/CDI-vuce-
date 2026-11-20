@@ -15,7 +15,9 @@ const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
 const XSS = '<img src=x onerror="window.__xss=1">';
 // Lo guardado y cómo se ve. Lo recortado a 3 de un nombre y lo que no es un país, como pudo quedar
 // de antes, se siembra en la base: la API ya no lo guarda.
-const GUARDADOS = [['CN', '310 · CHINA'], ['Holanda', '423 · PAISES BAJOS'], ...['CHI', 'HOL', 'tierra media', XSS].map(o => [o, o])];
+const GUARDADOS = [['CN', '310 · CHINA'], ['Holanda', '423 · PAISES BAJOS'], ...['CHI', 'HOL', 'A\nB', 'tierra media', XSS].map(o => [o, o])];
+// Los saltos de línea, que el campo de texto no muestra, a la vista en los mensajes.
+const ver = o => o.replace(/\n/g, '↵');
 // Los orígenes corrientes, Emiratos primero: es la etiqueta más ancha de los seis.
 const CORRIENTES = ['331', '310', '423', '212', '309', '438'];
 let USUARIO, page;
@@ -127,18 +129,19 @@ async function guardarOtroDato(cids) {
   for (const [o, visto, cid] of cids) {
     await abrirFicha(cid, visto);
     const f = await medirFicha();
-    if (f.html) falla('«' + o + '» guardado se ve como HTML');
-    if (f.mayusculas) falla('«' + o + '» guardado no se ve con sus letras');
+    if (f.html) falla('«' + ver(o) + '» guardado se ve como HTML');
+    if (f.mayusculas) falla('«' + ver(o) + '» guardado no se ve con sus letras');
     await abrirEdicion();
-    if (await page.inputValue('#cfOrigen') !== visto) falla('el formulario muestra «' + await page.inputValue('#cfOrigen') + '» para «' + o + '»');
+    const enCampo = await page.inputValue('#cfOrigen');
+    if (enCampo !== visto.replace(/\n/g, '')) falla('el formulario muestra «' + enCampo + '» para «' + ver(o) + '»');
     await page.fill('#cfNotas', 'otro dato ' + o);
     const r = await guardar();
-    if (!r.ok()) falla('guardar otro dato con «' + o + '» guardado da ' + r.status() + ': ' + await r.text());
+    if (!r.ok()) falla('guardar otro dato con «' + ver(o) + '» guardado da ' + r.status() + ': ' + await r.text());
     await cerrado();
-    if (await guardado(cid) !== o) falla('guardar otro dato reescribe «' + o + '» → «' + await guardado(cid) + '»');
+    if (await guardado(cid) !== o) falla('guardar otro dato reescribe «' + ver(o) + '» → «' + ver(await guardado(cid)) + '»');
   }
   if (await page.evaluate(() => window.__xss)) falla('un origen con HTML se ejecutó');
-  console.log('OK guardar otro dato: ' + cids.map(([o]) => '«' + o + '»').join(', ') + ' se ven con su etiqueta o como se guardaron, y quedan');
+  console.log('OK guardar otro dato: ' + cids.map(([o]) => '«' + ver(o) + '»').join(', ') + ' se ven con su etiqueta o como se guardaron, y quedan');
 }
 
 async function abrirEdicion() {
