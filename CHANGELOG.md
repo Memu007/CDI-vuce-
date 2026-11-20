@@ -14,6 +14,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - Cancelar o reactivar la suscripción al mismo tiempo que una recarga, con los créditos extra vencidos, ya no termina en error.
 
+## 2026-11-20 · feat: el panel de admin lista los usuarios con su plan y sus créditos (ADMIN-USUARIOS-1)
+
+- Sección «Usuarios» en el panel de admin, sólo para admin y sólo para mirar: usuario, email, si es admin, quién paga (la cuenta o su estudio), plan, cobro, operaciones del período, créditos extra vigentes con su vencimiento y la última recarga. Los créditos vencidos se ven en 0 sin tocar la cuenta. Va de a 50 por página, con búsqueda por usuario o email; no muestra contraseñas, tokens ni datos de pago.
+
 ## 2026-11-20 · fix: en los catálogos, el origen cortado se ve entero al pasar el mouse (CATALOGO-PAIS-2)
 
 - En el catálogo del proveedor y en el del cliente, al pasar el mouse por el campo del origen se ve la etiqueta entera («423 · PAISES BAJOS»), la que el campo tiene en ese momento: lo que se escribe, lo que queda al guardar, nada si está vacío.

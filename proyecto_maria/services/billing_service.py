@@ -106,18 +106,20 @@ def plans_public() -> list[dict[str, Any]]:
 EXTRA_OPS_MAX = 100
 
 
-def _extra_vencidos(cuenta) -> bool:
-    expires = getattr(cuenta, "extra_ops_expires_at", None)
-    # La columna que agrega la migración de arranque es TIMESTAMP sin zona
-    # (y SQLite no la guarda): se lee como UTC.
-    if expires is not None and expires.tzinfo is None:
-        expires = expires.replace(tzinfo=timezone.utc)
+def como_utc(fecha: datetime | None) -> datetime | None:
+    # Las columnas que agrega la migración de arranque son TIMESTAMP sin zona
+    # (y SQLite no la guarda): se leen como UTC.
+    return fecha.replace(tzinfo=timezone.utc) if fecha is not None and fecha.tzinfo is None else fecha
+
+
+def extra_vencidos(expires: datetime | None) -> bool:
+    expires = como_utc(expires)
     return bool(expires) and datetime.now(timezone.utc) > expires
 
 
 def _expire_extra_ops(user) -> None:
     """Si los créditos extra ya vencieron, los resetea a 0."""
-    if _extra_vencidos(user):
+    if extra_vencidos(getattr(user, "extra_ops_expires_at", None)):
         user.extra_ops_remaining = 0
         user.extra_ops_expires_at = None
 
@@ -144,9 +146,7 @@ def tiene_acceso(cuenta, ahora: datetime | None = None) -> bool:
 def vigente(fin: datetime | None, ahora: datetime | None = None) -> bool:
     if fin is None:
         return False
-    if fin.tzinfo is None:
-        fin = fin.replace(tzinfo=timezone.utc)
-    return fin > (ahora or datetime.now(timezone.utc))
+    return como_utc(fin) > (ahora or datetime.now(timezone.utc))
 
 
 def cancelar_corta_acceso(cuenta, ahora: datetime | None = None) -> bool:
@@ -177,7 +177,7 @@ def razon_del_tope(cuenta) -> str | None:
     limite = plan["ops"]
     if limite is None or int(getattr(cuenta, "ops_used_this_period", 0) or 0) < limite:
         return None
-    if not _extra_vencidos(cuenta) and int(getattr(cuenta, "extra_ops_remaining", 0) or 0) > 0:
+    if not extra_vencidos(getattr(cuenta, "extra_ops_expires_at", None)) and int(getattr(cuenta, "extra_ops_remaining", 0) or 0) > 0:
         return None
     return f"Alcanzaste el límite de {limite} operaciones del plan {plan['name']}. Comprá un top-up o actualizá a Premium."
 

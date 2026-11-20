@@ -194,8 +194,7 @@ sabotaje $M "se escribe el archivo antes de contar" \
   $'        with open(os.path.join(_user_downloads_dir(user["username"]), f"MARIA_{safe_id}.TXT"), \'w\') as f:\n            f.write(txt_content)\n        operacion_id, filename = await _contar_maria(\n            db, user["username"], request.operacion_id, txt_content, txt_content,\n            len(request.items or []), f"MARIA_{safe_id}")\n'
 sabotaje $B "la fecha de las recargas sin zona no se toma como UTC" \
   "FAILED $T::test_con_el_tope_lleno_el_extra_paga_la_operacion_nueva" \
-  $'    if expires is not None and expires.tzinfo is None:\n        expires = expires.replace(tzinfo=timezone.utc)' \
-  $'    if False:\n        pass'
+  '    expires = como_utc(expires)' '    pass'
 sabotaje $M "cuenta el usuario y no su organización" \
   "FAILED $T::test_la_organizacion_es_la_que_cuenta" \
   $'        if org:\n            return db_user, org' $'        if org:\n            return db_user, db_user'
@@ -217,8 +216,7 @@ done
 
 sabotaje $B "la fecha de las recargas sin zona no se toma como UTC" \
   "FAILED $T::test_con_el_tope_lleno_el_extra_paga_la_operacion_nueva" \
-  $'    if expires is not None and expires.tzinfo is None:\n        expires = expires.replace(tzinfo=timezone.utc)' \
-  $'    if False:\n        pass'
+  '    expires = como_utc(expires)' '    pass'
 sabotaje $M "cuenta el usuario y no su organización" \
   "FAILED $T::test_la_organizacion_es_la_que_cuenta" \
   $'        if org:\n            return db_user, org' $'        if org:\n            return db_user, db_user'
