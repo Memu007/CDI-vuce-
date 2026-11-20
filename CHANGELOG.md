@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-20 · fix: un pedido lento de una cuenta ya no hace esperar a las demás (CONEXIONES-1-PRODUCTO)
+
+- La carga manual, sugerir NCM, la subida de clientes y las rutas que cobran sueltan la conexión a la base antes de esperar el cuerpo del pedido o la IA, así muchos pedidos lentos de una cuenta no dejan sin conexión a otra. La carga manual ya no puede perder una recarga hecha al mismo tiempo con créditos vencidos.
+
 ## 2026-11-20 · fix: con créditos vencidos, una recarga ya no choca con un guardado ni con MARIA (CONEXIONES-1-NOKEY)
 
 - Con los créditos extra vencidos, una recarga al mismo tiempo que un guardado o que una consulta a MARIA ya no termina en error ni deja la recarga sin acreditar. Siguen pendientes los choques del alta de un integrante con el guardado, cancelar y reactivar.

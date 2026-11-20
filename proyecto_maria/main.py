@@ -2291,6 +2291,17 @@ async def _vencer_y_guardar(db: AsyncSession, entidad):
             await db.rollback()
 
 
+async def _soltar_conexion(db: AsyncSession) -> None:
+    # Termina la transacción de lectura antes de esperar algo lento (el cuerpo,
+    # la IA, la lectura del archivo). Si la base se cayó, lo ya leído alcanza:
+    # close lo desprende, rollback lo vencería y leerlo sin await da 500.
+    try:
+        await db.commit()
+    except Exception as err:
+        logging.warning("db release before slow wait failed: %s", err)
+        await db.close()
+
+
 async def require_billing_vigente(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -2306,28 +2317,7 @@ async def require_billing_vigente(
     await _vencer_y_guardar(db, entidad)
     if not billing_service.tiene_acceso(entidad):
         raise HTTPException(status_code=402, detail=_detalle_402(entidad))
-    return db_user
-
-
-async def require_active_billing(
-    request: Request,
-    user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Dependencia: estado vigente y cupo del plan (402 si no). Mira el tope
-    sin bloquear: las rutas que cuentan lo vuelven a mirar con la cuenta
-    bloqueada, en la misma transacción que cuentan.
-    """
-    result = await db.execute(select(User).where(User.username == user["username"]))
-    db_user = result.scalars().first()
-    if not db_user:
-        raise HTTPException(status_code=401, detail="Usuario no encontrado")
-
-    entidad, _ = await _get_billing_entity(db, db_user)
-    await _vencer_y_guardar(db, entidad)
-    ok, reason = billing_service.can_create_operation(entidad)
-    if not ok:
-        raise HTTPException(status_code=402, detail=_detalle_402(entidad, reason))
+    await _soltar_conexion(db)
     return db_user
 
 
@@ -3756,7 +3746,7 @@ async def create_manual_operation(
     request: Request,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    db_user: User = Depends(require_active_billing),
+    _cobro=Depends(require_billing_vigente),
 ):
     """Crea una operación cargada manualmente (sin PDF/Excel).
 
@@ -7185,6 +7175,7 @@ async def analyze_client_migration(
         )
     )
     existing_clients = existing_result.scalars().all()
+    await _soltar_conexion(db)
     mapper = GeminiMigrationHeaderMapper(username=user["username"])
     try:
         # Con tiempo máximo, como leer un PDF (EXCEL-1).
@@ -7224,7 +7215,6 @@ async def analyze_client_migration(
     db.add(batch)
     try:
         await db.commit()
-        await db.refresh(batch)
     except Exception as exc:
         await db.rollback()
         logging.exception("analyze_client_migration staging failed")
@@ -10467,6 +10457,7 @@ async def sugerir_ncm(
         # (RENDIMIENTO-1). Si no contesta a tiempo, se sigue sin sus sugerencias.
         import asyncio
         limite = _segundos_de_entorno("NCM_GEMINI_TIMEOUT_S", 30.0)
+        await _soltar_conexion(db)
         try:
             de_gemini = await asyncio.wait_for(
                 asyncio.to_thread(_suggest_ncm_with_gemini, descripcion, 5 - len(sugerencias)),
