@@ -1107,3 +1107,17 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   la tarea de log) no tumba el `soltar()` viejo, así que el mecanismo queda incompleto. Se pide un
   párrafo en PRODUCTO; si no, riesgo abierto.
 - D231 (a). Lo de PRODUCTO que estaba sólo acá pasó a `PARA-DEV.md`, Pieza 2.
+
+## 2026-11-20 18:46 UTC — Panel de admin: ver usuarios y darles créditos
+
+- Emi, 20/11: «Quiero ver usuarios y darles créditos desde el panel». Entra al roadmap como dos
+  piezas (consejero): ADMIN-USUARIOS-1 (ver) a MARIA ya; ADMIN-CREDITOS-1 (dar) espera.
+- Hoy: `/dev/dashboard` y `admin_router.py` están detrás de `require_admin`, sin usuarios ni créditos.
+  Una recarga pagada suma `TOPUP_OPS` (10) al saldo y pone el vencimiento de todo el saldo a 30 días;
+  el tope es `EXTRA_OPS_MAX` (100). El saldo de una integrante de estudio es el del estudio.
+- Dar créditos espera a CONEXIONES-1-PRODUCTO porque esa pieza cambia el candado de la cuenta en
+  `main.py`; se construye sobre su SHA final y con ese candado.
+- Supuesto, sin preguntar: sólo dar, no quitar; a una integrante de estudio se le carga al estudio.
+- A Emi, con recomendación: ¿vencen como los comprados (rec. sí, 30 días)? ¿rige el tope de 100
+  (rec. sí)? ¿queda registro de quién, a quién, cuánto y por qué (rec. sí; tabla nueva, copia de la
+  base al publicar)?
