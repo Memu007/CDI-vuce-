@@ -140,7 +140,7 @@ class Client(Base):
     notes = Column(Text, nullable=True)
     favorite = Column(Boolean, default=False)
 
-    default_origin = Column(String(3), default="CN")
+    default_origin = Column(Text, default="CN")
     preferred_currency = Column(String(3), default="USD")
     auto_ncm_enabled = Column(Boolean, default=True)
     # Fecha de inicio de actividad del importador (formato ISO YYYY-MM-DD).

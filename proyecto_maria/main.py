@@ -577,7 +577,7 @@ async def _migrate_sync_clients_columns():
         ("address", "TEXT"),
         ("notes", "TEXT"),
         ("favorite", "BOOLEAN DEFAULT FALSE"),
-        ("default_origin", "VARCHAR(3) DEFAULT 'CN'"),
+        ("default_origin", "TEXT DEFAULT 'CN'"),
         ("preferred_currency", "VARCHAR(3) DEFAULT 'USD'"),
         ("auto_ncm_enabled", "BOOLEAN DEFAULT TRUE"),
         ("fecha_inic_activ", "VARCHAR(10)"),
@@ -1083,7 +1083,7 @@ async def _migrate_clients_email_nullable():
                     address TEXT,
                     notes TEXT,
                     favorite BOOLEAN DEFAULT 0,
-                    default_origin VARCHAR(3) DEFAULT 'CN',
+                    default_origin TEXT DEFAULT 'CN',
                     preferred_currency VARCHAR(3) DEFAULT 'USD',
                     auto_ncm_enabled BOOLEAN DEFAULT 1,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -1309,8 +1309,8 @@ async def _migrate_widen_pieza_column():
 
 
 async def _migrate_catalogo_sin_tope():
-    """Lleva a text las columnas del catálogo y los orígenes de la memoria y de los ítems. Si falla, el
-    arranque se detiene: con el tope viejo, guardar-uso respondería sin guardar."""
+    """Lleva a text las columnas del catálogo y los orígenes de la memoria, de los ítems y del cliente. Si
+    falla, el arranque se detiene: con el tope viejo, guardar-uso respondería sin guardar."""
     from proyecto_maria.database.connection import engine, IS_SQLITE
 
     if IS_SQLITE:
@@ -1319,7 +1319,8 @@ async def _migrate_catalogo_sin_tope():
     # contrario, y tomarlas juntas puede trabarse con él.
     for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "origen", "vendor_nombre")),
                             ("client_product_history", ("origen_frecuente",)),
-                            ("operation_items", ("origen",))):
+                            ("operation_items", ("origen",)),
+                            ("clients", ("default_origin",))):
         async with engine.begin() as conn:
             # Si otra conexión tiene tomada la tabla, falla rápido y el reinicio
             # lo vuelve a intentar, en vez de colgar el arranque.
@@ -7473,6 +7474,13 @@ def _textos_de_arriba_guardables(cuerpo):
         elif clave in _TEXTOS_DEL_CLIENTE and not isinstance(valor, str):
             raise HTTPException(status_code=400, detail=f"{clave} tiene que ser texto.")
         limpio[clave] = _guardable_en_pg(valor) if isinstance(valor, str) else valor
+    if "default_origin" in limpio:
+        from proyecto_maria.core.despacho_lector import origen_para_catalogo
+
+        origen, problema = origen_para_catalogo(limpio["default_origin"])
+        if problema:
+            raise HTTPException(status_code=400, detail=problema)
+        limpio["default_origin"] = origen
     return limpio
 
 
@@ -7527,7 +7535,7 @@ async def create_cliente(
                 detail=f"Ya tenés un cliente con el email {email}",
             )
 
-    default_origin = str(client.get("default_origin", "")).strip().upper()[:3] or None
+    default_origin = client.get("default_origin")
     preferred_currency = str(client.get("preferred_currency", "")).strip().upper()[:3] or None
     auto_ncm_enabled = client.get("auto_ncm_enabled")
     if auto_ncm_enabled is None:
@@ -7605,8 +7613,7 @@ async def update_cliente(
     if "favorito" in client_data:
         client.favorite = bool(client_data.get("favorito"))
     if "default_origin" in client_data:
-        val = str(client_data.get("default_origin", "")).strip().upper()[:3]
-        client.default_origin = val or None
+        client.default_origin = client_data["default_origin"]
     if "preferred_currency" in client_data:
         val = str(client_data.get("preferred_currency", "")).strip().upper()[:3]
         client.preferred_currency = val or None

@@ -2,6 +2,296 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## ORIGEN-2 sobre `0d7401ed` (2026-11-20 01:50 UTC)
+
+**Resultado.** Los seis puntos se cumplen en `0d7401ed`, contra la base `4fe296d4`.
+- `producto +44/−42`. chequeo-6 da dos `AVISO`. Abajo va su salida entera, con el porqué de cada uno.
+- Es migración: corrí los sabotajes con Postgres descartable, `/code-review` alto, un adversario Opus
+  alto y `/security-review`.
+- Antes de publicar hace falta la copia de la base que pediste. No la hice: es producción.
+- **Lo que decidís vos:**
+  - **D276.** Un alta sin origen se guarda «CN». Viene del modelo y ya era así.
+  - **D277.** Un recorte viejo que es la sigla de otro país se ve como ese país: «EST» se ve
+    «440 · ESTONIA».
+  - Los dos van en «Decisiones», abajo.
+
+## Qué cambió
+
+**Servidor** (`main.py`, `models.py`).
+- El alta y la edición pasan el origen por `origen_para_catalogo`, el validador del catálogo, dentro
+  de `_textos_de_arriba_guardables`. Las dos rutas usan esa función, así que el chequeo está una vez.
+- Un país se guarda como se escribió: nombre, código o etiqueta. Los espacios se juntan y una sigla
+  de dos letras pasa a mayúsculas.
+- Lo que no es un país da 400 con «No reconozco el origen «X»: usá el nombre o el código del país.» y
+  no toca la fila.
+- Vacío o `null`: la edición lo deja vacío y el alta toma «CN» del modelo (D276).
+- La columna pasa a `text`:
+  - el modelo;
+  - las columnas que suma `_migrate_sync_clients_columns`;
+  - la reconstrucción de SQLite;
+  - en Postgres, `_migrate_catalogo_sin_tope`, que ya lleva a `text` las columnas del catálogo. Suma
+    `("clients", ("default_origin",))` con el mismo `lock_timeout` y el mismo reintento.
+
+**Pantalla** (`clientes.js`, `app_v2.css`, `dashboard_v2.html`).
+- El selector de diez siglas pasa a un campo de texto con la tabla entera (308 países) en un
+  `datalist`. Va en su propio renglón (supuesto 2).
+- Al abrir, el campo muestra lo guardado con su `etiqueta`. Si no se toca, el origen no se manda y
+  queda como estaba: «CN» no se reescribe «310 · CHINA».
+- La comparación es con lo que muestra el campo, no con lo guardado: el campo pierde los saltos de
+  línea. Un «A↵B» de antes se mandaba «AB» y daba 400 al guardar otro dato. Lo encontró
+  `/code-review`.
+- La etiqueta de arriba y «Origen habitual» usan `CDI.paisesMaria.etiqueta`, escapadas.
+- La etiqueta de arriba:
+  - va sin mayúsculas forzadas y en un renglón;
+  - si no entra, se corta con «…» y el código queda entero;
+  - el contenedor de las etiquetas puede bajar la moneda a otro renglón y no pasa del ancho de la
+    ficha.
+
+## Los seis puntos
+
+1. **Nombre o código, validado como en el catálogo; lo que no es país dice por qué.**
+   - Lo cubren `tests/test_origen2.py`, por alta y por edición:
+     - «BRASIL», «Brasil», «Holanda», «países  bajos» y dos etiquetas (una de 54 caracteres) se
+       guardan enteros;
+     - «310», «0434», «ARG», «cn» y «  br » también se guardan;
+     - «Narnia», «tierra media», «CHI», «HOL», «XX» y «<b>x</b>» dan 400 con el mensaje exacto, y no
+       se crea ni se cambia nada.
+   - En la pantalla, `escribir` de `pantalla_origen2.js`:
+     - «Narnia» muestra el mensaje en el formulario, que queda abierto, y «CN» no cambia;
+     - «Brasil» se guarda «Brasil» y se ve «203 · BRASIL»;
+     - el alta con «Países Bajos» se ve «423 · PAISES BAJOS».
+   - Sobre la base, el caso da «2 failed, 1 passed». Pasa el de editar otro dato, porque la base
+     tampoco mandaba el origen sin tocarlo; ese caso cuida el código nuevo (sabotaje 2d).
+2. **La ficha con código y nombre; un renglón; sin mayúsculas; capturas.**
+   - `fichaDeCadaPais` guarda cada uno de los 308 códigos. En cada ancho de disposición (1280, 841,
+     721, 641, 601, 561, 521, 481 y 320 px) mira:
+     - la etiqueta de arriba en un renglón y adentro de la ficha, sin mayúsculas forzadas;
+     - si se corta, con «…» y el código entero;
+     - los seis orígenes corrientes (Emiratos, China, Países Bajos, Estados Unidos, Japón y Vietnam)
+       enteros desde 400 px y su «Origen habitual» en un renglón.
+   - `guardarOtroDato`: «CN», «Holanda», «CHI», «HOL», «A↵B», «tierra media» y un `<img onerror>`,
+     sembrados en la base, se ven con su etiqueta o como quedaron. El formulario los muestra igual,
+     guardar las notas no los toca y el HTML no corre.
+   - `campoDelFormulario`: el campo ofrece 308 países; los corrientes entran enteros de 1280 a 481 px
+     y el campo queda adentro del formulario a todos los anchos.
+   - Capturas a 960 y 1280: `docs/pm/capturas/origen-2-960.png` y `origen-2-1280.png`.
+3. **Migración en Postgres descartable** (`scripts/testing/origen2_postgres.py`, con
+   `con_pg16.sh`).
+   - Siembra con el esquema de `4fe296d4` (`character varying(3)`) cinco clientes: «CN», NULL, «»,
+     «CHI» y «HOL».
+   - Arranca dos veces la app de esta rama. En cada arranque, la columna es `text` y los cinco quedan
+     iguales.
+   - Después, por la API:
+     - la edición guarda «BRASIL» entero;
+     - el alta guarda entera la etiqueta de 54 caracteres, que en `VARCHAR(3)` Postgres rechaza;
+     - «Narnia» da 400 sin tocar la fila;
+     - editar otro dato deja «CHI».
+4. **Negativo en el mismo SHA con el recorte de vuelta.** El sabotaje 0 de `origen2.sh` pone de vuelta
+   las líneas de la base, palabra por palabra:
+   - en Postgres, el alta y la edición dan rojo;
+   - en los casos, alta y edición dan «AssertionError: BRASIL».
+5. **`e2e_maria.sh` verde sobre `0d7401ed`.** Abajo, con el pytest entero.
+6. **Afuera.** La calculadora y `calculadora.js:112`, en riesgos. No toqué código.
+
+## Commits
+
+| commit | qué |
+|---|---|
+| `b6c22ac9` fix | el origen se valida y se guarda entero; la columna a text; campo con la tabla; la ficha con su etiqueta; CHANGELOG |
+| `6e46e747` test | `test_origen2.py`, `origen2_postgres.py`, `pantalla_origen2.js`, `sabotajes/origen2.sh` |
+| `55060c5a` fix | el formulario compara con lo que muestra el campo; sale un `max-width` repetido |
+| `fe3c33e1` test | «A↵B» en lo guardado; las anclas de los sabotajes en la línea de hoy |
+| `b2b9cc29` docs | las capturas a 960 y 1280 |
+| `0d7401ed` test | la frase de un sabotaje (abajo, «Un rojo con otra frase»). **Lo que se entrega** |
+| `7dae3c2d` merge | tu rama hasta `b73d96ec` (el acta) |
+| informe | el commit siguiente |
+
+## Pruebas, sobre `0d7401ed`
+
+| qué | resultado |
+|---|---|
+| `sabotajes/origen2.sh 0d7401ed`, con Postgres 16 descartable | BASE «3 passed», «OK: pantalla del origen habitual», «Postgres: fallas: 0»; 25 «ROJO», «sabotajes sin rojo: 0», rc=0, de 01:25:46 a 01:46:41 UTC (abajo, entera) |
+| pytest entero, desde un worktree limpio | «6231 passed, 110 skipped, 3 xfailed, 117 warnings in 1266.57s (0:21:06)», rc=0; 0 «dejó». Hay 11 avisos «Event loop is closed» de aiosqlite, en tests de cobro, sesión, org y entradas: ninguno es de esta pieza, y es el aviso que ya conocés |
+| `e2e_maria.sh`, en el mismo worktree | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.», rc=0, worktree sin cambios |
+| `origen2_postgres.py` solo | 8 «OK», «fallas: 0» (salida en el punto 3) |
+| `tests/test_origen2.py` | «3 passed»; en la base `4fe296d4`, «2 failed, 1 passed» (alta y edición) |
+| pantalla con Inter | «OK ficha: 308 países con código y nombre, la etiqueta en un renglón y todo adentro a 1280, 841, 721, 641, 601, 561, 521, 481, 320 px»; «OK guardar otro dato: «CN», «Holanda», «CHI», «HOL», «A↵B», «tierra media», «<img src=x onerror="window.__xss=1">» se ven con su etiqueta o como se guardaron, y quedan»; «OK formulario: 308 países para elegir; los corrientes, enteros en el campo a 1280, 841, 721, 641, 601, 561, 521, 481 px y adentro a 1280, 841, 721, 641, 601, 561, 521, 481, 320 px»; «OK formulario: «Narnia» dice por qué y no guarda; «Brasil» se guarda así y se ve «203 · BRASIL»»; «OK formulario: el alta con «Países Bajos» se guarda así y se ve «423 · PAISES BAJOS»» |
+| pantalla con Liberation Sans (métricas de Arial) | las mismas cinco líneas «OK» y «OK: pantalla del origen habitual», rc=0, sobre `7dae3c2d` (el mismo producto) |
+| chequeo-6 `4fe296d4 0d7401ed` | abajo, entera |
+
+La pantalla con Inter y las capturas corrieron sobre `fe3c33e1`. `0d7401ed` sólo cambia una frase de
+`sabotajes/origen2.sh`, así que el producto y la pantalla son los mismos. Las capturas muestran «Origen 203 · BRASIL»
+en un renglón y sin mayúsculas forzadas.
+
+**Un rojo con otra frase.** La primera corrida de los sabotajes fue sobre `fe3c33e1` y dio «sabotajes
+sin rojo: 1», con 24 «ROJO» y esta línea:
+```
+ROJO? | lo que no entra se dibuja afuera: rojo (salida 1), pero sin «lo que no entra en la etiqueta se sale o se corta sin «…»»
+FALLA: «109» a 320 px: el origen se sale de la ficha
+```
+- El rojo era bueno; la frase esperada, no. Sin `overflow: hidden`, la etiqueta es un ítem flex que
+  crece al ancho de su texto y sale de la ficha, así que salta antes el chequeo de «se sale de la ficha».
+- Antes lo frenaba el `max-width` de la etiqueta, que saqué en `55060c5a`.
+- `0d7401ed` cambia sólo esa frase. Corté las puertas, que iban sobre `fe3c33e1`, y las relancé todas
+  sobre `0d7401ed`.
+
+**Salida de los sabotajes sobre `0d7401ed`, entera:**
+```
+BASE  | casos: ======================== 3 passed, 5 warnings in 3.46s =========================
+BASE  | pantalla: OK: pantalla del origen habitual
+BASE  | Postgres: fallas: 0
+ROJO  | el alta recorta a 3: «FALLA | el alta guarda entero un origen de 54»
+ROJO  | la edición recorta a 3: «FALLA | la edición guarda «BRASIL» entero»
+ROJO  | el alta recorta a 3: «AssertionError: BRASIL», 1 casos
+ROJO  | la edición recorta a 3: «AssertionError: BRASIL», 1 casos
+ROJO  | la migración no toca el cliente: «FALLA | primer arranque: el origen es text»
+ROJO  | lo que no es un país se guarda: «AssertionError: Narnia», 2 casos
+ROJO  | lo escrito se guarda sin normalizar: «AssertionError: países  bajos», 2 casos
+ROJO  | lo vacío no pasa por el validador: «AssertionError», 2 casos
+ROJO  | guardar otro dato borra el origen: «AssertionError», 1 casos
+ROJO  | la etiqueta de arriba muestra lo guardado: «FALLA: la ficha muestra «Origen 101» y «101 · BURKINA FASO»»
+ROJO  | la etiqueta de arriba muestra HTML: «no «<img src=x»
+ROJO  | «Origen habitual» muestra lo guardado: «FALLA: la ficha muestra «Origen 101 · BURKINA FASO» y «101»»
+ROJO  | la etiqueta de arriba en mayúsculas: «la ficha fuerza las letras del origen»
+ROJO  | la etiqueta de arriba baja de renglón: «la etiqueta del origen baja de renglón»
+ROJO  | lo que no entra se dibuja afuera: «el origen se sale de la ficha»
+ROJO  | lo que no entra se corta sin «…»: «lo que no entra en la etiqueta se sale o se corta sin «…»»
+ROJO  | las etiquetas de arriba crecen fuera de la ficha: «el origen se sale de la ficha»
+ROJO  | la moneda le quita lugar al origen: «no entra entera en la etiqueta»
+ROJO  | el formulario manda el origen aunque no se toque: «FALLA: guardar otro dato reescribe «CN» → «310 · CHINA»»
+ROJO  | el formulario muestra lo guardado: «FALLA: el formulario muestra «CN» para «CN»»
+ROJO  | el formulario compara con lo guardado y no con lo que muestra: «FALLA: guardar otro dato con «A↵B» guardado da 400»
+ROJO  | el formulario no ofrece los países: «FALLA: el formulario ofrece 0 países»
+ROJO  | el campo no está unido a la lista: «FALLA: el formulario ofrece 0 países»
+ROJO  | el origen comparte renglón con la moneda: «FALLA: «331 · EMIRATOS ARABES,UNID» no entra en el campo de origen a 1280 px»
+sabotajes sin rojo: 0
+```
+
+## Decisiones
+
+- **D276. Un alta sin origen se guarda «CN».**
+  - Viene del `default="CN"` del modelo y ya era así en la base.
+  - La pantalla muestra el campo vacío y la ficha después dice «Origen 310 · CHINA».
+  - Lo señalaron `/code-review` y el adversario. Choca con «no se guarda en silencio» de tu punto 1.
+  - Opciones:
+    - **(a) dejarlo.** Es mi recomendación para esta pieza: no es un recorte;
+    - **(b) que el alta guarde vacío.** Es una línea, pero cambia lo que ya esperan los clientes que se
+      dan de alta sin origen;
+    - **(c) que el formulario de alta muestre «310 · CHINA»** de entrada, para que se vea antes de
+      guardar.
+- **D277. Un recorte viejo que es la sigla de otro país se ve como ese país.**
+  - La fila no cambia (punto 3). Lo que cambia es que la ficha ahora le pone código y nombre, y el
+    servidor lo acepta como válido.
+  - Ejemplos: «Estados Unidos» recortado queda «EST» y se ve «440 · ESTONIA»; «Austria» → «AUS» →
+    «501 · AUSTRALIA»; «Argelia» → «ARG» → «200 · ARGENTINA».
+  - De los 308 nombres de la tabla recortados a 3, 36 se ven como otro país (uno es Turquía con su
+    otro código), 66 como el suyo y 206 como quedaron («CHI», «HOL»). Lo saqué con
+    `CDI.paisesMaria` sobre la tabla.
+  - No hay forma de distinguir un «EST» recortado de un «EST» escrito.
+  - Para que haya filas así, alguien tuvo que mandar un nombre a la API: el selector viejo mandaba
+    siglas de dos letras, y la importación no escribe este campo (lo revisó el adversario). Así que
+    espero que no haya ninguna.
+  - Para saberlo hay que mirar producción, y yo no la toco. La consulta de sólo lectura, probada en
+    Postgres descartable (con «EST» dos veces da `[('EST', 2)]`):
+    ```sql
+    SELECT default_origin, count(*) FROM clients WHERE length(default_origin) = 3 GROUP BY 1 ORDER BY 1;
+    ```
+  - Opciones:
+    - **(a) dejarlo como riesgo.** Es mi recomendación si la consulta da vacío o sólo siglas de tres
+      letras escritas así;
+    - **(b) si aparecen recortes, una pieza aparte** que los corrija con el dato real.
+
+## Supuestos
+
+1. El selector pasa a un campo de texto con `datalist`. Es la forma en que se escribe «el nombre o el
+   código», y las 308 opciones pasan la validación del servidor.
+2. El origen y la moneda iban en un renglón de dos columnas. Ahí el campo era angosto: a 1280 px no
+   entraban 65 etiquetas, entre ellas Emiratos y Japón. Ahora cada uno va en su renglón. Lo cuida el
+   sabotaje 5f.
+3. «Origen habitual» baja de renglón con un nombre largo, como los demás datos de la grilla, y se lee
+   entero. Los seis corrientes quedan en un renglón.
+
+## Riesgos
+
+1. **La calculadora** (`/api/ncm/calcular`) recorta el origen a 3: con «BRASIL» dejaría de contar como
+   Mercosur. Su pantalla ofrece sólo siglas de dos letras. Además, `calculadora.js:112` no precarga un
+   origen guardado como nombre o etiqueta. Es tu punto 6; no lo toqué.
+2. **La migración de `clients` en el arranque.**
+   - Usa el mismo `lock_timeout` de 5 s que las otras tres tablas.
+   - El adversario lo reprodujo en su Postgres descartable: con otra sesión que tenía `clients` en una
+     transacción abierta, el arranque se cortó a los 5,0 s con `LockNotAvailableError`.
+   - El código prevé que el reinicio lo vuelva a intentar. Pero `clients` es la tabla más leída: en el
+     despliegue, una transacción vieja que la tenga abierta corta el arranque hasta que se libere.
+   - Va con la copia de la base.
+3. **Cuántas etiquetas se cortan en la ficha.** Con Inter, cortadas con «…» y el código entero:
+   1280:4 841:36 721:5 641:12 601:14 561:17 521:23 481:37 320:46. Con Liberation Sans: 1280:4 841:36 721:6 641:13 601:14 561:17 521:26 481:38 320:45. «Origen habitual» en dos renglones, con Inter: 1280:7 841:38 721:0 641:6 601:7 561:10 521:13 481:15 320:40.
+4. **A 320 px Emiratos se corta** en la etiqueta y en el campo. El código queda a la vista.
+5. **Los tipos del modelo y de `_migrate_sync_clients_columns`** no tienen sabotaje propio. En Postgres
+   los cubre la migración, que lleva a `text` cualquier columna con tope, y su sabotaje (1) da rojo. En
+   SQLite el largo no se hace cumplir.
+6. **Ya estaban, no son de esta pieza** (de `/code-review` y del adversario):
+   - la moneda se sigue recortando a 3 sin aviso («Dólar» → «DÓL»), y un select sin la moneda guardada
+     la borra al guardar;
+   - la reconstrucción de `clients` en SQLite (`_migrate_clients_email_nullable`) no copia
+     `fecha_inic_activ` ni `column_mapping`. Sólo corre en una base SQLite vieja con email
+     obligatorio.
+   - Te los propongo para la cola.
+7. **chequeo-6, los dos `AVISO`:**
+   - el primero es la función anónima que envuelve todo `clientes.js`;
+   - el otro, `init`, suma una sola línea, sin rama: llenar el `datalist` donde se toman los demás
+     campos del formulario.
+8. **Lo que no corrí:** navegadores reales de Windows y macOS, y la copia de la base de producción.
+
+## Revisión
+
+- **`/code-review` alto:** el salto de línea (arreglado, `55060c5a`), D276 y lo que ya estaba (riesgo
+  6).
+  - No atendí, con razón:
+    - el orden de carga de `paises_maria.js`: `clientes.js` ya lo usaba en el catálogo;
+    - el mensaje que repite lo escrito sin tope: el catálogo hace lo mismo, y sale con `textContent`.
+- **Adversario Opus alto:** D277, el riesgo 2 y lo que ya estaba. No encontró otros caminos que
+  escriban `default_origin`.
+- **`/security-review`:** sin hallazgos.
+  - Las dos vistas escapan: `clientes.js:1073` y `:1239`.
+  - El error sale con `textContent`, y el `datalist` sale de la tabla fija.
+  - La edición sigue pasando por `_get_owned_client`.
+
+## chequeo-6
+
+```
+chequeo-6 4fe296d4..0d7401ed: avisos para mirar, no un veredicto
+producto +44/−42
+arnés +613/−0
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/database/models.py: 617 → 617
+  proyecto_maria/main.py: 12280 → 12287
+  proyecto_maria/static/v2/screens/clientes.js: 2213 → 2219
+  AVISO creció una función de más de 150: proyecto_maria/static/v2/screens/clientes.js:12 <anónima> 2202 → 2208, 1 en su propio cuerpo (§6: lo nuevo va aparte)
+  AVISO creció una función de más de 150: proyecto_maria/static/v2/screens/clientes.js:66 <anónima>.init 167 → 168, 1 en su propio cuerpo (§6: lo nuevo va aparte)
+avisos: 2
+```
+Los dos `AVISO` tienen su porqué en el riesgo 7.
+
+## Comandos para reproducir
+
+```bash
+VENV=/ruta/al/venv
+# 1. sabotajes con Postgres 16 descartable (21 min) → BASE «3 passed», «OK: pantalla del origen habitual»,
+#    «Postgres: fallas: 0»; 25 «ROJO», «sabotajes sin rojo: 0»
+PY=$VENV/bin/python scripts/testing/con_pg16.sh bash -c 'PG_URL="$BACKUP1A_PG_URL" scripts/testing/sabotajes/origen2.sh 0d7401ed' | grep -E "^(BASE|ROJO|VERDE|ROTO|NO CORRIDO)|sin rojo"
+# 2. la migración sola (1 min)                       → 8 «OK», «fallas: 0»
+PY=$VENV/bin/python scripts/testing/con_pg16.sh bash -c '"$PY" -I scripts/testing/origen2_postgres.py "$BACKUP1A_PG_URL"' 2>&1 | grep -E "^(OK|FALLA)|fallas"
+# 3. el caso (5 s)                                   → «3 passed»
+env -u DATABASE_URL -u ENVIRONMENT GEMINI_API_KEY=test-key PYTHONPATH=. $VENV/bin/python -B -m pytest -q --no-cov -p no:cacheprovider tests/test_origen2.py | tail -1
+# 4. §6                                              → «producto +44/−42», «avisos: 2»
+python3 docs/pm/herramientas/chequeo-6.py 4fe296d4 0d7401ed
+```
+- Corrí el 1 desde un guion, con `PY` puesto también adentro del `bash -c`. Comprobé aparte que `PY`
+  llega adentro de `con_pg16.sh`.
+- El 2, el 3 y el 4 los corrí tal cual, y dieron esa salida.
+- Para D277, la consulta de sólo lectura en producción no es para correr acá: es la de arriba.
+
 ## Vuelta de CATALOGO-PAIS sobre `8140f496` (2026-11-19 23:45 UTC)
 
 **Resultado.** Los dos puntos de tu devolución se cumplen en `8140f496`.
@@ -225,4 +515,4 @@ línea igual.
    - Navegadores reales de Windows y macOS.
    - Ventanas más angostas que el piso (460 px y 320 px): ahí la base también baja de renglón.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`; rutina trig_01Ukttby1fc4sGVQfSn1jC9U (/respondio). PM principal session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `75a5fd30`. Aceptadas: las de antes (… PAISES-NOMBRES (D266) sobre `fa89e917`; ORIGEN-ETIQUETA (D261) sobre `5a28c13c`; CATALOGO-4 sobre `f5395b9f`). Pieza activa: CATALOGO-PAIS, vuelta entregada sobre `8140f496` (base `695a5377`; la entrega anterior, `4904e5a1`), espero el veredicto y D275. Después, sólo con CATALOGO-PAIS aceptada: ORIGEN-2 (migración VARCHAR(3) del origen habitual, revisión fuerte, calculadora fuera; su punto 3 suma que las filas ya cortadas en 3, «CHI» y «HOL», quedan igual, como datos en el caso de la migración). Próxima D: D276. Lecciones (además de las del historial de este archivo): el negativo de un arreglo va en el mismo SHA con el arreglo vaciado; cada número del informe sale de un log; un ancho en `ch` depende de la fuente: medir con Inter y con Liberation Sans (`fuente/arial.conf`); una regla de pantalla se mide en cada ancho de disposición, no sólo a 1280; un sabotaje que falla en el primer elemento de una lista no prueba los de atrás: el más exigente va primero; no editar `scripts/` mientras corre un guion de sabotaje: cortar las puertas y relanzarlas sobre el SHA nuevo; `catalogo3.sh` tarda ~80 min, sin tope de 3600 s; puertas con `setsid nohup`; horas, sólo de `date -u`; los comandos para la PM se prueban antes de escribirlos. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe. Letra ancha: tabla U+FF01..FF5E, no NFKC («№» da Noruega).
+/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`; rutina trig_01Ukttby1fc4sGVQfSn1jC9U (/respondio). PM principal session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `b73d96ec`. Aceptadas: las de antes (… ORIGEN-ETIQUETA (D261) sobre `5a28c13c`; CATALOGO-4 sobre `f5395b9f`; CATALOGO-PAIS sobre `8140f496`, D275 (a)). Pieza activa: ORIGEN-2, entregada sobre `0d7401ed` (base `4fe296d4`), espero el veredicto y D276–D277. Afuera, decidido: la calculadora recorta a 3 y `calculadora.js:112`, como riesgo sin código. Próxima D: D278. Lecciones (además de las del historial de este archivo): el negativo de un arreglo va en el mismo SHA con el arreglo vaciado; cada número del informe sale de un log; un ancho en `ch` depende de la fuente: medir con Inter y con Liberation Sans (`fuente/arial.conf`); una regla de pantalla se mide en cada ancho de disposición, no sólo a 1280; un sabotaje que falla en el primer elemento de una lista no prueba los de atrás: el más exigente va primero; sacar una regla de CSS puede cambiar qué chequeo pone el rojo de otro sabotaje: relanzar el guion entero después; no editar `scripts/` mientras corre un guion de sabotaje: cortar las puertas y relanzarlas sobre el SHA nuevo; un campo de texto pierde los saltos de línea de lo que se le pone; puertas con `setsid nohup`; horas, sólo de `date -u`; los comandos para la PM se prueban antes de escribirlos. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe. Letra ancha: tabla U+FF01..FF5E, no NFKC («№» da Noruega).
