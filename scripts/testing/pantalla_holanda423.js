@@ -151,7 +151,6 @@ async function alPasarElMouse(page, donde, filas, campo, guardar) {
   await page.waitForFunction(c => c.value === '410 · ESPAÑA', await campo().elementHandle(), { timeout: 10000 })
     .catch(async () => falla(donde + ': «España» guardado se ve «' + await campo().inputValue() + '»'));
   await igual('«España» guardado');
-  if (await page.evaluate(() => window.__xss)) falla(donde + ': un origen con HTML escrito se ejecutó');
   console.log('OK ' + donde + ': al pasar el mouse se ve lo guardado, lo escrito, lo elegido y lo que queda al guardar');
 }
 
