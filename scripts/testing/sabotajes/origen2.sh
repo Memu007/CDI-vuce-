@@ -79,7 +79,7 @@ sabotaje pantalla $CSS "la etiqueta de arriba baja de renglón" "$ORIGEN_CSS" \
   "la etiqueta del origen baja de renglón"
 sabotaje pantalla $CSS "lo que no entra se dibuja afuera" "$ORIGEN_CSS" \
   '.cx-hero-tag.is-origen { text-transform: none; white-space: nowrap; text-overflow: ellipsis; }' \
-  "lo que no entra en la etiqueta se sale o se corta sin «…»"
+  "el origen se sale de la ficha"
 sabotaje pantalla $CSS "lo que no entra se corta sin «…»" "$ORIGEN_CSS" \
   '.cx-hero-tag.is-origen { text-transform: none; white-space: nowrap; overflow: hidden; }' \
   "lo que no entra en la etiqueta se sale o se corta sin «…»"
