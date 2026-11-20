@@ -16,7 +16,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-20 · fix: con créditos vencidos, una recarga ya no choca con un guardado ni con MARIA (CONEXIONES-1-NOKEY)
 
-- Con los créditos extra vencidos, una recarga al mismo tiempo que un guardado o que una consulta a MARIA ya no termina en error ni deja la recarga sin acreditar. Siguen pendientes los choques del alta de un integrante con el guardado, cancelar y reactivar.
+- Con los créditos extra vencidos, una recarga al mismo tiempo que un guardado o que una consulta a MARIA ya no termina en error ni deja la recarga sin acreditar. Siguen pendientes los choques de la carga manual de una operación con el guardado, cancelar y reactivar.
 
 ## 2026-11-20 · fix: el origen habitual del cliente acepta el nombre o el código del país (ORIGEN-2)
 
