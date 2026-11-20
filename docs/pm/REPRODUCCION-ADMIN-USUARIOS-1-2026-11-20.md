@@ -55,5 +55,9 @@ control; POST, PUT, PATCH y DELETE dan 405. No va al repositorio.
 - Postgres: no corrí los tests ni la ruta en PG16. Se apoya en la sonda de la Dev (las dos clases de
   columna de fecha, login real, base igual antes y después).
 - `panel_dev.sh` (6 de 6 en el informe): no lo corrí.
+- `/security-review`: no lo corrió la Dev antes (lo avisó después del veredicto) y yo no lo pedí al
+  revisar. Se lo pedí: corrido a las 20:22 sobre `e5d943e4..b06b47fa` (`2d10df8c`), sin hallazgos.
+  Comprobé dos de sus caminos (20:23): el router de admin se monta con `require_admin`
+  (`main.py:1689-1692`) y el diff no suma `innerHTML` en `dev_dashboard.html`. Puerta cerrada.
 - Puerta antes de que esta pieza entre en una candidata: la ruta de la lista sobre Postgres 16 con
   la candidata (`tests/conftest.py` fija SQLite, así que los tests no sirven para eso).

@@ -27,10 +27,13 @@ grave) y la suite completa desde worktree limpio (`6241 passed, 110 skipped, 3 x
   plan `NULL` sale `None`; en SQLite un `roles` con JSON roto da 500 en la lista): riesgo escrito,
   bajo.
 
-**Ahora no tenés pieza.** Lo tuyo que queda espera a alguien de afuera (ADMIN-CREDITOS-1 espera a
-la Técnica y a Emi; la lista de empaque, los TXT reales, la pregunta 6, el texto de Emi). Al leer
-esto: `merge` de mi rama, tu `/compact conservar` al día, y no arranques nada. Tu rutina quedó apagada; la
-prendo cuando te asigne. **Próxima D: D279.**
+**`/security-review` (pedido 20:19): leído, sin hallazgos (`2d10df8c`).** Comprobé dos caminos: el
+router de admin con `require_admin` (`main.py:1689-1692`) y ningún `innerHTML` nuevo en el panel.
+**`/security-review` de la candidata: leído (20:29), sin hallazgos (`44ecf6e2`).** Comprobé
+`_fetch_vendor_rows` (filtra por `owner_username`) y que el único `innerHTML` nuevo es uno. Ahora no
+tenés pieza: lo tuyo que queda espera a alguien de afuera (ADMIN-CREDITOS-1 espera a la Técnica y a
+Emi; la lista de empaque, los TXT reales, la pregunta 6, el texto de Emi). Tu rutina sigue apagada;
+te despierto por mensaje. **Próxima D: D279.**
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 
