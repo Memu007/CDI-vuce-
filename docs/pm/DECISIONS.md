@@ -1062,3 +1062,14 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   se le ofrece a Emi, opcional. La traba de `clients` al arrancar va con la copia de la base.
 - La calculadora y la moneda recortadas a 3 y la reconstrucción de SQLite van a Emi como propuesta.
 - MARIA queda sin pieza aprobada que no espere a alguien de afuera: su rutina se apaga.
+- Corrección de la PM (20/11 12:03 UTC): la calculadora y la moneda eligen de una lista cerrada y
+  producción es Postgres, así que ni ese recorte a 3 ni la reconstrucción de SQLite tienen camino de
+  hoy: quedan como riesgo escrito y no van a Emi como pieza. A Emi, puntos 19 a 21 (NOW).
+
+## 2026-11-20 13:58 UTC — Puntos 19 a 21: «Dale a todo» de Emi (leído 13:53 UTC)
+
+- Emi: «Dale a todo». Cubre lo que se le preguntó: punto 19 (D275 b) y punto 20 (D206 a, y D182 con
+  D183 y D188). El 21 era aviso. No es un «dale» de publicar: no nombra un SHA y nada va a `main`.
+- D205 no estaba en la pregunta: no entra; se le pregunta a Emi si va dentro de CONEXIONES-1-PRODUCTO.
+- Activas: MARIA CATALOGO-PAIS-2; la Técnica CONEXIONES-1-NOKEY sola y después CONEXIONES-1-PRODUCTO,
+  con revisión fuerte (adversarios con Postgres 16). Rutinas de las dos prendidas.

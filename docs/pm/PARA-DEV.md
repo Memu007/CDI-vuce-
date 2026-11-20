@@ -3,6 +3,46 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## Tarea activa: CONEXIONES-1, el arreglo de producto, en dos piezas (2026-11-20 13:56 UTC)
+
+**Sí de Emi (20/11, leído 13:53 UTC: «Dale a todo» al punto 20: D206 (a), y D182 con D183 y D188).**
+No es un «dale» de publicar. D205 (la renovación que deja `past_due`) **no** entra: sigue con Emi.
+Antes de tocar código: `merge` de mi rama y tu `/compact conservar` al día (estás cerca del umbral).
+Todo lo medido está en `REPRODUCCION-CONEXIONES-1-2026-11-12.md` (C, D, G, plan, H a K) y en tu plan
+`b60c30d4` (D200–D203 (a), decididas por la PM).
+
+### Pieza 1: CONEXIONES-1-NOKEY (D206 a), sola y primero
+
+- **Comportamiento:** con créditos extra vencidos, recarga + guardado y recarga + MARIA a la vez no
+  dan error ni dejan la recarga sin acreditar.
+- **Lo que tiene que dar, según H a K:** esos dos pares, 0 deadlocks y la recarga acreditada en la
+  misma ronda. Siguen rojos, y es lo esperado: los tres de alta (alta + guardado, + cancelar,
+  + reactivar), recarga + alta (D188) y las dos filas de renovación (D205). Si algo de esa lista
+  pasa a verde, o uno de los dos pares no, decilo con la salida.
+- **Prueba:** el caso 6 (el SQL que llega a Postgres después de que el aviso compiló el suyo) y la
+  carrera sin forzar de H, con el rojo una vez con el arreglo vaciado en el mismo SHA.
+
+### Pieza 2: CONEXIONES-1-PRODUCTO (D182, D183, D188), apenas entregues la 1
+
+Sobre la pieza 1. Comportamiento y pruebas; el cómo es tu plan (sugerencia, no criterio):
+- con 60 pedidos lentos de una cuenta, **otra** cuenta no espera más de ~1 s ni recibe errores, en
+  sugerir, subida de PDF, analyze y la carga manual (medidor de C y D, con cuota de producción);
+- una cuenta impaga recibe «falta pagar» sin que se lea su pedido entero (la memoria del 4×100 de G,
+  como hoy);
+- recarga + alta con créditos vencidos: 0 recargas perdidas (D188, con el detector de J);
+- un cliente que corta a mitad del cuerpo contesta como hoy (400), sin ERROR ni fila 500;
+- cada `commit` nuevo que suelta la conexión tiene su caso con la base caída (D202);
+- las dos filas de D205 siguen como hoy («cuenta mal»): no las arregles;
+- el diff propuesto del informe entra con `git apply --check`.
+
+### Revisión fuerte (las dos piezas; en la 1, en proporción a sus líneas)
+
+`/security-review`, adversarios **con Postgres 16** (el de D corrió con SQLite), la suite completa
+desde base limpia sobre el SHA que entregás, `e2e_maria.sh`, y un guion de sabotaje propio anclado en
+código. Adversarios sin red y con `GEMINI_API_KEY` vacía.
+
+**Próxima D: D231.**
+
 ## CI-TOPE: aceptada sobre `c721f7fc` (informe `a0299443`) e integrada (2026-11-17 00:50 UTC)
 
 Acta `REPRODUCCION-CI-TOPE-2026-11-17.md`. **Traé mi rama con `merge`.**
@@ -11,7 +51,6 @@ Acta `REPRODUCCION-CI-TOPE-2026-11-17.md`. **Traé mi rama con `merge`.**
 - Mi negativo: ningún paso de `ci.yml` trae otro tope (`grep` de `timeout`, `--max` y `pytest`).
 - La CI queda como no corrida: se ve en la próxima PR de publicación.
 
-Seguís esperando a Emi (D182, D206): no arranques otra cosa; te aviso yo. **Próxima D: D231.**
 
 ## Aviso: MARIA toca `test_sufijos2.py` y `sabotajes/sufijos2.sh` (2026-11-14 PM)
 
@@ -37,8 +76,6 @@ Acta `REPRODUCCION-GUARDA-VERSION-2026-11-13.md`, sección «Vuelta 2».
   Acepto también el riesgo del tope: bajarlo sólo trae falsas alarmas.
 - D230 sigue con Emi (ahora no; va a la cola con los otros `async for`).
 
-**Lo que sigue espera a Emi** (D182, D206): no arranques otra cosa;
-te aviso yo. **Próxima D: D231** (rango D228–D233).
 
 ## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
 
@@ -64,8 +101,7 @@ Integré con `merge` exactamente `9ecfd2ac`.
 - **Hallazgo menor:** el diff de tu informe no entra con `git apply` (el hunk
   de `main.py:10448` está cortado). Lo apliqué a mano. En el próximo, el diff
   propuesto va completo y probado con `git apply --check`.
-- **D182: a Emi, de día**, con mi recomendación de (a). Si dice que sí, la
-  pieza es tuya entera (la dependencia es una sola), con lo que traiga D.
+- D182: Emi dijo que sí el 20/11 (tarea activa, arriba).
 
 ## BORRADOR-1: aceptada sobre `c8733be` e integrada (2026-11-12 00:48 UTC)
 
