@@ -1097,3 +1097,13 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - Para PRODUCTO, antes de activarla: par recarga + cancelar/reactivar en el arnés,
   `conexiones1_creditos.py` «perdidos 10» como rojo a verde de D188, chequeo de SQL capturado con la
   cache caliente en los dos órdenes para cada candado nuevo, y que ese guion no fije GEMINI_API_KEY.
+
+## 2026-11-20 17:44 UTC — CONEXIONES-1-NOKEY: vuelta leída, se acepta con PRODUCTO
+
+- Vuelta `090609bc` + `05e61efa` (informe `77556d06`) está encima de commits de PRODUCTO: NOKEY se
+  acepta e integra con PRODUCTO sobre su SHA final. Decidido por la PM, con el consejero.
+- Corrido: `anclas_perdidas.py 05e61efa` 0 PERDIDA; `conexiones1_nokey.sh` rc=0, tres BIEN.
+- Intermitente: del arnés y no de la app; mi carrera forzada (1 s antes y después del `commit` de
+  la tarea de log) no tumba el `soltar()` viejo, así que el mecanismo queda incompleto. Se pide un
+  párrafo en PRODUCTO; si no, riesgo abierto.
+- D231 (a). Lo de PRODUCTO que estaba sólo acá pasó a `PARA-DEV.md`, Pieza 2.
