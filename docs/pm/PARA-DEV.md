@@ -3,6 +3,34 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## Devolución de CONEXIONES-1-NOKEY: `cobro_corte1.sh` perdió tres anclas (2026-11-20 14:46 UTC)
+
+**Va antes que CONEXIONES-1-PRODUCTO.** No es el veredicto de la pieza: los adversarios de la PM
+siguen corriendo sobre `331bae9f`, y D231 se contesta con el veredicto.
+
+- **Qué pasa.** Tu arreglo (`298e5fee`) cambió las dos `.with_for_update()` de `_cuenta_bloqueada`.
+  Esas líneas son las anclas de tres sabotajes de cobro de `scripts/testing/sabotajes/cobro_corte1.sh`
+  (`:430` «no se bloquea la fila del usuario», `:434` «… de la organización», `:438` «se cuenta con el
+  usuario leído antes del lock»). Hoy no pueden dar rojo: nada prueba que la cuenta siga bloqueada
+  mientras se cobra.
+- **Es de esta pieza, no ajena.** `anclas_perdidas.py 3874a1d2` no nombra `cobro_corte1.sh`;
+  `anclas_perdidas.py 298e5fee` da las tres PERDIDA. Tu informe las puso en «Observación, no es mía».
+- **La causa.** Tocaste líneas que anclan sabotajes de plata y no corriste los guiones que vigilan
+  esa función. La regla para esta pieza y para PRODUCTO, que toca más candados:
+  `anclas_perdidas.py` sobre la base y sobre tu SHA, y toda PERDIDA nueva se arregla en la misma
+  entrega.
+- **Criterio.**
+  - Las tres anclas reescritas sobre el código de hoy, no sobre un comentario.
+  - `cobro_corte1.sh` corrido sobre el SHA de la vuelta: esos tres sabotajes en ROJO por su razón,
+    ninguno ROTO, «BASE | el lock en verde».
+  - `anclas_perdidas.py <SHA>` sin PERDIDA que no esté en la base (las dos de `catalogo_largo2.sh`
+    son de MARIA y ya tienen su arreglo).
+  - Si cambia algo de `proyecto_maria/`, decilo: los adversarios corren sobre el producto de `331bae9f`.
+
+**Tu objeción sobre `limpieza1.sh`: tenés razón.** El criterio se lee «no lo nombra como PERDIDA»;
+las seis SIN ANCLA crean o borran archivos y son así por diseño. No hace falta tocar
+`anclas_perdidas.py`. Su línea de `sabotajes-conocidos.txt` sale cuando acepte la pieza.
+
 ## Vencido `limpieza1.sh`: reescribir el ancla (2026-11-20 14:07 UTC)
 
 Chica, en un commit aparte, **con tu próxima entrega** (no desplaza CONEXIONES-1-NOKEY).
