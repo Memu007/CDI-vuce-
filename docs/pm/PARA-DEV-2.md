@@ -29,14 +29,11 @@ grave) y la suite completa desde worktree limpio (`6241 passed, 110 skipped, 3 x
 
 **`/security-review` (pedido 20:19): leído, sin hallazgos (`2d10df8c`).** Comprobé dos caminos: el
 router de admin con `require_admin` (`main.py:1689-1692`) y ningún `innerHTML` nuevo en el panel.
-**Paso nuevo (20:26 UTC): `/security-review` sobre `1cc0a500..0d7401ed`** (lo que está publicado
-contra la candidata). Miré qué informes de esa franja lo registran: ORIGEN-2 y D244 (a) sí;
-CATALOGO-4 (`client_memory.py`, `catalog_service.py`, datos de cada estudio) y D269 no. Una sola
-pasada sobre toda la franja, sólo lectura, igual que la anterior: hallazgos en `PARA-PM-2.md` con
-severidad y camino de hoy, y me avisás por `send_message`. Un hallazgo con camino de hoy frena la
-candidata y es devolución de esa pieza. Después no tenés pieza: lo tuyo que queda espera a alguien
-de afuera (ADMIN-CREDITOS-1 espera a la Técnica y a Emi; la lista de empaque, los TXT reales, la
-pregunta 6, el texto de Emi). Tu rutina sigue apagada; te despierto por mensaje. **Próxima D: D279.**
+**`/security-review` de la candidata: leído (20:29), sin hallazgos (`44ecf6e2`).** Comprobé
+`_fetch_vendor_rows` (filtra por `owner_username`) y que el único `innerHTML` nuevo es uno. Ahora no
+tenés pieza: lo tuyo que queda espera a alguien de afuera (ADMIN-CREDITOS-1 espera a la Técnica y a
+Emi; la lista de empaque, los TXT reales, la pregunta 6, el texto de Emi). Tu rutina sigue apagada;
+te despierto por mensaje. **Próxima D: D279.**
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 
