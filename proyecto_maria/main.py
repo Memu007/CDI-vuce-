@@ -2292,9 +2292,8 @@ async def _vencer_y_guardar(db: AsyncSession, entidad):
 
 
 async def _soltar_conexion(db: AsyncSession) -> None:
-    # Termina la transacción de lectura antes de esperar algo lento (el cuerpo,
-    # la IA, la lectura del archivo). Si la base se cayó, lo ya leído alcanza:
-    # close lo desprende, rollback lo vencería y leerlo sin await da 500.
+    # Suelta la conexión antes de algo lento. Si la base cayó, close desprende lo
+    # leído; rollback lo vencería, y leerlo sin await da 500.
     try:
         await db.commit()
     except Exception as err:
