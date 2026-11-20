@@ -70,11 +70,15 @@ PYEOF
 M=proyecto_maria/main.py
 T=test_la_espera_no_retiene_conexiones
 B=test_la_base_caida_al_soltarla_no_corta_el_pedido
-FIRMA_MANUAL='    _cobro=Depends(require_billing_vigente),
+FIRMA_MANUAL='    _cobro=Depends(require_cupo_del_plan),
 ):
     """Crea una operación cargada manualmente'
 SUELTA_COBRO='    await _soltar_conexion(db)
     return db_user'
+TOPE='    if mirar_tope and (razon := billing_service.razon_del_tope(entidad)):'
+CUPO="$TOPE
+        raise HTTPException(status_code=402, detail=_detalle_402(entidad, razon))
+"
 SUELTA_ANALYZE='    await _soltar_conexion(db)
     mapper = GeminiMigrationHeaderMapper'
 SUELTA_NCM='        await _soltar_conexion(db)
@@ -92,8 +96,11 @@ en_codigo "$M" "from fastapi import FastAPI," "from fastapi import Body, FastAPI
   "$FIRMA_MANUAL" "${FIRMA_MANUAL/),/),
     _cuerpo: dict = Body(None),}" &&
   casos "manual lee el cuerpo antes del 402" test_cuenta_que_no_puede_cargar_no_lee_el_cuerpo
+# Sin el tope en la dependencia, la cuenta al tope sube y valida el cuerpo antes del 402.
+en_codigo "$M" "$CUPO" "" &&
+  casos "manual no mira el tope antes del cuerpo" test_cuenta_que_no_puede_cargar_no_lee_el_cuerpo
 en_codigo "$M" "$SUELTA_COBRO" "    return db_user" &&
-  casos "require_billing_vigente no suelta" "$T[body-404]" "$T[body-400]" \
+  casos "_billing_vigente no suelta" "$T[body-404]" "$T[body-400]" \
     "$T[process_pdf-422]" "$B[/api/ncm/sugerir]" "$B[/api/migrations/analyze]" "$B[/api/operations/manual]"
 en_codigo "$M" "$SUELTA_NCM" "        try:
             de_gemini" &&
@@ -126,7 +133,10 @@ en_codigo "$M" "async def require_billing_vigente(" 'async def _cupo_sin_candado
 
 
 async def require_billing_vigente(' \
-  "$FIRMA_MANUAL" "${FIRMA_MANUAL/require_billing_vigente/_cupo_sin_candado}" &&
+  "$FIRMA_MANUAL" "${FIRMA_MANUAL/require_cupo_del_plan/_cupo_sin_candado}" &&
   creditos "manual con el cupo sin candado (D188)" 1 "PIERDE | usuario, carrera"
+# El tope de la dependencia vence los créditos sin candado y pisa la recarga.
+en_codigo "$M" "$TOPE" '    if mirar_tope and (razon := billing_service.can_create_operation(entidad)[1]):' &&
+  creditos "el tope de la dependencia vence créditos" 1 "PIERDE | usuario, carrera"
 git checkout -q -- proyecto_maria
 exit $((FALLAS > 0))

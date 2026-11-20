@@ -186,8 +186,10 @@ def fase_carrera(c, de_org):
 
 
 def arbol():
-    fuente = inspect.getsource(main_mod.require_billing_vigente)
-    return (f"{main_mod.__file__}; suelta la conexión en require_billing_vigente: {'_soltar_conexion' in fuente}; "
+    # La base no tiene _billing_vigente: ahí el cuerpo está en require_billing_vigente.
+    dep = getattr(main_mod, "_billing_vigente", main_mod.require_billing_vigente)
+    fuente = inspect.getsource(dep)
+    return (f"{main_mod.__file__}; suelta la conexión en {dep.__name__}: {'_soltar_conexion' in fuente}; "
             f"_leer_cuerpo: {hasattr(main_mod, '_leer_cuerpo')}")
 
 

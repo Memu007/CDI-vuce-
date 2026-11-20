@@ -1,9 +1,9 @@
 diff --git a/tests/test_conexiones1.py b/tests/test_conexiones1.py
 new file mode 100644
-index 00000000..0b4ccacc
+index 00000000..032467e3
 --- /dev/null
 +++ b/tests/test_conexiones1.py
-@@ -0,0 +1,291 @@
+@@ -0,0 +1,297 @@
 +"""Las rutas lentas de RUTAS no retienen una conexión a la base mientras esperan.
 +
 +Cada ruta se frena en su punto lento (la IA, el lector de PDF, la lectura del
@@ -14,6 +14,7 @@ index 00000000..0b4ccacc
 +import asyncio
 +import io
 +import uuid
++from datetime import datetime, timedelta, timezone
 +
 +import aiosqlite
 +import pytest
@@ -28,7 +29,7 @@ index 00000000..0b4ccacc
 +from proyecto_maria.core import rate_limit
 +from proyecto_maria.database import connection as _conn
 +from proyecto_maria.database.models import Client, SystemBackup, User
-+from proyecto_maria.services import migration_service
++from proyecto_maria.services import billing_service, migration_service
 +
 +CLAVE = "Clave-Segura-123"
 +
@@ -134,10 +135,10 @@ index 00000000..0b4ccacc
 +    assert vistas and max(vistas) == 0, f"conexiones tomadas en {punto}: {vistas}"
 +
 +
-+def _impaga(nombre):
++def _guardar(nombre, **valores):
 +    async def guardar():
 +        async with _conn.AsyncSessionLocal() as db:
-+            await db.execute(update(User).where(User.username == nombre).values(billing_status="past_due"))
++            await db.execute(update(User).where(User.username == nombre).values(**valores))
 +            await db.commit()
 +    asyncio.run(guardar())
 +
@@ -151,9 +152,14 @@ index 00000000..0b4ccacc
 +
 +
 +MANUAL = {"client_id": "999999999", "items": [{"descripcion": "notebook", "cantidad": 1, "valor_unitario": 10}]}
++TOPE = billing_service.PLANS["premium"]["ops"]
 +# (cuenta, cómo queda sin poder cargar, código con el cuerpo completo)
 +CUENTAS = [
-+    ("impaga", lambda nombre, _mp: _impaga(nombre), 402),
++    ("impaga", lambda nombre, _mp: _guardar(nombre, billing_status="past_due"), 402),
++    ("al tope", lambda nombre, _mp: _guardar(nombre, ops_used_this_period=TOPE), 402),
++    ("al tope con créditos vencidos", lambda nombre, _mp: _guardar(
++        nombre, ops_used_this_period=TOPE, extra_ops_remaining=10,
++        extra_ops_expires_at=datetime.now(timezone.utc) - timedelta(days=1)), 402),
 +    ("sin cuota", lambda _nombre, mp: _sin_cuota(mp), 429),
 +]
 +
