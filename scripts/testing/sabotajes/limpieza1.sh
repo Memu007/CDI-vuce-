@@ -133,7 +133,9 @@ sabotaje "el paso con continue-on-error" "la CI puede esconder el resultado de l
   reemplazar $CI "      - name: Suite completa" "      - name: Suite completa
         continue-on-error: true"
 sabotaje "el job con continue-on-error" "la CI puede esconder el resultado de la suite: ['continue-on-error: true']" \
-  reemplazar $CI "    timeout-minutes: 20" "    timeout-minutes: 20
+  reemplazar $CI "  tests:
+    runs-on: ubuntu-latest" "  tests:
+    runs-on: ubuntu-latest
     continue-on-error: true"
 sabotaje "un # que tapa la línea que sigue" "la suite corre con algo fuera de lo permitido: ['#', 'nota', 'exit', '0']" \
   reemplazar $CI "$RUN" "        shell: bash {0}
