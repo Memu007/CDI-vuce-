@@ -148,7 +148,10 @@ async function alPasarElMouse(page, donde, filas, campo, guardar) {
   await campo().evaluate(c => { c.value = '410 · ESPAÑA'; c.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText' })); });
   await igual('«410 · ESPAÑA» elegido');
   await guardar('España');
+  await page.waitForFunction(c => c.value === '410 · ESPAÑA', await campo().elementHandle(), { timeout: 10000 })
+    .catch(async () => falla(donde + ': «España» guardado se ve «' + await campo().inputValue() + '»'));
   await igual('«España» guardado');
+  if (await page.evaluate(() => window.__xss)) falla(donde + ': un origen con HTML escrito se ejecutó');
   console.log('OK ' + donde + ': al pasar el mouse se ve lo guardado, lo escrito, lo elegido y lo que queda al guardar');
 }
 
@@ -201,8 +204,6 @@ async function catalogoDelCliente(page, base) {
   await alPasarElMouse(page, 'catálogo del cliente', '.cx-catalogo-producto-row', del212, async escrito => {
     await del212().fill(escrito);
     await del212().press('Enter');
-    await page.waitForFunction(c => c.value === '410 · ESPAÑA', await del212().elementHandle(), { timeout: 10000 })
-      .catch(async () => falla('«' + escrito + '» guardado en el catálogo del cliente se ve «' + await del212().inputValue() + '»'));
   });
 }
 
