@@ -3,45 +3,27 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Vencido `catalogo_largo2.sh`: reescribir el ancla (2026-11-20 14:07 UTC)
+## Veredicto: CATALOGO-PAIS-2 aceptada sobre `9459a0d4` (informe `43f3aa29`) (2026-11-20 15:38 UTC)
 
-Chica, en un commit aparte, **con tu próxima entrega** (no desplaza CATALOGO-PAIS-2).
-ORIGEN-2 (`b6c22ac9`) sumó `("clients", ("default_origin",))` a la tupla de
-`_migrate_catalogo_sin_tope`, y tres textos ancla de `scripts/testing/sabotajes/catalogo_largo2.sh`
-ya no están en `main.py`: los dos de «el arranque traba las tablas en una transacción»
-y el de «el arranque no pasa el origen de los ítems a text». Hoy `sabotaje()` imprime ROTO.
-Una salida posible (sugerencia; la PM la está corriendo fuera del árbol sobre `0d7401ed`):
-sumar esa fila a los dos textos de la transacción, y en el de `operation_items`
-reemplazar `                            ("operation_items", ("origen",)),` por nada.
-Criterio: los tres sabotajes dan rojo sobre tu SHA, y `scripts/testing/anclas_perdidas.py <SHA>`
-ya no nombra `catalogo_largo2.sh`. Al aceptarla, la PM saca su línea de
-`docs/pm/herramientas/sabotajes-conocidos.txt`. Si la corrida de la PM muestra que alguna
-de esas dos protecciones se perdió de verdad, eso llega como devolución aparte y va primero.
+Acta: `REPRODUCCION-CATALOGO-PAIS-2-2026-11-20.md`. La integro con `merge` de `43f3aa29`; sin
+publicar. Reproduje con las copias de `9459a0d4`: chequeo-6 (+16/−3, el AVISO del envoltorio
+explicado), `holanda423.sh` (34 ROJO, 0 ROTO), dos negativos míos (`'input'`→`'keyup'` y el `title`
+con lo que vino del servidor: los dos rojos), `catalogo_largo2.sh` en PG16 (39 ROJO, «fallas: 0»),
+`anclas_perdidas.py` (ya no te nombra) y `e2e_maria.sh` sobre el SHA y la unión: todo verde. Leí que
+el `input` que manda el guardado sólo lo escucha `mostrar`, y que el cambio de `clientes.js` queda en
+las filas del catálogo, no en la ficha.
 
-## Tarea activa: CATALOGO-PAIS-2 (D275 b) (2026-11-20 13:56 UTC)
+**Decidido por la PM:**
+- Supuestos 1 a 3 (`title` siempre presente, `aria-label="Origen"`, la sugerencia del navegador
+  simulada con `insertReplacementText`): aceptados.
+- Riesgos 1 a 3 (táctil y teclado no ven el `title`, el lector de pantalla puede repetir el valor,
+  el tooltip nativo no se vio sin ventana): riesgo escrito, bajo.
+- Vencido `catalogo_largo2.sh`: cerrado con `cbd7718c`; su línea sale de `sabotajes-conocidos.txt`.
 
-**Sí de Emi (20/11, leído 13:53 UTC: «Dale a todo» a los puntos 19 y 20; no es un «dale» de publicar).**
-Antes de tocar código: `merge` de mi rama y tu `/compact conservar` al día.
-
-**Comportamiento:** en los catálogos del proveedor y del cliente, el campo del origen que muestra
-«423 · PAISES BAJOS» deja ver la etiqueta entera al pasar el mouse, en cada ancho donde hoy se corta.
-Sólo los catálogos: la ficha del cliente y el resto de `static/v2` no entran.
-
-**La familia del defecto** (un caso, las entradas como datos):
-- el valor cambia (se escribe otro, se elige otro, se borra): lo que se ve al pasar el mouse es el
-  valor de ahora, nunca el de antes;
-- vacío: no queda un texto viejo ni uno vacío visible;
-- lo que no es un país (sigla vieja, texto libre): se ve con sus letras, como en el campo;
-- un nombre con tildes o eñe sale igual que en el campo.
-
-**Prueba:** el caso lee lo que el navegador muestra (el atributo), no el código; el informe trae una
-vez el rojo con el arreglo revertido en el mismo SHA.
-
-**Puertas:** `chequeo-6`, tu guion de sabotajes de CSS de CATALOGO-PAIS sigue verde, y `e2e_maria.sh`
-sobre el SHA y sobre la unión con mi rama. `catalogo3.sh` y la suite completa no hacen falta si no
-tocás el servidor ni `tests/` fuera de tu caso; si los tocás, van las dos.
-
-**Próxima D: D278.**
+**Ahora no tenés pieza.** Lo tuyo que queda en el roadmap espera a alguien de afuera (la lista de
+empaque y los TXT reales del despachante, la pregunta 6, el texto de Emi). Al leer esto: `merge` de
+mi rama, tu `/compact conservar` al día, y no arranques nada. Apago tu rutina; la prendo cuando te
+asigne. **Próxima D: D278.**
 
 ## Veredicto: ORIGEN-2 aceptada sobre `0d7401ed` (informe `76b98256`) (2026-11-20 02:20 UTC)
 
