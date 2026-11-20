@@ -121,3 +121,11 @@ Arial no lo corrí):
   el código, y el código queda entero en todos esos anchos. La (b), la etiqueta entera en `title`, va a
   Emi como propuesta.
 - Los riesgos 2 a 7 de su informe quedan escritos; los siete sabotajes de CSS se quedan.
+- Riesgos escritos, sin código: los anchos sólo salen de los cortes `max-width` en px (3); la altura se
+  compara con la misma fila a 1280 y el piso de 460 es una constante, 456–459 px sin medir (4); el
+  chequeo de mayúsculas mira el estilo en reposo, no `:focus` ni `:hover` (5).
+- En el proveedor, «tierra Média» lo sembré por SQL; escribirlo no lo corrí. Lo escrito ahí se pasa a
+  mayúsculas al guardar (`saveProduct` de `catalogo.js`, `toUpperCase`), igual que en la base: no lo
+  trae esta pieza y queda como riesgo escrito.
+- `e2e_maria.sh` sobre la unión con mi rama: no lo volví a correr, porque el producto de la unión
+  (`4fe296d4`) es igual al de `8140f496`; sólo difieren documentos de `docs/pm`.
