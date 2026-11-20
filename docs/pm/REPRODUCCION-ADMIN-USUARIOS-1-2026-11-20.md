@@ -55,5 +55,7 @@ control; POST, PUT, PATCH y DELETE dan 405. No va al repositorio.
 - Postgres: no corrí los tests ni la ruta en PG16. Se apoya en la sonda de la Dev (las dos clases de
   columna de fecha, login real, base igual antes y después).
 - `panel_dev.sh` (6 de 6 en el informe): no lo corrí.
+- `/security-review`: no lo corrió la Dev (lo avisó después del veredicto) ni lo pedí yo. Se lo pedí
+  sobre `e5d943e4..b06b47fa`; su resultado es la otra puerta antes de entrar en una candidata.
 - Puerta antes de que esta pieza entre en una candidata: la ruta de la lista sobre Postgres 16 con
   la candidata (`tests/conftest.py` fija SQLite, así que los tests no sirven para eso).
