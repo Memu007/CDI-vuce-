@@ -106,14 +106,20 @@ def plans_public() -> list[dict[str, Any]]:
 EXTRA_OPS_MAX = 100
 
 
+def como_utc(fecha: datetime | None) -> datetime | None:
+    # Las columnas que agrega la migración de arranque son TIMESTAMP sin zona
+    # (y SQLite no la guarda): se leen como UTC.
+    return fecha.replace(tzinfo=timezone.utc) if fecha is not None and fecha.tzinfo is None else fecha
+
+
+def extra_vencidos(expires: datetime | None) -> bool:
+    expires = como_utc(expires)
+    return bool(expires) and datetime.now(timezone.utc) > expires
+
+
 def _expire_extra_ops(user) -> None:
     """Si los créditos extra ya vencieron, los resetea a 0."""
-    expires = getattr(user, "extra_ops_expires_at", None)
-    # La columna que agrega la migración de arranque es TIMESTAMP sin zona
-    # (y SQLite no la guarda): se lee como UTC.
-    if expires is not None and expires.tzinfo is None:
-        expires = expires.replace(tzinfo=timezone.utc)
-    if expires and datetime.now(timezone.utc) > expires:
+    if extra_vencidos(getattr(user, "extra_ops_expires_at", None)):
         user.extra_ops_remaining = 0
         user.extra_ops_expires_at = None
 
@@ -140,9 +146,7 @@ def tiene_acceso(cuenta, ahora: datetime | None = None) -> bool:
 def vigente(fin: datetime | None, ahora: datetime | None = None) -> bool:
     if fin is None:
         return False
-    if fin.tzinfo is None:
-        fin = fin.replace(tzinfo=timezone.utc)
-    return fin > (ahora or datetime.now(timezone.utc))
+    return como_utc(fin) > (ahora or datetime.now(timezone.utc))
 
 
 def cancelar_corta_acceso(cuenta, ahora: datetime | None = None) -> bool:

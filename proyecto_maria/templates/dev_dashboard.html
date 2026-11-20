@@ -174,6 +174,47 @@
             </div>
         </div>
 
+        <div class="card mb-4">
+            <div class="card-header border-bottom border-secondary bg-transparent py-3 d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Usuarios</h5>
+                <form class="d-flex gap-2" onsubmit="event.preventDefault(); fetchUsuarios(0);">
+                    <input id="usuarios-buscar" type="search" class="form-control form-control-sm" placeholder="Usuario o email" aria-label="Buscar usuario o email">
+                    <button type="submit" class="refresh-btn py-1" style="font-size:0.82rem;">Buscar</button>
+                </form>
+            </div>
+            <div class="card-body p-0">
+                <p class="text-muted small px-3 pt-3">Plan, cobro y créditos de la cuenta que paga: la del estudio para quien es integrante. Los créditos vencidos se ven en 0.</p>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0 log-table">
+                        <thead>
+                            <tr>
+                                <th>USUARIO</th>
+                                <th>EMAIL</th>
+                                <th>ADMIN</th>
+                                <th>PAGA</th>
+                                <th>PLAN</th>
+                                <th>COBRO</th>
+                                <th>OPS DEL PERÍODO</th>
+                                <th>CRÉDITOS EXTRA</th>
+                                <th>VENCEN</th>
+                                <th>ÚLTIMA RECARGA</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usuarios-body">
+                            <tr><td colspan="10" class="text-center py-4 text-muted">Cargando…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-between align-items-center px-3 py-2 small text-muted">
+                    <span id="usuarios-pagina"></span>
+                    <span>
+                        <button type="button" id="usuarios-anteriores" class="refresh-btn py-1" style="font-size:0.82rem;" hidden>Anteriores</button>
+                        <button type="button" id="usuarios-siguientes" class="refresh-btn py-1" style="font-size:0.82rem;" hidden>Siguientes</button>
+                    </span>
+                </div>
+            </div>
+        </div>
+
         <!-- Pagos de Mercado Pago rechazados (COBRO-MP-1) -->
         <div class="card mb-4">
             <div class="card-header border-bottom border-secondary bg-transparent py-3 d-flex justify-content-between align-items-center">
@@ -350,7 +391,48 @@
             }
         }
 
+        // El día en la Argentina: las 00:00 UTC todavía son el día anterior allá.
+        const dia = (iso) => iso ? new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }) : null;
+
+        // Las páginas siguen la búsqueda que se pidió, aunque el campo se haya cambiado después,
+        // y una respuesta que llega tarde no pisa la de un pedido posterior.
+        let ultimoPedidoDeUsuarios = 0;
+        async function fetchUsuarios(desde, buscar = document.getElementById('usuarios-buscar').value) {
+            const pedido = ++ultimoPedidoDeUsuarios;
+            let response = null, data = null;
+            try {
+                response = await fetch('/api/admin/usuarios?' + new URLSearchParams({ buscar, desde }));
+                data = await response.json();
+            } catch (e) { /* sin red o sin JSON: se dice abajo */ }
+            if (pedido !== ultimoPedidoDeUsuarios) return;
+            const tbody = document.getElementById('usuarios-body');
+            tbody.replaceChildren();
+            const anteriores = document.getElementById('usuarios-anteriores');
+            const siguientes = document.getElementById('usuarios-siguientes');
+            if (!response || !response.ok || !data) {
+                tbody.appendChild(fila(['No se pudo leer' + (response ? ': ' + response.status : '')]));
+                anteriores.hidden = siguientes.hidden = true;
+                document.getElementById('usuarios-pagina').textContent = '';
+                return;
+            }
+            if (!data.usuarios.length) tbody.appendChild(fila(['Ninguno']));
+            data.usuarios.forEach((u) => tbody.appendChild(fila([
+                u.usuario, u.email, u.admin ? 'sí' : 'no',
+                u.saldo_del_estudio ? 'el estudio «' + u.estudio + '»' : 'la cuenta',
+                u.plan, u.cobro_hasta ? u.cobro + ' hasta ' + dia(u.cobro_hasta) : u.cobro,
+                u.operaciones_del_periodo, u.creditos_extra, dia(u.creditos_vencen), dia(u.ultima_recarga),
+            ])));
+            const hasta = data.desde + data.usuarios.length;
+            document.getElementById('usuarios-pagina').textContent = data.total
+                ? (data.desde + 1) + '–' + hasta + ' de ' + data.total : '';
+            anteriores.hidden = data.desde === 0;
+            siguientes.hidden = hasta >= data.total;
+            anteriores.onclick = () => fetchUsuarios(Math.max(0, data.desde - data.cuantos), buscar);
+            siguientes.onclick = () => fetchUsuarios(hasta, buscar);
+        }
+
         fetchWave1();
+        fetchUsuarios(0);
         fetchPagosRechazados();
 
         // Initial load

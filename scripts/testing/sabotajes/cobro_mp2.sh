@@ -96,7 +96,7 @@ sabotaje $M "cancelar sin suscripción llama a Mercado Pago" \
   "    for cuenta in sorted(con_sid, key=lambda c: (paga[c], c is db_user)):" "    for cuenta in con_sid or [db_user]:"
 sabotaje $B "la cancelada no sigue hasta el fin del período" \
   "FAILED $T2::test_la_cancelada_genera_hasta_el_fin_del_periodo" \
-  "    return fin > (ahora or datetime.now(timezone.utc))" "    return False"
+  "    return como_utc(fin) > (ahora or datetime.now(timezone.utc))" "    return False"
 
 # --- Reactivar pagando (C8, D9, D7.3)
 sabotaje $M "reactivar una prueba la deja activa" \

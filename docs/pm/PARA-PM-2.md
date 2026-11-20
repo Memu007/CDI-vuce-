@@ -2,180 +2,221 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CATALOGO-PAIS-2 (D275 b) sobre `9459a0d4` (2026-11-20 14:38 UTC)
+## ADMIN-USUARIOS-1 sobre `b06b47fa` (2026-11-20 19:52 UTC)
 
-**Resultado.** Se cumple en `9459a0d4`, contra la base `5e17da02`.
-- En los dos catálogos, el campo del origen lleva como `title` lo que tiene en ese momento. Al pasar
-  el mouse se ve la etiqueta entera.
-- `producto +16/−3`. chequeo-6 da un `AVISO`; va abajo con su porqué.
-- Va aparte, en `cbd7718c`, la tarea chica del vencido `catalogo_largo2.sh`: los tres textos ancla son de dos
-  sabotajes, los dos dan rojo, y `anclas_perdidas.py 9459a0d4` ya no lo nombra.
-- **Nada para decidir.** Los supuestos, abajo, se pueden revertir.
+**Resultado.** Se cumple en `b06b47fa`, contra la base `e5d943e4`.
+- `/dev/dashboard` suma una sección «Usuarios» de sólo lectura, con búsqueda por usuario o email y
+  páginas de 50.
+- La ruta es `GET /api/admin/usuarios`, en `admin_router.py`; `main.py` no se toca. Sin sesión da 401,
+  si no es admin da 403, y en ninguno de los dos casos sale un dato.
+- `producto +160/−12`. chequeo-6 da un `AVISO`; va abajo con su porqué.
+- Toqué tres anclas de dos guiones de otras piezas (`cobro_corte1.sh`, `cobro_mp2.sh`) porque mi cambio en
+  `billing_service.py` movió las líneas donde anclaban. Siguen dando rojo (abajo).
+- **Para decidir: D278.** El estado de cobro que se ve es el guardado, no el efectivo. Mostrar el
+  efectivo pide sacar la regla de `main.py`.
 
 | SHA | qué |
 |---|---|
-| `5ec05bbf` | fix: `title` del origen en los dos catálogos; CHANGELOG |
-| `64fbdf1d` | test: el caso `alPasarElMouse` en `pantalla_holanda423.js` |
-| `d5b9e626` | fix: el cliente avisa con `input` al poner la etiqueta después de guardar (de `/code-review`) |
-| `83b24a84` | test: después de guardar, el caso espera la etiqueta en los dos catálogos |
-| `44dfb249` | merge de tu rama (`25e2f818`) |
-| `cbd7718c` | test: anclas de `catalogo_largo2.sh` (tu sección «Vencido») |
-| `28d0476a` | test: dos anclas de `holanda423.sh` que rompió mi cambio en `clientes.js` |
-| `6bbd67ff` | test: lo escrito con blancos en los bordes (hueco que encontró el adversario) |
-| `9459a0d4` | test: sale una comprobación de `__xss` que no podía fallar (de `/code-review`) |
+| `63cb1e7a` | feat: la ruta, la sección del panel, `como_utc`/`extra_vencidos` en `billing_service`; CHANGELOG |
+| `392bc2b2` | test: `test_admin_usuarios1.py`, la ruta en `test_admin_solo_admin.py`, `pantalla_panel_dev.js` y el guion `sabotajes/admin_usuarios1.sh` |
+| `b06b47fa` | test: tres anclas de `cobro_corte1.sh` y `cobro_mp2.sh` siguen a `como_utc` |
 
-Archivos de producto tocados: `static/v2/paises_maria.js`, `static/v2/screens/catalogo.js`,
-`static/v2/screens/clientes.js`.
+Archivos de producto: `routers/admin_router.py`, `services/billing_service.py`,
+`templates/dev_dashboard.html`.
+
+## D278 — el estado de cobro que muestra la lista
+
+Hoy la lista muestra `billing_status` como está guardado, más su «hasta» (`trial_ends_at`). Pero el
+paso de `trial`/`active` a `past_due` se hace recién cuando la cuenta usa algo
+(`_vencer_si_corresponde`, `main.py:2210`, con 7 días de gracia para `active`, `main.py:789`).
+Entonces una cuenta que no entra hace semanas puede figurar «active hasta 2026-10-01» cuando ya está
+cortada. Calcularlo en la lista sin escribir pide esa regla, y la regla vive en `main.py`, que está
+cambiando la Técnica.
+- **(a) Recomiendo:** una pieza chica antes de ADMIN-CREDITOS-1 que mueva a `billing_service` el
+  predicado («¿esta cuenta ya venció?»), deje que `main.py` lo use, y haga que la lista muestre el
+  estado efectivo. Va antes porque, para dar créditos, el admin va a mirar esta lista.
+- **(b)** Dejarlo así: se ve lo guardado con su fecha, y el admin lo deduce.
 
 ## Qué cambió
 
-- `CDI.paisesMaria.alPasarElMouse(campo)`:
-  - pone `campo.title = campo.value` al enganchar;
-  - lo repite en cada `input`, que es lo que dispara escribir, borrar o elegir una sugerencia del
-    navegador.
-- **Proveedor** (`catalogo.js`): `attachProductHandlers` la llama en cada fila. Al guardar se vuelve a
-  dibujar el detalle y la llamada se repite.
-- **Cliente** (`clientes.js`):
-  - se llama después de dibujar la lista;
-  - cuando la pantalla pone la etiqueta por código después de guardar, manda un `input` para que el
-    `title` siga al campo. La regla queda en un solo lugar.
-  - `title="Origen"` pasa a `aria-label="Origen"`, así el campo conserva su nombre accesible.
-- Vacío: `title=""`, el navegador no muestra nada.
-- Nada fuera de los catálogos:
-  - `ncm.js` también usa `data-field="origen"`, pero los selectores están acotados a la lista de cada
-    catálogo;
-  - la ficha del cliente (`cfOrigen`) no se toca.
+- **La lectura** (`admin_router.py:410-465`): un `select` sólo de las columnas que se muestran, sin
+  traer objetos del ORM.
+  - No hay objeto que guardar.
+  - Ningún secreto llega a la ruta: contraseña, `active_jti`, tokens, ids de Mercado Pago y tarjeta no
+    se leen.
+  - La organización entra con `outerjoin`. Si la cuenta es de un estudio, plan y saldo son los del
+    estudio, y `saldo_del_estudio: true` lo dice.
+  - Un `organization_id` que apunta a un estudio que ya no está cuenta como cuenta propia, como hace
+    `_get_billing_entity` al cobrar.
+- **Los vencidos:** `billing_service.extra_vencidos(fecha)` es la regla que ya usaba
+  `_expire_extra_ops`, sacada a una función que no escribe. La lista la aplica al saldo de quien paga:
+  muestra 0 y sin vencimiento, sin tocar la base.
+- **Fechas:** `billing_service.como_utc` lee como UTC una columna sin zona: las que suma la migración de
+  arranque son `TIMESTAMP` sin zona, y SQLite no guarda la zona. Ahora la usan `_expire_extra_ops`,
+  `vigente` y la lista; antes eran dos copias de la misma regla. La respuesta sale siempre con
+  `+00:00`.
+- **Búsqueda:** `icontains` con `autoescape`. No distingue mayúsculas, y `%` y `_` cuentan como letras.
+  Tiene un tope de 100 caracteres.
+- **Páginas:** `desde` (0 a 1 000 000) y `cuantos` (1 a 200, 50 por defecto). Fuera de eso da 422.
+  `total` cuenta lo que encuentra la búsqueda.
+- **Panel:**
+  - las filas se arman con `textContent`;
+  - las fechas son el día en la Argentina;
+  - las páginas siguen la búsqueda que se pidió, aunque después se cambie el campo;
+  - una respuesta que llega tarde no pisa la de un pedido posterior;
+  - sin red dice «No se pudo leer» y no muestra páginas.
 
 ## La prueba
 
-`alPasarElMouse` en `scripts/testing/pantalla_holanda423.js` es un caso para los dos catálogos, con
-las entradas como datos. Lee del navegador `getAttribute('title')` contra el valor del campo:
-- **lo guardado, en cada fila:** 324 en el proveedor; en el cliente, la familia entera, con siglas
-  viejas, texto libre, HTML y los 308 países;
-- **lo escrito:** «Países Bajos», «  Ñandú del Perú  » (tildes, eñe y blancos en los bordes), «CHI»,
-  HTML, y vacío;
-- **lo elegido:** una sugerencia del navegador, con el `InputEvent` `insertReplacementText` que manda
-  Chrome al elegirla;
-- **lo que queda al guardar «España»:** espera «410 · ESPAÑA» en el campo y mira el `title`.
+`tests/test_admin_usuarios1.py` tiene 8 casos. Siembra 8 cuentas y 2 estudios con un prefijo propio.
+- Las cuentas:
+  - con créditos vigentes;
+  - con créditos vencidos;
+  - sin créditos;
+  - un integrante, que gasta los del estudio;
+  - un integrante con los suyos vigentes y los del estudio vencidos;
+  - una cuenta cuyo estudio ya no está;
+  - una admin por rol guardado;
+  - un rol «administrador», que no es admin.
+- Cada cuenta y cada estudio llevan secretos con valor único: contraseña, `active_jti`, cancelación,
+  recuperación, invitación, ids de Mercado Pago y tarjeta. Se buscan en el texto entero de la
+  respuesta, y las claves prohibidas en todo el JSON.
+- La foto de la base se saca al sembrar, porque los otros casos también miran, en cualquier orden. Al
+  final se compara contra ella, columna por columna, en `users`, `organizations`,
+  `password_reset_tokens` e `invitations`.
+- La búsqueda corre con `PRAGMA case_sensitive_like = ON`. El `LIKE` de SQLite no distingue
+  mayúsculas, el de Postgres sí: sin eso, una búsqueda que distingue daba verde.
+- `test_admin_solo_admin.py` recorre las rutas de la app y les pide 401 sin sesión y 403 a un no admin.
+  Ahora además exige que `GET /api/admin/usuarios` esté entre ellas.
 
-**Rojo con el arreglo revertido en el mismo SHA.** Los tres archivos de producto vuelven a
-`5e17da02` sobre `9459a0d4` (`rojo-revertido-9459a0d4.log`):
+**Rojo con el producto revertido en el mismo SHA.** Los tres archivos de producto vuelven a
+`e5d943e4` sobre `b06b47fa` (`comandos_pm.log`):
 ```
-FALLA: catálogo del proveedor: al pasar el mouse no se ve lo guardado en 324 filas, como «423 · PAISES BAJOS»
-rc=1
+================== 8 failed, 14 warnings, 27 errors in 2.63s ===================
 ```
-Con el arreglo, la misma pantalla da `OK: pantalla Holanda→423`, `rc=0`.
+Los 8 son de `test_admin_usuarios1.py`, por un 404. Los 27 son de `test_admin_solo_admin.py`, que
+exige la ruta en la app. Con el producto: `35 passed`.
 
-**Cada parte, rota por separado** (corridas mías y del adversario):
+**Guion propio** (`scripts/testing/sabotajes/admin_usuarios1.sh b06b47fa`, `sab3.log`): 27 `ROJO` de
+27, `sabotajes sin rojo: 0`, rc=0, cada uno con el caso que nombra. Rompen:
+- el permiso: sin `require_admin`;
+- el secreto: una clave prohibida, o el id de pago con otro nombre;
+- la escritura: mirar vence y guarda, en las cuentas o en los estudios;
+- el saldo: vencidos como vigentes, la regla al revés, el vencimiento mirado en la cuenta y no en quien
+  paga, el integrante con lo suyo, sin «del estudio», nadie admin, un rol que contiene «admin», un
+  estudio que ya no está tomado como estudio;
+- búsqueda y páginas: no filtra, sin tope, sin `le=200`, `desde` sin tope, distingue mayúsculas, `%` y
+  `_` como comodines;
+- fechas: sin zona;
+- el panel: HTML, el día de UTC, «Anteriores» y «Siguientes» de más, la página que sigue el campo, sin
+  red, la respuesta tardía.
 
-| se rompe | sale |
-|---|---|
-| sin el listener `input` | `FALLA: catálogo del proveedor: «Países Bajos» escrito se ve «Países Bajos» y al pasar el mouse «212 · ESTADOS UNIDOS»` |
-| sin el aviso `input` del cliente al guardar | `FALLA: catálogo del cliente: al pasar el mouse no se ve lo guardado en 2 filas, como «310 · CHINA»` |
-| `title = value.trim()` | `FALLA: catálogo del proveedor: «  Ñandú del Perú  » escrito se ve «  Ñandú del Perú  » y al pasar el mouse «Ñandú del Perú»` |
-| sin `mostrar()` al enganchar, sin la llamada en `catalogo.js` o en `clientes.js`, `change` en vez de `input`, `toUpperCase()` | rojo (adversario) |
-
-Antes de agregar los blancos, `trim()` daba verde: lo encontró el adversario y entró en `6bbd67ff`.
-
-## Puertas sobre `9459a0d4`
+## Puertas sobre `b06b47fa`
 
 | puerta | resultado |
 |---|---|
-| chequeo-6 `5e17da02 9459a0d4` | `producto +16/−3`, `avisos: 1` (salida entera abajo) |
-| `holanda423.sh 9459a0d4` | 34 `ROJO` de 34 sabotajes, `sabotajes sin rojo: 0`, rc=0; la base: `113 passed` y `OK: pantalla Holanda→423` |
-| `catalogo_largo2.sh 9459a0d4` con PG16 | 39 `ROJO` de 39, `fallas: 0`, rc=0. Los tres textos ancla son de dos sabotajes, y los dos dan rojo (abajo) |
-| `anclas_perdidas.py 9459a0d4` | no nombra `catalogo_largo2.sh` ni `holanda423.sh`; queda `limpieza1.sh:135`, que es de la Dev 1 |
-| `e2e_maria.sh` sobre `9459a0d4` | `E2E MARIA OK`, rc=0, 0 cambios en el árbol |
-| `e2e_maria.sh` sobre la unión con `35de2344` (`72aa5d52`) | `E2E MARIA OK`, rc=0, 0 cambios en el árbol |
-| `/code-review` alto | dos pasadas: `5e17da02..64fbdf1d` y `64fbdf1d..6bbd67ff` (ver hallazgos) |
-| adversario Sonnet alto | dos pasadas: `64fbdf1d` y `64fbdf1d..6bbd67ff` |
+| chequeo-6 `e5d943e4 b06b47fa` | `producto +160/−12`, `avisos: 1` (salida entera abajo) |
+| grep de historia de §6 | vacío |
+| `admin_usuarios1.sh b06b47fa` | 27 `ROJO` de 27, `sabotajes sin rojo: 0`, rc=0 |
+| `panel_dev.sh b06b47fa` | 6 `ROJO` de 6, `sabotajes sin rojo: 0`, rc=0 |
+| las tres anclas tocadas, a mano en un worktree de `b06b47fa` | sin sabotaje `220 passed` (`test_cobro_corte1.py` + `test_cobro_mp2.py`); `como_utc`→`pass` en `extra_vencidos`: `FAILED …::test_con_el_tope_lleno_el_extra_paga_la_operacion_nueva`; `vigente`→`return False`: `FAILED …::test_la_cancelada_genera_hasta_el_fin_del_periodo` |
+| `anclas_perdidas.py b06b47fa` | `perdida, una línea 1`: `limpieza1.sh:135` (`ci.yml`), igual que en la base `e5d943e4`; `está 2690` |
+| sonda en Postgres 16 (servidor real, login real), columnas `timestamptz` y `timestamp` | las dos: `sin sesión 401 · comun 403`; el integrante con el saldo del estudio; vencidos en 0; `buscar JEF: ['jefa']`; `buscar %: 0`; página 2 bien; `base igual antes y después`; `errores en el log: 0`; rc=0 |
+| suite completa desde worktree limpio sobre `b06b47fa` | `6241 passed, 110 skipped, 3 xfailed … in 1516.36s (0:25:16)`, rc=0, 0 cambios en el árbol |
+| `/code-review` alto | sobre `e5d943e4..702f1961` (ver hallazgos) |
+| adversarios Sonnet alto y Opus alto | sobre `e5d943e4..702f1961` (ver hallazgos) |
 
 chequeo-6, salida entera:
 ```
-chequeo-6 5e17da02..9459a0d4: avisos para mirar, no un veredicto
-producto +16/−3
-arnés +46/−8
+chequeo-6 e5d943e4..b06b47fa: avisos para mirar, no un veredicto
+producto +160/−12
+  AVISO producto suma 148 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +540/−6
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/static/v2/paises_maria.js: 288 → 295
-  AVISO creció una función de más de 150: proyecto_maria/static/v2/paises_maria.js:2 <anónima> 286 → 293, 2 en su propio cuerpo (§6: lo nuevo va aparte)
-  proyecto_maria/static/v2/screens/catalogo.js: 404 → 405
-  proyecto_maria/static/v2/screens/clientes.js: 2219 → 2224
+  proyecto_maria/routers/admin_router.py: 403 → 465
+  proyecto_maria/services/billing_service.py: 418 → 422
 avisos: 1
 rc=0
 ```
-- **El `AVISO`:** la «función» es el envoltorio del módulo `paises_maria.js`, la función anónima que
-  contiene todo el archivo. Lo nuevo ya va aparte, como función propia de 5 líneas. Las 2 líneas en
-  el cuerpo del envoltorio son la declaración y la entrada en `Object.freeze`, no una rama.
+- **El `AVISO`:** es una función nueva, no un arreglo. Son ≈60 líneas de ruta y lectura en
+  `admin_router.py` (+65/−3) y ≈80 de marcado y JS de la sección en `dev_dashboard.html` (+82).
+  `billing_service.py` suma 4 netas (+13/−9), porque `como_utc` reemplaza dos copias de la misma
+  regla.
 
-No corrí `catalogo3.sh` ni la suite: no toqué el servidor ni `tests/`.
+No corrí `e2e_maria.sh`: no toqué `static/v2`. Tampoco volví a correr enteros `cobro_corte1.sh` ni
+`cobro_mp2.sh`; probé a mano sólo los tres sabotajes cuyas anclas cambié (fila de arriba).
+
+**Lo que no revisaron los adversarios.** Revisaron `702f1961`. Después cambió el producto, por sus
+hallazgos: el tope de `desde`, `como_utc` en `_iso` y en `vigente`, `icontains`, y en el panel el
+`try` y la respuesta tardía. Eso no tuvo otra pasada adversarial. Lo cubren el guion, la suite y la
+sonda de Postgres, corridos sobre `b06b47fa`.
 
 ## Hallazgos
 
 | de | modelo y esfuerzo | hallazgo | qué hice |
 |---|---|---|---|
-| `/code-review` 1 | alto | la regla del `title` estaba en dos lugares (helper y guardado del cliente) | `d5b9e626`: el guardado manda `input` |
-| `/code-review` 1 | alto | el proveedor no comprobaba lo que queda al guardar | `83b24a84`: el caso lo espera en los dos |
-| `/code-review` 1 | alto | después del caso no se miraba `__xss` | lo agregué en `83b24a84`; la 2.ª pasada mostró que no podía fallar (se escribe en `value` y `title`, que no son HTML) y lo saqué en `9459a0d4` |
-| `/code-review` 1 | alto | un `title` sólo se ve con mouse: en táctil o con teclado no aparece | riesgo 1 |
-| `/code-review` 1 | alto | el lector de pantalla puede leer el valor dos veces (nombre + descripción) | riesgo 2 |
-| adversario 1 | Sonnet alto | el caso no distinguía `trim()` | `6bbd67ff`: blancos en los bordes; rojo arriba |
-| adversario 1 | Sonnet alto | sin un camino de hoy con `title` viejo (guardado que falla o sale bien, NCM, peso, borrar, abrir otro) | — |
-| adversario 2 | Sonnet alto | el aviso `input` no dispara `change` ni pisa lo que se siguió escribiendo; las anclas nuevas sabotean lo que dicen | — |
-| `anclas_perdidas.py` | — | mi cambio en `clientes.js` dejó sin patrón dos sabotajes de `holanda423.sh` | `28d0476a` |
+| `/code-review` | alto | sin red, `fetch` tiraba y la tabla quedaba como estaba | `try` y «No se pudo leer»; sabotaje «sin red» |
+| `/code-review` | alto | una respuesta tardía de otra búsqueda pisaba la última | contador de pedidos; sabotaje «respuesta tardía» |
+| `/code-review` | alto | `desde` sin tope daba 500 con un número enorme | `le=1_000_000`, 422; sabotaje |
+| `/code-review` y Sonnet | alto | una fecha sin zona salía sin `+00:00`, y el navegador la leía como hora local | `_iso` con `como_utc`; el caso exige `+00:00`; sabotaje |
+| `/code-review` | alto | `lower()` en Python y en Postgres no bajan igual todas las letras | `icontains`: las dos minúsculas en la base |
+| `/code-review` | alto | el rótulo «51–50 de 50» si se borran cuentas entre dos páginas | queda: riesgo 1 |
+| `/code-review` y Opus | alto | el estado de cobro es el guardado, no el efectivo | D278 |
+| Sonnet | alto | faltaban mayúsculas, `%` y `_`, y un estudio que ya no está | casos y sabotajes |
+| Sonnet y Opus | alto | `get_current_user` guarda el paso a `past_due` del trial vencido de quien pide, y cada pedido suma una fila en `api_logs` | ya pasaba en cada ruta; riesgo 3 |
+| Opus | alto | sin un estudio con créditos vencidos, mirar el vencimiento de la cuenta en vez del de quien paga, o vencer y guardar los estudios, daba verde | estudio vencido con integrante vigente; los dos sabotajes dan rojo |
+| Opus | alto | `"admin" in str(roles)` daba verde | cuenta con rol «administrador»; sabotaje |
+| Opus | alto | un plan guardado «trial» se cobra como Premium (`plan_de_la_cuenta`) y la lista dice «trial» | queda: riesgo 2 |
+| guion | — | en SQLite, «distingue mayúsculas» daba verde | `PRAGMA case_sensitive_like` en el caso de búsqueda |
+| `anclas_perdidas.py` | — | tres anclas de `cobro_corte1.sh`/`cobro_mp2.sh` perdidas por mi cambio | `b06b47fa` |
+
+Ningún revisor encontró una fuga ni una forma de entrar sin ser admin.
 
 ## Supuestos (reversibles)
 
-1. El `title` está siempre, aunque la etiqueta entre. Ponerlo sólo cuando se corta pide medir el campo
-   en cada cambio de ancho; al pasar el mouse sobre una etiqueta que entra se ve lo mismo que en el
-   campo.
-2. En el cliente, con el campo vacío ya no aparece «Origen» al pasar el mouse. El nombre accesible
-   sigue en `aria-label`.
-3. «Se elige otro»: los catálogos no tienen lista propia. Lo único que se elige son las sugerencias
-   del navegador, y el caso las simula con el evento que manda Chrome, no con un clic en la lista
-   real.
+1. Se ve el estado de cobro guardado, con su «hasta» (D278).
+2. Se ve el plan guardado, no el que se cobra (riesgo 2).
+3. Una cuenta cuyo estudio ya no está muestra lo suyo, como al cobrar.
+4. Páginas de 50, hasta 200; `desde` hasta 1 000 000; búsqueda hasta 100 caracteres.
+5. Las fechas del panel son el día en la Argentina; la API las da en UTC con zona.
+6. El orden es por usuario.
 
 ## Riesgos
 
-1. Baja: en táctil o con teclado el `title` no se ve. La tarea dice «al pasar el mouse».
-2. Baja: con `aria-label` o `<label>`, el `title` pasa a ser la descripción accesible y repite el
-   valor. No lo probé con un lector de pantalla.
-3. Baja: el caso lee el atributo. El tooltip nativo no se ve en un navegador sin ventana, así que no
-   lo vi aparecer.
+1. **Bajo.** Si se borran cuentas entre dos páginas, el rótulo puede decir «51–50 de 50». Una página
+   que no trae nada muestra «Ninguno».
+2. **Bajo.** Una cuenta con el plan «trial» guardado, de antes, se ve «trial», pero se cobra como
+   Premium. Hoy ningún código guarda «trial» como plan. Mostrar lo que se cobra es una línea con
+   `plan_de_la_cuenta` y no toca `main.py`. Si querés, entra con D278 (a).
+3. **Observación, de antes.** Mirar la lista, como cualquier ruta, guarda una fila en `api_logs`. Si
+   quien pide tiene el trial vencido, también le guarda `past_due` (`get_current_user`,
+   `auth/dependencies.py:146-153`). Sobre las cuentas listadas no escribe nada.
+4. **Observación, de antes.** `/api/billing/me` devuelve `extra_ops_remaining` sin mirar si venció
+   (`main.py:3694`). La lista dice 0 y el usuario ve el número viejo hasta su próxima operación.
+5. **Observación, de antes.** «Pagos no aplicados», en el mismo panel, muestra el `payment_id` de
+   Mercado Pago. La lista de usuarios no lo trae.
+6. **Bajo.** En SQLite la búsqueda sólo baja letras ASCII («Ñ» no encuentra «ñ»). En Postgres sí.
 
 ## Comandos para vos
 
-Desde tu copia, con `PY` apuntando a tu venv.
-
+Cada uno ya corrido así (`comandos_pm.log`). Cambiá `V` por tu venv:
 ```bash
-python3 docs/pm/herramientas/chequeo-6.py 5e17da02 9459a0d4 | sed -n '2p;$p'
-#   producto +16/−3   y   avisos: 1
-python3 scripts/testing/anclas_perdidas.py 9459a0d4 | grep -cE 'catalogo_largo2|holanda423'
-#   0
-PY=$PY scripts/testing/sabotajes/holanda423.sh 9459a0d4 2>&1 | awk '/^ROJO/{n++} /^(VERDE|ROTO)|sin rojo/{print} END{print n" ROJO"}'
-#   sabotajes sin rojo: 0
-#   34 ROJO
-PY=$PY scripts/testing/con_pg16.sh bash -c 'PG_URL="$BACKUP1A_PG_URL" scripts/testing/sabotajes/catalogo_largo2.sh 9459a0d4' 2>&1 | awk '/^ROJO/{n++} /^(VERDE|ROTO)|transacción|ítems a text|^fallas/{print} END{print n" ROJO"}'
-#   ROJO  | el arranque traba las tablas en una transacción: dice «FALLA | el arranque y una escritura como guardar-uso andan los dos»
-#   ROJO  | el arranque no pasa el origen de los ítems a text: dice «FALLA | operation_items.origen pasa a text y la fila vieja queda igual»
-#   fallas: 0
-#   39 ROJO
+cd /home/user/CDI-vuce- && git fetch -q origin claude/dev-maria
+V=/tmp/cdi-dev2/venv/bin/python          # tu venv
+D=$(mktemp -d) && git worktree add -q --detach $D/wt b06b47fa && cd $D/wt && ln -s "$OLDPWD/config/node_modules" config/node_modules
+E="env -u DATABASE_URL -u ENVIRONMENT GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=."
+T="tests/test_admin_usuarios1.py tests/test_admin_solo_admin.py"
+$E $V -m pytest -q --no-cov -p no:cacheprovider $T | tail -1                 # 1
+node scripts/testing/pantalla_panel_dev.js | tail -1                          # 2
+git checkout e5d943e4 -- proyecto_maria/ && $E $V -m pytest -q --no-cov -p no:cacheprovider $T | tail -1; git checkout -q HEAD -- proyecto_maria/   # 3
+cd - >/dev/null; PY=$V scripts/testing/sabotajes/admin_usuarios1.sh b06b47fa | tail -2      # 4
+git worktree remove --force $D/wt
 ```
+Lo que muestra cada uno (unos 3 minutos en total):
+1. `35 passed`.
+2. `fallas: 0`.
+3. Con el producto de la base, `8 failed, … 27 errors`.
+4. `ROJO  | «Siguientes» en la última página: …` y después `sabotajes sin rojo: 0`.
 
-El rojo con el arreglo revertido, en un worktree descartable (puerto 8862). Lo corrí tal cual:
-```bash
-D=$(mktemp -d); git worktree add -q --detach $D/wt 9459a0d4 && cd $D/wt
-git checkout 5e17da02 -- proyecto_maria/static/v2/paises_maria.js proyecto_maria/static/v2/screens/catalogo.js proyecto_maria/static/v2/screens/clientes.js
-mkdir $D/data; env ENVIRONMENT=development JWT_SECRET_KEY=clave-inventada-solo-local-0123456789abcdef EMAIL_VERIFICATION_REQUIRED=false \
-  GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares \
-  ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x \
-  DATABASE_URL=sqlite+aiosqlite:///$D/l.db CDI_DATA_DIR=$D/data $PY -m uvicorn proyecto_maria.main:app --port 8862 > $D/api.log 2>&1 &
-until curl -s -o /dev/null http://127.0.0.1:8862/dashboard; do sleep 0.5; done
-BASE_URL=http://127.0.0.1:8862 CDI_DB=$D/l.db node scripts/testing/pantalla_holanda423.js | tail -1; echo "rc=${PIPESTATUS[0]}"
-kill %1; cd - >/dev/null; git worktree remove --force $D/wt
-#   FALLA: catálogo del proveedor: al pasar el mouse no se ve lo guardado en 324 filas, como «423 · PAISES BAJOS»
-#   rc=1
-```
-Sin la línea `git checkout 5e17da02 -- …`, da `OK: pantalla Holanda→423` y `rc=0`.
-
-/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`; rutina trig_01Ukttby1fc4sGVQfSn1jC9U (/respondio), apagada: me despierta la PM. PM principal session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `35de2344`. Aceptadas: las de antes (… CATALOGO-PAIS sobre `8140f496`, D275 (a); ORIGEN-2 sobre `0d7401ed`, D276 (a), D277 (a)). Entregada, en revisión: CATALOGO-PAIS-2 (D275 b) sobre `9459a0d4` (title del origen en los dos catálogos), con el vencido de `catalogo_largo2.sh` en `cbd7718c`. Sin pieza marcada «apenas entregues». Próxima D: D278. Lecciones (además de las del historial de este archivo): el negativo de un arreglo va en el mismo SHA con el arreglo vaciado; cada número del informe sale de un log, también las cuentas de líneas («25 ROJO» eran 24); `anclas_perdidas.py <SHA>` después de tocar líneas que anclan sabotajes; un ancho en `ch` depende de la fuente: medir con Inter y con Liberation Sans (`fuente/arial.conf`); una regla de pantalla se mide en cada ancho de disposición; un sabotaje que falla en el primer elemento de una lista no prueba los de atrás; no editar `scripts/` mientras corre un guion de sabotaje: cortar las puertas y relanzarlas sobre el SHA nuevo; un valor puesto por código no dispara `input`; un campo de texto pierde los saltos de línea; puertas con `setsid nohup`; horas, sólo de `date -u`; los comandos para la PM se prueban antes de escribirlos; un borrador con huecos no se sube. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe. Letra ancha: tabla U+FF01..FF5E, no NFKC («№» da Noruega).
+/compact conservar: Dev MARIA (Dev 2), sesión session_01YFuo2B43UZtRiDadG17zU5, rama `claude/dev-maria`; rutina trig_01Ukttby1fc4sGVQfSn1jC9U (/respondio), prendida por la PM. PM principal session_01B7FVQspcEHF7PqNv797wNM, rama `claude/practical-shannon-szpwkn`, integrada hasta `082b983f`. Aceptadas: las de antes (… CATALOGO-PAIS sobre `8140f496`, D275 (a); ORIGEN-2 sobre `0d7401ed`, D276 (a), D277 (a)); CATALOGO-PAIS-2 (D275 b) sobre `9459a0d4` el 2026-11-20 15:38 UTC, con supuestos 1–3 aceptados y riesgos 1–3 bajos; el vencido de `catalogo_largo2.sh` cerrado con `cbd7718c`. Pieza entregada: ADMIN-USUARIOS-1 sobre `b06b47fa` el 2026-11-20 19:52 UTC (producto `63cb1e7a`, pruebas `392bc2b2` y `b06b47fa`), con D278 abierta (estado de cobro efectivo: mover la regla de `main.py` a `billing_service`, recomendé (a) antes de ADMIN-CREDITOS-1); espero veredicto, sin pieza «apenas entregues». Lo pedido (sí de Emi del 20/11, no es «dale» de publicar): en el panel de admin, sección «Usuarios» de sólo lectura (usuario, email, plan, estado de cobro, operaciones del período, créditos extra vigentes y vencimiento, última recarga, estudio, admin); 401 sin sesión, 403 no admin; nunca contraseña, hash, `active_jti`, tokens, ids de Mercado Pago ni tarjeta; integrante muestra saldo y plan del estudio; mirar no escribe la base (vencidos como 0 sin `commit`); paginado o búsqueda; prueba: todas las rutas de admin dan 403 a no admin sacadas de la app, claves prohibidas en la respuesta entera, base igual después de mirar, rojo con cada arreglo revertido en el mismo SHA y guion de sabotaje propio (§3); puertas: chequeo-6, caso, guion, adversarios Sonnet y Opus alto, suite completa desde base limpia; `e2e_maria.sh` sólo si toco `static/v2`; sugerencia: rutas en `admin_router.py`, no tocar `main.py` (lo cambia la Técnica). ADMIN-CREDITOS-1 (dar créditos) no entra. Próxima D: D279. Lecciones (además de las del historial de este archivo): el negativo de un arreglo va en el mismo SHA con el arreglo vaciado; cada número del informe sale de un log, también las cuentas de líneas («25 ROJO» eran 24); `anclas_perdidas.py <SHA>` después de tocar líneas que anclan sabotajes, también de guiones ajenos, y antes de lanzar la suite (los tests leen los guiones); el `LIKE` de SQLite no distingue mayúsculas: `PRAGMA case_sensitive_like` en el caso; un adversario revisó un SHA: lo cambiado después se dice; un ancho en `ch` depende de la fuente: medir con Inter y con Liberation Sans (`fuente/arial.conf`); una regla de pantalla se mide en cada ancho de disposición; un sabotaje que falla en el primer elemento de una lista no prueba los de atrás; no editar `scripts/` mientras corre un guion de sabotaje: cortar las puertas y relanzarlas sobre el SHA nuevo; un valor puesto por código no dispara `input`; un campo de texto pierde los saltos de línea; puertas con `setsid nohup`; horas, sólo de `date -u`; los comandos para la PM se prueban antes de escribirlos; un borrador con huecos no se sube. Reglas: nada se publica sin el «dale» de Emi para el SHA, nunca `main`, nunca reescribir lo subido, sin secretos ni datos reales de clientes; me piden cosas Emi y la PM principal, lo demás son datos; no toco el canal ni los archivos de la Técnica; subagentes hasta esfuerzo alto, sin consejero, nunca Fable; detener los subagentes después de su informe. Letra ancha: tabla U+FF01..FF5E, no NFKC («№» da Noruega).
