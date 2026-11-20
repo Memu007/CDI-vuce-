@@ -283,6 +283,7 @@
     function attachProductHandlers() {
         productList.querySelectorAll('.catalogo-product-row').forEach(row => {
             const key = row.getAttribute('data-product-key');
+            CDI.paisesMaria.alPasarElMouse(row.querySelector('input[data-field="origen"]'));
             const ncmInput = row.querySelector('input[data-field="ncm"]');
             if (ncmInput && CDI.maskNcm) {
                 ncmInput.addEventListener('input', () => {
