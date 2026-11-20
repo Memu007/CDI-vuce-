@@ -3,6 +3,7 @@
 ronda() toma la fila de la cuenta, larga los dos pedidos, espera verlos
 esperando y suelta. Mercado Pago es simulado.
 """
+import asyncio
 import gc
 import os
 import sys
@@ -21,6 +22,7 @@ from tests.mp_firma import aviso_firmado  # noqa: E402
 from tests.test_maria7_rechazos_24_10 import _pedido  # noqa: E402
 
 m, SUSCRIPCIONES, COBROS = h.main_mod, {}, {}
+APP = os.path.dirname(os.path.abspath(m.__file__)) + os.sep
 m._leer_cobro_autorizado_mp = COBROS.__getitem__
 h._SDK.preapproval = lambda self: type("P", (), {
     "get": lambda _, sid: {"status": 200, "response": SUSCRIPCIONES[sid]}})()
@@ -86,8 +88,13 @@ def soltar(c):
     """Cierra las conexiones de la app y espera a que Postgres no vea ninguna.
     Falla si gc tuvo que cerrar una conexión que la app nunca devolvió al pool."""
     # La app registra cada pedido en una tarea que sigue después de responder: si
-    # devuelve su conexión tras el dispose, cae en el pool descartado y sólo la cierra gc,
-    # que corre en el loop para que asyncpg cierre el socket desde su propio hilo.
+    # devolviera su conexión tras el dispose, caería en el pool descartado. Por eso
+    # se espera a que no quede ninguna antes de cerrar.
+    async def tareas_de_la_app():
+        return [t for t in asyncio.all_tasks() if not t.done() and getattr(
+            getattr(t.get_coro(), "cr_code", None), "co_filename", "").startswith(APP)]
+
+    # gc corre en el loop para que asyncpg cierre el socket desde su propio hilo.
     async def cerrar():
         await engine.dispose()
         with warnings.catch_warnings(record=True) as avisos:
@@ -96,12 +103,16 @@ def soltar(c):
         return [str(a.message) for a in avisos if "non-checked-in" in str(a.message)]
 
     def libres():
+        if c.portal.call(tareas_de_la_app):
+            return False
         if fugas := c.portal.call(cerrar):
             raise h.Invalida(f"la app dejó conexiones sin devolver al pool: {fugas[0][:90]}")
         return h.sql(OTRAS)[0][0] == 0
     if not h.hasta(libres):
         quedan = "; ".join(f"{e}, espera {w}, hace {t} s: {q}" for e, w, t, q in h.sql(QUE_HACEN))
-        raise h.Invalida(f"la app no soltó sus conexiones: {quedan or 'ya no queda ninguna'}")
+        tareas = [t.get_coro().__qualname__ for t in c.portal.call(tareas_de_la_app)]
+        raise h.Invalida(f"la app no soltó sus conexiones: {quedan or 'ya no queda ninguna'}; "
+                         f"tareas de la app sin terminar: {tareas}")
 
 
 def correr(caso):

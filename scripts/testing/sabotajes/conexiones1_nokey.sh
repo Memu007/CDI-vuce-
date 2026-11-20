@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Control del caso 6 de scripts/testing/conexiones1_pares.py. El caso sale 1
-# también con el arreglo, por los deadlocks que siguen esperados en otros pares,
-# así que lo que discrimina es el texto: sin sabotaje los candados son FOR NO KEY
-# UPDATE y ninguna fila dice «MAL»; sin key_share o sin of= vuelve FOR UPDATE.
+# Control del caso 6 de scripts/testing/conexiones1_pares.py. Sin sabotaje los
+# candados son FOR NO KEY UPDATE y el caso sale 0; sin key_share o sin of= vuelve
+# FOR UPDATE y la línea de los candados dice «MAL».
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/conexiones1_nokey.sh [SHA]
 # Trabaja en un worktree descartable y cada corrida levanta su propio
@@ -62,7 +61,7 @@ M=proyecto_maria/main.py
 U='.with_for_update(key_share=True, of=User)'
 O='.with_for_update(key_share=True, of=Organization)'
 
-NO='\| MAL' corrida "sin sabotaje" 1 \
+NO='\| MAL' corrida "sin sabotaje" 0 \
   "_cuenta_bloqueada después del aviso: FOR NO KEY UPDATE OF users | FOR NO KEY UPDATE OF organizations"
 # Sin el arreglo: las dos consultas vuelven a FOR UPDATE y la recarga choca.
 en_codigo "$M" "$U" '.with_for_update()' "$O" '.with_for_update()' &&
