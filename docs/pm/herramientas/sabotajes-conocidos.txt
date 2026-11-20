@@ -3,5 +3,4 @@
 # Una línea por guion. Los dos primeros campos son fijos (el selector lee el segundo); el resto, libre:
 #   vencido <guion> <fecha> <dueño: la Dev que lo arregla> <salida: retirarlo o reescribirlo> <por qué; evidencia>
 # El selector de sabotajes antes de publicar no lo elige y lo nombra.
-vencido scripts/testing/sabotajes/catalogo_largo2.sh 2026-11-20 MARIA reescribirlo b6c22ac9 (ORIGEN-2) sumó la fila ("clients", ("default_origin",)) en _migrate_catalogo_sin_tope: las dos anclas de la transacción y la de operation_items ya no están; sabotaje() imprime ROTO. Copia arreglada fuera del árbol, corrida en la tanda del 20/11 sobre 0d7401ed.
 vencido scripts/testing/sabotajes/limpieza1.sh 2026-11-20 Técnica reescribirlo c721f7fc (CI-TOPE) pasó ci.yml a timeout-minutes: 30; el guion busca 20. Copia arreglada fuera del árbol, corrida en la tanda del 20/11 sobre 0d7401ed.

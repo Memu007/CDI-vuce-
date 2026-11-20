@@ -279,10 +279,17 @@
         return label(value) || String(value || '').trim();
     }
 
+    // Los campos angostos cortan la etiqueta: al pasar el mouse se ve entero lo que tienen ahora.
+    function alPasarElMouse(campo) {
+        const mostrar = () => { campo.title = campo.value; };
+        mostrar();
+        campo.addEventListener('input', mostrar);
+    }
+
     function optionMarkup() {
         return COUNTRIES.map(country => '<option value="' + country.code + ' · ' + country.name.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '"></option>').join('');
     }
 
-    CDI.paisesMaria = Object.freeze({ countries: COUNTRIES, resolve, label, etiqueta, optionMarkup });
+    CDI.paisesMaria = Object.freeze({ countries: COUNTRIES, resolve, label, etiqueta, alPasarElMouse, optionMarkup });
 })();
 
