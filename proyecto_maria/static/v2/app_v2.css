@@ -4062,7 +4062,7 @@ tr:hover .ncm-note-pill.is-empty {
 }
 .cx-hero-tag.is-favorite { background: #fff7e6; color: #b45309; }
 /* El código va al principio: si el nombre no entra, se corta a la vista y el código queda entero. */
-.cx-hero-tag.is-origen { text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.cx-hero-tag.is-origen { text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cx-hero-meta {
     margin: 4px 0 0;
     color: var(--c-text-3);

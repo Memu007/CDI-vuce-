@@ -1957,8 +1957,9 @@
         if (fDireccion) fDireccion.value = c.direccion || '';
         if (fEmail) fEmail.value = c.email || '';
         if (fTelefono) fTelefono.value = c.telefono || '';
-        origenVisto = CDI.paisesMaria.etiqueta(c.default_origin);
-        if (fOrigen) fOrigen.value = origenVisto;
+        // Se compara con lo que el campo muestra, que pierde los saltos de línea de lo guardado.
+        if (fOrigen) fOrigen.value = CDI.paisesMaria.etiqueta(c.default_origin);
+        origenVisto = fOrigen ? fOrigen.value : '';
         if (fMoneda) fMoneda.value = c.preferred_currency || '';
         if (fNotas) fNotas.value = c.notas || '';
         if (fFechaInicActiv) fFechaInicActiv.value = c.fecha_inic_activ || '';
