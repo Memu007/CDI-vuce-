@@ -429,16 +429,16 @@ PYEOF
   echo "BASE  | el lock en verde"
   sabotaje $M "no se bloquea la fila del usuario" \
     "FALLA | tope" \
-    $'        .where(User.username == username)\n        .with_for_update()' \
+    $'        .where(User.username == username)\n        .with_for_update(key_share=True, of=User)' \
     $'        .where(User.username == username)'
   sabotaje $M "no se bloquea la fila de la organización" \
     "FALLA | estudio" \
-    $'            .where(Organization.id == db_user.organization_id)\n            .with_for_update()' \
+    $'            .where(Organization.id == db_user.organization_id)\n            .with_for_update(key_share=True, of=Organization)' \
     $'            .where(Organization.id == db_user.organization_id)'
   sabotaje $M "se cuenta con el usuario leído antes del lock" \
     "FALLA | tope" \
-    $'        .with_for_update()\n        .execution_options(populate_existing=True)\n    )\n    db_user' \
-    $'        .with_for_update()\n    )\n    db_user'
+    $'        .with_for_update(key_share=True, of=User)\n        .execution_options(populate_existing=True)\n    )\n    db_user' \
+    $'        .with_for_update(key_share=True, of=User)\n    )\n    db_user'
   sabotaje $M "borrar cliente no espera el candado de la cuenta" \
     "FALLA | borrar cliente" \
     $'        client = await _cliente_con_cuenta_bloqueada(db, client_id, username)\n        op_rows' \
