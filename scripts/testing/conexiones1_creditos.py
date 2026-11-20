@@ -186,8 +186,8 @@ def fase_carrera(c, de_org):
 
 
 def arbol():
-    fuente = inspect.getsource(main_mod.require_active_billing)
-    return (f"{main_mod.__file__}; db.commit() escrito en require_active_billing: {'db.commit()' in fuente}; "
+    fuente = inspect.getsource(main_mod.require_billing_vigente)
+    return (f"{main_mod.__file__}; suelta la conexión en require_billing_vigente: {'_soltar_conexion' in fuente}; "
             f"_leer_cuerpo: {hasattr(main_mod, '_leer_cuerpo')}")
 
 

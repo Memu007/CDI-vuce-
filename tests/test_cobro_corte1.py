@@ -593,7 +593,6 @@ def test_sin_sesion_las_rutas_que_cuentan_dan_401(cuenta):
     nadie = {"username": f"nadie_{uuid.uuid4().hex[:8]}"}
     pasos = {
         "require_billing_vigente": lambda db: main.require_billing_vigente(user=nadie, db=db),
-        "require_active_billing": lambda db: main.require_active_billing(None, user=nadie, db=db),
         "_contar_operacion_bloqueada": lambda db: main._contar_operacion_bloqueada(db, nadie["username"]),
         "_contar_maria": lambda db: main._contar_maria(db, nadie["username"], "", "X", "X", 1, "MARIA_X"),
     }
