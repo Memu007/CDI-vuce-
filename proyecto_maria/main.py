@@ -11810,7 +11810,7 @@ async def _cuenta_con_suscripciones(db: AsyncSession, username: str):
     nombres = {username, *((await db.execute(otros_con_sid)).scalars().all() if org_previa else ())}
     filas = (await db.execute(
         select(User).where(User.username.in_(nombres)).order_by(User.username)
-        .with_for_update().execution_options(populate_existing=True)
+        .with_for_update(key_share=True, of=User).execution_options(populate_existing=True)
     )).scalars().all()
     db_user = next((u for u in filas if u.username == username), None)
     if not db_user:

@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-20 · fix: con créditos vencidos, cancelar o reactivar ya no chocan con una recarga (CONEXIONES-1-PRODUCTO)
+
+- Cancelar o reactivar la suscripción al mismo tiempo que una recarga, con los créditos extra vencidos, ya no termina en error.
+
 ## 2026-11-20 · fix: en los catálogos, el origen cortado se ve entero al pasar el mouse (CATALOGO-PAIS-2)
 
 - En el catálogo del proveedor y en el del cliente, al pasar el mouse por el campo del origen se ve la etiqueta entera («423 · PAISES BAJOS»), la que el campo tiene en ese momento: lo que se escribe, lo que queda al guardar, nada si está vacío.
