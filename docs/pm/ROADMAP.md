@@ -141,7 +141,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | ✅ ORG-1 | Dev MARIA | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
 | ⏳ LEGAL-1 | Dev MARIA | Términos y privacidad con el texto de Emi; aviso de que CDI es un asistente y el despachante revisa; cómo pedir el borrado de datos (X5) |
 | ✅ ADMIN-USUARIOS-1 | Dev MARIA | Sí de Emi el 20/11 («Quiero ver usuarios y darles créditos desde el panel»), primera parte: el panel de administración lista los usuarios con su plan y sus créditos, sólo para admin, sin datos secretos y sin cambiar nada al mirar |
-| ⏳ ADMIN-CREDITOS-1 | a decidir | Sí de Emi el 20/11, segunda parte: dar créditos desde el panel por el mismo camino y candado que una recarga pagada, una sola vez por pedido, dentro del tope y con registro de quién dio cuánto. Antes, la lista de usuarios muestra el estado de cobro efectivo y el plan que se cobra (D278 b). Espera CONEXIONES-1-PRODUCTO (cambia ese candado) y las respuestas de Emi (vencimiento, tope, registro) |
+| ⏳ ADMIN-CREDITOS-1 | a decidir | Sí de Emi el 20/11, segunda parte: dar créditos desde el panel por el mismo camino y candado que una recarga pagada, una sola vez por pedido, dentro del tope y con registro de quién dio cuánto. Antes, la lista de usuarios muestra el estado de cobro efectivo y el plan que se cobra (D278 b). Espera CONEXIONES-1-PRODUCTO (cambia ese candado). Emi, 20/11 21:42: sí a los tres (los créditos dados vencen a 30 días como una recarga, respetan el tope de 100, cada carga queda registrada en una tabla nueva: copia de la base antes de publicar) |
 
 **Cierre:** publicar; el pago chico de Emi recorre todo el ciclo (cierra G7).
 
