@@ -224,12 +224,14 @@ if [ -n "$PG_URL" ]; then
     sabotaje $M "el arranque traba las tablas en una transacción" \
       '    for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "origen", "vendor_nombre")),
                             ("client_product_history", ("origen_frecuente",)),
-                            ("operation_items", ("origen",))):
+                            ("operation_items", ("origen",)),
+                            ("clients", ("default_origin",))):
         async with engine.begin() as conn:' \
       '    async with engine.begin() as conn:
      for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "origen", "vendor_nombre")),
                             ("client_product_history", ("origen_frecuente",)),
-                            ("operation_items", ("origen",))):
+                            ("operation_items", ("origen",)),
+                            ("clients", ("default_origin",))):
         if True:' \
       "FALLA | el arranque y una escritura como guardar-uso andan los dos"
     sabotaje $M "el arranque espera la tabla tomada sin tope" \
@@ -261,8 +263,8 @@ if [ -n "$PG_URL" ]; then
   CORRE=("${PRUEBA_PG_ITEMS[@]}")
   if base_en_verde "catalogo3_postgres.py"; then
     sabotaje $M "el arranque no pasa el origen de los ítems a text" \
-      '                            ("operation_items", ("origen",))):' \
-      '                            ):' \
+      '                            ("operation_items", ("origen",)),' \
+      '' \
       "FALLA | operation_items.origen pasa a text y la fila vieja queda igual"
     sabotaje $M "dos workers migran las claves sin esperarse" \
       '                await conn.exec_driver_sql("SELECT pg_advisory_xact_lock(7302551)")' \

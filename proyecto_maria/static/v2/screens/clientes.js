@@ -1426,7 +1426,7 @@
                         '<div class="cx-catalogo-producto-sub">' +
                             '<input type="text" class="cx-catalogo-producto-input" data-field="ncm" value="' + CDI.escapeHtml(p.ncm) + '" title="NCM" maxlength="10">' +
                             '<span> · Origen </span>' +
-                            '<input type="text" class="cx-catalogo-producto-input" data-field="origen" value="' + CDI.escapeHtml(CDI.paisesMaria.etiqueta(p.origen || 'XX')) + '" title="Origen">' +
+                            '<input type="text" class="cx-catalogo-producto-input" data-field="origen" value="' + CDI.escapeHtml(CDI.paisesMaria.etiqueta(p.origen || 'XX')) + '" aria-label="Origen">' +
                             '<span> · Peso </span>' +
                             '<input type="number" step="0.001" class="cx-catalogo-producto-input" data-field="peso_unitario_avg" value="' + peso + '" title="Peso unitario">' +
                             '<span> kg</span>' +
@@ -1445,6 +1445,7 @@
             input.addEventListener('change', onProductoFieldChange);
             input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); } });
         });
+        catalogoProductosList.querySelectorAll('input[data-field="origen"]').forEach(campo => CDI.paisesMaria.alPasarElMouse(campo));
         catalogoProductosList.querySelectorAll('[data-action="delete-producto"]').forEach(btn => {
             btn.addEventListener('click', onProductoDelete);
         });
@@ -1467,7 +1468,11 @@
             });
             if (!res || !res.ok) throw new Error('No se pudo guardar');
             // Si se siguió escribiendo mientras se guardaba, no se pisa.
-            if (field === 'origen' && input.value.trim() === value) input.value = CDI.paisesMaria.etiqueta(value);
+            if (field === 'origen' && input.value.trim() === value) {
+                input.value = CDI.paisesMaria.etiqueta(value);
+                // Un valor puesto por código no dispara «input»: se avisa a lo que sigue el campo.
+                input.dispatchEvent(new Event('input'));
+            }
             CDI.toast && CDI.toast.success('Producto actualizado');
             CDI.track && CDI.track('catalogo_producto_updated', { cliente_id: detailClienteId, producto_id: productoId, field });
         } catch (err) {
