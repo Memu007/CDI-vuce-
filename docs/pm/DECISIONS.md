@@ -1073,3 +1073,13 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - D205 no estaba en la pregunta: no entra; se le pregunta a Emi si va dentro de CONEXIONES-1-PRODUCTO.
 - Activas: MARIA CATALOGO-PAIS-2; la Técnica CONEXIONES-1-NOKEY sola y después CONEXIONES-1-PRODUCTO,
   con revisión fuerte (adversarios con Postgres 16). Rutinas de las dos prendidas.
+
+## 2026-11-20 15:38 UTC — CATALOGO-PAIS-2: aceptada sobre `9459a0d4`
+
+- Acta `REPRODUCCION-CATALOGO-PAIS-2-2026-11-20.md`; merge de `43f3aa29`, sin publicar y fuera de la
+  candidata `0d7401ed`. Supuestos 1 a 3 aceptados; riesgos 1 a 3 escritos, bajos.
+- Vencido `catalogo_largo2.sh` cerrado con `cbd7718c`; sale de `sabotajes-conocidos.txt`.
+- Escape de la PM: la primera corrida usó guiones de la rama de PM y dio dos ROTO falsos; repetida
+  con la copia del SHA. La regla ya existía.
+- MARIA queda sin pieza: lo suyo espera al despachante (lista de empaque, TXT reales), la pregunta 6
+  o el texto de Emi. Su rutina se apaga y se prende al asignar.
