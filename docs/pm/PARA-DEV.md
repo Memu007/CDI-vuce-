@@ -3,44 +3,31 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Devolución de CONEXIONES-1-NOKEY: `cobro_corte1.sh` perdió tres anclas (2026-11-20 14:46 UTC)
+## CONEXIONES-1-NOKEY, vuelta leída: anclas bien, se acepta con PRODUCTO (2026-11-20 17:44 UTC)
 
-**Va antes que CONEXIONES-1-PRODUCTO.** No es el veredicto de la pieza: los adversarios de la PM
-siguen corriendo sobre `331bae9f`, y D231 se contesta con el veredicto.
+Vuelta `090609bc` y `05e61efa`, informe `77556d06`. Acta `REPRODUCCION-CONEXIONES-1-NOKEY-2026-11-20.md`.
+**No es aceptación todavía:** la vuelta está encima de `7f4e04d1` y otros de PRODUCTO, así que
+NOKEY se acepta e integra junto con PRODUCTO, sobre su SHA final. No hace falta separar nada.
+Seguí con PRODUCTO, con lo sumado abajo.
 
-- **Qué pasa.** Tu arreglo (`298e5fee`) cambió las dos `.with_for_update()` de `_cuenta_bloqueada`.
-  Esas líneas son las anclas de tres sabotajes de cobro de `scripts/testing/sabotajes/cobro_corte1.sh`
-  (`:430` «no se bloquea la fila del usuario», `:434` «… de la organización», `:438` «se cuenta con el
-  usuario leído antes del lock»). Hoy no pueden dar rojo: nada prueba que la cuenta siga bloqueada
-  mientras se cobra.
-- **Es de esta pieza, no ajena.** `anclas_perdidas.py 3874a1d2` no nombra `cobro_corte1.sh`;
-  `anclas_perdidas.py 298e5fee` da las tres PERDIDA. Tu informe las puso en «Observación, no es mía».
-- **La causa.** Tocaste líneas que anclan sabotajes de plata y no corriste los guiones que vigilan
-  esa función. La regla para esta pieza y para PRODUCTO, que toca más candados:
-  `anclas_perdidas.py` sobre la base y sobre tu SHA, y toda PERDIDA nueva se arregla en la misma
-  entrega.
-- **Criterio.**
-  - Las tres anclas reescritas sobre el código de hoy, no sobre un comentario.
-  - `cobro_corte1.sh` corrido sobre el SHA de la vuelta: esos tres sabotajes en ROJO por su razón,
-    ninguno ROTO, «BASE | el lock en verde».
-  - `anclas_perdidas.py <SHA>` sin PERDIDA que no esté en la base (las dos de `catalogo_largo2.sh`
-    son de MARIA y ya tienen su arreglo).
-  - Si cambia algo de `proyecto_maria/`, decilo: los adversarios corren sobre el producto de `331bae9f`.
-
-**Tu objeción sobre `limpieza1.sh`: tenés razón.** El criterio se lee «no lo nombra como PERDIDA»;
-las seis SIN ANCLA crean o borran archivos y son así por diseño. No hace falta tocar
-`anclas_perdidas.py`. Su línea de `sabotajes-conocidos.txt` sale cuando acepte la pieza.
-
-## Vencido `limpieza1.sh`: reescribir el ancla (2026-11-20 14:07 UTC)
-
-Chica, en un commit aparte, **con tu próxima entrega** (no desplaza CONEXIONES-1-NOKEY).
-CI-TOPE (`c721f7fc`) pasó `.github/workflows/ci.yml` a `timeout-minutes: 30`, y el sabotaje
-«el job con continue-on-error» de `scripts/testing/sabotajes/limpieza1.sh` sigue buscando
-`    timeout-minutes: 20`: hoy no puede dar rojo. La PM corre fuera del árbol una copia con 30
-sobre `0d7401ed`. Sugerencia: un ancla que no dependa del número del tope.
-Criterio: ese sabotaje da rojo sobre tu SHA, y `scripts/testing/anclas_perdidas.py <SHA>`
-ya no nombra `limpieza1.sh`. Al aceptarla, la PM saca su línea de
-`docs/pm/herramientas/sabotajes-conocidos.txt`.
+- **Anclas:** `anclas_perdidas.py 05e61efa` da 0 PERDIDA (lo corrí). `limpieza1.sh` ya ancla en el
+  nombre del job (`ac4993b7`, coincide con `ci.yml`): el vencido queda cumplido y su línea de
+  `sabotajes-conocidos.txt` sale al aceptar.
+- **`conexiones1_nokey.sh` sobre `05e61efa`:** rc=0 y los tres BIEN, igual a tu informe. Como
+  «sin sabotaje: salida 0» depende de `7f4e04d1`, pasa a ser puerta de PRODUCTO.
+- **El intermitente.** «Del arnés, no de la app» queda: `dispose(` sólo está en `close_db()` y no
+  apareció el aviso `non-checked-in`. Tu arreglo espera una condición observable y queda. Pero el
+  mecanismo está incompleto: forcé la carrera con 1 s de espera en la tarea de log, antes y después
+  del `commit`, y el `soltar()` viejo pasó las dos veces (el nuevo tardó 101 s contra 44 s: la tarea
+  estaba viva en el dispose). El `soltar()` viejo ya repetía dispose + gc justo para ese camino.
+  Falta explicar por qué en tu volcado esa conexión sobrevivió 14 s de dispose + gc repetidos.
+  **Un párrafo con evidencia en el informe de PRODUCTO**; si no sale, va como riesgo abierto. Un
+  rc=2 «la app no soltó» con el `soltar()` nuevo, tuyo o mío, lo reabre como segunda causa.
+  11/12 contra 12/12 no separa el arreglo de la suerte: no lo uses como prueba.
+- **D231: (a)**, decidido por la PM: queda el pin de SQLAlchemy 2.0.25 y el `of=`.
+- La palabra del CHANGELOG se corrige en PRODUCTO: de acuerdo.
+- **No corrido por la PM:** `cobro_corte1.sh`, la suite, `e2e_maria.sh`, adversarios y
+  `/code-review` sobre `05e61efa`. Van sobre el SHA final de PRODUCTO.
 
 ## Tarea activa: CONEXIONES-1, el arreglo de producto, en dos piezas (2026-11-20 13:56 UTC)
 
@@ -74,13 +61,25 @@ Sobre la pieza 1. Comportamiento y pruebas; el cómo es tu plan (sugerencia, no 
 - las dos filas de D205 siguen como hoy («cuenta mal»): no las arregles;
 - el diff propuesto del informe entra con `git apply --check`.
 
+**Sumado a PRODUCTO (20/11, adversarios y revisión de NOKEY).** Todo esto es criterio:
+- el par recarga + cancelar y recarga + reactivar en el arnés de pares;
+- `conexiones1_creditos.py` «perdidos 10» como el rojo de D188 en la base y 0 en tu SHA;
+- para cada candado nuevo, el SQL capturado con la cache caliente, en los dos órdenes;
+- `conexiones1_creditos.py:38` todavía fija `GEMINI_API_KEY="test-key"`: que no la fije;
+- `conexiones1_nokey.sh` con «sin sabotaje: salida 0» y `anclas_perdidas.py` sobre la base y sobre
+  tu SHA, sin PERDIDA nueva, y el sabotaje «el job con continue-on-error» de `limpieza1.sh` en ROJO;
+- tu rango borra líneas de pruebas de plata (`test_cobro_corte1.py`, `test_maria1b_controles.py`,
+  `test_prelaunch_block2/3`) y el paso «activa» de `cobro_corte1.sh`: cada una con su porqué, y la
+  cuenta de ROJO de `cobro_corte1.sh` (hoy 87) contra la última aceptada;
+- el 500 por clave foránea en alta contra borrar cliente queda como riesgo escrito, sin arreglarlo.
+
 ### Revisión fuerte (las dos piezas; en la 1, en proporción a sus líneas)
 
 `/security-review`, adversarios **con Postgres 16** (el de D corrió con SQLite), la suite completa
 desde base limpia sobre el SHA que entregás, `e2e_maria.sh`, y un guion de sabotaje propio anclado en
 código. Adversarios sin red y con `GEMINI_API_KEY` vacía.
 
-**Próxima D: D231.**
+**Próxima D: D232.**
 
 ## CI-TOPE: aceptada sobre `c721f7fc` (informe `a0299443`) e integrada (2026-11-17 00:50 UTC)
 

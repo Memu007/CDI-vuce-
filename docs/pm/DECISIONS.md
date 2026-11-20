@@ -1083,3 +1083,41 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   con la copia del SHA. La regla ya existía.
 - MARIA queda sin pieza: lo suyo espera al despachante (lista de empaque, TXT reales), la pregunta 6
   o el texto de Emi. Su rutina se apaga y se prende al asignar.
+
+## 2026-11-20 15:43 UTC — CONEXIONES-1-NOKEY: adversarios y negativo de la PM
+
+- Opus y Sonnet sobre `331bae9f`: nada que bloquee. Preexistentes, iguales en la base: recarga
+  perdida contra el alta con créditos vencidos (D188, en PRODUCTO), vencimiento viejo que pisa una
+  renovación (D205, con Emi), 500 por clave foránea en alta contra borrar cliente (riesgo escrito,
+  fuera de D182/D183/D188).
+- Negativo de la PM: sin el arreglo de organizaciones, `conexiones1_pares.py` da «FOR UPDATE | MAL»
+  en el SQL capturado y los mismos 3 deadlocks que con el arreglo. Lo sostiene el SQL que manda el
+  motor, que es observable: no se pide otro caso.
+- A la devolución se suma el diagnóstico del intermitente «la app no soltó sus conexiones».
+- Para PRODUCTO, antes de activarla: par recarga + cancelar/reactivar en el arnés,
+  `conexiones1_creditos.py` «perdidos 10» como rojo a verde de D188, chequeo de SQL capturado con la
+  cache caliente en los dos órdenes para cada candado nuevo, y que ese guion no fije GEMINI_API_KEY.
+
+## 2026-11-20 17:44 UTC — CONEXIONES-1-NOKEY: vuelta leída, se acepta con PRODUCTO
+
+- Vuelta `090609bc` + `05e61efa` (informe `77556d06`) está encima de commits de PRODUCTO: NOKEY se
+  acepta e integra con PRODUCTO sobre su SHA final. Decidido por la PM, con el consejero.
+- Corrido: `anclas_perdidas.py 05e61efa` 0 PERDIDA; `conexiones1_nokey.sh` rc=0, tres BIEN.
+- Intermitente: del arnés y no de la app; mi carrera forzada (1 s antes y después del `commit` de
+  la tarea de log) no tumba el `soltar()` viejo, así que el mecanismo queda incompleto. Se pide un
+  párrafo en PRODUCTO; si no, riesgo abierto.
+- D231 (a). Lo de PRODUCTO que estaba sólo acá pasó a `PARA-DEV.md`, Pieza 2.
+
+## 2026-11-20 18:46 UTC — Panel de admin: ver usuarios y darles créditos
+
+- Emi, 20/11: «Quiero ver usuarios y darles créditos desde el panel». Entra al roadmap como dos
+  piezas (consejero): ADMIN-USUARIOS-1 (ver) a MARIA ya; ADMIN-CREDITOS-1 (dar) espera.
+- Hoy: `/dev/dashboard` y `admin_router.py` están detrás de `require_admin`, sin usuarios ni créditos.
+  Una recarga pagada suma `TOPUP_OPS` (10) al saldo y pone el vencimiento de todo el saldo a 30 días;
+  el tope es `EXTRA_OPS_MAX` (100). El saldo de una integrante de estudio es el del estudio.
+- Dar créditos espera a CONEXIONES-1-PRODUCTO porque esa pieza cambia el candado de la cuenta en
+  `main.py`; se construye sobre su SHA final y con ese candado.
+- Supuesto, sin preguntar: sólo dar, no quitar; a una integrante de estudio se le carga al estudio.
+- A Emi, con recomendación: ¿vencen como los comprados (rec. sí, 30 días)? ¿rige el tope de 100
+  (rec. sí)? ¿queda registro de quién, a quién, cuánto y por qué (rec. sí; tabla nueva, copia de la
+  base al publicar)?

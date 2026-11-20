@@ -3,6 +3,52 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
+## Tarea activa: ADMIN-USUARIOS-1 (2026-11-20 18:47 UTC)
+
+**Sí de Emi (20/11): «Quiero ver usuarios y darles créditos desde el panel».** Esta pieza es la
+primera parte: **ver**. Dar créditos es ADMIN-CREDITOS-1 y no entra acá (espera la pieza de la
+Técnica que cambia el candado de la cuenta, y respuestas de Emi). Ningún botón ni ruta que escriba.
+Antes de tocar código: `merge` de mi rama y tu `/compact conservar` al día.
+
+**Hoy:** `/dev/dashboard` (`dev_dashboard.html`) y `routers/admin_router.py` están detrás de
+`require_admin`; no hay nada de usuarios ni de créditos. Revisión fuerte (permisos y datos, §3).
+
+**Comportamiento:** en el panel de admin, una sección «Usuarios» lista cada cuenta con: usuario,
+email, plan, estado de cobro, operaciones usadas en el período, créditos extra vigentes y hasta
+cuándo vencen, fecha de la última recarga, estudio (si es integrante) y si es admin.
+- **Sólo admin:** sin sesión, 401; con sesión de no admin, 403; en los dos casos sin datos.
+- **Nada secreto:** nunca sale la contraseña ni su hash, `active_jti`, tokens de recuperación o de
+  invitación, ids de pago de Mercado Pago (`last_payment_id`, `payment_customer_id`) ni datos de la
+  tarjeta.
+- **Integrante de estudio:** muestra el saldo y el plan del estudio, que es el que gasta, y dice que
+  es del estudio.
+- **Mirar no cambia nada:** créditos vencidos se muestran como 0 vigentes sin escribir la base
+  (`_expire_extra_ops` pone el saldo en 0 sobre el objeto; si la ruta lo usa y hace `commit`, cambia
+  datos). Las filas quedan iguales antes y después de mirar.
+- Con muchas cuentas no se traba ni manda todo de una vez (límite por página o búsqueda: a tu
+  criterio, decilo en el informe).
+
+**La familia** (un caso por causa, entradas como datos): cuenta sola con créditos vigentes, con
+créditos vencidos, sin créditos, integrante de estudio, admin por rol guardado, y los tres que piden
+la página (sin sesión, no admin, admin).
+
+**Prueba:**
+- que **todas** las rutas de admin, nuevas y viejas, den 403 a un no admin, sacadas de las rutas de
+  la app y no de una lista a mano;
+- que la respuesta no traiga ninguna clave prohibida, mirando la respuesta entera;
+- que la base quede igual después de listar una cuenta con créditos vencidos;
+- el informe muestra una vez el rojo con cada arreglo revertido en el mismo SHA, y trae tu guion de
+  sabotaje (sacar el `require_admin`, devolver un campo prohibido, hacer `commit` del vencido).
+
+*Sugerencia (no es criterio):* las rutas en `admin_router.py`, que ya monta con `require_admin`, y no
+tocar `main.py`, que la Técnica está cambiando.
+
+**Puertas:** `chequeo-6`, tu caso y tu guion de sabotaje, adversarios Sonnet y Opus alto, y la suite
+completa desde base limpia sobre el SHA (tocás el servidor). `e2e_maria.sh` sólo si tocás `static/v2`.
+Sin datos reales: cuentas de prueba.
+
+**Próxima D: D278.**
+
 ## Veredicto: CATALOGO-PAIS-2 aceptada sobre `9459a0d4` (informe `43f3aa29`) (2026-11-20 15:38 UTC)
 
 Acta: `REPRODUCCION-CATALOGO-PAIS-2-2026-11-20.md`. La integro con `merge` de `43f3aa29`; sin
