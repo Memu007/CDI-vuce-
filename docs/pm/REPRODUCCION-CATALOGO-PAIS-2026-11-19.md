@@ -80,3 +80,44 @@ encontré yo, arriba). Notas, ninguna causada por este diff:
 - **Riesgo 7, `catalogo3.sh` tarda ~70–80 min**: a la cola de limpieza.
 - **Hueco del caso de MARIA** (sólo siembra códigos; con el PUT del cliente saboteado su caso pasa y
   el mío falla): a la cola de limpieza, las formas viejas como datos en su caso.
+
+## Vuelta sobre `8140f496` (informe `d2169ef0`) (2026-11-20)
+
+Sólo cambia `app_v2.css` (+2/−2 contra `4904e5a1`): el bloque del producto del cliente puede achicarse
+(`flex: 1; min-width: 0`) y el campo del origen pasa de ancho fijo a `flex: 1 1 36px; min-width: 36px;
+max-width: 30ch`, sin `text-transform: uppercase`. El catálogo del proveedor no cambia.
+
+**Puertas, corridas por la PM sobre `8140f496`:**
+- `chequeo-6.py 4904e5a1 8140f496`: «producto +2/−2», «avisos: 0». La pieza entera
+  (`695a5377..8140f496`): «producto +9/−13», historia vacía, «avisos: 0».
+- `holanda423.sh`: «113 passed», «OK: pantalla Holanda→423», 34 ROJO iguales mensaje a mensaje a los del
+  informe, «sabotajes sin rojo: 0».
+- `paises_nombres.sh`: «22 passed», 9 ROJO, «OK: todos los sabotajes en rojo».
+- `e2e_maria.sh`: «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y
+  memoria verificadas.»
+- Capturas del informe (cliente 1280, 960 y 841; proveedor 1280 y 960): sólo datos inventados.
+
+**Ejes míos, no dados en la devolución** (chequeo propio en navegador, fuera del repo, con Inter; con
+Arial no lo corrí):
+- Fila recién guardada y Enter: a 850 px escribo «emiratos arabes» y Enter; queda «331 · EMIRATOS
+  ARABES,UNID» en el campo, con el comienzo a la vista (`scrollLeft` 0, también al salir del campo).
+- Lo que no es un país, con formas mezcladas («Narnia», «tierra Média»): se ve con sus letras en los
+  dos catálogos. En la base se veía en mayúsculas y el campo del cliente no guardaba («pai», por el
+  `maxlength` de 3).
+- El código del país entero en el campo a 460, 521, 641, 721, 841, 850, 960, 1040 y 1280 px (el ancho
+  libre más chico, 30 px a 460, alcanza para «331»).
+- Catálogo del proveedor de 320 a 1440 px: un renglón y el mismo alto.
+- Zoom: sin fallas en la corrida extendida.
+- El desborde horizontal de la página (641–1140 y 460–521 px) da el mismo ancho de documento en la
+  base: no lo trae esta pieza.
+
+**No corrido en la vuelta:** `catalogo3.sh` y la suite completa (sólo cambió CSS; los corrí sobre
+`4904e5a1`), `/security-review` (sin servidor ni datos nuevos) y navegadores reales de Windows y macOS.
+
+**Decidido por la PM, con el consejero:**
+- Aceptada sobre `8140f496` e integrada con `merge` de `d2169ef0`.
+- D275 (a): el texto largo que no entra en el campo, aceptado como riesgo. Según su tabla con Inter, no
+  entran 36 etiquetas a ancho completo, 61 a 960 px, 301 a 841 px y 308 a 460 px. La base mostraba sólo
+  el código, y el código queda entero en todos esos anchos. La (b), la etiqueta entera en `title`, va a
+  Emi como propuesta.
+- Los riesgos 2 a 7 de su informe quedan escritos; los siete sabotajes de CSS se quedan.

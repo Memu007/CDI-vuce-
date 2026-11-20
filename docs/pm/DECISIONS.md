@@ -1041,3 +1041,14 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   `catalogo3.sh` (~70–80 min) y el caso que sólo siembra códigos, a `COLA-LIMPIEZA.md`. A ORIGEN-2 se
   le suman los valores ya recortados a 3 («CHI», «HOL») en el caso de la migración y el riesgo de
   `calculadora.js:112`.
+
+## 2026-11-20 00:05 UTC — CATALOGO-PAIS: aceptada sobre `8140f496` (sin publicar)
+
+- Los dos catálogos muestran el origen con código y nombre; la fila del cliente queda en un renglón en
+  cada disposición y lo que no es un país se ve con sus letras. Acta
+  `REPRODUCCION-CATALOGO-PAIS-2026-11-19.md`, sección «Vuelta sobre `8140f496`».
+- Decidido por la PM, con el consejero: D275 (a), el texto largo que no entra en el campo queda como
+  riesgo (36 etiquetas a ancho completo, 61 a 960 px, 301 a 841 px, 308 a 460 px; el código queda
+  entero). La (b), la etiqueta entera en `title`, va a Emi como propuesta. El desplazamiento horizontal
+  de la página ya estaba en la base.
+- Activa ORIGEN-2; a su ficha del cliente se le suma la misma medida de la fila y sin mayúsculas forzadas.
