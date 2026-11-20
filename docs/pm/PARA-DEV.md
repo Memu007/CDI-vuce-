@@ -72,6 +72,9 @@ Sobre la pieza 1. Comportamiento y pruebas; el cómo es tu plan (sugerencia, no 
   `test_prelaunch_block2/3`) y el paso «activa» de `cobro_corte1.sh`: cada una con su porqué, y la
   cuenta de ROJO de `cobro_corte1.sh` (hoy 87) contra la última aceptada;
 - el 500 por clave foránea en alta contra borrar cliente queda como riesgo escrito, sin arreglarlo.
+- MARIA (ADMIN-USUARIOS-1, integrada hoy en mi rama) movió anclas de `cobro_corte1.sh` y
+  `cobro_mp2.sh` al sacar `como_utc` a `billing_service.py`. Después del `merge` de mi rama:
+  `anclas_perdidas.py` sobre la unión sin PERDIDA nueva, y `cobro_corte1.sh` entero en rojo.
 
 ### Revisión fuerte (las dos piezas; en la 1, en proporción a sus líneas)
 

@@ -3,94 +3,34 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Tarea activa: ADMIN-USUARIOS-1 (2026-11-20 18:47 UTC)
+## Veredicto: ADMIN-USUARIOS-1 aceptada sobre `b06b47fa` (informe `a8edd311`) (2026-11-20 20:13 UTC)
 
-**Sí de Emi (20/11): «Quiero ver usuarios y darles créditos desde el panel».** Esta pieza es la
-primera parte: **ver**. Dar créditos es ADMIN-CREDITOS-1 y no entra acá (espera la pieza de la
-Técnica que cambia el candado de la cuenta, y respuestas de Emi). Ningún botón ni ruta que escriba.
-Antes de tocar código: `merge` de mi rama y tu `/compact conservar` al día.
-
-**Hoy:** `/dev/dashboard` (`dev_dashboard.html`) y `routers/admin_router.py` están detrás de
-`require_admin`; no hay nada de usuarios ni de créditos. Revisión fuerte (permisos y datos, §3).
-
-**Comportamiento:** en el panel de admin, una sección «Usuarios» lista cada cuenta con: usuario,
-email, plan, estado de cobro, operaciones usadas en el período, créditos extra vigentes y hasta
-cuándo vencen, fecha de la última recarga, estudio (si es integrante) y si es admin.
-- **Sólo admin:** sin sesión, 401; con sesión de no admin, 403; en los dos casos sin datos.
-- **Nada secreto:** nunca sale la contraseña ni su hash, `active_jti`, tokens de recuperación o de
-  invitación, ids de pago de Mercado Pago (`last_payment_id`, `payment_customer_id`) ni datos de la
-  tarjeta.
-- **Integrante de estudio:** muestra el saldo y el plan del estudio, que es el que gasta, y dice que
-  es del estudio.
-- **Mirar no cambia nada:** créditos vencidos se muestran como 0 vigentes sin escribir la base
-  (`_expire_extra_ops` pone el saldo en 0 sobre el objeto; si la ruta lo usa y hace `commit`, cambia
-  datos). Las filas quedan iguales antes y después de mirar.
-- Con muchas cuentas no se traba ni manda todo de una vez (límite por página o búsqueda: a tu
-  criterio, decilo en el informe).
-
-**La familia** (un caso por causa, entradas como datos): cuenta sola con créditos vigentes, con
-créditos vencidos, sin créditos, integrante de estudio, admin por rol guardado, y los tres que piden
-la página (sin sesión, no admin, admin).
-
-**Prueba:**
-- que **todas** las rutas de admin, nuevas y viejas, den 403 a un no admin, sacadas de las rutas de
-  la app y no de una lista a mano;
-- que la respuesta no traiga ninguna clave prohibida, mirando la respuesta entera;
-- que la base quede igual después de listar una cuenta con créditos vencidos;
-- el informe muestra una vez el rojo con cada arreglo revertido en el mismo SHA, y trae tu guion de
-  sabotaje (sacar el `require_admin`, devolver un campo prohibido, hacer `commit` del vencido).
-
-*Sugerencia (no es criterio):* las rutas en `admin_router.py`, que ya monta con `require_admin`, y no
-tocar `main.py`, que la Técnica está cambiando.
-
-**Puertas:** `chequeo-6`, tu caso y tu guion de sabotaje, adversarios Sonnet y Opus alto, y la suite
-completa desde base limpia sobre el SHA (tocás el servidor). `e2e_maria.sh` sólo si tocás `static/v2`.
-Sin datos reales: cuentas de prueba.
-
-**Próxima D: D278.**
-
-## Veredicto: CATALOGO-PAIS-2 aceptada sobre `9459a0d4` (informe `43f3aa29`) (2026-11-20 15:38 UTC)
-
-Acta: `REPRODUCCION-CATALOGO-PAIS-2-2026-11-20.md`. La integro con `merge` de `43f3aa29`; sin
-publicar. Reproduje con las copias de `9459a0d4`: chequeo-6 (+16/−3, el AVISO del envoltorio
-explicado), `holanda423.sh` (34 ROJO, 0 ROTO), dos negativos míos (`'input'`→`'keyup'` y el `title`
-con lo que vino del servidor: los dos rojos), `catalogo_largo2.sh` en PG16 (39 ROJO, «fallas: 0»),
-`anclas_perdidas.py` (ya no te nombra) y `e2e_maria.sh` sobre el SHA y la unión: todo verde. Leí que
-el `input` que manda el guardado sólo lo escucha `mostrar`, y que el cambio de `clientes.js` queda en
-las filas del catálogo, no en la ficha.
+Acta: `REPRODUCCION-ADMIN-USUARIOS-1-2026-11-20.md`. La integro con `merge` de `a8edd311`; sin
+publicar y fuera de la candidata `0d7401ed`. Reproduje con la copia de `b06b47fa`: chequeo-6 (igual
+que el informe, el AVISO explicado), tus comandos 1 a 4 (`35 passed`, `fallas: 0`, `8 failed … 27
+errors`, 27 ROJO), un negativo mío con sesiones reales (seis roles que no son admin dan 403 sin
+datos; rojo con la bandera o con `_es_admin` comparando texto), adversarios Sonnet y Opus alto (nada
+grave) y la suite completa desde worktree limpio (`6241 passed, 110 skipped, 3 xfailed`, como el tuyo). No corrí Postgres ni
+`panel_dev.sh`: me apoyo en tu sonda.
 
 **Decidido por la PM:**
-- Supuestos 1 a 3 (`title` siempre presente, `aria-label="Origen"`, la sugerencia del navegador
-  simulada con `insertReplacementText`): aceptados.
-- Riesgos 1 a 3 (táctil y teclado no ven el `title`, el lector de pantalla puede repetir el valor,
-  el tooltip nativo no se vio sin ventana): riesgo escrito, bajo.
-- Vencido `catalogo_largo2.sh`: cerrado con `cbd7718c`; su línea sale de `sabotajes-conocidos.txt`.
+- **D278: (b).** Leí `_check_expired_trials`: cubre `trial` y `active` con gracia, pero sólo al
+  arrancar; al usar lo vencen `_vencer_si_corresponde` y `get_current_user`. El hueco queda como
+  riesgo escrito. No se abre (a) ahora porque pide tocar `main.py` mientras la Técnica lo cambia.
+  Mostrar el estado efectivo y el plan que se cobra pasa a ser criterio del paso previo a
+  ADMIN-CREDITOS-1, después de CONEXIONES-1-PRODUCTO.
+- **Supuestos 1 a 6:** aceptados.
+- **Riesgo 2:** lo confirmé en el código. Los tres caminos que crean cuentas (registro, alta de
+  estudio, demo) guardan «premium»; el «trial» sólo es el valor por defecto del modelo. Riesgo
+  escrito, bajo.
+- **Riesgos 1, 3 a 6** y los de los adversarios (un `creditos_extra` negativo se ve tal cual; un
+  plan `NULL` sale `None`; en SQLite un `roles` con JSON roto da 500 en la lista): riesgo escrito,
+  bajo.
 
-**Ahora no tenés pieza.** Lo tuyo que queda en el roadmap espera a alguien de afuera (la lista de
-empaque y los TXT reales del despachante, la pregunta 6, el texto de Emi). Al leer esto: `merge` de
-mi rama, tu `/compact conservar` al día, y no arranques nada. Apago tu rutina; la prendo cuando te
-asigne. **Próxima D: D278.**
-
-## Veredicto: ORIGEN-2 aceptada sobre `0d7401ed` (informe `76b98256`) (2026-11-20 02:20 UTC)
-
-Acta: `REPRODUCCION-ORIGEN-2-2026-11-20.md`. La integro con `merge` de `76b98256`; sin publicar, y antes
-de publicar va la copia de la base. Reproduje chequeo-6, `test_origen2.py`, `origen2_postgres.py` en
-PG16 (`fallas: 0`), `origen2.sh` (24 ROJO, «sabotajes sin rojo: 0»), el pytest entero (6231 passed) y
-`e2e_maria.sh` sobre el SHA y la unión. Probé tipos que no son texto, NUL, surrogate, letra ancha, PUT
-con sólo el origen y las doce siglas del selector de producción: todo bien.
-
-**Una cuenta mal:** la tabla del informe dice «25 ROJO»; tu salida pegada, la mía y el guion dan 24.
-La próxima vez, la cuenta sale de la salida, no de memoria.
-
-**Decidido por la PM:**
-- **D276 (a):** el alta sin origen sigue guardando «CN», como la base.
-- **D277 (a):** riesgo escrito. El selector de producción sólo mandó doce siglas de dos letras, que
-  pasan; tu consulta de sólo lectura se la ofrezco a Emi, opcional, con la copia.
-- **Riesgo 2** (traba de `clients` al arrancar): va en la nota de publicar, con la copia.
-- **Riesgos 1 y 6** (calculadora y moneda recortadas a 3, reconstrucción de SQLite): cambian
-  comportamiento; se los propongo a Emi. No te los asigno.
-- El adversario reprodujo que un GET devuelto entero con PUT da 400 para un «CHI» viejo. La pantalla
-  no lo manda y producción no tiene esos valores: riesgo escrito, sin código.
+**Ahora no tenés pieza.** Lo tuyo que queda espera a alguien de afuera (ADMIN-CREDITOS-1 espera a
+la Técnica y a Emi; la lista de empaque, los TXT reales, la pregunta 6, el texto de Emi). Al leer
+esto: `merge` de mi rama, tu `/compact conservar` al día, y no arranques nada. Tu rutina quedó apagada; la
+prendo cuando te asigne. **Próxima D: D279.**
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 

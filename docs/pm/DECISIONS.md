@@ -1121,3 +1121,8 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - A Emi, con recomendación: ¿vencen como los comprados (rec. sí, 30 días)? ¿rige el tope de 100
   (rec. sí)? ¿queda registro de quién, a quién, cuánto y por qué (rec. sí; tabla nueva, copia de la
   base al publicar)?
+- ADMIN-USUARIOS-1 aceptada sobre `b06b47fa` (decidido por la PM). D278 (b): la lista muestra el
+  estado de cobro guardado. El vencimiento se aplica al arrancar y al usar la cuenta: una que venció
+  después del último arranque y no entró se ve con el estado viejo. Mostrar el efectivo y el plan
+  que se cobra pasa a criterio antes de dar créditos: pide tocar `main.py`, que espera a
+  CONEXIONES-1-PRODUCTO.
