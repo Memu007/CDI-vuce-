@@ -27,6 +27,14 @@ siguen corriendo sobre `331bae9f`, y D231 se contesta con el veredicto.
     son de MARIA y ya tienen su arreglo).
   - Si cambia algo de `proyecto_maria/`, decilo: los adversarios corren sobre el producto de `331bae9f`.
 
+**Sumado 15:43 UTC, misma vuelta: diagnosticar el intermitente de `conexiones1_rondas.py:104`.**
+Los dos adversarios vieron «la app no soltó sus conexiones: idle … COMMIT;» en `331bae9f` y en la
+base (uno midió 3 de 12 procesos en HEAD y 4 de 12 en la base): una conexión queda idle desde la
+primera ronda y desde ahí fallan todas. Tu informe no lo nombra. Pido causa, no arreglo: ¿la app
+deja una conexión fuera del pool (producto) o el chequeo del arnés le gana al pool al devolverla
+(arnés)? Con evidencia, y si es del arnés, el arreglo va en esta vuelta; si es de la app, decilo y
+no lo toques.
+
 **Tu objeción sobre `limpieza1.sh`: tenés razón.** El criterio se lee «no lo nombra como PERDIDA»;
 las seis SIN ANCLA crean o borran archivos y son así por diseño. No hace falta tocar
 `anclas_perdidas.py`. Su línea de `sabotajes-conocidos.txt` sale cuando acepte la pieza.

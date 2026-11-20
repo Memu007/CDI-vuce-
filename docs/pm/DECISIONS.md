@@ -1083,3 +1083,17 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   con la copia del SHA. La regla ya existía.
 - MARIA queda sin pieza: lo suyo espera al despachante (lista de empaque, TXT reales), la pregunta 6
   o el texto de Emi. Su rutina se apaga y se prende al asignar.
+
+## 2026-11-20 15:43 UTC — CONEXIONES-1-NOKEY: adversarios y negativo de la PM
+
+- Opus y Sonnet sobre `331bae9f`: nada que bloquee. Preexistentes, iguales en la base: recarga
+  perdida contra el alta con créditos vencidos (D188, en PRODUCTO), vencimiento viejo que pisa una
+  renovación (D205, con Emi), 500 por clave foránea en alta contra borrar cliente (riesgo escrito,
+  fuera de D182/D183/D188).
+- Negativo de la PM: sin el arreglo de organizaciones, `conexiones1_pares.py` da «FOR UPDATE | MAL»
+  en el SQL capturado y los mismos 3 deadlocks que con el arreglo. Lo sostiene el SQL que manda el
+  motor, que es observable: no se pide otro caso.
+- A la devolución se suma el diagnóstico del intermitente «la app no soltó sus conexiones».
+- Para PRODUCTO, antes de activarla: par recarga + cancelar/reactivar en el arnés,
+  `conexiones1_creditos.py` «perdidos 10» como rojo a verde de D188, chequeo de SQL capturado con la
+  cache caliente en los dos órdenes para cada candado nuevo, y que ese guion no fije GEMINI_API_KEY.
