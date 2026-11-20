@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Negativos de lo que muestra la pantalla para un origen: cada sabotaje deshace
-# una llamada a `mostrar` (paises_maria.js), que en los catálogos pone el código
-# que sale en el TXT en lugar del 434, o a `etiqueta`, que en el «Origen
-# frecuente» y la procedencia de la revisión pone el código y el nombre del TXT.
-# El caso de tests/test_catalogo3.py y la pantalla tienen que fallar con su frase.
+# una llamada a `etiqueta` (paises_maria.js), que en los catálogos, el «Origen
+# frecuente» y la procedencia de la revisión pone el código y el nombre del TXT,
+# o el campo donde se ve y se escribe. El caso de tests/test_catalogo3.py y la
+# pantalla tienen que fallar con su frase.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/holanda423.sh [SHA]
 # Trabaja en un worktree descartable con su propia SQLite, una API local por
@@ -16,15 +16,15 @@ J=proyecto_maria/static/v2/paises_maria.js
 CAT=proyecto_maria/static/v2/screens/catalogo.js
 CLI=proyecto_maria/static/v2/screens/clientes.js
 REV=proyecto_maria/static/v2/screens/review.js
-MUESTRA="return (code && REEMPLAZOS[code[1]] && resolve(value)) || String(value ?? '');"
+CSS=proyecto_maria/static/v2/app_v2.css
 ETIQUETA="return label(value) || String(value || '').trim();"
 ETQ=test_la_etiqueta_es_la_del_txt
 
-# 0. La etiqueta vaciada: se ve lo de antes, el código del TXT sólo en lugar del 434.
-sabotaje casos $J "la etiqueta es lo que muestra el catálogo" "$ETIQUETA" "return mostrar(value);" \
+# 0. La etiqueta vaciada: se ve lo que vino.
+sabotaje casos $J "la etiqueta es lo que vino" "$ETIQUETA" "return String(value || '').trim();" \
   "AssertionError" $ETQ
-sabotaje pantalla $J "la etiqueta es lo que muestra el catálogo" "$ETIQUETA" "return mostrar(value);" \
-  "FALLA: el origen frecuente «434» se ve «423»"
+sabotaje pantalla $J "la etiqueta es lo que vino" "$ETIQUETA" "return String(value || '').trim();" \
+  "FALLA: catálogo del proveedor: «434» guardado se ve «434»"
 sabotaje casos $J "la etiqueta es sólo el código" "$ETIQUETA" "return resolve(value) || String(value || '').trim();" \
   "AssertionError" $ETQ
 sabotaje casos $J "la etiqueta escribe «null» por lo que falta" "$ETIQUETA" "return label(value) || String(value).trim();" \
@@ -34,29 +34,76 @@ sabotaje casos $J "la etiqueta deja los blancos de los bordes" "$ETIQUETA" \
 sabotaje pantalla $CLI "el origen frecuente se ve como HTML" "kpiOrigen.textContent   = CDI.paisesMaria.etiqueta(" \
   "kpiOrigen.innerHTML   = CDI.paisesMaria.etiqueta(" "FALLA: el origen frecuente «<img"
 
-# 1. `mostrar` pone el código del TXT en lugar del reemplazado.
-sabotaje casos $J "mostrar devuelve lo que vino" "$MUESTRA" "return String(value ?? '');" \
-  "At index 0 diff: '434' != '423'" test_holanda_y_paises_bajos_son_423
-sabotaje casos $J "mostrar escribe «null» por lo que falta" "$MUESTRA" \
-  "return (code && REEMPLAZOS[code[1]] && resolve(value)) || String(value);" \
-  "'null' != ''" test_holanda_y_paises_bajos_son_423
-sabotaje casos $J "mostrar recorta lo que no es el 434" "$MUESTRA" \
-  "return (code && REEMPLAZOS[code[1]] && resolve(value)) || String(value ?? '').trim();" \
-  "'Holanda' != ' Holanda '" test_holanda_y_paises_bajos_son_423
-sabotaje pantalla $J "mostrar devuelve lo que vino" "$MUESTRA" "return String(value ?? '');" \
-  "FALLA: catálogo del proveedor: «434» guardado se ve «434»"
-
-# 2. Cada lugar que muestra un origen guardado o escrito lo pasa por `mostrar`.
+# 1. Cada lugar que muestra un origen guardado o escrito lo pasa por `etiqueta`.
 sabotaje pantalla $CAT "el catálogo del proveedor muestra lo guardado" \
-  "const origen = CDI.paisesMaria.mostrar(p.origen);" "const origen = p.origen || '';" \
+  "const origen = CDI.paisesMaria.etiqueta(p.origen);" "const origen = p.origen || '';" \
   "FALLA: catálogo del proveedor: «434» guardado se ve «434»"
+sabotaje pantalla $CAT "el catálogo del proveedor muestra lo guardado como HTML" \
+  "value=\"' + CDI.escapeHtml(origen) + '\"" "value=\"' + origen + '\"" \
+  "FALLA: catálogo del proveedor: «<img"
 sabotaje pantalla $CLI "el catálogo del cliente muestra lo guardado" \
-  "CDI.escapeHtml(CDI.paisesMaria.mostrar(p.origen || 'XX'))" "CDI.escapeHtml(p.origen || 'XX')" \
+  "CDI.escapeHtml(CDI.paisesMaria.etiqueta(p.origen || 'XX'))" "CDI.escapeHtml(p.origen || 'XX')" \
   "FALLA: catálogo del cliente: «434» guardado se ve «434»"
+sabotaje pantalla $CLI "el catálogo del cliente muestra lo guardado como HTML" \
+  "CDI.escapeHtml(CDI.paisesMaria.etiqueta(p.origen || 'XX'))" "CDI.paisesMaria.etiqueta(p.origen || 'XX')" \
+  "FALLA: catálogo del cliente: «<img"
 sabotaje pantalla $CLI "el catálogo del cliente deja lo escrito" \
-  "            if (field === 'origen' && input.value.trim() === value) input.value = CDI.paisesMaria.mostrar(value);
+  "            if (field === 'origen' && input.value.trim() === value) input.value = CDI.paisesMaria.etiqueta(value);
 " "" \
   "FALLA: «434» escrito en el catálogo del cliente se ve «434»"
+
+# 2. El campo del origen deja escribir un nombre y lo muestra entero.
+sabotaje pantalla $CLI "el catálogo del cliente corta el origen en 3" \
+  "CDI.paisesMaria.etiqueta(p.origen || 'XX')) + '\" title=\"Origen\">'" \
+  "CDI.paisesMaria.etiqueta(p.origen || 'XX')) + '\" title=\"Origen\" maxlength=\"3\">'" \
+  "FALLA: «CHINA» escrito en origen del catálogo del cliente se ve «CHI»"
+ORIGEN_CLI='.cx-catalogo-producto-input[data-field="origen"] { flex: 1 1 36px; min-width: 36px; max-width: 30ch; }'
+sabotaje pantalla $CSS "el origen del catálogo del cliente no llega a Emiratos" \
+  "$ORIGEN_CLI" '.cx-catalogo-producto-input[data-field="origen"] { flex: 1 1 36px; min-width: 36px; max-width: 22ch; }' \
+  "FALLA: catálogo del cliente: «331 · EMIRATOS ARABES,UNID» no entra en el campo"
+sabotaje pantalla $CSS "el origen del catálogo del cliente no crece con la fila" \
+  ".cx-catalogo-producto-main { flex: 1; min-width: 0; }" ".cx-catalogo-producto-main { min-width: 0; }" \
+  "FALLA: catálogo del cliente: «331 · EMIRATOS ARABES,UNID» no entra en el campo"
+sabotaje pantalla $CSS "el origen del catálogo del cliente con ancho fijo" \
+  "$ORIGEN_CLI" '.cx-catalogo-producto-input[data-field="origen"] { width: 30ch; }' \
+  "FALLA: catálogo del cliente a 841 px: baja de renglón la fila de «"
+sabotaje pantalla $CSS "el origen del catálogo del cliente no se achica hasta el ancho de la base" \
+  "$ORIGEN_CLI" '.cx-catalogo-producto-input[data-field="origen"] { flex: 1 1 36px; min-width: 48px; max-width: 30ch; }' \
+  "FALLA: catálogo del cliente a 460 px: baja de renglón la fila de «"
+sabotaje pantalla $CSS "el origen del catálogo del cliente en mayúsculas" \
+  "$ORIGEN_CLI" '.cx-catalogo-producto-input[data-field="origen"] { flex: 1 1 36px; min-width: 36px; max-width: 30ch; text-transform: uppercase; }' \
+  "FALLA: catálogo del cliente: «Narnia» guardado no se ve con sus letras"
+sabotaje pantalla $CSS "el origen del catálogo del proveedor en mayúsculas" \
+  "    width: 100%;
+    min-width: 0;
+    padding: 6px 8px;" "    width: 100%;
+    min-width: 0;
+    text-transform: uppercase;
+    padding: 6px 8px;" \
+  "FALLA: catálogo del proveedor: «Narnia» guardado no se ve con sus letras"
+sabotaje pantalla $CSS "los campos del catálogo del proveedor bajan de renglón en el teléfono" \
+  "    grid-template-columns: 1fr 2fr;
+    gap: var(--s-2);
+}
+.catalogo-product-field {" "    grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+    gap: var(--s-2);
+}
+.catalogo-product-field {" \
+  "FALLA: catálogo del proveedor a 320 px: baja de renglón la fila de «"
+sabotaje pantalla $CSS "el origen del catálogo del proveedor en el ancho de un código" \
+  "    grid-template-columns: 1fr 2fr;
+    gap: var(--s-2);
+}
+.catalogo-product-field {" "    grid-template-columns: 1fr 90px;
+    gap: var(--s-2);
+}
+.catalogo-product-field {" \
+  "FALLA: catálogo del proveedor: «331 · EMIRATOS ARABES,UNID» no entra en el campo"
+sabotaje pantalla $CSS "el origen del catálogo del proveedor con su ancho propio" \
+  "    width: 100%;
+    min-width: 0;
+    padding: 6px 8px;" "    padding: 6px 8px;" \
+  "FALLA: catálogo del proveedor: el campo de origen se sale de su fila"
 sabotaje pantalla $REV "la procedencia del borrador se ve como vino" \
   "CDI.paisesMaria.etiqueta(normalized) : normalized" "normalized : normalized" \
   "FALLA: procedencia «434» del borrador se ve «434»"
@@ -75,9 +122,19 @@ sabotaje pantalla $REV "la procedencia escrita se guarda como se ve" \
 sabotaje pantalla $CAT "el catálogo del proveedor manda el origen sin tocar" \
   "if (campoOrigen.value !== campoOrigen.defaultValue) cambios.origen" "cambios.origen" \
   "FALLA: cambiar sólo el NCM reescribe el origen guardado"
+sabotaje casos proyecto_maria/core/catalog_service.py "guardar otro campo del proveedor borra el origen" \
+  'if updates.get("origen") is not None:
+        origen, aviso = origen_para_guardar(updates["origen"])' 'if True:
+        origen, aviso = origen_para_guardar(updates.get("origen"))' \
+  "AssertionError" test_cada_pais_del_catalogo_vuelve_a_su_codigo
+sabotaje casos proyecto_maria/main.py "guardar otro campo del cliente borra el origen" \
+  'if "origen" in body:
+        origen, problema = origen_para_catalogo(body["origen"])' 'if True:
+        origen, problema = origen_para_catalogo(body.get("origen"))' \
+  "AssertionError" test_cada_pais_del_catalogo_vuelve_a_su_codigo
 sabotaje pantalla $CLI "el catálogo del cliente pisa lo que se sigue escribiendo" \
   "if (field === 'origen' && input.value.trim() === value)" "if (field === 'origen')" \
-  "FALLA: lo escrito mientras se guardaba «434» quedó «423»"
+  "FALLA: lo escrito mientras se guardaba «434» quedó «423 · PAISES BAJOS»"
 sabotaje pantalla $REV "el borrador muestra cada campo con su etiqueta" \
   "el.value = key === 'procedencia' ? CDI.paisesMaria.etiqueta(normalized) : normalized;" \
   "el.value = CDI.paisesMaria.etiqueta(normalized);" \
@@ -86,8 +143,8 @@ sabotaje pantalla $REV "lo escrito en cualquier campo pasa por la etiqueta" \
   "if (el.name === 'procedencia' && ev.type === 'change') el.value" "if (ev.type === 'change') el.value" \
   "FALLA: la factura «0434» escrita se ve «423 · PAISES BAJOS»"
 sabotaje pantalla $CLI "el catálogo del cliente muestra el código de lo escrito" \
-  "input.value = CDI.paisesMaria.mostrar(value);" "input.value = CDI.paisesMaria.resolve(value) || value;" \
-  "FALLA: «nl» escrito en origen del catálogo del cliente se ve «423»"
+  "input.value = CDI.paisesMaria.etiqueta(value);" "input.value = CDI.paisesMaria.resolve(value) || value;" \
+  "FALLA: «434» escrito en el catálogo del cliente se ve «423»"
 sabotaje pantalla $REV "la procedencia cambia en cada tecla" \
   "if (el.name === 'procedencia' && ev.type === 'change') el.value" "if (el.name === 'procedencia') el.value" \
   "FALLA: procedencia «434» escrita queda «423 · PAISES BAJOS» en la operación"

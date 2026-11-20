@@ -274,12 +274,6 @@
         return country ? country.code + ' · ' + country.name : '';
     }
 
-    // Lo guardado o escrito se ve como vino, salvo un código reemplazado: se ve el que sale en el TXT.
-    function mostrar(value) {
-        const code = strip(String(value ?? '').normalize('NFC')).match(CODIGO);
-        return (code && REEMPLAZOS[code[1]] && resolve(value)) || String(value ?? '');
-    }
-
     // Un país se ve con el código y el nombre que salen en el TXT; lo demás, como vino, sin blancos en los bordes.
     function etiqueta(value) {
         return label(value) || String(value || '').trim();
@@ -289,6 +283,6 @@
         return COUNTRIES.map(country => '<option value="' + country.code + ' · ' + country.name.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '"></option>').join('');
     }
 
-    CDI.paisesMaria = Object.freeze({ countries: COUNTRIES, resolve, label, mostrar, etiqueta, optionMarkup });
+    CDI.paisesMaria = Object.freeze({ countries: COUNTRIES, resolve, label, etiqueta, optionMarkup });
 })();
 
