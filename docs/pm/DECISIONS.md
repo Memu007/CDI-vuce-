@@ -1062,3 +1062,6 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   se le ofrece a Emi, opcional. La traba de `clients` al arrancar va con la copia de la base.
 - La calculadora y la moneda recortadas a 3 y la reconstrucción de SQLite van a Emi como propuesta.
 - MARIA queda sin pieza aprobada que no espere a alguien de afuera: su rutina se apaga.
+- Corrección de la PM (20/11 12:03 UTC): la calculadora y la moneda eligen de una lista cerrada y
+  producción es Postgres, así que ni ese recorte a 3 ni la reconstrucción de SQLite tienen camino de
+  hoy: quedan como riesgo escrito y no van a Emi como pieza. A Emi, puntos 19 a 21 (NOW).
