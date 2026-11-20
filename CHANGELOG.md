@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-20 · fix: una cuenta al tope de su plan recibe «límite alcanzado» en la carga manual (CONEXIONES-1-PRODUCTO)
+
+- Una cuenta que ya usó todas las operaciones de su plan, sin créditos extra vigentes, recibe el aviso de límite al cargar una operación a mano, sin que se lea ni se valide lo que mandó.
+
 ## 2026-11-20 · fix: con créditos vencidos, cancelar o reactivar ya no chocan con una recarga (CONEXIONES-1-PRODUCTO)
 
 - Cancelar o reactivar la suscripción al mismo tiempo que una recarga, con los créditos extra vencidos, ya no termina en error.

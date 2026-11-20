@@ -2301,12 +2301,7 @@ async def _soltar_conexion(db: AsyncSession) -> None:
         await db.close()
 
 
-async def require_billing_vigente(
-    user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """402 si la cuenta no está al día. No mira el tope: ese se mira sólo donde se
-    cuenta, así lo ya contado se puede seguir validando y bajando."""
+async def _billing_vigente(user, db: AsyncSession, mirar_tope: bool):
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
     if not db_user:
@@ -2316,8 +2311,28 @@ async def require_billing_vigente(
     await _vencer_y_guardar(db, entidad)
     if not billing_service.tiene_acceso(entidad):
         raise HTTPException(status_code=402, detail=_detalle_402(entidad))
+    if mirar_tope and (razon := billing_service.razon_del_tope(entidad)):
+        raise HTTPException(status_code=402, detail=_detalle_402(entidad, razon))
     await _soltar_conexion(db)
     return db_user
+
+
+async def require_billing_vigente(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """402 si la cuenta no está al día. No mira el tope: ese se mira sólo donde se
+    cuenta, así lo ya contado se puede seguir validando y bajando."""
+    return await _billing_vigente(user, db, mirar_tope=False)
+
+
+async def require_cupo_del_plan(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Como require_billing_vigente, y además 402 al tope del plan, antes de leer el
+    cuerpo. No vence créditos: el conteo con candado es _contar_operacion_bloqueada."""
+    return await _billing_vigente(user, db, mirar_tope=True)
 
 
 async def _contar_operacion_bloqueada(db: AsyncSession, username: str):
@@ -3745,7 +3760,7 @@ async def create_manual_operation(
     request: Request,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    _cobro=Depends(require_billing_vigente),
+    _cobro=Depends(require_cupo_del_plan),
 ):
     """Crea una operación cargada manualmente (sin PDF/Excel).
 

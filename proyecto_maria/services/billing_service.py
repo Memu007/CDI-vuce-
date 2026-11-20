@@ -106,14 +106,18 @@ def plans_public() -> list[dict[str, Any]]:
 EXTRA_OPS_MAX = 100
 
 
-def _expire_extra_ops(user) -> None:
-    """Si los créditos extra ya vencieron, los resetea a 0."""
-    expires = getattr(user, "extra_ops_expires_at", None)
+def _extra_vencidos(cuenta) -> bool:
+    expires = getattr(cuenta, "extra_ops_expires_at", None)
     # La columna que agrega la migración de arranque es TIMESTAMP sin zona
     # (y SQLite no la guarda): se lee como UTC.
     if expires is not None and expires.tzinfo is None:
         expires = expires.replace(tzinfo=timezone.utc)
-    if expires and datetime.now(timezone.utc) > expires:
+    return bool(expires) and datetime.now(timezone.utc) > expires
+
+
+def _expire_extra_ops(user) -> None:
+    """Si los créditos extra ya vencieron, los resetea a 0."""
+    if _extra_vencidos(user):
         user.extra_ops_remaining = 0
         user.extra_ops_expires_at = None
 
@@ -162,22 +166,20 @@ def can_create_operation(user) -> Tuple[bool, str | None]:
 
     # Limpiar créditos extra vencidos antes de evaluar.
     _expire_extra_ops(user)
+    razon = razon_del_tope(user)
+    return razon is None, razon
 
-    plan = plan_de_la_cuenta(user)
-    ops_limit = plan["ops"]
 
-    # Premium (u otros ilimitados)
-    if ops_limit is None:
-        return True, None
-
-    used = int(getattr(user, "ops_used_this_period", 0) or 0)
-    extra = int(getattr(user, "extra_ops_remaining", 0) or 0)
-    if used >= ops_limit:
-        if extra <= 0:
-            return False, f"Alcanzaste el límite de {ops_limit} operaciones del plan {plan['name']}. Comprá un top-up o actualizá a Premium."
-        # Consumimos un crédito extra
-        return True, None
-    return True, None
+def razon_del_tope(cuenta) -> str | None:
+    """Por qué el plan no deja contar otra operación, o None. No escribe: los
+    créditos vencidos no cuentan, pero quedan como están."""
+    plan = plan_de_la_cuenta(cuenta)
+    limite = plan["ops"]
+    if limite is None or int(getattr(cuenta, "ops_used_this_period", 0) or 0) < limite:
+        return None
+    if not _extra_vencidos(cuenta) and int(getattr(cuenta, "extra_ops_remaining", 0) or 0) > 0:
+        return None
+    return f"Alcanzaste el límite de {limite} operaciones del plan {plan['name']}. Comprá un top-up o actualizá a Premium."
 
 
 def record_operation_created(user):
