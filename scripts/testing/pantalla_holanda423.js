@@ -2,7 +2,8 @@
 // En los catálogos del proveedor y del cliente, en el «Origen frecuente» y en la
 // procedencia de la revisión, un país guardado o escrito se ve con el código y el
 // nombre que salen en el TXT (el 434, como 423); lo que no es un país, como vino.
-// Guardar otro campo del catálogo deja el origen guardado como estaba.
+// Guardar otro campo del catálogo deja el origen guardado como estaba. Al pasar el mouse
+// por el origen de un catálogo se ve entero lo que el campo tiene ahora.
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> CDI_DB=<base sqlite del servidor> node scripts/testing/pantalla_holanda423.js
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
@@ -121,6 +122,34 @@ async function catalogoDelProveedor(page, base) {
   console.log('OK catálogo del proveedor: «0434» escrito y guardado se ve «' + PB + '»');
   for (const o of ['434 · HOLANDA', 'Países Bajos', ...NO_SON_PAISES]) await soloElNcm(page, base, proveedor.vendor_id, o);
   if (await page.evaluate(() => window.__xss)) falla('un origen del catálogo del proveedor con HTML se ejecutó');
+  await alPasarElMouse(page, 'catálogo del proveedor', '.catalogo-product-row', () => delProveedor(page, '212').locator('input[data-field="origen"]'), async escrito => {
+    await delProveedor(page, '212').evaluate(f => { f.dataset.antesDeGuardar = '1'; });
+    await delProveedor(page, '212').locator('input[data-field="origen"]').fill(escrito);
+    await delProveedor(page, '212').locator('[data-action="save-product"]').click();
+    await enFila(page, '.catalogo-product-row:not([data-antes-de-guardar])', '.catalogo-product-desc', '212').waitFor({ timeout: 10000 })
+      .catch(() => falla('guardar «' + escrito + '» en el catálogo del proveedor no vuelve a mostrar la fila'));
+  });
+}
+
+// Al pasar el mouse se ve entero lo que el campo de origen tiene ahora: lo guardado, lo escrito, lo
+// elegido de lo que sugiere el navegador, nada si se vacía y lo que queda al guardar.
+async function alPasarElMouse(page, donde, filas, campo, guardar) {
+  const distintos = await page.$$eval(filas + ' input[data-field="origen"]', cs => cs.filter(c => (c.getAttribute('title') || '') !== c.value).map(c => c.value));
+  if (distintos.length) falla(donde + ': al pasar el mouse no se ve lo guardado en ' + distintos.length + ' filas, como «' + distintos[0] + '»');
+  const igual = async que => {
+    const [visto, alPasar] = await campo().evaluate(c => [c.value, c.getAttribute('title')]);
+    if ((alPasar || '') !== visto) falla(donde + ': ' + que + ' se ve «' + visto + '» y al pasar el mouse «' + alPasar + '»');
+  };
+  for (const escrito of ['Países Bajos', 'Ñandú del Perú', 'CHI', XSS, '']) {
+    await campo().fill(escrito);
+    await igual('«' + escrito + '» escrito');
+  }
+  // Elegir una sugerencia del navegador cambia el valor con este evento, sin teclas.
+  await campo().evaluate(c => { c.value = '410 · ESPAÑA'; c.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText' })); });
+  await igual('«410 · ESPAÑA» elegido');
+  await guardar('España');
+  await igual('«España» guardado');
+  console.log('OK ' + donde + ': al pasar el mouse se ve lo guardado, lo escrito, lo elegido y lo que queda al guardar');
 }
 
 // Guardar la fila cambiando sólo el NCM deja el origen guardado como estaba.
@@ -168,6 +197,13 @@ async function catalogoDelCliente(page, base) {
   console.log('OK catálogo del cliente: «434» escrito se ve «' + PB + '»');
   await escritoMientrasGuarda(page, campo);
   await otrosEscritos(page, base, cid);
+  const del212 = () => delCliente(page, '212').locator('input[data-field="origen"]');
+  await alPasarElMouse(page, 'catálogo del cliente', '.cx-catalogo-producto-row', del212, async escrito => {
+    await del212().fill(escrito);
+    await del212().press('Enter');
+    await page.waitForFunction(c => c.value === '410 · ESPAÑA', await del212().elementHandle(), { timeout: 10000 })
+      .catch(async () => falla('«' + escrito + '» guardado en el catálogo del cliente se ve «' + await del212().inputValue() + '»'));
+  });
 }
 
 // El origen frecuente sale de las operaciones: se responde cada forma guardada.
