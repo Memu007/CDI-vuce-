@@ -165,7 +165,7 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | ✅ PYPDF-1 | Dev MARIA | Sumada por la PM el 06/11 (D73 de MARIA): ver qué cambió en pypdf 6.21.4, que rompe 5 pruebas, y fijar la versión o adaptar las pruebas según eso |
 | ✅ ABUSO-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ EMAIL-1 | Dev MARIA | Sumada por Emi el 28/10 (D36 de MARIA): recuperar usuario y contraseña encuentran el email con otras mayúsculas; ningún alta ni cambio crea un email repetido con otras mayúsculas; los pares que ya existan no se tocan hasta que Emi los cuente |
-| 🔵 CONEXIONES-1 | Dev técnica (desde el 08/11; antes MARIA) | Sumada por Emi el 28/10 (D37 de MARIA): medir si el cierre de la sesión de base cancelado deja conexiones tomadas, con Postgres 16; arreglar sólo si las deja. A y B medidas (no hay fuga); C mide si una cuenta sola agota el pool para otra (D180); arreglarlo es propuesta a Emi |
+| 🔵 CONEXIONES-1 | Dev técnica (desde el 08/11; antes MARIA) | Sumada por Emi el 28/10 (D37 de MARIA): medir si el cierre de la sesión de base cancelado deja conexiones tomadas, con Postgres 16; arreglar sólo si las deja. A y B medidas (no hay fuga); C mide si una cuenta sola agota el pool para otra (D180). Sí de Emi el 20/11 al arreglo: CONEXIONES-1-NOKEY (D206 a) y después CONEXIONES-1-PRODUCTO (D182, D183, D188); D205 sigue con Emi |
 | ✅ AISLAMIENTO-2 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ LIMPIEZA-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ PERMISOS-1 | Dev técnica | Sumada por la PM el 08/11 («arreglos chicos de seguridad», Emi; D116): ningún usuario llega a admin por un email que él puso |
@@ -188,6 +188,7 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | ✅ BORRADOR-1 | Dev técnica, aceptada sobre `c8733be` (producto de `22163cec`) e integrada | Sí de Emi el 09/11 (D143 a): recuperar el borrador no saca a la usuaria de la pantalla donde está (Clientes) |
 | ✅ CATALOGO-4 | Dev MARIA, aceptada sobre `f5395b9f` e integrada | Sí de Emi el 19/11: ante dos productos del catálogo del proveedor igual de parecidos a lo leído, gana el último confirmado y no el orden en que la base devuelve las filas |
 | ✅ CATALOGO-PAIS | Dev MARIA, aceptada sobre `8140f496` e integrada | Sí de Emi el 19/11: los catálogos del proveedor y del cliente muestran el origen con código y nombre («423 · PAISES BAJOS») sin cambiar lo guardado |
+| 🔵 CATALOGO-PAIS-2 | Dev MARIA | Sí de Emi el 20/11 (D275 b): en los catálogos, el nombre entero del país se ve al pasar el mouse |
 | ✅ ORIGEN-2 | Dev MARIA | Sí de Emi el 19/11: el origen habitual del cliente acepta nombre o código como el resto del producto, sin recortarse a 3 caracteres; con migración probada en Postgres descartable |
 | ⚪ AUDITORIA-FINAL | PM | Ver `AUDITORIA-2026-10-06.md` |
 

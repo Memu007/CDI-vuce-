@@ -3,6 +3,31 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
+## Tarea activa: CATALOGO-PAIS-2 (D275 b) (2026-11-20 13:56 UTC)
+
+**Sí de Emi (20/11, leído 13:53 UTC: «Dale a todo» a los puntos 19 y 20; no es un «dale» de publicar).**
+Antes de tocar código: `merge` de mi rama y tu `/compact conservar` al día.
+
+**Comportamiento:** en los catálogos del proveedor y del cliente, el campo del origen que muestra
+«423 · PAISES BAJOS» deja ver la etiqueta entera al pasar el mouse, en cada ancho donde hoy se corta.
+Sólo los catálogos: la ficha del cliente y el resto de `static/v2` no entran.
+
+**La familia del defecto** (un caso, las entradas como datos):
+- el valor cambia (se escribe otro, se elige otro, se borra): lo que se ve al pasar el mouse es el
+  valor de ahora, nunca el de antes;
+- vacío: no queda un texto viejo ni uno vacío visible;
+- lo que no es un país (sigla vieja, texto libre): se ve con sus letras, como en el campo;
+- un nombre con tildes o eñe sale igual que en el campo.
+
+**Prueba:** el caso lee lo que el navegador muestra (el atributo), no el código; el informe trae una
+vez el rojo con el arreglo revertido en el mismo SHA.
+
+**Puertas:** `chequeo-6`, tu guion de sabotajes de CSS de CATALOGO-PAIS sigue verde, y `e2e_maria.sh`
+sobre el SHA y sobre la unión con mi rama. `catalogo3.sh` y la suite completa no hacen falta si no
+tocás el servidor ni `tests/` fuera de tu caso; si los tocás, van las dos.
+
+**Próxima D: D278.**
+
 ## Veredicto: ORIGEN-2 aceptada sobre `0d7401ed` (informe `76b98256`) (2026-11-20 02:20 UTC)
 
 Acta: `REPRODUCCION-ORIGEN-2-2026-11-20.md`. La integro con `merge` de `76b98256`; sin publicar, y antes
@@ -23,13 +48,6 @@ La próxima vez, la cuenta sale de la salida, no de memoria.
   comportamiento; se los propongo a Emi. No te los asigno.
 - El adversario reprodujo que un GET devuelto entero con PUT da 400 para un «CHI» viejo. La pantalla
   no lo manda y producción no tiene esos valores: riesgo escrito, sin código.
-
-## Sin tarea activa: esperás a Emi (2026-11-20 02:20 UTC)
-
-No queda en el roadmap una pieza tuya aprobada que no espere a alguien de afuera. Apago tu rutina;
-te despierto cuando Emi apruebe la próxima. No empieces nada por tu cuenta.
-
-**Próxima D: D278.**
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 
