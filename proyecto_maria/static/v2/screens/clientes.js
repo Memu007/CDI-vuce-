@@ -47,6 +47,7 @@
     let editingId = null;            // null = nuevo, string = edit
     let fechaInicOculta = '';        // fecha guardada que el campo de fecha no puede mostrar (D3)
     let fechaInicOcultaSirve = false; // si esa fecha le sirve al TXT: lo dice el servidor (CLIENTE-1c)
+    let origenVisto = '';            // el origen como lo mostró el campo al abrir
     let detailClienteId = null;
     let activeIndex = -1;            // indice del item "focuseado" por teclado en vista filtrada
     let visibleIds = [];             // ids en el orden renderizado (para flechas)
@@ -130,6 +131,7 @@
         fEmail      = $('cfEmail');
         fTelefono   = $('cfTelefono');
         fOrigen     = $('cfOrigen');
+        $('cfOrigenPaises').innerHTML = CDI.paisesMaria.optionMarkup();
         fMoneda     = $('cfMoneda');
         fNotas      = $('cfNotas');
         fFechaInicActiv = $('cfFechaInicActiv');
@@ -1068,7 +1070,7 @@
         const cuit = c.cuit && CDI.formatCuit ? CDI.formatCuit(c.cuit) : (c.cuit || '');
         const tags = [];
         if (c.favorito) tags.push('<span class="cx-hero-tag is-favorite">★ Favorito</span>');
-        if (c.default_origin) tags.push('<span class="cx-hero-tag">Origen ' + CDI.escapeHtml(c.default_origin) + '</span>');
+        if (c.default_origin) tags.push('<span class="cx-hero-tag is-origen">Origen ' + CDI.escapeHtml(CDI.paisesMaria.etiqueta(c.default_origin)) + '</span>');
         if (c.preferred_currency) tags.push('<span class="cx-hero-tag">' + CDI.escapeHtml(c.preferred_currency) + '</span>');
 
         const metaParts = [];
@@ -1229,7 +1231,7 @@
             ['Inicio de actividad', fechaDdMmAaaa(c.fecha_inic_activ) || '—'],
             ['Email', c.email || '—'],
             ['Teléfono', c.telefono || '—'],
-            ['Origen habitual', c.default_origin || '—'],
+            ['Origen habitual', CDI.paisesMaria.etiqueta(c.default_origin) || '—'],
             ['Moneda', c.preferred_currency || '—'],
             ['Notas', c.notas || '—'],
         ];
@@ -1939,6 +1941,7 @@
         if (fEmail) fEmail.value = '';
         if (fTelefono) fTelefono.value = '';
         if (fOrigen) fOrigen.value = '';
+        origenVisto = '';
         if (fMoneda) fMoneda.value = '';
         if (fNotas) fNotas.value = '';
         if (fFechaInicActiv) fFechaInicActiv.value = '';
@@ -1954,7 +1957,8 @@
         if (fDireccion) fDireccion.value = c.direccion || '';
         if (fEmail) fEmail.value = c.email || '';
         if (fTelefono) fTelefono.value = c.telefono || '';
-        if (fOrigen) fOrigen.value = c.default_origin || '';
+        origenVisto = CDI.paisesMaria.etiqueta(c.default_origin);
+        if (fOrigen) fOrigen.value = origenVisto;
         if (fMoneda) fMoneda.value = c.preferred_currency || '';
         if (fNotas) fNotas.value = c.notas || '';
         if (fFechaInicActiv) fFechaInicActiv.value = c.fecha_inic_activ || '';
@@ -2024,10 +2028,11 @@
             direccion: direccion,
             email: email,
             telefono: telefono,
-            default_origin: origen,
             preferred_currency: moneda,
             notas: notas,
         };
+        // El campo muestra lo guardado con su etiqueta: si no se tocó, no se manda y queda como estaba.
+        if (origen !== origenVisto) body.default_origin = origen;
         // D3: si el campo quedó vacío porque no podía mostrar la fecha guardada,
         // no se manda y la API la conserva; una fecha cargada la reemplaza.
         const conservaFecha = !fechaInicActiv && !!fechaInicOculta;

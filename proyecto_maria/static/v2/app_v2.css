@@ -4045,7 +4045,7 @@ tr:hover .ncm-note-pill.is-empty {
     gap: var(--s-2);
     flex-wrap: wrap;
 }
-.cx-hero-tags { display: inline-flex; gap: var(--s-1); }
+.cx-hero-tags { display: inline-flex; flex-wrap: wrap; gap: var(--s-1); max-width: 100%; }
 .cx-hero-tag {
     font-size: var(--t-11);
     font-weight: var(--w-semibold);
@@ -4061,6 +4061,8 @@ tr:hover .ncm-note-pill.is-empty {
     color: var(--c-accent);
 }
 .cx-hero-tag.is-favorite { background: #fff7e6; color: #b45309; }
+/* El código va al principio: si el nombre no entra, se corta a la vista y el código queda entero. */
+.cx-hero-tag.is-origen { text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .cx-hero-meta {
     margin: 4px 0 0;
     color: var(--c-text-3);

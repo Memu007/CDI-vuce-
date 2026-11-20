@@ -1284,34 +1284,21 @@
                                 <input class="input" type="tel" id="cfTelefono" autocomplete="off">
                             </div>
                         </div>
-                        <div class="field-row">
-                            <div class="field">
-                                <label class="field-label" for="cfOrigen">Origen habitual</label>
-                                <select class="input" id="cfOrigen">
-                                    <option value="">—</option>
-                                    <option value="CN">CN · China</option>
-                                    <option value="BR">BR · Brasil</option>
-                                    <option value="US">US · EE.UU.</option>
-                                    <option value="DE">DE · Alemania</option>
-                                    <option value="IT">IT · Italia</option>
-                                    <option value="ES">ES · España</option>
-                                    <option value="JP">JP · Japón</option>
-                                    <option value="KR">KR · Corea</option>
-                                    <option value="TR">TR · Turquía</option>
-                                    <option value="IN">IN · India</option>
-                                </select>
-                            </div>
-                            <div class="field">
-                                <label class="field-label" for="cfMoneda">Moneda</label>
-                                <select class="input" id="cfMoneda">
-                                    <option value="">—</option>
-                                    <option value="USD">USD</option>
-                                    <option value="EUR">EUR</option>
-                                    <option value="ARS">ARS</option>
-                                    <option value="BRL">BRL</option>
-                                    <option value="CNY">CNY</option>
-                                </select>
-                            </div>
+                        <div class="field">
+                            <label class="field-label" for="cfOrigen">Origen habitual</label>
+                            <input class="input" type="text" id="cfOrigen" list="cfOrigenPaises" autocomplete="off" placeholder="Nombre o código del país">
+                            <datalist id="cfOrigenPaises"></datalist>
+                        </div>
+                        <div class="field">
+                            <label class="field-label" for="cfMoneda">Moneda</label>
+                            <select class="input" id="cfMoneda">
+                                <option value="">—</option>
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                                <option value="ARS">ARS</option>
+                                <option value="BRL">BRL</option>
+                                <option value="CNY">CNY</option>
+                            </select>
                         </div>
                         <div class="field">
                             <label class="field-label" for="cfNotas">Notas internas</label>

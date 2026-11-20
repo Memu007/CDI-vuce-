@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-20 · fix: el origen habitual del cliente acepta el nombre o el código del país (ORIGEN-2)
+
+- El origen habitual se escribe con el nombre o el código del país, con la lista de la tabla para elegir, y se guarda entero (la pantalla ofrecía diez siglas y lo escrito se cortaba a tres letras: «Brasil» quedaba «BRA»). Lo que no es un país no se guarda y la pantalla dice por qué. La ficha lo muestra con código y nombre («203 · BRASIL»); lo ya recortado que no es un país («CHI») se ve como quedó, y editar otro dato no toca el origen.
+
 ## 2026-11-19 · fix: los catálogos muestran el origen con código y nombre (CATALOGO-PAIS)
 
 - En el catálogo del proveedor y en el del cliente, un origen que es un país se ve como sale en el TXT («423 · PAISES BAJOS»); lo que no es un país, como se escribió. Guardar otro campo no toca el origen guardado. El campo del cliente ya no corta en tres caracteres: se puede corregir escribiendo un nombre o un código. Unos cuarenta de los 308 nombres, los más largos, se corren dentro del campo; en una ventana mediana el campo se achica para que la fila siga en un renglón, y se corren más.
