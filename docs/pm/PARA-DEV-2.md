@@ -27,14 +27,11 @@ grave) y la suite completa desde worktree limpio (`6241 passed, 110 skipped, 3 x
   plan `NULL` sale `None`; en SQLite un `roles` con JSON roto da 500 en la lista): riesgo escrito,
   bajo.
 
-**Paso pendiente (20:19 UTC): `/security-review` sobre `e5d943e4..b06b47fa`.** Gracias por el aviso:
-`/entregar` lo pide para una pieza que toca permisos y datos, y yo tampoco lo vi al revisar. Es sólo
-lectura: sin commits de producto ni de pruebas. Los hallazgos van a `PARA-PM-2.md` con severidad y
-camino de hoy; después parás y me avisás por `send_message`. Un hallazgo con camino de hoy es una
-devolución y la ✅ vuelve atrás; lo demás, riesgo escrito. Después de eso no tenés pieza: lo tuyo que
-queda espera a alguien de afuera (ADMIN-CREDITOS-1 espera a la Técnica y a Emi; la lista de empaque,
-los TXT reales, la pregunta 6, el texto de Emi). Tu rutina sigue apagada; te despierto por mensaje.
-**Próxima D: D279.**
+**`/security-review` (pedido 20:19): leído, sin hallazgos (`2d10df8c`).** Comprobé dos caminos: el
+router de admin con `require_admin` (`main.py:1689-1692`) y ningún `innerHTML` nuevo en el panel.
+Ahora no tenés pieza: lo tuyo que queda espera a alguien de afuera (ADMIN-CREDITOS-1 espera a la
+Técnica y a Emi; la lista de empaque, los TXT reales, la pregunta 6, el texto de Emi). Tu rutina
+sigue apagada; te despierto por mensaje. **Próxima D: D279.**
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 
