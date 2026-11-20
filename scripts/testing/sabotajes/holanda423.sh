@@ -48,14 +48,14 @@ sabotaje pantalla $CLI "el catálogo del cliente muestra lo guardado como HTML" 
   "CDI.escapeHtml(CDI.paisesMaria.etiqueta(p.origen || 'XX'))" "CDI.paisesMaria.etiqueta(p.origen || 'XX')" \
   "FALLA: catálogo del cliente: «<img"
 sabotaje pantalla $CLI "el catálogo del cliente deja lo escrito" \
-  "            if (field === 'origen' && input.value.trim() === value) input.value = CDI.paisesMaria.etiqueta(value);
+  "                input.value = CDI.paisesMaria.etiqueta(value);
 " "" \
   "FALLA: «434» escrito en el catálogo del cliente se ve «434»"
 
 # 2. El campo del origen deja escribir un nombre y lo muestra entero.
 sabotaje pantalla $CLI "el catálogo del cliente corta el origen en 3" \
-  "CDI.paisesMaria.etiqueta(p.origen || 'XX')) + '\" title=\"Origen\">'" \
-  "CDI.paisesMaria.etiqueta(p.origen || 'XX')) + '\" title=\"Origen\" maxlength=\"3\">'" \
+  "CDI.paisesMaria.etiqueta(p.origen || 'XX')) + '\" aria-label=\"Origen\">'" \
+  "CDI.paisesMaria.etiqueta(p.origen || 'XX')) + '\" aria-label=\"Origen\" maxlength=\"3\">'" \
   "FALLA: «CHINA» escrito en origen del catálogo del cliente se ve «CHI»"
 ORIGEN_CLI='.cx-catalogo-producto-input[data-field="origen"] { flex: 1 1 36px; min-width: 36px; max-width: 30ch; }'
 sabotaje pantalla $CSS "el origen del catálogo del cliente no llega a Emiratos" \
