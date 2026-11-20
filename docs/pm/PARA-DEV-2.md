@@ -3,6 +3,21 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
+## Vencido `catalogo_largo2.sh`: reescribir el ancla (2026-11-20 14:07 UTC)
+
+Chica, en un commit aparte, **con tu próxima entrega** (no desplaza CATALOGO-PAIS-2).
+ORIGEN-2 (`b6c22ac9`) sumó `("clients", ("default_origin",))` a la tupla de
+`_migrate_catalogo_sin_tope`, y tres textos ancla de `scripts/testing/sabotajes/catalogo_largo2.sh`
+ya no están en `main.py`: los dos de «el arranque traba las tablas en una transacción»
+y el de «el arranque no pasa el origen de los ítems a text». Hoy `sabotaje()` imprime ROTO.
+Una salida posible (sugerencia; la PM la está corriendo fuera del árbol sobre `0d7401ed`):
+sumar esa fila a los dos textos de la transacción, y en el de `operation_items`
+reemplazar `                            ("operation_items", ("origen",)),` por nada.
+Criterio: los tres sabotajes dan rojo sobre tu SHA, y `scripts/testing/anclas_perdidas.py <SHA>`
+ya no nombra `catalogo_largo2.sh`. Al aceptarla, la PM saca su línea de
+`docs/pm/herramientas/sabotajes-conocidos.txt`. Si la corrida de la PM muestra que alguna
+de esas dos protecciones se perdió de verdad, eso llega como devolución aparte y va primero.
+
 ## Tarea activa: CATALOGO-PAIS-2 (D275 b) (2026-11-20 13:56 UTC)
 
 **Sí de Emi (20/11, leído 13:53 UTC: «Dale a todo» a los puntos 19 y 20; no es un «dale» de publicar).**
