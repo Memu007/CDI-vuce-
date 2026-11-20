@@ -1,12 +1,12 @@
 """Caso 6: dos pedidos de la misma cuenta a la vez, códigos y deadlocks de Postgres.
 
 Cada par va en los dos órdenes, con usuario y con org, con créditos extra
-vencidos y al día. Antes mira qué candados le llegan a Postgres de _cuenta_bloqueada
-después de que el aviso compiló los suyos, que son FOR UPDATE de las mismas tablas.
-Una recarga junto a un guardado o a MARIA tiene que armarse, dar 200 a los dos y
-dejar los créditos vigentes; si no, la fila dice «MAL».
+vencidos y al día. Antes mira qué candados le llegan a Postgres de _cuenta_con_suscripciones
+y de _cuenta_bloqueada, la segunda después de que la primera compiló los suyos.
+Una recarga junto a un guardado, a MARIA, a cancelar o a reactivar tiene que armarse,
+dar 200 a los dos y dejar los créditos vigentes; si no, la fila dice «MAL».
 uso: scripts/testing/con_pg16.sh python scripts/testing/conexiones1_pares.py
-Sale 1 si hubo algún deadlock, una fila MAL o un candado no es FOR NO KEY UPDATE,
+Sale 1 si hubo algún deadlock, una fila MAL o un candado no es el de ESPERADOS,
 4 si alguna ronda no se armó, 2 si el arnés falló y 0 si no.
 """
 import itertools
@@ -22,12 +22,16 @@ from proyecto_maria.database.connection import AsyncSessionLocal, engine  # noqa
 from sqlalchemy import event  # noqa: E402
 
 PARES = [("alta", "guardado"), ("alta", "recarga"), ("guardado", "recarga"), ("maria", "recarga"),
-         ("alta", "renovación"), ("cancelar", "alta"), ("reactivar", "alta")]
-OBJETIVO = [{"guardado", "recarga"}, {"maria", "recarga"}]
+         ("alta", "renovación"), ("cancelar", "alta"), ("reactivar", "alta"),
+         ("cancelar", "recarga"), ("reactivar", "recarga")]
+OBJETIVO = [{"guardado", "recarga"}, {"maria", "recarga"}, {"cancelar", "recarga"}, {"reactivar", "recarga"}]
+# El usuario NO KEY: la recarga que ya venció los créditos vuelve a chequear owner_username con KEY SHARE.
+ESPERADOS = {"_cuenta_con_suscripciones": ["FOR NO KEY UPDATE OF users", "FOR UPDATE"],
+             "_cuenta_bloqueada": ["FOR NO KEY UPDATE OF users", "FOR NO KEY UPDATE OF organizations"]}
 
 
 def candados(c):
-    """Los FOR ... que manda _cuenta_bloqueada, con la cache ya cargada por el aviso."""
+    """Los FOR ... que manda cada función, en el orden de ESPERADOS."""
     _, _, _, (_, _, org) = preparar(c, True)
     usuario = sql("select owner_username from organizations where id = %s", org)[0][0]
     vistos = []
@@ -36,12 +40,14 @@ def candados(c):
         vistos.extend(re.findall(r"FOR (?:NO KEY )?UPDATE(?: OF \w+)?(?: NOWAIT| SKIP LOCKED)?", sentencia))
 
     async def pedir():
-        for funcion in (m._cuenta_con_suscripciones, m._cuenta_bloqueada):
+        por_funcion = {}
+        for nombre in ESPERADOS:
             async with AsyncSessionLocal() as db:
                 vistos.clear()
-                await funcion(db, usuario)
+                await getattr(m, nombre)(db, usuario)
                 await db.rollback()
-        return list(vistos)
+            por_funcion[nombre] = list(vistos)
+        return por_funcion
     event.listen(engine.sync_engine, "before_cursor_execute", anotar)
     try:
         return c.portal.call(pedir)
@@ -52,9 +58,11 @@ def candados(c):
 def main():
     total, sin_armar, malas = 0, 0, 0
     with TestClient(m.app, raise_server_exceptions=False) as c:
-        vistos = candados(c)
-        bien = vistos == ["FOR NO KEY UPDATE OF users", "FOR NO KEY UPDATE OF organizations"]
-        print("_cuenta_bloqueada después del aviso:", " | ".join(vistos), "" if bien else "| MAL")
+        bien = True
+        for nombre, vistos in candados(c).items():
+            bien &= vistos == ESPERADOS[nombre]
+            print(f"{nombre}{' después del aviso' * (nombre == '_cuenta_bloqueada')}:", " | ".join(vistos),
+                  "" if vistos == ESPERADOS[nombre] else "| MAL")
         for (x, y), orden, de_org, vencidos in itertools.product(PARES, (1, -1), (False, True), (True, False)):
             a, b = (x, y)[::orden]
             ajuste = f"billing_status = '{'canceled' if 'reactivar' in (a, b) else 'active'}'"

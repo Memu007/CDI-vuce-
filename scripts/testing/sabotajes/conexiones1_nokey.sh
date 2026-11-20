@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Control del caso 6 de scripts/testing/conexiones1_pares.py. Sin sabotaje los
-# candados son FOR NO KEY UPDATE y el caso sale 0; sin key_share o sin of= vuelve
-# FOR UPDATE y la línea de los candados dice «MAL».
+# candados de usuario son FOR NO KEY UPDATE y el caso sale 0; sin key_share o sin
+# of= vuelve FOR UPDATE y la línea de los candados dice «MAL».
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/conexiones1_nokey.sh [SHA]
 # Trabaja en un worktree descartable y cada corrida levanta su propio
@@ -58,17 +58,28 @@ PYEOF
 }
 
 M=proyecto_maria/main.py
-U='.with_for_update(key_share=True, of=User)'
+B='.where(User.username == username)
+        '
+U="$B.with_for_update(key_share=True, of=User)"
+S='.order_by(User.username)
+        .with_for_update(key_share=True, of=User)'
 O='.with_for_update(key_share=True, of=Organization)'
 
 NO='\| MAL' corrida "sin sabotaje" 0 \
+  "_cuenta_con_suscripciones: FOR NO KEY UPDATE OF users | FOR UPDATE" \
   "_cuenta_bloqueada después del aviso: FOR NO KEY UPDATE OF users | FOR NO KEY UPDATE OF organizations"
 # Sin el arreglo: las dos consultas vuelven a FOR UPDATE y la recarga choca.
-en_codigo "$M" "$U" '.with_for_update()' "$O" '.with_for_update()' &&
+en_codigo "$M" "$U" "$B.with_for_update()" "$O" '.with_for_update()' &&
   corrida "sin key_share ni of=" 1 "FOR UPDATE | FOR UPDATE | MAL" \
     "DEADLOCK | recarga + guardado" "DEADLOCK | recarga + maria"
 # Sin of=: vuelve desde la cache el FOR UPDATE compilado por la consulta igual del aviso.
-en_codigo "$M" "$U" '.with_for_update(key_share=True)' "$O" '.with_for_update(key_share=True)' &&
+en_codigo "$M" "$U" "$B.with_for_update(key_share=True)" "$O" '.with_for_update(key_share=True)' &&
   corrida "key_share sin of=" 1 "FOR NO KEY UPDATE | FOR UPDATE | MAL"
+# Cancelar y reactivar toman al usuario con FOR UPDATE: la recarga que ya venció
+# los créditos espera su KEY SHARE mientras cancelar espera la org.
+en_codigo "$M" "$S" '.order_by(User.username)
+        .with_for_update()' &&
+  corrida "suscripciones con FOR UPDATE" 1 "_cuenta_con_suscripciones: FOR UPDATE | FOR UPDATE | MAL" \
+    "DEADLOCK | recarga + cancelar" "DEADLOCK | recarga + reactivar"
 git checkout -q -- .
 exit $((FALLAS > 0))
