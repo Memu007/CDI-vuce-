@@ -3,51 +3,33 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Veredicto: CATALOGO-PAIS aceptada sobre `8140f496` (informe `d2169ef0`) (2026-11-20 00:05 UTC)
+## Veredicto: ORIGEN-2 aceptada sobre `0d7401ed` (informe `76b98256`) (2026-11-20 02:20 UTC)
 
-Acta: `REPRODUCCION-CATALOGO-PAIS-2026-11-19.md`, sección «Vuelta sobre `8140f496`». La integro con
-`merge` de `d2169ef0`; sin publicar. Reproduje chequeo-6 («avisos: 0»), `holanda423.sh` (34 ROJO,
-«sabotajes sin rojo: 0»), `paises_nombres.sh` (9 ROJO) y `e2e_maria.sh` OK. Probé ejes que no te di:
-la fila recién guardada con Enter a 850 px, «tierra Média» en los dos catálogos, el código entero en
-nueve anchos y el proveedor de 320 a 1440 px. Todo bien.
+Acta: `REPRODUCCION-ORIGEN-2-2026-11-20.md`. La integro con `merge` de `76b98256`; sin publicar, y antes
+de publicar va la copia de la base. Reproduje chequeo-6, `test_origen2.py`, `origen2_postgres.py` en
+PG16 (`fallas: 0`), `origen2.sh` (24 ROJO, «sabotajes sin rojo: 0»), el pytest entero (6231 passed) y
+`e2e_maria.sh` sobre el SHA y la unión. Probé tipos que no son texto, NUL, surrogate, letra ancha, PUT
+con sólo el origen y las doce siglas del selector de producción: todo bien.
+
+**Una cuenta mal:** la tabla del informe dice «25 ROJO»; tu salida pegada, la mía y el guion dan 24.
+La próxima vez, la cuenta sale de la salida, no de memoria.
 
 **Decidido por la PM:**
-- **D275 (a):** el texto largo que no entra en el campo queda como riesgo aceptado (con tus números:
-  36 etiquetas a ancho completo, 61 a 960, 301 a 841, 308 a 460). El código queda entero. La (b) se la
-  propongo a Emi; no te la asigno.
-- **Riesgo 2** (desplazamiento horizontal de la página): lo medí también en la base, con el mismo ancho
-  de documento; no es de esta pieza.
-- **Riesgos 3, 4 y 5** (anchos sólo de los cortes en px, 456–459 sin medir, `:focus`/`:hover` sin
-  mirar): quedan escritos, sin código.
-- **Riesgo 6:** los siete sabotajes de CSS se quedan en `holanda423.sh`.
-- **Riesgo 7:** lo no corrido queda dicho en el acta.
+- **D276 (a):** el alta sin origen sigue guardando «CN», como la base.
+- **D277 (a):** riesgo escrito. El selector de producción sólo mandó doce siglas de dos letras, que
+  pasan; tu consulta de sólo lectura se la ofrezco a Emi, opcional, con la copia.
+- **Riesgo 2** (traba de `clients` al arrancar): va en la nota de publicar, con la copia.
+- **Riesgos 1 y 6** (calculadora y moneda recortadas a 3, reconstrucción de SQLite): cambian
+  comportamiento; se los propongo a Emi. No te los asigno.
+- El adversario reprodujo que un GET devuelto entero con PUT da 400 para un «CHI» viejo. La pantalla
+  no lo manda y producción no tiene esos valores: riesgo escrito, sin código.
 
-## Tarea activa: ORIGEN-2 (2026-11-20 00:05 UTC)
+## Sin tarea activa: esperás a Emi (2026-11-20 02:20 UTC)
 
-Sí de Emi del 19/11 («sí a las dos y al país con nombre»); es un sí a la pieza, no un «dale» para
-publicar. Base: la cabeza de mi rama; traela con `merge`.
+No queda en el roadmap una pieza tuya aprobada que no espere a alguien de afuera. Apago tu rutina;
+te despierto cuando Emi apruebe la próxima. No empieces nada por tu cuenta.
 
-La causa: el origen habitual del cliente se recorta a 3 caracteres en el servidor (alta y edición) y en
-la base (`VARCHAR(3)`), mientras el resto del producto acepta el nombre o el código del país. Es
-migración: revisión más fuerte (§3) y sabotajes. Antes de publicarla hace falta una copia de la base.
-
-1. El origen habitual acepta el nombre o el código, validado igual que en el catálogo. Lo que no es un
-   país de la tabla no se guarda recortado ni en silencio: la pantalla dice por qué.
-2. La ficha del cliente (la etiqueta de arriba y «Origen habitual») lo muestra con código y nombre,
-   con la misma `etiqueta`. Como en CATALOGO-PAIS: el campo queda en un renglón en el ancho más
-   angosto de cada disposición, con su rojo; nada de mayúsculas forzadas en lo que no es un país;
-   capturas a 960 y a 1280.
-3. Migración probada en Postgres descartable: las filas que ya existen («CN» y vacías) quedan iguales,
-   y también las ya recortadas a 3 de un nombre («CHI», «HOL»), como datos en el mismo caso.
-   El caso del largo corre en Postgres, que hace cumplir el `VARCHAR`; SQLite no.
-4. Negativo en el mismo SHA con el recorte de vuelta: rojo.
-5. `e2e_maria.sh` verde sobre el SHA.
-6. **Afuera, decidido por la PM:** la calculadora (`/api/ncm/calcular`) también recorta a 3, y ahí
-   «BRASIL» dejaría de contar como Mercosur. Su pantalla sólo ofrece una lista de códigos de dos letras,
-   así que hoy no hay camino que lo rompa: queda como riesgo escrito, sin código. Junto a ese riesgo:
-   `calculadora.js:112` no precarga un origen guardado como nombre o etiqueta.
-
-**Próxima D: D276.**
+**Próxima D: D278.**
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 

@@ -1052,3 +1052,13 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   entero). La (b), la etiqueta entera en `title`, va a Emi como propuesta. El desplazamiento horizontal
   de la página ya estaba en la base.
 - Activa ORIGEN-2; a su ficha del cliente se le suma la misma medida de la fila y sin mayúsculas forzadas.
+
+## 2026-11-20 02:20 UTC — ORIGEN-2: aceptada sobre `0d7401ed` (sin publicar)
+
+- El origen habitual del cliente acepta nombre o código, validado como en el catálogo, y la columna
+  pasa de `varchar(3)` a `text` sin tocar las filas. Acta `REPRODUCCION-ORIGEN-2-2026-11-20.md`.
+- Decidido por la PM, con el consejero: D276 (a), el alta sin origen sigue en «CN»; D277 (a), riesgo
+  escrito (el selector de producción sólo mandó doce siglas que pasan) y la consulta de sólo lectura
+  se le ofrece a Emi, opcional. La traba de `clients` al arrancar va con la copia de la base.
+- La calculadora y la moneda recortadas a 3 y la reconstrucción de SQLite van a Emi como propuesta.
+- MARIA queda sin pieza aprobada que no espere a alguien de afuera: su rutina se apaga.
