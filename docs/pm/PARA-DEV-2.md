@@ -3,52 +3,24 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Tarea activa: la lista de usuarios en Postgres 16 (2026-11-21 05:57 UTC)
+## Sin tarea activa (2026-11-21 07:05 UTC)
 
-Es lo que falta antes de que ADMIN-USUARIOS-1 y D278 (b) entren a una candidata. Antes de nada:
-`merge` de mi rama.
+Lo tuyo espera a alguien de afuera (la lista de empaque, los TXT reales, el texto de Emi). Tu rutina
+queda apagada; te despierto por `send_message`. Próxima D: D280.
 
-**Comportamiento:** en Postgres 16 la lista de usuarios del panel da lo mismo que en SQLite:
-1. la familia `COBROS` (lo que muestra la lista coincide con lo que decide el acceso), con la
-   integrante cuyo estudio se borró (Sonnet no la probó en Postgres);
-2. sólo admin la ve;
-3. mirar no cambia la base, leída por **otra conexión de Postgres** (hoy el caso lee con `sqlite3`).
+## Veredicto: la lista de usuarios en Postgres 16 aceptada sobre `3abb203d` (informe `d451a007`) (2026-11-21 07:05 UTC)
 
-**Prueba:** los casos corren con `scripts/testing/con_pg16.sh` (Postgres descartable; no el 55462).
-El informe trae una vez el rojo en Postgres con `admin_router.py` de `a17011d1`. Sin esperas fijas
-nuevas.
+Acta: `REPRODUCCION-ADMIN-USUARIOS-PG-2026-11-21.md`. Integrada con el merge de `d451a007` (`9c5fbfc4`);
+sin publicar y fuera de la candidata `0d7401ed`. Reproduje con la copia del SHA: chequeo-6 (igual, sin
+avisos), el guion en Postgres descartable (9 casos, «fallas: 0»), el rojo con `admin_router.py` de
+`a17011d1` («fallas: 1»), los casos en SQLite (`134 passed`), `anclas_perdidas.py` (igual) y
+`admin_usuarios1.sh` (31 ROJO, «sabotajes sin rojo: 0»). Dos negativos míos dieron rojo donde
+debían: una escritura escondida en la lista (sólo cae `test_mirar_no_cambia_la_base`) y un caso
+dentro de una clase (lo marca la comparación con `pytest --collect-only`). No corrí adversario ni
+`/code-review`: sólo pruebas, y ya traía tres Sonnet y seis `/code-review`.
 
-**Alcance:** sólo pruebas, `producto +0/−0`. Si en Postgres aparece una diferencia de producto,
-frenás y la traés como D280: desde ahora `admin_router.py` y `billing_service.py` son de la Técnica
-(ADMIN-CREDITOS-1, tramo 2).
-
-**Puertas:** `chequeo-6.py`, `anclas_perdidas.py`, los casos de admin en SQLite y en Postgres,
-`/code-review`. Si tocás `tests/conftest.py` o un ayudante compartido, también la suite completa
-desde worktree limpio. Próxima D: D280.
-
-Después de esta entrega no te queda pieza: lo tuyo espera a alguien de afuera (la lista de empaque,
-los TXT reales, el texto de Emi). Tu rutina se apaga y te despierto por `send_message`.
-
-## Veredicto: D278 (b) aceptada sobre `05ca7f71` (informe `f244c7b4`) (2026-11-21 05:57 UTC)
-
-Acta: `REPRODUCCION-D278B-2026-11-21.md`. Integrada con el merge de `f244c7b4` (`647ea7da`); sin publicar y fuera
-de la candidata `0d7401ed`. Reproduje con la copia de `05ca7f71`: chequeo-6 (igual, sin avisos), tus
-casos (`134 passed`), el rojo con `admin_router.py` de la base (las tres vencidas, nada más), la
-suite completa desde worktree limpio (`6242 passed, 110 skipped, 3 xfailed`, como el tuyo),
-`admin_usuarios1.sh` (31 ROJO), `anclas_perdidas.py`, `cobro_corte1.sh` en Postgres (87 ROJO, «sabotajes con falla: 0»), un negativo mío (la regla vieja contra
-`cobro_efectivo` en 198 casos: iguales; rojo con la regla saboteada) y los adversarios Opus y Sonnet
-alto (nada serio; Sonnet probó a mano en Postgres que la lista y el acceso coinciden). No corrí `/code-review`: lo cubren los dos adversarios. La familia en Postgres tampoco: esa sí es tu tarea de arriba.
-
-En `anclas_perdidas.py` los números son los tuyos, pero los 5 «no medido» son de `e2e_rerun.sh` y
-`foco_cliente1.sh`, no de `limpieza1.sh` (ese sale «SIN ANCLA»). Corregilo en tu próximo informe si
-lo repetís.
-
-**Decidido por la PM:**
-- **D279: (b).** Las tres copias van a `COLA-LIMPIEZA.md`; la de `get_current_user`, atada a D205.
-  Leí las tres: las dos primeras usan los mismos umbrales y sólo pasan a `past_due`; el checkout no
-  tiene gracia, pero sólo elige el texto del 409 (las dos ramas dan 409). El perfil con el estado
-  guardado queda como riesgo escrito.
-- **Riesgos 1 a 6:** aceptados como los escribís, bajos.
+Tu riesgo 1 (superusuario; el estado colgado sólo donde falta la FK) queda escrito, bajo. Con esto,
+ADMIN-USUARIOS-1 y D278 (b) pueden entrar a la próxima candidata.
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 

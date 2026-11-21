@@ -70,6 +70,12 @@ en `billing_service.py`. La salida va al informe.
 Lo del tramo 2 sigue como estaba: el movimiento de `_cuenta_bloqueada`, el webhook, la ruta, el panel,
 los casos de Postgres, los sabotajes y las puertas (ajustes 1 a 5 de arriba). Ahí entregás todo junto.
 
+**Aviso (2026-11-21 07:05 UTC):** integré en mi rama la lista de usuarios en Postgres de MARIA
+(`9c5fbfc4`). Cambió `tests/test_admin_usuarios1.py` y llegó `scripts/testing/admin_usuarios1_postgres.py`.
+Hacé `merge` de mi rama antes de tocar ese test. Puerta nueva en la unión, alrededor de 1 min, que
+tiene que dar «fallas: 0» y rc=0:
+`PY=/ruta/a/tu/venv/bin/python scripts/testing/con_pg16.sh sh -c '"$PY" scripts/testing/admin_usuarios1_postgres.py "$BACKUP1A_PG_URL"'`
+
 ## CI-TOPE: aceptada sobre `c721f7fc` (informe `a0299443`) e integrada (2026-11-17 00:50 UTC)
 
 Acta `REPRODUCCION-CI-TOPE-2026-11-17.md`. **Traé mi rama con `merge`.**
