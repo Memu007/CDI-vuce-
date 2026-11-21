@@ -78,11 +78,11 @@ sabotaje pantalla $H "la página no manda el token CSRF" '    <script src="/stat
 sabotaje pantalla $H "cada envío usa otro pedido" \
   '            const pedido = previa && previa.cantidad === cantidad ? previa.pedido : crypto.randomUUID();' \
   '            const pedido = crypto.randomUUID();' "FALLA: reintento"
-sabotaje pantalla $H "reabrir olvida la carga sin confirmar" '            const previa = sinConfirmar[u.usuario];' \
+sabotaje pantalla $H "reabrir olvida la carga sin confirmar" '            const previa = sinConfirmar.get(u.usuario);' \
   '            const previa = undefined;' "FALLA: reabrir:"
 sabotaje pantalla $H "otra cantidad usa el mismo pedido" 'previa && previa.cantidad === cantidad ? previa.pedido' \
   'previa ? previa.pedido' "FALLA: otra cantidad"
-sabotaje pantalla $H "la carga confirmada sigue sin confirmar" '                delete sinConfirmar[esta.usuario];
+sabotaje pantalla $H "la carga confirmada sigue sin confirmar" '                sinConfirmar.delete(esta.usuario);
 ' '' "FALLA: reabrir después de confirmar"
 sabotaje pantalla $H "el 409 no muestra el texto del servidor" \
   "            const detalle = data && typeof data.detail === 'string' ? data.detail : null;" \
