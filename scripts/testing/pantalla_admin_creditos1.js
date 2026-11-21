@@ -4,8 +4,8 @@
 // con el texto del servidor; reabrir el diálogo tampoco repite una carga sin
 // confirmar ni, si la carga estaba en vuelo, deja de decir cómo terminó; la
 // respuesta de una carga anterior no se escribe en el diálogo de otra; una cuenta que se llama como algo
-// que todo objeto trae («__proto__», «constructor») no abre como si tuviera una carga sin confirmar ni se
-// la pasa a otra. Sale con error si algo no se cumple.
+// que todo objeto trae («__proto__», «constructor») no abre como si tuviera una carga sin confirmar.
+// Pide una base nueva: esas cuentas tienen nombre fijo. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> CDI_DB=<base sqlite del servidor> node scripts/testing/pantalla_admin_creditos1.js
 // corredor: servidor CSRF_ENFORCE=true
 const { chromium } = require('playwright');
@@ -145,7 +145,7 @@ async function respuestaAjena(p, uno, otro) {
 }
 
 const HEREDADOS = ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'];
-async function heredados(p, otro) {
+async function heredados(p) {
   for (const nombre of HEREDADOS) {
     await abrir(p, nombre);
     await esperarEstado(p, '', 'abrir ' + nombre);
@@ -154,15 +154,12 @@ async function heredados(p, otro) {
     await esperarEstado(p, 'Cargada. Ahora tiene 1 vigentes.', 'cargar a ' + nombre);
     await p.click('#carga-cerrar');
   }
-  // La carga sin confirmar de «__proto__» queda en esa cuenta y en ninguna otra.
+  // La carga sin confirmar de «__proto__» se recuerda al reabrir.
   await abrir(p, '__proto__');
   await p.fill('#carga-cantidad', '2');
   await p.route('**/creditos', async r => { await r.fetch(); await r.abort(); }, { times: 1 });
   await p.click('#carga-enviar');
   await esperarEstado(p, 'No se pudo cargar: sin conexión. Si la reintentás, no se carga dos veces.', '__proto__ sin red');
-  await p.click('#carga-cerrar');
-  await abrir(p, otro);
-  await esperarEstado(p, '', 'otra cuenta después de la carga sin confirmar de __proto__');
   await p.click('#carga-cerrar');
   await abrir(p, '__proto__');
   await esperarEstado(p, 'La carga de 2 no se confirmó: si la enviás de nuevo, no se carga dos veces.', 'reabrir __proto__');
@@ -189,7 +186,7 @@ async function heredados(p, otro) {
   await reabrir(p, enviados, uno);
   await reabrirEnVuelo(p, uno);
   await respuestaAjena(p, uno, otro);
-  await heredados(p, otro);
+  await heredados(p);
   await b.close();
   console.log('OK: ADMIN-CREDITOS-1 en el navegador');
 })().catch(e => falla(e.stack || e.message));

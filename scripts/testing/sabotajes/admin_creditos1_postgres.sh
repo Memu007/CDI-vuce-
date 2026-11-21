@@ -85,7 +85,7 @@ en_codigo proyecto_maria/main.py 'cuenta = (await session.execute(consulta.with_
   'cuenta = (await session.execute(consulta)).scalars().first()' &&
   creditos "la recarga sin candado" 1 "MAL | carga + recarga | usuario" "MAL | carga + recarga | org"
 # El reintento del mismo pedido lo frenan dos cosas: se busca con la cuenta bloqueada y, si
-# igual entra, choca con la clave. Sin las dos, el segundo vuelve a cargar.
+# igual entra, choca con la clave. Sin buscarlo ni atrapar el choque, el segundo da 500.
 en_codigo "$R" '    previa = await db.get(CreditoAdmin, carga.pedido)
     ya = previa is not None' '    previa = None
     ya = previa is not None' '        try:

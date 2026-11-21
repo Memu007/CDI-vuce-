@@ -97,15 +97,16 @@ def mismo_pedido_dos_cuentas(c):
 
 
 def a_la_vez(c, otro, orden, de_org, vencidos):
-    """El guardado va con la cuenta al tope del plan, así gasta un crédito extra."""
+    """Con créditos al día, el guardado va con la cuenta al tope del plan, así gasta uno extra."""
     a, b = ("carga", otro)[::orden]
+    al_tope = otro == "guardado" and not vencidos
     codigos, dl, consultas, cuenta = ronda(c, a, b, de_org, "billing_status = 'active'" + (
-        "" if vencidos else ", " + h.AL_DIA) + (", ops_used_this_period = 15" if otro == "guardado" else ""))
-    esperado = (0 if vencidos else 5) + N + (h.RECARGA if otro == "recarga" else -1)
+        "" if vencidos else ", " + h.AL_DIA) + (", ops_used_this_period = 15" if al_tope else ""))
+    esperado = (0 if vencidos else 5) + N + (h.RECARGA if otro == "recarga" else -1 if al_tope else 0)
     quedan = creditos(cuenta)
     mal = dl or codigos != [200, 200] or quedan != esperado
     return fila(f"{a} + {b} | {'org' if de_org else 'usuario'} | créditos "
-                f"{'vencidos' if vencidos else 'al día'} | quedan {quedan}, esperaba {esperado}",
+                f"{'vencidos' if vencidos else 'al día'}{', al tope' if al_tope else ''} | quedan {quedan}, esperaba {esperado}",
                 mal, codigos, dl, consultas)
 
 
@@ -143,8 +144,8 @@ def main():
               c.get("/auth/me", headers=ADMIN).json()["username"])
         rondas = [lambda: mismo_pedido_misma_cuenta(c, False), lambda: mismo_pedido_misma_cuenta(c, True),
                   lambda: mismo_pedido_dos_cuentas(c)]
-        rondas += [lambda x=x: a_la_vez(c, "recarga", *x) for x in itertools.product((1, -1), (False, True), (True, False))]
-        rondas += [lambda x=x: a_la_vez(c, "guardado", *x, False) for x in itertools.product((1, -1), (False, True))]
+        rondas += [lambda o=o, x=x: a_la_vez(c, o, *x) for o in ("recarga", "guardado")
+                   for x in itertools.product((1, -1), (False, True), (True, False))]
         for r in rondas:
             mal, no = r()
             malas, sin_armar = malas + mal, sin_armar + no
