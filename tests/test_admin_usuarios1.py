@@ -244,7 +244,10 @@ def test_la_respuesta_no_trae_nada_secreto(sembradas):
 def _otra_conexion():
     # Fuera del pool de la app, con el driver sincrónico de la misma base: ve lo guardado, no lo
     # que quedó en una sesión.
-    otra = create_engine(engine.url.set(drivername=engine.url.get_backend_name()), poolclass=NullPool)
+    url = engine.url.set(drivername=engine.url.get_backend_name())
+    # En SQLite espera el lock como la app en las pruebas (conftest), en vez de fallar a los 5 s.
+    espera = {"timeout": 30} if url.get_backend_name() == "sqlite" else {}
+    otra = create_engine(url, poolclass=NullPool, connect_args=espera)
     try:
         with otra.connect() as conexion:
             yield conexion
@@ -343,7 +346,8 @@ def test_la_lista_muestra_el_cobro_con_el_que_decide_el_acceso():
     assert r.status_code == 200, r.text[:300]
     vistos = {c["usuario"]: c["cobro"] for c in r.json()["usuarios"]}
     decididos = {f"{cobros}_{clave}": _decidir_el_acceso(f"{cobros}_{clave}") for clave in COBROS}
-    assert vistos == decididos, {u: (vistos.get(u), d) for u, d in decididos.items() if vistos.get(u) != d}
+    assert vistos == decididos, {u: (vistos.get(u), decididos.get(u)) for u in vistos.keys() | decididos.keys()
+                                 if vistos.get(u) != decididos.get(u)}
     assert decididos == {f"{cobros}_{clave}": cobro for clave, (_, _, cobro) in COBROS.items()}
 
 
