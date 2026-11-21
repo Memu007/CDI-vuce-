@@ -70,6 +70,8 @@ def test_una_recarga_vence_a_los_30_dias(client):
     if isinstance(vence, str):
         vence = datetime.fromisoformat(vence)
     assert _cerca(vence, datetime.now(timezone.utc) + timedelta(days=30)), vence
+    recarga = _leer_usuario(usuario, "last_topup_at")["last_topup_at"]
+    assert _cerca(recarga, datetime.now(timezone.utc)), recarga
 
 
 def test_pagar_durante_la_prueba_extiende_desde_el_fin(client):

@@ -135,8 +135,7 @@ sabotaje $R "la búsqueda no filtra" \
   '    if buscar.strip():' '    if False:' \
   "FAILED tests/test_admin_usuarios1.py::test_la_lista_va_por_paginas"
 sabotaje $R "la página no tiene tope" \
-  '        .limit(cuantos)
-' '' \
+  '.offset(desde).limit(cuantos))' '.offset(desde))' \
   "FAILED tests/test_admin_usuarios1.py::test_la_lista_va_por_paginas"
 sabotaje $R "se pueden pedir todas de una vez" \
   'cuantos: int = Query(50, ge=1, le=200),' 'cuantos: int = Query(50, ge=1),' \

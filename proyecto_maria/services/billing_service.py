@@ -124,12 +124,23 @@ def _expire_extra_ops(user) -> None:
         user.extra_ops_expires_at = None
 
 
-def recarga_entra(cuenta) -> tuple[bool, int]:
+def recarga_entra(cuenta, n: int = TOPUP_OPS) -> tuple[bool, int]:
     """Si una recarga más entra en el tope, y cuántas extra vigentes tiene la
     cuenta: las vencidas no cuentan (COBRO-MP-1, f)."""
     _expire_extra_ops(cuenta)
     vigentes = cuenta.extra_ops_remaining or 0
-    return vigentes + TOPUP_OPS <= EXTRA_OPS_MAX, vigentes
+    return vigentes + n <= EXTRA_OPS_MAX, vigentes
+
+
+def acreditar_extra(cuenta, n: int, ahora: datetime) -> tuple[bool, int]:
+    """Suma n operaciones extra si entran en el tope; todas las vigentes pasan
+    a vencer a 30 días. Devuelve si entraron y cuántas había vigentes."""
+    entra, vigentes = recarga_entra(cuenta, n)
+    if entra:
+        cuenta.extra_ops_remaining = vigentes + n
+        cuenta.extra_ops_expires_at = ahora + timedelta(days=30)
+        cuenta.last_topup_at = ahora
+    return entra, vigentes
 
 
 def tiene_acceso(cuenta, ahora: datetime | None = None) -> bool:
@@ -394,8 +405,6 @@ def process_payment(payment_info: dict[str, Any]) -> dict[str, Any] | None:
             **base_update,
             "action": "topup",
             "extra_ops_remaining": TOPUP_OPS,
-            "last_topup_at": now,
-            "extra_ops_expires_at": now + timedelta(days=30),
         }
 
     if kind in PLANS:
