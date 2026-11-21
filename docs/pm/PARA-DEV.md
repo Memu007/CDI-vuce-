@@ -36,7 +36,7 @@ como propuesta para Emi: no entra.
 Acta `REPRODUCCION-ADMIN-CREDITOS-1-2026-11-21.md`. **El servidor cobra bien**: suite, `cobro_mp1.sh`,
 tus dos guiones de Postgres, `anclas_perdidas` y tus 26 sabotajes de SQLite dan lo mismo que tu informe,
 y los adversarios Opus y Sonnet alto no encontraron defecto del servidor. Mi `cobro_corte1.sh`
-entero todavía corre: si no da 87 ROJO, te sumo un punto. Vuelve por lo que sigue.
+entero dio lo mismo: 87 ROJO, «sabotajes con falla: 0». Vuelve por lo que sigue.
 Cada punto es criterio de aceptación salvo lo marcado «sugerencia». Próxima D: D239.
 
 1. **Una ronda de Postgres que dice «armada» tiene que haber armado lo que afirma.**

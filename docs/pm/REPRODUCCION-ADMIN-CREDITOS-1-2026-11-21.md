@@ -24,7 +24,7 @@ con valor por defecto a `recarga_entra`: los llamadores de antes no cambian.
 | `sabotajes/admin_creditos1_postgres.sh` | **«sabotajes sin rojo: 1»**, rc=1: abajo |
 | suite completa, worktree limpio | `6276 passed, 110 skipped, 3 xfailed, 112 warnings in 1226.22s`, rc=0. Las 2 de más: «Event loop is closed» en hilos de aiosqlite, en `test_datos1` y `test_sesion1` (fuera de la pieza, máquina con carga 6) |
 | `cobro_mp1.sh` entero | 145 ROJO, 0 ROTO/PATRÓN/MAL, BASE en verde, el VERDE de D31 sigue verde, «sabotajes con falla: 0», rc=0, 3618 s |
-| `cobro_corte1.sh` entero | corriendo al escribir esto; su línea se suma acá al terminar |
+| `cobro_corte1.sh` entero | 87 ROJO, BASE en verde (también la pantalla y el lock), «sabotajes con falla: 0», rc=0, 4011 s (la primera corrida la cortó el tope de 2 h en 63 ROJO; repetida sola) |
 | mis negativos en SQLite | sin negativo 35 passed; registro con `cuenta=username`: 2 failed; `vigentes_antes` mal: 5 failed |
 
 ## Por qué vuelve
