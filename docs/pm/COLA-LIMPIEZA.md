@@ -335,3 +335,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `test_cada_pais_del_catalogo_vuelve_a_su_codigo` sólo siembra códigos: con un PUT del cliente que
   normaliza el origen en cualquier guardado, pasa igual. Sumarle, como datos, orígenes viejos guardados
   como nombre o forma rara («Holanda», «0423», « 423 », «Narnia»). Lo vio la PM (CATALOGO-PAIS).
+- La regla «¿venció el cobro?» tiene tres copias fuera de `billing_service.cobro_efectivo` (D279 b):
+  `_check_expired_trials` (`main.py:786-807`, SQL del arranque), `get_current_user`
+  (`auth/dependencies.py:142-155`, sólo `trial`; va con D205, que lee sin candado) y el checkout
+  (`main.py:~11878`, sin gracia, sólo elige el texto del 409). Pasan a usar la función. Lo vio la PM (D278).

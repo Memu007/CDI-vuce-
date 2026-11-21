@@ -5,10 +5,13 @@ la suite la comparten todas las pruebas. Cada cuenta lleva secretos con
 valores únicos, para buscarlos en el texto entero de la respuesta.
 """
 import asyncio
+import sqlite3
 import uuid
+from contextlib import closing, contextmanager
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import event, text
 
@@ -164,14 +167,20 @@ COMUN = {"username": "comun_adus", "roles": ["operador"], "effective_owner": "co
          "plan": "premium", "billing_status": "active"}
 
 
-def _pedir(usuario=ADMIN, **params):
+@contextmanager
+def _cliente(usuario=ADMIN):
     _como(usuario)
     try:
         # Con with: el router de admin se monta al arrancar la app.
         with TestClient(main.app) as client:
-            return client.get(RUTA, params={"buscar": PREFIJO, **params})
+            yield client
     finally:
         _como(None)
+
+
+def _pedir(usuario=ADMIN, **params):
+    with _cliente(usuario) as client:
+        return client.get(RUTA, params={"buscar": PREFIJO, **params})
 
 
 FECHAS = {"cobro_hasta", "creditos_vencen", "ultima_recarga"}
@@ -227,23 +236,96 @@ def test_la_respuesta_no_trae_nada_secreto(sembradas):
     assert not salidos, salidos
 
 
-def _filas():
-    async def _leer():
+def _otra_conexion():
+    # Fuera del pool de la app: ve lo guardado, no lo que quedó en una sesión.
+    return closing(sqlite3.connect(engine.url.database, timeout=30))
+
+
+def _filas(prefijo=PREFIJO):
+    with _otra_conexion() as otra:
+        return [otra.execute(f"SELECT * FROM {tabla} WHERE {columna} LIKE ? ORDER BY 1", (f"%{prefijo}%",)).fetchall()
+                for tabla, columna in (("users", "username"), ("organizations", "name"),
+                                       ("password_reset_tokens", "token"), ("invitations", "token"))]
+
+
+# cuenta → (lo suyo, lo de su estudio o None, el cobro con el que decide el acceso); el fin, contado
+# desde que se siembra, así el borde de la gracia no se gasta mientras corre la suite.
+COBROS = {
+    "prueba_vencida": (dict(billing_status="trial", fin=-timedelta(days=1)), None, "past_due"),
+    "prueba_vigente": (dict(billing_status="trial", fin=timedelta(days=5)), None, "trial"),
+    # Una hora a cada lado de los 7 días de gracia: una gracia de 6 u 8 también da rojo.
+    "en_la_gracia": (dict(billing_status="active", fin=-timedelta(days=7, hours=-1)), None, "active"),
+    "fuera_de_la_gracia": (dict(billing_status="active", fin=-timedelta(days=7, hours=1)), None, "past_due"),
+    "impaga": (dict(billing_status="past_due", fin=timedelta(days=10)), None, "past_due"),
+    "cancelada_terminada": (dict(billing_status="canceled", fin=-timedelta(days=1)), None, "canceled"),
+    "de_estudio_vencido": (dict(billing_status="active", fin=timedelta(days=10)),
+                           dict(billing_status="trial", fin=-timedelta(days=1)), "past_due"),
+    "de_estudio_vigente": (dict(billing_status="trial", fin=-timedelta(days=1)),
+                           dict(billing_status="active", fin=timedelta(days=10)), "active"),
+}
+
+
+def _sembrar_cobros():
+    """Las cuentas de COBROS con un prefijo nuevo, porque el acceso las vence. Con la app
+    ya arrancada: el arranque pasa a past_due las cuentas que encuentra vencidas."""
+    prefijo = "adco" + uuid.uuid4().hex[:8]
+    ahora = datetime.now(timezone.utc)
+
+    def _cobro(c):
+        return dict(billing_status=c["billing_status"], trial_ends_at=ahora + c["fin"])
+
+    async def _sembrar():
         async with AsyncSessionLocal() as db:
-            filas = []
-            for tabla, columna in (("users", "username"), ("organizations", "name"),
-                                   ("password_reset_tokens", "token"), ("invitations", "token")):
-                res = await db.execute(text(f"SELECT * FROM {tabla} WHERE {columna} LIKE :p ORDER BY 1"),
-                                       {"p": f"%{PREFIJO}%"})
-                filas.append([tuple(f) for f in res])
-            return filas
-    return asyncio.run(_leer())
+            for clave, (suyo, _, _) in COBROS.items():
+                db.add(User(username=f"{prefijo}_{clave}", email=f"{prefijo}_{clave}@prueba.cdi",
+                            password="x", is_verified=True, plan="premium", **_cobro(suyo)))
+            await db.flush()
+            for clave, (_, del_estudio, _) in COBROS.items():
+                if del_estudio:
+                    org = str(uuid.uuid4())
+                    db.add(Organization(id=org, name=f"Estudio {prefijo}_{clave}", plan="premium",
+                                        owner_username=f"{prefijo}_{clave}", **_cobro(del_estudio)))
+                    await db.flush()
+                    await db.execute(text("UPDATE users SET organization_id = :o WHERE username = :u"),
+                                     {"o": org, "u": f"{prefijo}_{clave}"})
+            await db.commit()
+    asyncio.run(_sembrar())
+    return prefijo
+
+
+def _decidir_el_acceso(usuario):
+    async def _decidir():
+        async with AsyncSessionLocal() as db:
+            try:
+                await main._billing_vigente({"username": usuario}, db, mirar_tope=False)
+            except HTTPException as e:
+                assert e.status_code == 402, e.detail
+    asyncio.run(_decidir())
+    with _otra_conexion() as otra:
+        return otra.execute("SELECT COALESCE(o.billing_status, u.billing_status) FROM users u LEFT JOIN "
+                            "organizations o ON o.id = u.organization_id WHERE u.username = ?",
+                            (usuario,)).fetchone()[0]
+
+
+def test_la_lista_muestra_el_cobro_con_el_que_decide_el_acceso():
+    with _cliente() as client:
+        cobros = _sembrar_cobros()
+        r = client.get(RUTA, params={"buscar": cobros})
+    assert r.status_code == 200, r.text[:300]
+    vistos = {c["usuario"]: c["cobro"] for c in r.json()["usuarios"]}
+    decididos = {f"{cobros}_{clave}": _decidir_el_acceso(f"{cobros}_{clave}") for clave in COBROS}
+    assert vistos == decididos
+    assert decididos == {f"{cobros}_{clave}": cobro for clave, (_, _, cobro) in COBROS.items()}
 
 
 def test_mirar_no_cambia_la_base(sembradas):
     assert len(sembradas[0]) == len(CUENTAS) and len(sembradas[1]) == len(ESTUDIOS), sembradas
-    assert _pedir().status_code == 200
-    assert _filas() == sembradas
+    with _cliente() as client:
+        cobros = _sembrar_cobros()
+        vencidas = _filas(cobros)
+        for buscar in (PREFIJO, cobros):
+            assert client.get(RUTA, params={"buscar": buscar}).status_code == 200
+    assert _filas() == sembradas and _filas(cobros) == vencidas
 
 
 def test_la_lista_va_por_paginas(sembradas):

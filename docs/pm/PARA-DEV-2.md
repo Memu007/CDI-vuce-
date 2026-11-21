@@ -3,60 +3,52 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
-## Tarea activa: D278 (b), el paso previo a ADMIN-CREDITOS-1 (2026-11-21 01:55 UTC)
+## Tarea activa: la lista de usuarios en Postgres 16 (2026-11-21 05:57 UTC)
 
-CONEXIONES-1-PRODUCTO está aceptada e integrada en mi rama (`45ea6192`): ya podés tocar `main.py`.
-Antes de nada: `merge` de mi rama. Es tuya sola hasta que entregues; la Técnica hace después
-ADMIN-CREDITOS-1 sobre lo tuyo, así que no tocan `admin_router.py` las dos a la vez.
+Es lo que falta antes de que ADMIN-USUARIOS-1 y D278 (b) entren a una candidata. Antes de nada:
+`merge` de mi rama.
 
-**Comportamiento** (sí de Emi 20/11, «Quiero ver usuarios y darles créditos desde el panel»):
-1. La lista de usuarios del panel muestra el **estado de cobro efectivo**: una cuenta en `trial`
-   o en `active` que ya pasó su vencimiento (con la gracia de `active`) se ve vencida, aunque no
-   haya entrado desde el último arranque. Lo que ve el admin y lo que decide el acceso salen de la
-   misma regla: no una copia de `_vencer_si_corresponde`.
-   El plan ya sale de quien paga (la cuenta o su estudio): no se toca.
-2. **Mirar no escribe:** listar no cambia `billing_status` ni nada en la base.
+**Comportamiento:** en Postgres 16 la lista de usuarios del panel da lo mismo que en SQLite:
+1. la familia `COBROS` (lo que muestra la lista coincide con lo que decide el acceso), con la
+   integrante cuyo estudio se borró (Sonnet no la probó en Postgres);
+2. sólo admin la ve;
+3. mirar no cambia la base, leída por **otra conexión de Postgres** (hoy el caso lee con `sqlite3`).
 
-**Prueba:** un caso con la familia como datos (trial vencido, active dentro y fuera de la gracia,
-`past_due`, integrante de estudio con estudio vencido y vigente) que compara, sobre las mismas
-cuentas, lo que muestra la lista con lo que decide el acceso: rojo con el estado guardado, verde con
-el efectivo. Otro que, después de listar, lee la base por **otra conexión** y la encuentra igual.
-El informe trae una vez el rojo con el arreglo revertido.
+**Prueba:** los casos corren con `scripts/testing/con_pg16.sh` (Postgres descartable; no el 55462).
+El informe trae una vez el rojo en Postgres con `admin_router.py` de `a17011d1`. Sin esperas fijas
+nuevas.
 
-**Puertas:** `chequeo-6.py`, `anclas_perdidas.py`, la suite completa desde worktree limpio,
-`/code-review` y adversario Sonnet alto. **Si tu diff toca `_vencer_si_corresponde`,
-`_billing_vigente` o `tiene_acceso`, pasa a revisión fuerte:** además `cobro_corte1.sh` y Opus alto.
-Próxima D: D279.
+**Alcance:** sólo pruebas, `producto +0/−0`. Si en Postgres aparece una diferencia de producto,
+frenás y la traés como D280: desde ahora `admin_router.py` y `billing_service.py` son de la Técnica
+(ADMIN-CREDITOS-1, tramo 2).
 
-## Veredicto: ADMIN-USUARIOS-1 aceptada sobre `b06b47fa` (informe `a8edd311`) (2026-11-20 20:13 UTC)
+**Puertas:** `chequeo-6.py`, `anclas_perdidas.py`, los casos de admin en SQLite y en Postgres,
+`/code-review`. Si tocás `tests/conftest.py` o un ayudante compartido, también la suite completa
+desde worktree limpio. Próxima D: D280.
 
-Acta: `REPRODUCCION-ADMIN-USUARIOS-1-2026-11-20.md`. La integro con `merge` de `a8edd311`; sin
-publicar y fuera de la candidata `0d7401ed`. Reproduje con la copia de `b06b47fa`: chequeo-6 (igual
-que el informe, el AVISO explicado), tus comandos 1 a 4 (`35 passed`, `fallas: 0`, `8 failed … 27
-errors`, 27 ROJO), un negativo mío con sesiones reales (seis roles que no son admin dan 403 sin
-datos; rojo con la bandera o con `_es_admin` comparando texto), adversarios Sonnet y Opus alto (nada
-grave) y la suite completa desde worktree limpio (`6241 passed, 110 skipped, 3 xfailed`, como el tuyo). No corrí Postgres ni
-`panel_dev.sh`: me apoyo en tu sonda.
+Después de esta entrega no te queda pieza: lo tuyo espera a alguien de afuera (la lista de empaque,
+los TXT reales, el texto de Emi). Tu rutina se apaga y te despierto por `send_message`.
+
+## Veredicto: D278 (b) aceptada sobre `05ca7f71` (informe `f244c7b4`) (2026-11-21 05:57 UTC)
+
+Acta: `REPRODUCCION-D278B-2026-11-21.md`. Integrada con el merge de `f244c7b4` (`647ea7da`); sin publicar y fuera
+de la candidata `0d7401ed`. Reproduje con la copia de `05ca7f71`: chequeo-6 (igual, sin avisos), tus
+casos (`134 passed`), el rojo con `admin_router.py` de la base (las tres vencidas, nada más), la
+suite completa desde worktree limpio (`6242 passed, 110 skipped, 3 xfailed`, como el tuyo),
+`admin_usuarios1.sh` (31 ROJO), `anclas_perdidas.py`, `cobro_corte1.sh` en Postgres (87 ROJO, «sabotajes con falla: 0»), un negativo mío (la regla vieja contra
+`cobro_efectivo` en 198 casos: iguales; rojo con la regla saboteada) y los adversarios Opus y Sonnet
+alto (nada serio; Sonnet probó a mano en Postgres que la lista y el acceso coinciden). No corrí `/code-review`: lo cubren los dos adversarios. La familia en Postgres tampoco: esa sí es tu tarea de arriba.
+
+En `anclas_perdidas.py` los números son los tuyos, pero los 5 «no medido» son de `e2e_rerun.sh` y
+`foco_cliente1.sh`, no de `limpieza1.sh` (ese sale «SIN ANCLA»). Corregilo en tu próximo informe si
+lo repetís.
 
 **Decidido por la PM:**
-- **D278: (b).** Leí `_check_expired_trials`: cubre `trial` y `active` con gracia, pero sólo al
-  arrancar; al usar lo vencen `_vencer_si_corresponde` y `get_current_user`. El hueco queda como
-  riesgo escrito. No se abre (a) ahora porque pide tocar `main.py` mientras la Técnica lo cambia.
-  Mostrar el estado efectivo y el plan que se cobra pasa a ser criterio del paso previo a
-  ADMIN-CREDITOS-1, después de CONEXIONES-1-PRODUCTO.
-- **Supuestos 1 a 6:** aceptados.
-- **Riesgo 2:** lo confirmé en el código. Los tres caminos que crean cuentas (registro, alta de
-  estudio, demo) guardan «premium»; el «trial» sólo es el valor por defecto del modelo. Riesgo
-  escrito, bajo.
-- **Riesgos 1, 3 a 6** y los de los adversarios (un `creditos_extra` negativo se ve tal cual; un
-  plan `NULL` sale `None`; en SQLite un `roles` con JSON roto da 500 en la lista): riesgo escrito,
-  bajo.
-
-**`/security-review` (pedido 20:19): leído, sin hallazgos (`2d10df8c`).** Comprobé dos caminos: el
-router de admin con `require_admin` (`main.py:1689-1692`) y ningún `innerHTML` nuevo en el panel.
-**`/security-review` de la candidata: leído (20:29), sin hallazgos (`44ecf6e2`).** Comprobé
-`_fetch_vendor_rows` (filtra por `owner_username`) y que el único `innerHTML` nuevo es uno. Lo tuyo que queda espera a alguien de afuera (ADMIN-CREDITOS-1 espera a la Técnica; Emi dijo sí a los tres a las 21:42: los créditos dados vencen a
-30 días, respetan el tope de 100 y cada carga se registra en una tabla nueva; la lista de empaque, los TXT reales, la pregunta 6, el texto de Emi). Arriba, tu tarea activa.
+- **D279: (b).** Las tres copias van a `COLA-LIMPIEZA.md`; la de `get_current_user`, atada a D205.
+  Leí las tres: las dos primeras usan los mismos umbrales y sólo pasan a `past_due`; el checkout no
+  tiene gracia, pero sólo elige el texto del 409 (las dos ramas dan 409). El perfil con el estado
+  guardado queda como riesgo escrito.
+- **Riesgos 1 a 6:** aceptados como los escribís, bajos.
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 

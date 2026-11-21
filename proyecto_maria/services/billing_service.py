@@ -154,6 +154,25 @@ def tiene_acceso(cuenta, ahora: datetime | None = None) -> bool:
     return vigente(getattr(cuenta, "trial_ends_at", None), ahora)
 
 
+# Días de gracia antes de cortar a un `active` cuyo período venció sin renovación: un
+# webhook de renovación o un reintento de MP pueden llegar tarde. `trial` no lleva: nadie pagó.
+BILLING_GRACE_DAYS_ACTIVE = 7
+
+
+def cobro_efectivo(cuenta, ahora: datetime | None = None) -> str | None:
+    """El billing_status con el que decide el acceso: past_due si la prueba o el
+    período ya vencieron, aunque todavía nadie lo haya guardado. No escribe."""
+    estado, fin = cuenta.billing_status, como_utc(cuenta.trial_ends_at)
+    if fin is None:
+        return estado
+    ahora = ahora or datetime.now(timezone.utc)
+    if estado == "trial" and fin < ahora:
+        return "past_due"
+    if estado == "active" and fin < ahora - timedelta(days=BILLING_GRACE_DAYS_ACTIVE):
+        return "past_due"
+    return estado
+
+
 def vigente(fin: datetime | None, ahora: datetime | None = None) -> bool:
     if fin is None:
         return False
