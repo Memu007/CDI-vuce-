@@ -5,15 +5,15 @@ la suite la comparten todas las pruebas. Cada cuenta lleva secretos con
 valores únicos, para buscarlos en el texto entero de la respuesta.
 """
 import asyncio
-import sqlite3
 import uuid
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from sqlalchemy import event, text
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.pool import NullPool
 
 from proyecto_maria import main
 from proyecto_maria.database.connection import AsyncSessionLocal, engine
@@ -102,10 +102,10 @@ ESTUDIOS = {
 
 
 def _secretos(de):
-    """Valores que no tienen que salir, únicos por cuenta."""
+    """Valores que no tienen que salir, únicos por cuenta. La marca, al largo de su columna."""
     return dict(payment_customer_id=f"CLIENTEMP-{de}", last_payment_id=f"PAGOMP-{de}",
                 mp_preapproval_id=f"PREAPROB-{de}", mp_plan_id=f"PLANMP-{de}",
-                payment_method_last4="Q7Z9", payment_method_brand=f"MARCA-{de}")
+                payment_method_last4="Q7Z9", payment_method_brand=f"MARCA-{de}"[:20])
 
 
 def _usuario(clave):
@@ -123,8 +123,7 @@ def _todos_los_secretos():
     return vistos + [f"INVITA-{PREFIJO}"]
 
 
-@pytest.fixture(scope="module")
-def sembradas():
+def _sembrar_cuentas():
     ids = {clave: str(uuid.uuid4()) for clave in ESTUDIOS}
 
     async def _sembrar():
@@ -139,10 +138,9 @@ def sembradas():
                 db.add(Organization(id=ids[clave], name=nombre, owner_username=_usuario(integrante),
                                     **_secretos(f"{clave}-{PREFIJO}"), **campos))
             await db.flush()
-            de_quien = {integrante: ids[clave] for clave, (_, _, integrante) in ESTUDIOS.items()}
-            for clave, org in (*de_quien.items(), ("colgada", f"borrado-{PREFIJO}")):
+            for clave, (_, _, integrante) in ESTUDIOS.items():
                 await db.execute(text("UPDATE users SET organization_id = :o WHERE username = :u"),
-                                 {"o": org, "u": _usuario(clave)})
+                                 {"o": ids[clave], "u": _usuario(integrante)})
             for clave in CUENTAS:
                 db.add(PasswordResetToken(user_username=_usuario(clave), token=f"RECUPERA-{clave}-{PREFIJO}",
                                           expires_at=EN_10_DIAS))
@@ -150,8 +148,14 @@ def sembradas():
                               expires_at=EN_10_DIAS))
             await db.commit()
     asyncio.run(_sembrar())
+    _colgar(_usuario("colgada"), f"borrado-{PREFIJO}")
     # La foto se saca al sembrar: los otros casos también miran, en cualquier orden.
     return _filas()
+
+
+@pytest.fixture(scope="module")
+def sembradas():
+    return _sembrar_cuentas()
 
 
 def _como(usuario):
@@ -236,20 +240,41 @@ def test_la_respuesta_no_trae_nada_secreto(sembradas):
     assert not salidos, salidos
 
 
+@contextmanager
 def _otra_conexion():
-    # Fuera del pool de la app: ve lo guardado, no lo que quedó en una sesión.
-    return closing(sqlite3.connect(engine.url.database, timeout=30))
+    # Fuera del pool de la app, con el driver sincrónico de la misma base: ve lo guardado, no lo
+    # que quedó en una sesión.
+    otra = create_engine(engine.url.set(drivername=engine.url.get_backend_name()), poolclass=NullPool)
+    try:
+        with otra.connect() as conexion:
+            yield conexion
+    finally:
+        otra.dispose()
+
+
+def _colgar(usuario, estudio):
+    """La deja en un estudio que no existe. Postgres no lo deja por la clave foránea: se apaga
+    en esta conexión, como en una base a la que el arranque no le pudo sumar esa clave."""
+    with _otra_conexion() as otra:
+        if otra.dialect.name == "postgresql":
+            otra.execute(text("SET session_replication_role = replica"))
+        cambio = otra.execute(text("UPDATE users SET organization_id = :o WHERE username = :u"),
+                              {"o": estudio, "u": usuario})
+        assert cambio.rowcount == 1, usuario
+        otra.commit()
 
 
 def _filas(prefijo=PREFIJO):
     with _otra_conexion() as otra:
-        return [otra.execute(f"SELECT * FROM {tabla} WHERE {columna} LIKE ? ORDER BY 1", (f"%{prefijo}%",)).fetchall()
+        return [otra.execute(text(f"SELECT * FROM {tabla} WHERE {columna} LIKE :p ORDER BY 1"),
+                             {"p": f"%{prefijo}%"}).fetchall()
                 for tabla, columna in (("users", "username"), ("organizations", "name"),
                                        ("password_reset_tokens", "token"), ("invitations", "token"))]
 
 
-# cuenta → (lo suyo, lo de su estudio o None, el cobro con el que decide el acceso); el fin, contado
-# desde que se siembra, así el borde de la gracia no se gasta mientras corre la suite.
+BORRADO = "borrado"
+# cuenta → (lo suyo, lo de su estudio, None o BORRADO, el cobro con el que decide el acceso); el fin,
+# contado desde que se siembra, así el borde de la gracia no se gasta mientras corre la suite.
 COBROS = {
     "prueba_vencida": (dict(billing_status="trial", fin=-timedelta(days=1)), None, "past_due"),
     "prueba_vigente": (dict(billing_status="trial", fin=timedelta(days=5)), None, "trial"),
@@ -262,6 +287,7 @@ COBROS = {
                            dict(billing_status="trial", fin=-timedelta(days=1)), "past_due"),
     "de_estudio_vigente": (dict(billing_status="trial", fin=-timedelta(days=1)),
                            dict(billing_status="active", fin=timedelta(days=10)), "active"),
+    "de_estudio_borrado": (dict(billing_status="trial", fin=-timedelta(days=1)), BORRADO, "past_due"),
 }
 
 
@@ -281,7 +307,7 @@ def _sembrar_cobros():
                             password="x", is_verified=True, plan="premium", **_cobro(suyo)))
             await db.flush()
             for clave, (_, del_estudio, _) in COBROS.items():
-                if del_estudio:
+                if isinstance(del_estudio, dict):
                     org = str(uuid.uuid4())
                     db.add(Organization(id=org, name=f"Estudio {prefijo}_{clave}", plan="premium",
                                         owner_username=f"{prefijo}_{clave}", **_cobro(del_estudio)))
@@ -290,6 +316,9 @@ def _sembrar_cobros():
                                      {"o": org, "u": f"{prefijo}_{clave}"})
             await db.commit()
     asyncio.run(_sembrar())
+    for clave, (_, del_estudio, _) in COBROS.items():
+        if del_estudio == BORRADO:
+            _colgar(f"{prefijo}_{clave}", f"borrado-{prefijo}")
     return prefijo
 
 
@@ -302,9 +331,9 @@ def _decidir_el_acceso(usuario):
                 assert e.status_code == 402, e.detail
     asyncio.run(_decidir())
     with _otra_conexion() as otra:
-        return otra.execute("SELECT COALESCE(o.billing_status, u.billing_status) FROM users u LEFT JOIN "
-                            "organizations o ON o.id = u.organization_id WHERE u.username = ?",
-                            (usuario,)).fetchone()[0]
+        return otra.execute(text("SELECT COALESCE(o.billing_status, u.billing_status) FROM users u LEFT JOIN "
+                                 "organizations o ON o.id = u.organization_id WHERE u.username = :u"),
+                            {"u": usuario}).scalar_one()
 
 
 def test_la_lista_muestra_el_cobro_con_el_que_decide_el_acceso():
