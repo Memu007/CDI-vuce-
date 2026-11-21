@@ -467,9 +467,9 @@
         // desde el diálogo reabierto, no carga dos veces; otra cantidad es otra carga.
         // El diálogo muestra la respuesta del último pedido que envió o retomó.
         let carga = null;
-        const sinConfirmar = {};
+        const sinConfirmar = new Map();
         function abrirCarga(u) {
-            const previa = sinConfirmar[u.usuario];
+            const previa = sinConfirmar.get(u.usuario);
             carga = { usuario: u.usuario, pedido: previa && previa.pedido };
             document.getElementById('carga-cuenta').textContent = 'Paga ' + (u.saldo_del_estudio
                 ? 'el estudio «' + u.estudio + '»' : 'la cuenta') + ' de ' + u.usuario
@@ -487,9 +487,9 @@
             const estado = document.getElementById('carga-estado');
             const esta = carga;
             const cantidad = Number(document.getElementById('carga-cantidad').value);
-            const previa = sinConfirmar[esta.usuario];
+            const previa = sinConfirmar.get(esta.usuario);
             const pedido = previa && previa.cantidad === cantidad ? previa.pedido : crypto.randomUUID();
-            sinConfirmar[esta.usuario] = { cantidad, pedido };
+            sinConfirmar.set(esta.usuario, { cantidad, pedido });
             esta.pedido = pedido;
             enviar.disabled = true;
             estado.textContent = 'Cargando…';
@@ -503,8 +503,8 @@
                 data = await response.json();
             } catch (e) { /* sin red o sin JSON: se dice abajo */ }
             // Con una respuesta menor a 500, el servidor ya dijo si cargó o no.
-            if (response && response.status < 500 && sinConfirmar[esta.usuario]?.pedido === pedido) {
-                delete sinConfirmar[esta.usuario];
+            if (response && response.status < 500 && sinConfirmar.get(esta.usuario)?.pedido === pedido) {
+                sinConfirmar.delete(esta.usuario);
             }
             if (response && response.ok) fetchUsuarios(0);
             if (!carga || carga.pedido !== pedido) return;
