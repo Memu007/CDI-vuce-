@@ -1,6 +1,6 @@
 # CONEXIONES-1-PRODUCTO (con NOKEY): `b4f7e590` (informe `924cb1ca`), 2026-11-21, PM
 
-**Veredicto: PENDIENTE** (falta `cobro_corte1.sh` y `cobro_mp1.sh` míos). Base `ac4993b7`.
+**Veredicto: PENDIENTE** (falta `cobro_corte1.sh` mío). Base `ac4993b7`.
 Sin publicar. Revisión fuerte (plata, sesión, transversal, §3).
 
 ## Diff
@@ -21,7 +21,7 @@ suficiente.
 | `GEMINI_API_KEY= e2e_maria.sh` sobre el SHA y sobre la unión con la rama de PM | los dos «E2E MARIA OK: …», rc=0 |
 | `conexiones1_medir.py` sin y con cuota (PG16 desechable) | rc=0 los dos, 504 s; abajo |
 | `cobro_corte1.sh b4f7e590` (PG16) | PENDIENTE |
-| `cobro_mp1.sh b4f7e590` entero (ella corrió sólo D, sobre `709b3a3e`) | PENDIENTE |
+| `cobro_mp1.sh b4f7e590` entero (ella corrió sólo D, sobre `709b3a3e`) | 145 ROJO; BASE en verde (servidor, carrera de D y pagos a la vez en Postgres, perfil, Listo); el VERDE de D31 sigue verde; «sabotajes con falla: 0», rc=0, 3561 s |
 | negativo mío `test_pm_neg_soltar.py` (6 casos: soltar y después usar, con la base caída) | `6 passed` |
 | negativo mío `pm_neg_tope.py` (PG, dos pedidos cruzados en el candado: a manual+manual, b manual+generar, c extra 1, d extras vencidos) | «fallas: 0», rc=0: pasa uno, el otro 402, un solo cobro |
 
