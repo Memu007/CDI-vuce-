@@ -1,6 +1,9 @@
 # ADMIN-CREDITOS-1, tramos 1 y 2: `39d4dd8b` (informe `010e0dae`), 2026-11-21, PM
 
-**Veredicto: vuelve.** No hay defecto de plata en el servidor. Vuelve por dos rondas de Postgres que
+**Aceptada a la vuelta sobre `0f5ee58d`** (informe `c4cb73e4`), integrada con el merge de `54a533c1`
+(`2c60ef94`): abajo, «La vuelta». Sin publicar y fuera de la candidata `0d7401ed`.
+
+**Primer veredicto (12:08): vuelve.** No hay defecto de plata en el servidor. Vuelve por dos rondas de Postgres que
 dicen «ok» sin comprobar lo que afirman, un error del panel con nombres de usuario que hoy se
 pueden registrar, y dos detalles del informe. Base `0208ea9d`. Revisión fuerte (plata, permisos,
 migración). Sin integrar.
@@ -77,3 +80,49 @@ con valor por defecto a `recarga_entra`: los llamadores de antes no cambian.
   riesgos se sostienen como los escribe.
 - No corrido por la PM: `/code-review` (lo cubren Opus y Sonnet alto y su `/security-review`), y
   `e2e_maria.sh` (la pieza no toca el recorrido MARIA).
+
+## La vuelta: `0f5ee58d` (informe `c4cb73e4`), 14:09 UTC, aceptada
+
+`git diff 0f5ee58d 54a533c1 -- . ':!docs/pm' ':!.claude' ':!AGENTS.md'` y lo mismo contra `2c60ef94`:
+vacíos. `chequeo-6.py 39d4dd8b 0f5ee58d`: «producto +6/−6», «arnés +143/−22», historia vacía,
+«avisos: 0»; desde la base `0208ea9d`, igual a su informe. El producto es sólo `dev_dashboard.html`
+(`const sinConfirmar = new Map()`); ningún `.py` de `proyecto_maria/` cambió desde `39d4dd8b`.
+
+| Qué (worktree en `0f5ee58d`, PG16 descartable) | Resultado |
+|---|---|
+| `anclas_perdidas.py` | rc=0, los mismos 6 «SIN ANCLA» de `limpieza1.sh` |
+| `admin_creditos1_postgres.py` | «filas MAL: 0; rondas sin armar: 0», rc=0 (una corrida) |
+| `sabotajes/admin_creditos1.sh` (ahora 100755) | 27 ROJO, BASE «35 passed», pantalla OK, «sabotajes sin rojo: 0», rc=0 |
+| `sabotajes/admin_creditos1_postgres.sh` | 11 sabotajes en rojo («la carga sin candado» 6, «la cuenta sin candado» 10, «la recarga sin candado» 4), «sabotajes sin rojo: 0», rc=0 |
+| `sabotajes/admin_creditos1_postgres_veces.sh` | «rojas: 20 de 20», todas `[200, 500]` armadas |
+| casos de cobro que leen el panel, anclas y admin en SQLite | `195 passed`, rc=0 |
+
+**Mis negativos, con ejemplos que no di:**
+
+1. **El orden tarde, forzado.** Parcheé la ronda del caso 8 para que la segunda cuenta mande su
+   pedido recién después del rollback del candado: rc=4, «SIN ARMAR | el mismo pedido para dos
+   cuentas | … | [200, 409] | NO SE ARMÓ», «rondas sin armar: 1». Ya no sale «ok».
+2. **Mi forma del candado sacado:** la carga busca la cuenta sin bloquearla. rc=1, «filas MAL: 6»: las
+   cuatro «recarga + carga» y «guardado + carga, créditos al día, al tope: quedan 12, esperaba 11»
+   (usuario y org). Coincide con su fila. El caso 10 ahora distingue en las dos direcciones.
+3. **Otras claves heredadas.** La pantalla con `isPrototypeOf`, `propertyIsEnumerable`,
+   `toLocaleString` y `__lookupGetter__`, y reabrir sobre `isPrototypeOf`: con el HTML nuevo «OK»,
+   rc=0; con el de `39d4dd8b`, «FALLA: abrir isPrototypeOf: … La carga de undefined no se
+   confirmó…», rc=1.
+
+**Lo que queda escrito:**
+
+- La ronda «guardado y después carga con créditos vencidos» no se corre (`admin_creditos1_postgres.py:148-149`):
+  la carga vence lo viejo igual, así que da 7 con candado o sin él. Las otras celdas de la familia sí
+  distinguen (mi negativo 2), así que la causa queda cubierta.
+- `/security-review` sugirió `Depends(require_admin)` en la ruta. **Decidido por la PM: no hace falta.**
+  El router se monta con `require_admin` (`main.py`), el caso `no_admin` da 403 y el sabotaje «las rutas
+  de admin no piden admin» da rojo («assert 200 == 403»).
+- Sus riesgos, bajos y escritos, sin pieza: `previa` borrada entre el choque y la relectura, y `.one()`
+  con la cuenta borrada (500 en una carrera con un borrado que hoy no tiene ruta);
+  `fetchUsuarios(0)` vuelve a la primera página; `crypto.randomUUID()` sólo con HTTPS o `localhost`
+  (Railway sirve HTTPS); `con_pg16.sh` ignora `TMPDIR` (arnés); `past_due`/`canceled` dan 200.
+- No corrido por la PM en la vuelta: la suite, `cobro_mp1.sh` y `cobro_corte1.sh` (el servidor no
+  cambió desde `39d4dd8b`, donde los corrí; su `cobro_corte1` sobre `8d6829ea` dio 87 ROJO),
+  adversarios y `/code-review`.
+- Al publicar: copia de la base antes (tabla nueva `creditos_admin`).

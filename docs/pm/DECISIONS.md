@@ -1187,3 +1187,12 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - D237 (el admin llena el tope y después se paga un link de recarga viejo) es de plata: va a Emi con
   la recomendación (a). No frena la vuelta.
 - Cargarle a una cuenta `past_due` sin aviso: riesgo bajo, escrito; el aviso es propuesta para Emi.
+
+## 2026-11-21 14:09 UTC — ADMIN-CREDITOS-1 aceptada sobre `0f5ee58d`
+
+- Aceptada a la vuelta (informe `c4cb73e4`) e integrada (merge de `54a533c1`, `2c60ef94`); acta
+  REPRODUCCION-ADMIN-CREDITOS-1-2026-11-21, «La vuelta». Sin publicar y fuera de la candidata
+  `0d7401ed`; al publicar, copia de la base antes (tabla `creditos_admin`).
+- Decidido por la PM, con el consejero: no hace falta `Depends(require_admin)` en la ruta, porque el
+  router ya se monta con `require_admin` y lo cubren un caso y un sabotaje.
+- La Técnica queda sin tarea activa y con la rutina apagada: lo próximo suyo espera a Emi.

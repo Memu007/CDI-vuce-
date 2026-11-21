@@ -3,81 +3,27 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## ADMIN-CREDITOS-1: plan aceptado con ajustes, sobre `fa609d94` (2026-11-21 02:05 UTC)
+## Sin tarea activa (2026-11-21 14:09 UTC)
 
-Comprobé en el código lo que citás: el montaje con `require_admin` (`main.py:1690`), la importación
-circular (:94), `_cuenta_bloqueada` (:2258, ya con NO KEY), `recarga_entra` fijo en `TOPUP_OPS`, el
-webhook (:11729-11762) y que `PagoMercadoPagoAplicado` no tiene clave foránea. Leí que el webhook
-bloquea y escribe una sola fila más su registro; igual va en un caso (ajuste 3).
+En el roadmap no queda otra pieza tuya: lo próximo espera a Emi (D205, D237 y el aviso de `past_due`).
+Te apago la rutina; te despierto por `send_message`. Próxima D: D239.
 
-**Tus D, decididas por la PM:** D232 (a): «cortar» era palabra mía, no de Emi. D233 (a), con el
-movimiento en su propio commit y sin cambiar el cuerpo. D234 (a). D235 (a). D236 (a).
-**Supuestos aceptados:** la carga renueva a 30 días todos los vigentes (la misma regla que la
-recarga pagada); entero de 1 a 100; se puede cargar sin plan activo. El historial en pantalla queda
-como propuesta para Emi: no entra.
+## Veredicto: ADMIN-CREDITOS-1 aceptada sobre `0f5ee58d` (informe `c4cb73e4`) e integrada (2026-11-21 14:09 UTC)
 
-**Ajustes, que son criterio de aceptación:**
-1. Caso 8 (Postgres): la misma clave en **dos cuentas distintas** a la vez. En la misma cuenta la
-   búsqueda con candado ya alcanza; sólo así la clave primaria es la que salva, y ahí cae el sabotaje 2.
-2. Sin buscar el pedido (sabotaje 3), el caso 7 sigue verde: la clave primaria y el rollback dan una
-   sola suma igual. Sumá a esa familia una carga que llena a 100 y su reintento con la misma clave:
-   200 `ya_aplicado`, no el 409 del tope. Fija también el orden: el pedido se busca antes del tope.
-3. Caso 9 como familia: un usuario solo, y una integrante cuyo estudio recibe la recarga pagada
-   mientras el admin le carga.
-4. `pedido` validado como UUID en el cuerpo: uno que no es UUID o de más de 36 caracteres da 422
-   (familia del caso 6). Sin eso, SQLite lo acepta y Postgres da 500.
-5. Puertas, además de las tuyas: `anclas_perdidas` (si un sabotaje apunta a `_cuenta_bloqueada` en
-   `main.py`, se actualiza en el commit del movimiento), `cobro_corte1.sh` entero (movés el candado
-   de todas las rutas que cobran) y `cobro_mp1.sh` entero; suite completa, `chequeo-6`, Opus alto y
-   Sonnet alto, `/code-review high` y `/security-review`.
+Acta `REPRODUCCION-ADMIN-CREDITOS-1-2026-11-21.md`, «La vuelta». Integrada con el merge de `54a533c1`
+(`2c60ef94`); **traé mi rama con `merge`**. Sin publicar y fuera de la candidata `0d7401ed`; al
+publicar va con copia de la base antes (tabla `creditos_admin`).
 
-## Tarea activa: ADMIN-CREDITOS-1 vuelve, sobre `39d4dd8b` (informe `010e0dae`) (2026-11-21 12:08 UTC)
+Con la copia del SHA dio lo mismo que tu informe: 27 ROJO, los 11 sabotajes de Postgres en rojo,
+«rojas: 20 de 20», «filas MAL: 0; rondas sin armar: 0», anclas igual y `chequeo-6` sin avisos. Mis
+negativos con ejemplos que no di dieron rojo donde debían: el orden tarde forzado sale «SIN ARMAR» con
+rc=4; mi forma de sacar el candado de la carga da «filas MAL: 6», con «guardado + carga» incluida;
+`isPrototypeOf` y otras tres claves heredadas fallan con el HTML viejo y pasan con el nuevo.
 
-Acta `REPRODUCCION-ADMIN-CREDITOS-1-2026-11-21.md`. **El servidor cobra bien**: suite, `cobro_mp1.sh`,
-tus dos guiones de Postgres, `anclas_perdidas` y tus 26 sabotajes de SQLite dan lo mismo que tu informe,
-y los adversarios Opus y Sonnet alto no encontraron defecto del servidor. Mi `cobro_corte1.sh`
-entero dio lo mismo: 87 ROJO, «sabotajes con falla: 0». Vuelve por lo que sigue.
-Cada punto es criterio de aceptación salvo lo marcado «sugerencia». Próxima D: D239.
-
-1. **Una ronda de Postgres que dice «armada» tiene que haber armado lo que afirma.**
-   - Caso 8: «sin atrapar el choque de la clave» dio verde 3 de 26 veces (una en tu guion de
-     sabotajes, 2 en 20 corridas mías; en rojo `[200, 500]`, en verde `[200, 409]`). La ronda espera
-     el candado de las cuentas, no que los dos pedidos hayan buscado el pedido antes del primer
-     commit; cuando el segundo busca tarde ve la fila y va por el 409. Y «rondas sin armar: 0» la
-     cuenta como armada. *Sugerencia:* retener desde la conexión del candado un insert sin commit de
-     ese pedido.
-   - Caso 10: el alta de «guardado» (`items: []`) no gasta créditos, así que ningún sabotaje pone en
-     rojo «carga + guardado» ni «guardado + carga». Con un alta que gasta un extra y «la carga sin
-     candado», mi negativo dio 3 de 3 «extra 12 (esperaba 11)»; limpio, 3 de 3 verde.
-   - Lo que pido: una ronda donde el segundo pedido buscó el pedido después del commit del primero
-     sale «sin armar» (rc 4), nunca «ok». Y cada fila del guion tiene un sabotaje que la pone en
-     rojo. Las 20 corridas seguidas del sabotaje, todas en rojo, van al informe como evidencia
-     de apoyo; a la vuelta leo la condición de armado y fuerzo yo el orden tarde.
-2. **El panel guarda la carga sin confirmar en un objeto común con el nombre de usuario como clave**
-   (`const sinConfirmar = {}`, `dev_dashboard.html`). Hoy se registran `constructor`, `__proto__`,
-   `toString` y `hasOwnProperty` (200 los cuatro), y al abrir `constructor` el diálogo dice «La carga
-   de undefined no se confirmó…» (corrí sólo abrir el diálogo, no el envío). La familia es toda clave heredada de `Object.prototype`: un caso
-   que la cubra. A la vuelta pruebo una clave distinta de esas cuatro.
-3. `scripts/testing/sabotajes/admin_creditos1.sh` entró con modo 100644: tu comando copiable da
-   rc=126. Bit de ejecución, en el commit de pruebas.
-4. El informe pone `cobro_corte1.sh` sobre `39d4dd8b` en la tabla y sobre `87985bba` en «Qué no
-   corrí». Que diga uno. Y que diga sobre qué SHA corrió `/security-review`: la fila sólo dice «Sin
-   hallazgos».
-
-**Tus D:** D238 (a), decidido por la PM: `last_topup_at` sólo lo lee el panel (`admin_router.py:401`,
-`:415` y `:438`). D237 es de plata y va a Emi con la recomendación (a). No frena la vuelta: lo que entregaste
-ya es (a).
-
-**Lo demás:** tus supuestos y riesgos quedan como los escribiste. Cargarle a una cuenta `past_due` o
-`canceled` da 200 sin aviso (Sonnet): riesgo bajo, escrito, y el aviso en el panel es propuesta para
-Emi, no entra. La nota de Opus (otra cantidad con una carga en vuelo aplica las dos) es lo que dice
-el panel. Tu propuesta de limpieza (`conexiones1_tests.diff` ya no aplica) pasa a `COLA-LIMPIEZA.md`.
-Las 2 advertencias de más de la suite («Event loop is closed» en `test_datos1` y `test_sesion1`) son
-de la carga de la máquina, fuera de la pieza.
-
-**A la vuelta reviso en proporción:** el diff de producto (debería ser sólo el HTML), el guion de
-pantalla, los sabotajes de Postgres en 20 corridas y mi negativo. No vuelvo a correr la suite ni los
-de cobro si el diff no toca el servidor: si lo toca, avisalo arriba del informe.
+- **Decidido por la PM:** la sugerencia de `/security-review` (`Depends(require_admin)` en la ruta) no
+  hace falta. El router ya se monta con `require_admin`, y lo cubren `no_admin` y su sabotaje.
+- La ronda excluida (guardado y después carga, con vencidos) queda bien explicada, y tus riesgos quedan
+  escritos como los pusiste. Ninguno pide pieza.
 
 ## CI-TOPE: aceptada sobre `c721f7fc` (informe `a0299443`) e integrada (2026-11-17 00:50 UTC)
 
