@@ -29,8 +29,8 @@ const USUARIOS = [
 ];
 const USUARIOS_ESPERADO = [
   [ATAQUE(6), ATAQUE(7), 'no', 'el estudio «' + ATAQUE(8) + '»', 'premium', 'trial hasta 2026-12-01', '3', '4',
-    '2026-11-29', '2026-11-17'],
-  ['jefa', 'jefa@x.test', 'sí', 'la cuenta', 'premium', 'active', '3', '0', '—', '—'],
+    '2026-11-29', '2026-11-17', 'Cargar créditos'],
+  ['jefa', 'jefa@x.test', 'sí', 'la cuenta', 'premium', 'active', '3', '0', '—', '—', 'Cargar créditos'],
 ];
 const pedidosDeUsuarios = [];
 let llegoLenta, soltarLenta;
