@@ -2,8 +2,8 @@
 // Un doble clic manda un solo pedido; si la respuesta se pierde, el reintento
 // manda el mismo pedido y no carga dos veces; lo que no entra en el tope se ve
 // con el texto del servidor; reabrir el diálogo tampoco repite una carga sin
-// confirmar; la respuesta de una carga anterior no se escribe
-// en el diálogo de otra. Sale con error si algo no se cumple.
+// confirmar ni, si la carga estaba en vuelo, deja de decir cómo terminó; la
+// respuesta de una carga anterior no se escribe en el diálogo de otra. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> CDI_DB=<base sqlite del servidor> node scripts/testing/pantalla_admin_creditos1.js
 // corredor: servidor CSRF_ENFORCE=true
 const { chromium } = require('playwright');
@@ -44,7 +44,8 @@ async function dobleClic(p, enviados, uno) {
   // Los dos clics van al botón dentro de la página: con dblclick el segundo cae
   // en el formulario, porque «Cargando…» corre el botón.
   await p.evaluate(() => { const b = document.getElementById('carga-enviar'); b.click(); b.click(); });
-  await p.waitForFunction(() => !['', 'Cargando…'].includes(document.getElementById('carga-estado').textContent));
+  await p.waitForFunction(() => !['', 'Cargando…'].includes(document.getElementById('carga-estado').textContent),
+    null, { timeout: 15000 }).catch(() => falla('doble clic: el diálogo no dice cómo terminó'));
   if (enviados.length !== 1) falla('el doble clic mandó ' + enviados.length + ' pedidos');
   await esperarEstado(p, 'Cargada. Ahora tiene 5 vigentes.', 'doble clic');
   await p.locator('#usuarios-body tr', { hasText: uno }).locator('td').nth(7).filter({ hasText: /^5$/ })
@@ -105,6 +106,22 @@ async function reabrir(p, enviados, uno) {
   await p.click('#carga-cerrar');
 }
 
+// Se cierra con la carga en vuelo y se reabre la misma cuenta: el diálogo reabierto
+// dice cómo terminó, no que sigue sin confirmar.
+async function reabrirEnVuelo(p, uno) {
+  let soltar;
+  const suelto = new Promise(r => { soltar = r; });
+  await p.route('**/creditos', async r => { await suelto; await r.continue(); }, { times: 1 });
+  await abrir(p, uno);
+  await p.fill('#carga-cantidad', '6');
+  await p.click('#carga-enviar');
+  await p.click('#carga-cerrar');
+  await abrir(p, uno);
+  soltar();
+  await esperarEstado(p, 'Cargada. Ahora tiene 21 vigentes.', 'reabrir en vuelo');
+  await p.click('#carga-cerrar');
+}
+
 // La respuesta de la carga de «uno» llega con el diálogo de «otro» abierto.
 async function respuestaAjena(p, uno, otro) {
   let soltar;
@@ -139,6 +156,7 @@ async function respuestaAjena(p, uno, otro) {
   await respuestaPerdida(p, enviados, uno);
   await tope(p, uno);
   await reabrir(p, enviados, uno);
+  await reabrirEnVuelo(p, uno);
   await respuestaAjena(p, uno, otro);
   await b.close();
   console.log('OK: ADMIN-CREDITOS-1 en el navegador');

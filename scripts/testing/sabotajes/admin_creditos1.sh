@@ -89,8 +89,13 @@ sabotaje pantalla $H "el 409 no muestra el texto del servidor" \
   '            const detalle = null;' "FALLA: tope"
 sabotaje pantalla $H "el error deja el botón apagado" '            enviar.disabled = false;
         }' '        }' "FALLA: después de perder la respuesta no se puede reintentar"
-sabotaje pantalla $H "la respuesta vieja escribe en otro diálogo" '            if (esta !== carga) return;
+sabotaje pantalla $H "la respuesta vieja escribe en otro diálogo" '            if (!carga || carga.pedido !== pedido) return;
 ' '' "FALLA: el diálogo de otra cuenta muestra «Cargada."
+sabotaje pantalla $H "reabrir con la carga en vuelo no retoma su pedido" \
+  '            carga = { usuario: u.usuario, pedido: previa && previa.pedido };' \
+  '            carga = { usuario: u.usuario };' "FALLA: reabrir en vuelo:"
+sabotaje pantalla $H "el diálogo no anota el pedido que envió" '            esta.pedido = pedido;
+' '' "FALLA: doble clic: el diálogo no dice cómo terminó"
 sabotaje pantalla $H "abrir otro diálogo deja el botón apagado" \
   "            document.getElementById('carga-enviar').disabled = false;" '' \
   "abrió sin poder cargar"
