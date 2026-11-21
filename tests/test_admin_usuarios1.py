@@ -343,7 +343,7 @@ def test_la_lista_muestra_el_cobro_con_el_que_decide_el_acceso():
     assert r.status_code == 200, r.text[:300]
     vistos = {c["usuario"]: c["cobro"] for c in r.json()["usuarios"]}
     decididos = {f"{cobros}_{clave}": _decidir_el_acceso(f"{cobros}_{clave}") for clave in COBROS}
-    assert vistos == decididos
+    assert vistos == decididos, {u: (vistos.get(u), d) for u, d in decididos.items() if vistos.get(u) != d}
     assert decididos == {f"{cobros}_{clave}": cobro for clave, (_, _, cobro) in COBROS.items()}
 
 
