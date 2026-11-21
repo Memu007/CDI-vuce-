@@ -17,6 +17,7 @@ import asyncio
 import functools
 import inspect
 import os
+import subprocess
 import sys
 import uuid
 from urllib.parse import urlparse
@@ -35,7 +36,8 @@ os.environ.update(
     DOLARAPI_BASE="http://127.0.0.1:9/v1/dolares", NCM_GEMINI_FALLBACK="false",
 )
 os.environ.pop("PYTEST_CURRENT_TEST", None)
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, RAIZ)
 
 import psycopg2  # noqa: E402
 
@@ -61,16 +63,12 @@ def admin(consulta):
 def casos(modulo, fijas):
     """Cada test_ del módulo, una vez por juego de parámetros; lo demás que pide sale de fijas.
     Sabe leer un parametrize de dos o más nombres, con listas de ids y de tuplas de ese largo, nada
-    más: ante otra marca, una clase o un caso async se corta antes de correr."""
+    más: ante otra marca se corta antes de correr."""
     if getattr(modulo, "pytestmark", None):
         sys.exit("el módulo tiene marcas que este guion no sabe correr")
     lista = []
     for nombre, caso in vars(modulo).items():
-        propia = getattr(caso, "__module__", None) == modulo.__name__
-        if (nombre.startswith("Test") and inspect.isclass(caso) and propia
-                or nombre.startswith("test_") and inspect.iscoroutinefunction(caso)):
-            sys.exit(f"{nombre}: es una clase o un caso async, que este guion no sabe correr")
-        if not nombre.startswith("test_"):
+        if not nombre.startswith("test_") or not inspect.isfunction(caso):
             continue
         marcas = getattr(caso, "pytestmark", [])
         juegos = [(nombre, {})]
@@ -79,7 +77,8 @@ def casos(modulo, fijas):
             nombres, valores = (marca.args + (None, None))[:2]
             ids = marca.kwargs.get("ids")
             claves = [c.strip() for c in nombres.split(",")] if type(nombres) is str else []
-            if (len(marcas) > 1 or marca.name != "parametrize" or set(marca.kwargs) != {"ids"}
+            if (len(marcas) > 1 or marca.name != "parametrize" or len(marca.args) != 2
+                    or set(marca.kwargs) != {"ids"}
                     or len(claves) < 2 or type(valores) is not list or type(ids) is not list
                     or not valores or len(ids) != len(valores)
                     or any(type(v) is not tuple or len(v) != len(claves) for v in valores)):
@@ -91,7 +90,19 @@ def casos(modulo, fijas):
     return lista
 
 
+def recogidos(archivo):
+    """Lo que pytest junta del archivo, con su conftest y en SQLite: lo que el guion tiene que correr."""
+    entorno = {k: v for k, v in os.environ.items() if k not in ("DATABASE_URL", "ENVIRONMENT")}
+    # Sin el addopts de pytest.ini (-v, cobertura): -q deja un id por renglón.
+    salida = subprocess.run([sys.executable, "-m", "pytest", "-o", "addopts=", "--collect-only", "-q",
+                             "-p", "no:cacheprovider", archivo], cwd=RAIZ, env=entorno, capture_output=True, text=True)
+    if salida.returncode:
+        sys.exit(f"pytest no pudo juntar {archivo}:\n{salida.stdout[-2000:]}")
+    return {linea.split("::", 1)[1] for linea in salida.stdout.splitlines() if linea.startswith(f"{archivo}::")}
+
+
 try:
+    de_pytest = recogidos("tests/test_admin_usuarios1.py")
     admin(f'create database "{BASE}"')
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
     from sqlalchemy.pool import NullPool  # noqa: E402
@@ -106,15 +117,17 @@ try:
     asyncio.run(conexion.init_db())
     # Las fixtures de prueba no hacen falta acá: sin pytest no hay atajo ni LIKE que imitar.
     fijas = dict(sembradas=caso_admin._sembrar_cuentas(), sin_bypass_de_test=None, like_distingue_mayusculas=None)
-    corridos = 0
-    for id_, correr in casos(caso_admin, fijas):
-        corridos += 1
+    lista = casos(caso_admin, fijas)
+    for id_, correr in lista:
         try:
-            correr()
-            chequear(True, id_)
+            # Un caso async o generador devuelve algo sin haber corrido.
+            devuelto = correr()
+            chequear(devuelto is None, id_ if devuelto is None else f"{id_}: no corrió, devolvió {devuelto!r}")
         except Exception as e:
             chequear(False, f"{id_}: {type(e).__name__}: {str(e)[:600]}")
-    chequear(corridos > 0, f"corrieron {corridos} casos")
+    corridos = {id_ for id_, _ in lista}
+    chequear(corridos == de_pytest, f"el guion corrió {len(corridos)} casos y pytest junta {len(de_pytest)}; "
+                                    f"sólo pytest: {sorted(de_pytest - corridos)}, sólo el guion: {sorted(corridos - de_pytest)}")
 finally:
     try:
         admin(f'drop database if exists "{BASE}" with (force)')
