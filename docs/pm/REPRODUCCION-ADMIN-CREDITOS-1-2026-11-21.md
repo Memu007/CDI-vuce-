@@ -30,8 +30,8 @@ con valor por defecto a `recarga_entra`: los llamadores de antes no cambian.
 ## Por qué vuelve
 
 1. **El choque de la clave entre dos cuentas (caso 8) se arma a veces sin choque.** El sabotaje
-   «sin atrapar el choque de la clave» dio verde 2 de 20 y 3 de 26 veces (en rojo: `[200, 500]`; en
-   verde: `[200, 409]`). La ronda espera a que los dos pedidos estén frenados en el candado de las
+   «sin atrapar el choque de la clave» dio verde 3 de 26 veces: 1 en su guion de sabotajes, 0 en 5 y
+   2 en 20 corridas mías (en rojo: `[200, 500]`; en verde: `[200, 409]`). La ronda espera a que los dos pedidos estén frenados en el candado de las
    cuentas, no a que los dos hayan buscado el pedido. A veces el segundo busca después del commit
    del primero, ve la fila y va por el 409 sin pasar por el choque. Lo mismo pasa sin sabotaje, y
    «rondas sin armar: 0» lo cuenta como armada. El producto está bien por los dos caminos.
@@ -46,11 +46,12 @@ con valor por defecto a `recarga_entra`: los llamadores de antes no cambian.
    (`dev_dashboard.html`). En el SHA, `/auth/register` acepta `constructor`, `__proto__`,
    `toString` y `hasOwnProperty` (200 los cuatro). Con la ronda de Opus sobre el HTML del SHA, al
    abrir el diálogo de `constructor` dice «La carga de undefined no se confirmó: si la enviás de
-   nuevo, no se carga dos veces.». No carga dos veces: lo que falla es el texto. La familia es toda
+   nuevo, no se carga dos veces.». Corrí sólo abrir el diálogo; el envío no lo corrí. La familia es toda
    clave heredada de `Object.prototype`.
 4. `sabotajes/admin_creditos1.sh` entró sin permiso de ejecución: el comando copiable del informe
    falla.
-5. El informe pone `cobro_corte1.sh` sobre `39d4dd8b` en la tabla y sobre `87985bba` en el texto.
+5. El informe pone `cobro_corte1.sh` sobre `39d4dd8b` en la tabla y sobre `87985bba` en el texto, y
+   no dice sobre qué SHA corrió `/security-review`.
 
 ## Adversarios (sin red, `GEMINI_API_KEY` vacía, PG16 descartable)
 
@@ -66,7 +67,8 @@ con valor por defecto a `recarga_entra`: los llamadores de antes no cambian.
 
 ## Lo que queda escrito
 
-- **D237** (plata) va a Emi, con la recomendación (a). No frena la vuelta: lo entregado es (a).
+- **D237** (plata) va a Emi, con la recomendación (a). El pago rechazado queda a la vista en el panel
+  de admin («Pagos de Mercado Pago rechazados», `/api/dev/pagos-mp-rechazados`). No frena la vuelta: lo entregado es (a).
 - **D238 (a), decidido por la PM.** `last_topup_at` sólo se lee en el panel de admin
   (`admin_router.py:401`, `:415` y `:438`, «ultima_recarga»). Ninguna regla lo usa.
 - **Cargar a una cuenta `past_due`:** riesgo bajo, escrito. Avisarlo en el panel es propuesta para

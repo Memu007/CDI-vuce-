@@ -1177,7 +1177,7 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - MARIA sin pieza: rutina apagada, se la despierta por `send_message`. La Técnica suma el guion de
   Postgres a las puertas de la unión del tramo 2.
 
-## 2026-11-21 12:10 UTC — ADMIN-CREDITOS-1 vuelve sobre `39d4dd8b`
+## 2026-11-21 12:08 UTC — ADMIN-CREDITOS-1 vuelve sobre `39d4dd8b`
 
 - Vuelve (informe `010e0dae`); acta REPRODUCCION-ADMIN-CREDITOS-1-2026-11-21. El servidor cobra bien;
   vuelve por pruebas que no distinguen (caso 8 de Postgres intermitente con su sabotaje, caso 10 con

@@ -31,15 +31,17 @@ como propuesta para Emi: no entra.
    de todas las rutas que cobran) y `cobro_mp1.sh` entero; suite completa, `chequeo-6`, Opus alto y
    Sonnet alto, `/code-review high` y `/security-review`.
 
-## Tarea activa: ADMIN-CREDITOS-1 vuelve, sobre `39d4dd8b` (informe `010e0dae`) (2026-11-21 12:10 UTC)
+## Tarea activa: ADMIN-CREDITOS-1 vuelve, sobre `39d4dd8b` (informe `010e0dae`) (2026-11-21 12:08 UTC)
 
 Acta `REPRODUCCION-ADMIN-CREDITOS-1-2026-11-21.md`. **El servidor cobra bien**: suite, `cobro_mp1.sh`,
 tus dos guiones de Postgres, `anclas_perdidas` y tus 26 sabotajes de SQLite dan lo mismo que tu informe,
-y los adversarios Opus y Sonnet alto no encontraron defecto del servidor. Vuelve por lo que sigue.
+y los adversarios Opus y Sonnet alto no encontraron defecto del servidor. Mi `cobro_corte1.sh`
+entero todavía corre: si no da 87 ROJO, te sumo un punto. Vuelve por lo que sigue.
 Cada punto es criterio de aceptación salvo lo marcado «sugerencia». Próxima D: D239.
 
 1. **Una ronda de Postgres que dice «armada» tiene que haber armado lo que afirma.**
-   - Caso 8: «sin atrapar el choque de la clave» dio verde 2 de 20 y 3 de 26 veces. La ronda espera
+   - Caso 8: «sin atrapar el choque de la clave» dio verde 3 de 26 veces (una en tu guion de
+     sabotajes, 2 en 20 corridas mías; en rojo `[200, 500]`, en verde `[200, 409]`). La ronda espera
      el candado de las cuentas, no que los dos pedidos hayan buscado el pedido antes del primer
      commit; cuando el segundo busca tarde ve la fila y va por el 409. Y «rondas sin armar: 0» la
      cuenta como armada. *Sugerencia:* retener desde la conexión del candado un insert sin commit de
@@ -47,17 +49,20 @@ Cada punto es criterio de aceptación salvo lo marcado «sugerencia». Próxima 
    - Caso 10: el alta de «guardado» (`items: []`) no gasta créditos, así que ningún sabotaje pone en
      rojo «carga + guardado» ni «guardado + carga». Con un alta que gasta un extra y «la carga sin
      candado», mi negativo dio 3 de 3 «extra 12 (esperaba 11)»; limpio, 3 de 3 verde.
-   - Lo que pido: cada fila del guion de Postgres tiene un sabotaje que la pone en rojo **siempre**.
-     Para los choques, la salida de 20 corridas seguidas del sabotaje, todas en rojo, va al informe.
+   - Lo que pido: una ronda donde el segundo pedido buscó el pedido después del commit del primero
+     sale «sin armar» (rc 4), nunca «ok». Y cada fila del guion tiene un sabotaje que la pone en
+     rojo. Las 20 corridas seguidas del sabotaje, todas en rojo, van al informe como evidencia
+     de apoyo; a la vuelta leo la condición de armado y fuerzo yo el orden tarde.
 2. **El panel guarda la carga sin confirmar en un objeto común con el nombre de usuario como clave**
    (`const sinConfirmar = {}`, `dev_dashboard.html`). Hoy se registran `constructor`, `__proto__`,
    `toString` y `hasOwnProperty` (200 los cuatro), y al abrir `constructor` el diálogo dice «La carga
-   de undefined no se confirmó…». La familia es toda clave heredada de `Object.prototype`: un caso
+   de undefined no se confirmó…» (corrí sólo abrir el diálogo, no el envío). La familia es toda clave heredada de `Object.prototype`: un caso
    que la cubra. A la vuelta pruebo una clave distinta de esas cuatro.
 3. `scripts/testing/sabotajes/admin_creditos1.sh` entró con modo 100644: tu comando copiable da
    rc=126. Bit de ejecución, en el commit de pruebas.
 4. El informe pone `cobro_corte1.sh` sobre `39d4dd8b` en la tabla y sobre `87985bba` en «Qué no
-   corrí». Que diga uno.
+   corrí». Que diga uno. Y que diga sobre qué SHA corrió `/security-review`: la fila sólo dice «Sin
+   hallazgos».
 
 **Tus D:** D238 (a), decidido por la PM: `last_topup_at` sólo lo lee el panel (`admin_router.py:401`,
 `:415` y `:438`). D237 es de plata y va a Emi con la recomendación (a). No frena la vuelta: lo que entregaste
