@@ -405,8 +405,6 @@ def process_payment(payment_info: dict[str, Any]) -> dict[str, Any] | None:
             **base_update,
             "action": "topup",
             "extra_ops_remaining": TOPUP_OPS,
-            "last_topup_at": now,
-            "extra_ops_expires_at": now + timedelta(days=30),
         }
 
     if kind in PLANS:

@@ -11707,15 +11707,14 @@ async def mercadopago_webhook(request: Request):
 
             cuenta.last_payment_id = payment_id
             for campo in ("plan", "billing_status", "trial_ends_at", "ops_used_this_period",
-                          "billing_period_started_at", "last_topup_at", "extra_ops_expires_at",
-                          "payment_provider", "payment_customer_id"):
+                          "billing_period_started_at", "payment_provider", "payment_customer_id"):
                 if campo in update:
                     setattr(cuenta, campo, update[campo])
             for campo in ("payment_method_last4", "payment_method_brand"):
                 if update.get(campo):
                     setattr(cuenta, campo, update[campo])
             if "extra_ops_remaining" in update:
-                cuenta.extra_ops_remaining = (cuenta.extra_ops_remaining or 0) + update["extra_ops_remaining"]
+                billing_service.acreditar_extra(cuenta, update["extra_ops_remaining"], datetime.now(timezone.utc))
 
             if not await _guardar_pago_mp(session):
                 return {"success": True, "skipped": "payment_id ya procesado"}
