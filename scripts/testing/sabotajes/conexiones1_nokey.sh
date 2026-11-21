@@ -58,6 +58,7 @@ PYEOF
 }
 
 M=proyecto_maria/main.py
+C=proyecto_maria/database/candados.py
 B='.where(User.username == username)
         '
 U="$B.with_for_update(key_share=True, of=User)"
@@ -69,11 +70,11 @@ SUS='_cuenta_con_suscripciones: FOR NO KEY UPDATE OF users | FOR UPDATE'
 BLO='_cuenta_bloqueada: FOR NO KEY UPDATE OF users | FOR NO KEY UPDATE OF organizations'
 NO='\| MAL' corrida "sin sabotaje" 0 "orden 1, $SUS" "orden 1, $BLO" "orden 2, $BLO" "orden 2, $SUS"
 # Sin el arreglo: las dos consultas vuelven a FOR UPDATE y la recarga choca.
-en_codigo "$M" "$U" "$B.with_for_update()" "$O" '.with_for_update()' &&
+en_codigo "$C" "$U" "$B.with_for_update()" "$O" '.with_for_update()' &&
   corrida "sin key_share ni of=" 1 "FOR UPDATE | FOR UPDATE | MAL" \
     "DEADLOCK | recarga + guardado" "DEADLOCK | recarga + maria"
 # Sin of=: vuelve desde la cache el FOR UPDATE compilado por la consulta igual del aviso.
-en_codigo "$M" "$U" "$B.with_for_update(key_share=True)" "$O" '.with_for_update(key_share=True)' &&
+en_codigo "$C" "$U" "$B.with_for_update(key_share=True)" "$O" '.with_for_update(key_share=True)' &&
   corrida "key_share sin of=" 1 "FOR NO KEY UPDATE | FOR UPDATE | MAL"
 # Cancelar y reactivar toman al usuario con FOR UPDATE: la recarga que ya venció
 # los créditos espera su KEY SHARE mientras cancelar espera la org.

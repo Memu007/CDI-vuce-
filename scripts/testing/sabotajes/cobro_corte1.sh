@@ -56,6 +56,7 @@ PYEOF
 
 T=tests/test_cobro_corte1.py
 M=proyecto_maria/main.py
+C=proyecto_maria/database/candados.py
 B=proyecto_maria/services/billing_service.py
 A=proyecto_maria/static/v2/app_v2.js
 F=proyecto_maria/static/v2/screens/finalize.js
@@ -425,15 +426,15 @@ PYEOF
     echo "BASE  | el lock ya está en rojo sin sabotaje: no se puede medir nada"; correr | grep FALLA; exit 1
   fi
   echo "BASE  | el lock en verde"
-  sabotaje $M "no se bloquea la fila del usuario" \
+  sabotaje $C "no se bloquea la fila del usuario" \
     "FALLA | tope" \
     $'        .where(User.username == username)\n        .with_for_update(key_share=True, of=User)' \
     $'        .where(User.username == username)'
-  sabotaje $M "no se bloquea la fila de la organización" \
+  sabotaje $C "no se bloquea la fila de la organización" \
     "FALLA | estudio" \
     $'            .where(Organization.id == db_user.organization_id)\n            .with_for_update(key_share=True, of=Organization)' \
     $'            .where(Organization.id == db_user.organization_id)'
-  sabotaje $M "se cuenta con el usuario leído antes del lock" \
+  sabotaje $C "se cuenta con el usuario leído antes del lock" \
     "FALLA | tope" \
     $'        .with_for_update(key_share=True, of=User)\n        .execution_options(populate_existing=True)\n    )\n    db_user' \
     $'        .with_for_update(key_share=True, of=User)\n    )\n    db_user'
