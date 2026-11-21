@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-21 · fix: el diálogo de créditos del panel reconoce cualquier nombre de usuario (ADMIN-CREDITOS-1)
 
-- Una cuenta llamada como una propiedad interna del navegador («constructor», «__proto__») ya no ve un aviso de carga sin confirmar que no existe ni rompe el reintento de las demás.
+- Una cuenta llamada como una propiedad interna del navegador («constructor», «__proto__») ya no ve un aviso de carga sin confirmar que no existe.
 
 ## 2026-11-21 · feat: el admin carga créditos extra a una cuenta desde el panel (ADMIN-CREDITOS-1)
 
