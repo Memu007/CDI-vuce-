@@ -492,7 +492,8 @@ async def cargar_creditos(
             await db.rollback()
             tope = billing_service.EXTRA_OPS_MAX
             raise HTTPException(status_code=409, detail=(
-                f"Ya tiene {vigentes} operaciones extra y el tope es {tope}: entran como mucho {tope - vigentes}."))
+                f"Ya tiene {vigentes} operaciones extra y el tope es {tope}: "
+                f"entran como mucho {max(0, tope - vigentes)}."))
         previa = CreditoAdmin(pedido=carga.pedido, admin=admin["username"], usuario=username,
                               cuenta=f"org:{cuenta.id}" if cuenta is not db_user else username,
                               cantidad=carga.cantidad, vigentes_antes=vigentes)
