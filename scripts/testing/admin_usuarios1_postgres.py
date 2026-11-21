@@ -60,21 +60,27 @@ def admin(consulta):
 
 def casos(modulo, fijas):
     """Cada test_ del módulo, una vez por juego de parámetros; lo demás que pide sale de fijas.
-    Sabe leer un solo parametrize con ids: otra marca corta el guion en vez de perder casos."""
+    Sabe leer un parametrize con ids y tuplas, nada más: ante otra marca se corta antes de correr."""
+    if getattr(modulo, "pytestmark", None):
+        sys.exit("el módulo tiene marcas que este guion no sabe correr")
+    lista = []
     for nombre, caso in vars(modulo).items():
         if not nombre.startswith("test_"):
             continue
         marcas = getattr(caso, "pytestmark", [])
-        if len(marcas) > 1 or any(m.name != "parametrize" or "ids" not in m.kwargs for m in marcas):
-            sys.exit(f"{nombre}: tiene marcas que este guion no sabe correr")
         juegos = [(nombre, {})]
-        for marca in marcas:
+        if marcas:
+            marca = marcas[0]
+            if (len(marcas) > 1 or marca.name != "parametrize" or set(marca.kwargs) != {"ids"}
+                    or len(marca.kwargs["ids"]) != len(marca.args[1])
+                    or any(type(v) is not tuple for v in marca.args[1])):
+                sys.exit(f"{nombre}: tiene marcas que este guion no sabe correr")
             claves = [c.strip() for c in marca.args[0].split(",")]
-            juegos = [(f"{nombre}[{id_}]", dict(zip(claves, valores)))
-                      for id_, valores in zip(marca.kwargs["ids"], marca.args[1])]
-        for id_, valores in juegos:
-            argumentos = {p: valores[p] if p in valores else fijas[p] for p in inspect.signature(caso).parameters}
-            yield id_, functools.partial(caso, **argumentos)
+            juegos = [(f"{nombre}[{id_}]", dict(zip(claves, v))) for id_, v in zip(marca.kwargs["ids"], marca.args[1])]
+        for id_, dados in juegos:
+            argumentos = {p: dados[p] if p in dados else fijas[p] for p in inspect.signature(caso).parameters}
+            lista.append((id_, functools.partial(caso, **argumentos)))
+    return lista
 
 
 try:
