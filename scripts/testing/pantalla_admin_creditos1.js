@@ -1,7 +1,8 @@
 // Carga de créditos extra desde el panel de admin, con el servidor exigiendo CSRF.
 // Un doble clic manda un solo pedido; si la respuesta se pierde, el reintento
 // manda el mismo pedido y no carga dos veces; lo que no entra en el tope se ve
-// con el texto del servidor; la respuesta de una carga anterior no se escribe
+// con el texto del servidor; reabrir el diálogo tampoco repite una carga sin
+// confirmar; la respuesta de una carga anterior no se escribe
 // en el diálogo de otra. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> CDI_DB=<base sqlite del servidor> node scripts/testing/pantalla_admin_creditos1.js
 // corredor: servidor CSRF_ENFORCE=true
@@ -75,6 +76,35 @@ async function tope(p, uno) {
   await p.click('#carga-cerrar');
 }
 
+// La respuesta se pierde y el diálogo se cierra: al reabrirlo, la misma carga no se repite.
+async function reabrir(p, enviados, uno) {
+  await abrir(p, uno);
+  await p.fill('#carga-cantidad', '2');
+  await p.route('**/creditos', async r => { await r.fetch(); await r.abort(); }, { times: 1 });
+  await p.click('#carga-enviar');
+  await esperarEstado(p, 'No se pudo cargar: sin conexión. Si la reintentás, no se carga dos veces.', 'reabrir sin red');
+  await p.click('#carga-cerrar');
+  await abrir(p, uno);
+  await esperarEstado(p, 'La carga de 2 no se confirmó: si la enviás de nuevo, no se carga dos veces.', 'reabrir');
+  if (await p.inputValue('#carga-cantidad') !== '2') falla('el diálogo reabierto no trae la cantidad sin confirmar');
+  await p.click('#carga-enviar');
+  await esperarEstado(p, 'Ya estaba cargada. Ahora tiene 10 vigentes.', 'reabrir y enviar');
+  const [a, b] = enviados.slice(-2);
+  if (a.pedido !== b.pedido) falla('el diálogo reabierto mandó otro pedido');
+  // Sin confirmar la de 1, otra cantidad es otra carga.
+  await p.click('#carga-cerrar');
+  await abrir(p, uno);
+  await esperarEstado(p, '', 'reabrir después de confirmar');
+  await p.fill('#carga-cantidad', '1');
+  await p.route('**/creditos', async r => { await r.fetch(); await r.abort(); }, { times: 1 });
+  await p.click('#carga-enviar');
+  await esperarEstado(p, 'No se pudo cargar: sin conexión. Si la reintentás, no se carga dos veces.', 'reabrir sin red');
+  await p.fill('#carga-cantidad', '4');
+  await p.click('#carga-enviar');
+  await esperarEstado(p, 'Cargada. Ahora tiene 15 vigentes.', 'otra cantidad');
+  await p.click('#carga-cerrar');
+}
+
 // La respuesta de la carga de «uno» llega con el diálogo de «otro» abierto.
 async function respuestaAjena(p, uno, otro) {
   let soltar;
@@ -108,6 +138,7 @@ async function respuestaAjena(p, uno, otro) {
   await dobleClic(p, enviados, uno);
   await respuestaPerdida(p, enviados, uno);
   await tope(p, uno);
+  await reabrir(p, enviados, uno);
   await respuestaAjena(p, uno, otro);
   await b.close();
   console.log('OK: ADMIN-CREDITOS-1 en el navegador');

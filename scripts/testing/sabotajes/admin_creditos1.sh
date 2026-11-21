@@ -42,7 +42,7 @@ sabotaje casos $R "el registro nombra al usuario aunque pague el estudio" \
 
 # 4. Lo que no entra se dice con el número que entra.
 sabotaje casos $R "el 409 no dice cuántas entran" 'entran como mucho {max(0, tope - vigentes)}.' 'entran como mucho {tope}.' \
-  "mo mucho 100.'" "test_no_entra[91-10]" "test_no_entra[1-100]"
+  "mo mucho 100.'" "test_no_entra[91-10]" "test_no_entra[1-100]" "test_no_entra[120-1]"
 sabotaje casos $R "el 409 da un número negativo" 'entran como mucho {max(0, tope - vigentes)}.' \
   'entran como mucho {tope - vigentes}.' "omo mucho -20." "test_no_entra[120-1]"
 
@@ -69,13 +69,21 @@ sabotaje casos $M "las rutas de admin no piden admin" '        admin_router.rout
         dependencies=[Depends(require_admin)]' '        admin_router.router,' \
   "assert 200 == 403" "test_quien_carga[no_admin]"
 
-# 7. El diálogo: un pedido por diálogo, el token CSRF, el texto del servidor y el refresco.
+# 7. El diálogo: un pedido por carga sin confirmar, también al reabrir; el token CSRF,
+# el texto del servidor y el refresco.
 sabotaje pantalla $H "el doble clic manda dos pedidos" '            enviar.disabled = true;
 ' '' "FALLA: el doble clic mandó 2 pedidos"
 sabotaje pantalla $H "la página no manda el token CSRF" '    <script src="/static/csrf.js"></script>
 ' '' "FALLA: doble clic: el diálogo dice «Token CSRF invalido"
-sabotaje pantalla $H "cada envío usa otro pedido" '                                           pedido: esta.pedido }),' \
-  '                                           pedido: crypto.randomUUID() }),' "FALLA: reintento"
+sabotaje pantalla $H "cada envío usa otro pedido" \
+  '            const pedido = previa && previa.cantidad === cantidad ? previa.pedido : crypto.randomUUID();' \
+  '            const pedido = crypto.randomUUID();' "FALLA: reintento"
+sabotaje pantalla $H "reabrir olvida la carga sin confirmar" '            const previa = sinConfirmar[u.usuario];' \
+  '            const previa = undefined;' "FALLA: reabrir:"
+sabotaje pantalla $H "otra cantidad usa el mismo pedido" 'previa && previa.cantidad === cantidad ? previa.pedido' \
+  'previa ? previa.pedido' "FALLA: otra cantidad"
+sabotaje pantalla $H "la carga confirmada sigue sin confirmar" '                delete sinConfirmar[esta.usuario];
+' '' "FALLA: reabrir después de confirmar"
 sabotaje pantalla $H "el 409 no muestra el texto del servidor" \
   "            const detalle = data && typeof data.detail === 'string' ? data.detail : null;" \
   '            const detalle = null;' "FALLA: tope"
