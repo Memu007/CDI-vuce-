@@ -1,7 +1,7 @@
 # CONEXIONES-1-PRODUCTO (con NOKEY): `b4f7e590` (informe `924cb1ca`), 2026-11-21, PM
 
-**Veredicto: PENDIENTE** (todas las puertas corridas; falta el consejero). Base `ac4993b7`.
-Sin publicar. Revisión fuerte (plata, sesión, transversal, §3).
+**Veredicto: aceptada** (CONEXIONES-1-NOKEY y CONEXIONES-1-PRODUCTO juntas), integrada con el merge
+de `924cb1ca` (`45ea6192`). Base `ac4993b7`. Sin publicar. Revisión fuerte (plata, sesión, transversal, §3).
 
 ## Diff
 
@@ -22,8 +22,10 @@ suficiente.
 | `conexiones1_medir.py` sin y con cuota (PG16 desechable) | rc=0 los dos, 504 s; abajo |
 | `cobro_corte1.sh b4f7e590` (PG 55462, usuario `cdi`) | 87 ROJO, 0 ROTO/PATRÓN/MAL, «BASE \| en verde», «BASE \| la pantalla en verde», «BASE \| el lock en verde», «sabotajes con falla: 0», rc=0, 3887 s; igual que el informe |
 | `cobro_mp1.sh b4f7e590` entero (ella corrió sólo D, sobre `709b3a3e`) | 145 ROJO; BASE en verde (servidor, carrera de D y pagos a la vez en Postgres, perfil, Listo); el VERDE de D31 sigue verde; «sabotajes con falla: 0», rc=0, 3561 s |
-| negativo mío `test_pm_neg_soltar.py` (6 casos: soltar y después usar, con la base caída) | `6 passed` |
-| negativo mío `pm_neg_tope.py` (PG, dos pedidos cruzados en el candado: a manual+manual, b manual+generar, c extra 1, d extras vencidos) | «fallas: 0», rc=0: pasa uno, el otro 402, un solo cobro |
+| `chequeo-6.py ac4993b7 b4f7e590` | igual al informe: «producto +218/−54», «avisos: 2», rc=0 |
+| `sabotajes/limpieza1.sh` | «sabotajes con falla: 0», rc=0: el vencido queda cumplido |
+| negativo mío `test_pm_neg_soltar.py` (6 casos: soltar y después usar, con la base caída) | `6 passed`; en la base, 6 failed por `AttributeError` (`_soltar_conexion` no existe): cubre lo nuevo, no distingue el defecto |
+| negativo mío `pm_neg_tope.py` (PG, dos pedidos cruzados en el candado: a manual+manual, b manual+generar, c extra 1, d extras vencidos) | «fallas: 0», rc=0: pasa uno, el otro 402, un solo cobro; en la base también «fallas: 0»: no distingue |
 
 Medición, otra cuenta con 60 pedidos lentos (sin / con cuota): bcrypt 3,77 / 4,09 s (D180, fuera de
 la pieza), gemini 0,36 / 0,41, pdf 0,03 / 0,06, excel 0,14 / 0,12, cuerpo 0,04 / 0,04. `close`
@@ -34,8 +36,9 @@ La primera corrida mía de `cobro_corte1.sh` dio «el lock ya está en rojo sin 
 con el usuario `postgres` y ese Postgres sólo tiene `cdi` («role "postgres" does not exist»).
 Error mío de entorno; la segunda, entera, es la de la tabla.
 
-Mis negativos no van al repositorio. A `pm_neg_tope.py` no le hice sabotaje propio: la familia la
-cubre su «manual con el cupo sin candado (D188)», que reproduje en rojo.
+Mis negativos no van al repositorio. Ninguno de los dos distingue el defecto: `pm_neg_tope.py` da
+verde en la base. Lo que distingue es su sabotaje «manual con el cupo sin candado (D188)» y
+`conexiones1_creditos.py` (base «pierden: 2»), los dos reproducidos en rojo.
 
 ## Adversarios (sin red, `GEMINI_API_KEY` vacía, PG16 desechable, sobre `b4f7e590`)
 
@@ -52,9 +55,22 @@ cubre su «manual con el cupo sin candado (D188)», que reproduje en rojo.
   conteo correcto o 500 sin cobro a medias. Sospecha sin reproducir (pool lleno entre la dependencia
   y la ruta): la medición dio 0 QueuePool.
 
+## El intermitente
+
+Cerrado con su explicación: la cadena de referencias que muestra (el `result` del lifespan, cerca de
+`main.py:1749`, retiene el pool viejo) explica por qué la conexión sobrevivió al dispose + gc. Ningún
+rc=2 en mis corridas con el `soltar()` nuevo. Mi doble pasada verde con el `soltar()` viejo queda
+como riesgo abierto, sólo del arnés.
+
 ## Lo que queda escrito
 
-- El previo 1 de Opus no es de esta pieza: no es devolución. Va como candidata a pieza futura, para
-  proponer a Emi.
+- **No corrido por la PM:** `/code-review`. Lo cubren los adversarios Opus y Sonnet alto y su
+  `/security-review`.
+- **Su supuesto reversible** (6 rutas más ahora sueltan la conexión): aceptado, decidido por la PM;
+  lo sostiene la matriz de Sonnet de 9 rutas, sin diferencias.
+- **Su «no corrido», cerrado por mí:** `cobro_mp1.sh` entero, y la base caída al soltar en generar,
+  exportar, confirmar y procesar (`test_pm_neg_soltar.py`).
+- El previo 1 de Opus no es de esta pieza: no es devolución. Es el mismo mecanismo que D205
+  (renovación que queda `past_due`, punto 22, con Emi): evidencia para esa decisión, no pieza nueva.
 - Sus riesgos se sostienen tal como los escribe (multipart antes de las dependencias, `_soltar_conexion`
   que se traga el error, `result` del lifespan, casos fuera de git y de la CI).

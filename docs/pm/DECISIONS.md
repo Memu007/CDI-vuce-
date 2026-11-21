@@ -1130,3 +1130,17 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   recarga pagada, respetan el tope `EXTRA_OPS_MAX` (100) y cada carga queda registrada (quién, a
   quién, cuánto, cuándo) en una tabla nueva: es migración, pide copia de la base antes de publicar.
   La pieza sigue esperando CONEXIONES-1-PRODUCTO.
+
+## 2026-11-21 01:55 UTC — CONEXIONES-1-NOKEY y -PRODUCTO: aceptadas sobre `b4f7e590`
+
+- Integradas con el merge de `924cb1ca` (`45ea6192`); fuera de `docs/pm`, `.claude` y `AGENTS.md`, el
+  árbol es igual a `b4f7e590`. Sin publicar. Acta `REPRODUCCION-CONEXIONES-1-PRODUCTO-2026-11-21.md`.
+- Todas las puertas del informe dan lo mismo; además `cobro_mp1.sh` entero (145 ROJO, sin fallas).
+  Adversarios Opus y Sonnet alto: nada nuevo del diff. `/code-review` no corrido por la PM.
+- Decidido por la PM: su supuesto (6 rutas más sueltan la conexión) se acepta, lo sostiene la matriz
+  de 9 rutas de Sonnet; el intermitente se cierra con su cadena de referencias y mi doble pasada con
+  el `soltar()` viejo queda riesgo abierto del arnés.
+- El previo 1 de Opus (`_vencer_y_guardar` pisa una renovación pagada) es el mismo mecanismo que D205:
+  evidencia para Emi en el punto 22, no pieza nueva.
+- Asignado, con el consejero: MARIA hace D278 (b) (estado de cobro efectivo en la lista); la Técnica,
+  el plan de ADMIN-CREDITOS-1 sin código, que va encima de lo de MARIA en `admin_router.py`.

@@ -3,86 +3,43 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## CONEXIONES-1-NOKEY, vuelta leída: anclas bien, se acepta con PRODUCTO (2026-11-20 17:44 UTC)
+## CONEXIONES-1-PRODUCTO y NOKEY: aceptadas sobre `b4f7e590` (informe `924cb1ca`) e integradas (2026-11-21 01:50 UTC)
 
-Vuelta `090609bc` y `05e61efa`, informe `77556d06`. Acta `REPRODUCCION-CONEXIONES-1-NOKEY-2026-11-20.md`.
-**No es aceptación todavía:** la vuelta está encima de `7f4e04d1` y otros de PRODUCTO, así que
-NOKEY se acepta e integra junto con PRODUCTO, sobre su SHA final. No hace falta separar nada.
-Seguí con PRODUCTO, con lo sumado abajo.
+Acta `REPRODUCCION-CONEXIONES-1-PRODUCTO-2026-11-21.md`. Integradas con el merge de `924cb1ca`
+(`45ea6192`); fuera de `docs/pm`, `.claude` y `AGENTS.md`, el árbol es igual a `b4f7e590`. Sin publicar. Corrí todo lo de tu
+tabla con los mismos números, más `cobro_mp1.sh` entero (145 ROJO, «sabotajes con falla: 0») y dos
+negativos míos. Adversarios Opus y Sonnet alto: nada nuevo del diff.
 
-- **Anclas:** `anclas_perdidas.py 05e61efa` da 0 PERDIDA (lo corrí). `limpieza1.sh` ya ancla en el
-  nombre del job (`ac4993b7`, coincide con `ci.yml`): el vencido queda cumplido y su línea de
-  `sabotajes-conocidos.txt` sale al aceptar.
-- **`conexiones1_nokey.sh` sobre `05e61efa`:** rc=0 y los tres BIEN, igual a tu informe. Como
-  «sin sabotaje: salida 0» depende de `7f4e04d1`, pasa a ser puerta de PRODUCTO.
-- **El intermitente.** «Del arnés, no de la app» queda: `dispose(` sólo está en `close_db()` y no
-  apareció el aviso `non-checked-in`. Tu arreglo espera una condición observable y queda. Pero el
-  mecanismo está incompleto: forcé la carrera con 1 s de espera en la tarea de log, antes y después
-  del `commit`, y el `soltar()` viejo pasó las dos veces (el nuevo tardó 101 s contra 44 s: la tarea
-  estaba viva en el dispose). El `soltar()` viejo ya repetía dispose + gc justo para ese camino.
-  Falta explicar por qué en tu volcado esa conexión sobrevivió 14 s de dispose + gc repetidos.
-  **Un párrafo con evidencia en el informe de PRODUCTO**; si no sale, va como riesgo abierto. Un
-  rc=2 «la app no soltó» con el `soltar()` nuevo, tuyo o mío, lo reabre como segunda causa.
-  11/12 contra 12/12 no separa el arreglo de la suerte: no lo uses como prueba.
-- **D231: (a)**, decidido por la PM: queda el pin de SQLAlchemy 2.0.25 y el `of=`.
-- La palabra del CHANGELOG se corrige en PRODUCTO: de acuerdo.
-- **No corrido por la PM:** `cobro_corte1.sh`, la suite, `e2e_maria.sh`, adversarios y
-  `/code-review` sobre `05e61efa`. Van sobre el SHA final de PRODUCTO.
+- **Tu supuesto reversible** (las 6 rutas que ya usaban la dependencia ahora sueltan): aceptado,
+  decidido por la PM. Lo sostiene la matriz de Sonnet, 9 rutas, sin diferencias contra la base.
+- **El intermitente:** cerrado con tu cadena de referencias. Mi doble pasada verde con el `soltar()`
+  viejo queda como riesgo abierto, sólo del arnés.
+- **Lo que no distingue:** mi `pm_neg_tope.py` da verde también en la base. Lo que distingue son tu
+  sabotaje D188 y `conexiones1_creditos.py`.
+- **El previo de Opus** (`_vencer_y_guardar` pisa una renovación pagada con `past_due`) es el mismo
+  mecanismo que D205: va con Emi, no es tuyo ahora.
+- `limpieza1.sh` corrido, «sabotajes con falla: 0»: su línea sale de `sabotajes-conocidos.txt`.
+- No corrido por la PM: `/code-review`.
 
-## Tarea activa: CONEXIONES-1, el arreglo de producto, en dos piezas (2026-11-20 13:56 UTC)
+## Tarea activa: el plan de ADMIN-CREDITOS-1, sin código de producto (2026-11-21 01:55 UTC)
 
-**Sí de Emi (20/11, leído 13:53 UTC: «Dale a todo» al punto 20: D206 (a), y D182 con D183 y D188).**
-No es un «dale» de publicar. D205 (la renovación que deja `past_due`) **no** entra: sigue con Emi.
-Antes de tocar código: `merge` de mi rama y tu `/compact conservar` al día (estás cerca del umbral).
-Todo lo medido está en `REPRODUCCION-CONEXIONES-1-2026-11-12.md` (C, D, G, plan, H a K) y en tu plan
-`b60c30d4` (D200–D203 (a), decididas por la PM).
+Antes de nada: `merge` de mi rama y `/compact` (estás cerca de tu umbral). Sólo plan, como
+`b60c30d4`: MARIA hace ahora D278 (b) en `admin_router.py` y `main.py`, y el código tuyo va encima de
+lo suyo. Próxima D: D232.
 
-### Pieza 1: CONEXIONES-1-NOKEY (D206 a), sola y primero
+**Lo que pidió Emi** (20/11, «Quiero ver usuarios y darles créditos desde el panel»; 21:42, «sí a
+los tres»): el admin le da créditos a una cuenta desde el panel. Vencen a 30 días como una recarga
+pagada, respetan el tope `EXTRA_OPS_MAX` (100) y cada carga queda registrada (quién, a quién,
+cuánto, cuándo) en una tabla nueva. Sólo dar, no quitar; a una integrante se le carga al estudio.
 
-- **Comportamiento:** con créditos extra vencidos, recarga + guardado y recarga + MARIA a la vez no
-  dan error ni dejan la recarga sin acreditar.
-- **Lo que tiene que dar, según H a K:** esos dos pares, 0 deadlocks y la recarga acreditada en la
-  misma ronda. Siguen rojos, y es lo esperado: los tres de alta (alta + guardado, + cancelar,
-  + reactivar), recarga + alta (D188) y las dos filas de renovación (D205). Si algo de esa lista
-  pasa a verde, o uno de los dos pares no, decilo con la salida.
-- **Prueba:** el caso 6 (el SQL que llega a Postgres después de que el aviso compiló el suyo) y la
-  carrera sin forzar de H, con el rojo una vez con el arreglo vaciado en el mismo SHA.
-
-### Pieza 2: CONEXIONES-1-PRODUCTO (D182, D183, D188), apenas entregues la 1
-
-Sobre la pieza 1. Comportamiento y pruebas; el cómo es tu plan (sugerencia, no criterio):
-- con 60 pedidos lentos de una cuenta, **otra** cuenta no espera más de ~1 s ni recibe errores, en
-  sugerir, subida de PDF, analyze y la carga manual (medidor de C y D, con cuota de producción);
-- una cuenta impaga recibe «falta pagar» sin que se lea su pedido entero (la memoria del 4×100 de G,
-  como hoy);
-- recarga + alta con créditos vencidos: 0 recargas perdidas (D188, con el detector de J);
-- un cliente que corta a mitad del cuerpo contesta como hoy (400), sin ERROR ni fila 500;
-- cada `commit` nuevo que suelta la conexión tiene su caso con la base caída (D202);
-- las dos filas de D205 siguen como hoy («cuenta mal»): no las arregles;
-- el diff propuesto del informe entra con `git apply --check`.
-
-**Sumado a PRODUCTO (20/11, adversarios y revisión de NOKEY).** Todo esto es criterio:
-- el par recarga + cancelar y recarga + reactivar en el arnés de pares;
-- `conexiones1_creditos.py` «perdidos 10» como el rojo de D188 en la base y 0 en tu SHA;
-- para cada candado nuevo, el SQL capturado con la cache caliente, en los dos órdenes;
-- `conexiones1_creditos.py:38` todavía fija `GEMINI_API_KEY="test-key"`: que no la fije;
-- `conexiones1_nokey.sh` con «sin sabotaje: salida 0» y `anclas_perdidas.py` sobre la base y sobre
-  tu SHA, sin PERDIDA nueva, y el sabotaje «el job con continue-on-error» de `limpieza1.sh` en ROJO;
-- tu rango borra líneas de pruebas de plata (`test_cobro_corte1.py`, `test_maria1b_controles.py`,
-  `test_prelaunch_block2/3`) y el paso «activa» de `cobro_corte1.sh`: cada una con su porqué, y la
-  cuenta de ROJO de `cobro_corte1.sh` (hoy 87) contra la última aceptada;
-- el 500 por clave foránea en alta contra borrar cliente queda como riesgo escrito, sin arreglarlo.
-- MARIA (ADMIN-USUARIOS-1, integrada hoy en mi rama) movió anclas de `cobro_corte1.sh` y
-  `cobro_mp2.sh` al sacar `como_utc` a `billing_service.py`. Después del `merge` de mi rama:
-  `anclas_perdidas.py` sobre la unión sin PERDIDA nueva, y `cobro_corte1.sh` entero en rojo.
-
-### Revisión fuerte (las dos piezas; en la 1, en proporción a sus líneas)
-
-`/security-review`, adversarios **con Postgres 16** (el de D corrió con SQLite), la suite completa
-desde base limpia sobre el SHA que entregás, `e2e_maria.sh`, y un guion de sabotaje propio anclado en
-código. Adversarios sin red y con `GEMINI_API_KEY` vacía.
-
-**Próxima D: D232.**
+**El plan dice:**
+1. El camino: el mismo que una recarga pagada (función y candado), con dónde se cruzan.
+2. Una sola vez por pedido: qué pasa con un doble clic o un reintento, y cómo se prueba.
+3. El tope: qué pasa si la carga lo pasa (cortar, rechazar o cargar hasta el tope); va como D.
+4. La tabla nueva y su migración (SQLite y Postgres 16), y la copia de la base antes de publicar.
+5. Permisos: sólo admin, con el mismo `require_admin`; qué ve y qué no.
+6. Qué casos y sabotajes lo cubren (revisión fuerte: plata y permisos) y cuánto suma.
+7. Tus D, con recomendación.
 
 ## CI-TOPE: aceptada sobre `c721f7fc` (informe `a0299443`) e integrada (2026-11-17 00:50 UTC)
 
@@ -118,32 +75,6 @@ Acta `REPRODUCCION-GUARDA-VERSION-2026-11-13.md`, sección «Vuelta 2».
 - D230 sigue con Emi (ahora no; va a la cola con los otros `async for`).
 
 
-## Plan de la pieza de producto de CONEXIONES-1: leído sobre `b60c30d4` e integrado (2026-11-12 10:47 UTC)
-
-Acta, sección «Plan» (en Git, `6001684c`). D200–D203 (a) por la PM, y siguen
-para la pieza: D201 con el dato de que los créditos extra vencidos no se
-gastan en un alta manual; D202 con tu condición (si el caso 4 da 200 con
-algo perdido, pasás a (b)); D203 con `cancel_billing`/`reactivate_billing` +
-alta como datos del caso 6.
-
-## CONEXIONES-1 C: aceptada como medición sobre `9ecfd2ac` e integrada (2026-11-12 03:29 UTC)
-
-Evidencia: `docs/pm/REPRODUCCION-CONEXIONES-1-2026-11-12.md`, sección C.
-Integré con `merge` exactamente `9ecfd2ac`.
-
-- Igual a tu informe: hoy, la otra cuenta espera 30,02 s en sugerir y 30,0 s
-  en la subida (5,26 s con cuota), rc=4 las dos; con el arreglo, 0,32 s y
-  0,04 s (0,35 y 0,06 con cuota), rc=0. Control: cinco `BIEN`. `chequeo-6`
-  igual. Las ocho rutas de la dependencia, contadas.
-- Mi negativo, pico de 40 con el arreglo: rc=0, 0 × 500, la otra cuenta
-  hasta 2,29 s. La subida da 40/40 con 40 y 50/50 con 60, y la otra cuenta
-  no espera: leo pico, no retención, pero no está muestreado (abajo, D).
-- pytest con el arreglo: 201 passed. Sin el ajuste del inyector, tus 4 rojos.
-- **Hallazgo menor:** el diff de tu informe no entra con `git apply` (el hunk
-  de `main.py:10448` está cortado). Lo apliqué a mano. En el próximo, el diff
-  propuesto va completo y probado con `git apply --check`.
-- D182: Emi dijo que sí el 20/11 (tarea activa, arriba).
-
 ## BORRADOR-1: aceptada sobre `c8733be` e integrada (2026-11-12 00:48 UTC)
 
 Evidencia: `docs/pm/REPRODUCCION-BORRADOR-1-2026-11-10.md`. Integré con
@@ -172,39 +103,6 @@ completa (`6077 passed, 110 skipped, 3 xfailed`) y, sobre el merge, el arnés 40
 - **La diferencia de `estudio1` (ids de pytest):** cerrada en IDS-PYTEST.
 
 **Tu rango de D: D180 a D189.**
-
-## CONEXIONES-1, la tarea original (2026-11-08 PM)
-
-Pasa de la cola de MARIA a la tuya, decidido por la PM: es de base y de
-servidor, y MARIA tiene cuatro piezas por delante. Está en el roadmap (sí de
-Emi del 28/10). El origen es la D37 de MARIA:
-`git show 1f648c3:docs/pm/PARA-DEV-2.md`, y la D46 en `PARA-DEV-2.md`.
-
-- Medí si un `await session.close()` cancelado (el `finally` de
-  `get_async_session`, `database/connection.py`) deja conexiones tomadas:
-  gunicorn con la misma configuración del `Dockerfile` y Postgres 16
-  descartable, muchas respuestas 401 y algunas normales, mirando
-  `pg_stat_activity` y el pool.
-- Condiciones de la D46: esperás a que `api_logs` tenga todos los pedidos
-  (no tiempos fijos); un control que cancele el `close` a propósito y tenga
-  que dar rojo; cortes en vuelo de verdad (cliente que corta a mitad).
-- También entran la conexión tomada durante bcrypt, Gemini en
-  `/api/ncm/sugerir` (con la clave vacía y sin red) y la subida pública de
-  PDF (D74 de MARIA).
-- Si quedan conexiones tomadas: arreglo con una prueba roja antes y verde
-  después. Si no quedan: producto sin cambio, el informe trae los números y
-  el aviso de las pruebas sigue en riesgos.
-- Toca todas las rutas: revisión fuerte, adversario y `/security-review` si
-  hay producto.
-- Corte, como antes: el **2026-11-09 a las 05:00 UTC**. Si no llegás,
-  commit, push y anotá dónde quedaste.
-
-**D134: (c), decidido por la PM.** Medí A y B en las dos ramas. En MARIA,
-sobre `40423be` (EMAIL-1, su última aceptada), no sobre su punta, que trae
-AVISOS-2 sin revisar. Un arreglo de A (middlewares o `get_async_session`, que
-son iguales) va en tu rama. Un arreglo de B (`dependencies.py` o rutas) espera
-a que yo integre la rama de MARIA: hasta entonces, el informe trae los
-números y el arreglo propuesto, sin commitearlo.
 
 ## PERMISOS-3: aceptada sobre `9428e00`, sin integrar (2026-11-08 PM)
 

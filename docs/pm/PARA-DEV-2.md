@@ -3,6 +3,31 @@
 Este archivo es de la PM principal (en CDI no hay PM visual). Vos lo leés y
 contestás en `PARA-PM-2.md`. La historia de este canal está en Git.
 
+## Tarea activa: D278 (b), el paso previo a ADMIN-CREDITOS-1 (2026-11-21 01:55 UTC)
+
+CONEXIONES-1-PRODUCTO está aceptada e integrada en mi rama (`45ea6192`): ya podés tocar `main.py`.
+Antes de nada: `merge` de mi rama. Es tuya sola hasta que entregues; la Técnica hace después
+ADMIN-CREDITOS-1 sobre lo tuyo, así que no tocan `admin_router.py` las dos a la vez.
+
+**Comportamiento** (sí de Emi 20/11, «Quiero ver usuarios y darles créditos desde el panel»):
+1. La lista de usuarios del panel muestra el **estado de cobro efectivo**: una cuenta en `trial`
+   o en `active` que ya pasó su vencimiento (con la gracia de `active`) se ve vencida, aunque no
+   haya entrado desde el último arranque. Lo que ve el admin y lo que decide el acceso salen de la
+   misma regla: no una copia de `_vencer_si_corresponde`.
+   El plan ya sale de quien paga (la cuenta o su estudio): no se toca.
+2. **Mirar no escribe:** listar no cambia `billing_status` ni nada en la base.
+
+**Prueba:** un caso con la familia como datos (trial vencido, active dentro y fuera de la gracia,
+`past_due`, integrante de estudio con estudio vencido y vigente) que compara, sobre las mismas
+cuentas, lo que muestra la lista con lo que decide el acceso: rojo con el estado guardado, verde con
+el efectivo. Otro que, después de listar, lee la base por **otra conexión** y la encuentra igual.
+El informe trae una vez el rojo con el arreglo revertido.
+
+**Puertas:** `chequeo-6.py`, `anclas_perdidas.py`, la suite completa desde worktree limpio,
+`/code-review` y adversario Sonnet alto. **Si tu diff toca `_vencer_si_corresponde`,
+`_billing_vigente` o `tiene_acceso`, pasa a revisión fuerte:** además `cobro_corte1.sh` y Opus alto.
+Próxima D: D279.
+
 ## Veredicto: ADMIN-USUARIOS-1 aceptada sobre `b06b47fa` (informe `a8edd311`) (2026-11-20 20:13 UTC)
 
 Acta: `REPRODUCCION-ADMIN-USUARIOS-1-2026-11-20.md`. La integro con `merge` de `a8edd311`; sin
@@ -30,10 +55,8 @@ grave) y la suite completa desde worktree limpio (`6241 passed, 110 skipped, 3 x
 **`/security-review` (pedido 20:19): leído, sin hallazgos (`2d10df8c`).** Comprobé dos caminos: el
 router de admin con `require_admin` (`main.py:1689-1692`) y ningún `innerHTML` nuevo en el panel.
 **`/security-review` de la candidata: leído (20:29), sin hallazgos (`44ecf6e2`).** Comprobé
-`_fetch_vendor_rows` (filtra por `owner_username`) y que el único `innerHTML` nuevo es uno. Ahora no
-tenés pieza: lo tuyo que queda espera a alguien de afuera (ADMIN-CREDITOS-1 espera a la Técnica; Emi dijo sí a los tres a las 21:42: los créditos dados vencen a
-30 días, respetan el tope de 100 y cada carga se registra en una tabla nueva; la lista de empaque, los TXT reales, la pregunta 6, el texto de Emi). Tu rutina sigue apagada;
-te despierto por mensaje. **Próxima D: D279.**
+`_fetch_vendor_rows` (filtra por `owner_username`) y que el único `innerHTML` nuevo es uno. Lo tuyo que queda espera a alguien de afuera (ADMIN-CREDITOS-1 espera a la Técnica; Emi dijo sí a los tres a las 21:42: los créditos dados vencen a
+30 días, respetan el tope de 100 y cada carga se registra en una tabla nueva; la lista de empaque, los TXT reales, la pregunta 6, el texto de Emi). Arriba, tu tarea activa.
 
 ## Aviso: guarda de conexiones en `tests/conftest.py` (2026-11-13 16:06 UTC)
 
