@@ -465,11 +465,12 @@
 
         // Una carga sin confirmar guarda su pedido por cuenta: reenviarla, también
         // desde el diálogo reabierto, no carga dos veces; otra cantidad es otra carga.
+        // El diálogo muestra la respuesta del último pedido que envió o retomó.
         let carga = null;
         const sinConfirmar = {};
         function abrirCarga(u) {
-            carga = { usuario: u.usuario };
             const previa = sinConfirmar[u.usuario];
+            carga = { usuario: u.usuario, pedido: previa && previa.pedido };
             document.getElementById('carga-cuenta').textContent = 'Paga ' + (u.saldo_del_estudio
                 ? 'el estudio «' + u.estudio + '»' : 'la cuenta') + ' de ' + u.usuario
                 + '. Tiene ' + u.creditos_extra + ' vigentes.';
@@ -489,6 +490,7 @@
             const previa = sinConfirmar[esta.usuario];
             const pedido = previa && previa.cantidad === cantidad ? previa.pedido : crypto.randomUUID();
             sinConfirmar[esta.usuario] = { cantidad, pedido };
+            esta.pedido = pedido;
             enviar.disabled = true;
             estado.textContent = 'Cargando…';
             let response = null, data = null;
@@ -505,8 +507,7 @@
                 delete sinConfirmar[esta.usuario];
             }
             if (response && response.ok) fetchUsuarios(0);
-            // Si mientras tanto se abrió otra carga, este resultado no es de ese diálogo.
-            if (esta !== carga) return;
+            if (!carga || carga.pedido !== pedido) return;
             if (response && response.ok && data) {
                 estado.textContent = (data.ya_aplicado ? 'Ya estaba cargada. ' : 'Cargada. ')
                     + 'Ahora tiene ' + data.creditos_extra + ' vigentes.';
