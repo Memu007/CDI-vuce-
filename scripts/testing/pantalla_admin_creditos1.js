@@ -53,7 +53,9 @@ async function abrir(p, usuario) {
   // Doble clic: un pedido, y la fila se refresca con lo cargado.
   await abrir(p, uno);
   await p.fill('#carga-cantidad', '5');
-  await p.dblclick('#carga-enviar');
+  // Los dos clics van al botón dentro de la página: con dblclick el segundo cae
+  // en el formulario, porque «Cargando…» corre el botón.
+  await p.evaluate(() => { const b = document.getElementById('carga-enviar'); b.click(); b.click(); });
   await p.waitForFunction(() => !['', 'Cargando…'].includes(document.getElementById('carga-estado').textContent));
   if (enviados.length !== 1) falla('el doble clic mandó ' + enviados.length + ' pedidos');
   await esperarEstado(p, 'Cargada. Ahora tiene 5 vigentes.', 'doble clic');
@@ -67,6 +69,7 @@ async function abrir(p, usuario) {
   await p.route('**/creditos', async r => { await r.fetch(); await r.abort(); }, { times: 1 });
   await p.click('#carga-enviar');
   await esperarEstado(p, 'No se pudo cargar: sin conexión. Si la reintentás, no se carga dos veces.', 'sin red');
+  if (await p.locator('#carga-enviar').isDisabled()) falla('después de perder la respuesta no se puede reintentar');
   await p.click('#carga-enviar');
   await esperarEstado(p, 'Ya estaba cargada. Ahora tiene 8 vigentes.', 'reintento');
   if (enviados[1].pedido !== enviados[2].pedido) falla('el reintento mandó otro pedido');

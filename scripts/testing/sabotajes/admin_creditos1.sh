@@ -77,8 +77,8 @@ sabotaje pantalla $H "cada envío usa otro pedido" '                            
 sabotaje pantalla $H "el 409 no muestra el texto del servidor" \
   "            const detalle = data && typeof data.detail === 'string' ? data.detail : null;" \
   '            const detalle = null;' "FALLA: tope"
-sabotaje pantalla $H "el 409 deja el botón apagado" '            enviar.disabled = false;
-        }' '        }' "FALLA: después del 409 no se puede corregir la cantidad"
+sabotaje pantalla $H "el error deja el botón apagado" '            enviar.disabled = false;
+        }' '        }' "FALLA: después de perder la respuesta no se puede reintentar"
 sabotaje pantalla $H "la respuesta vieja escribe en otro diálogo" '            if (esta !== carga) return;
 ' '' "FALLA: el diálogo de otra cuenta muestra «Cargada."
 sabotaje pantalla $H "abrir otro diálogo deja el botón apagado" \
