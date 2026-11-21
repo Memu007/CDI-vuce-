@@ -463,15 +463,19 @@
             return td;
         }
 
-        // Un pedido por diálogo abierto: un reintento, o un doble clic, no carga dos veces.
+        // Una carga sin confirmar guarda su pedido por cuenta: reenviarla, también
+        // desde el diálogo reabierto, no carga dos veces; otra cantidad es otra carga.
         let carga = null;
+        const sinConfirmar = {};
         function abrirCarga(u) {
-            carga = { usuario: u.usuario, pedido: crypto.randomUUID() };
+            carga = { usuario: u.usuario };
+            const previa = sinConfirmar[u.usuario];
             document.getElementById('carga-cuenta').textContent = 'Paga ' + (u.saldo_del_estudio
                 ? 'el estudio «' + u.estudio + '»' : 'la cuenta') + ' de ' + u.usuario
                 + '. Tiene ' + u.creditos_extra + ' vigentes.';
-            document.getElementById('carga-cantidad').value = '';
-            document.getElementById('carga-estado').textContent = '';
+            document.getElementById('carga-cantidad').value = previa ? previa.cantidad : '';
+            document.getElementById('carga-estado').textContent = previa ? 'La carga de ' + previa.cantidad
+                + ' no se confirmó: si la enviás de nuevo, no se carga dos veces.' : '';
             document.getElementById('carga-enviar').disabled = false;
             document.getElementById('carga').showModal();
         }
@@ -481,6 +485,10 @@
             const enviar = document.getElementById('carga-enviar');
             const estado = document.getElementById('carga-estado');
             const esta = carga;
+            const cantidad = Number(document.getElementById('carga-cantidad').value);
+            const previa = sinConfirmar[esta.usuario];
+            const pedido = previa && previa.cantidad === cantidad ? previa.pedido : crypto.randomUUID();
+            sinConfirmar[esta.usuario] = { cantidad, pedido };
             enviar.disabled = true;
             estado.textContent = 'Cargando…';
             let response = null, data = null;
@@ -488,11 +496,14 @@
                 response = await fetch('/api/admin/usuarios/' + encodeURIComponent(esta.usuario) + '/creditos', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cantidad: Number(document.getElementById('carga-cantidad').value),
-                                           pedido: esta.pedido }),
+                    body: JSON.stringify({ cantidad, pedido }),
                 });
                 data = await response.json();
             } catch (e) { /* sin red o sin JSON: se dice abajo */ }
+            // Con una respuesta menor a 500, el servidor ya dijo si cargó o no.
+            if (response && response.status < 500 && sinConfirmar[esta.usuario]?.pedido === pedido) {
+                delete sinConfirmar[esta.usuario];
+            }
             if (response && response.ok) fetchUsuarios(0);
             // Si mientras tanto se abrió otra carga, este resultado no es de ese diálogo.
             if (esta !== carga) return;

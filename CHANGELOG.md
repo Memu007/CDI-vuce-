@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-21 · feat: el admin carga créditos extra a una cuenta desde el panel (ADMIN-CREDITOS-1)
+
+- En la lista de usuarios del panel, «Cargar créditos» suma operaciones extra a la cuenta que paga (la del estudio si la integrante usa su saldo), con vencimiento a 30 días y hasta el tope de 100; si no entran, dice cuántas entran como mucho.
+- Reintentar una carga cuya respuesta se perdió, también desde el diálogo cerrado y vuelto a abrir, no la carga dos veces; cada carga queda registrada con el admin que la hizo.
+
 ## 2026-11-21 · fix: la lista de usuarios del panel muestra el cobro con el que decide el acceso (D278)
 
 - Una cuenta con la prueba vencida, o con la suscripción vencida hace más de 7 días, se ve «past_due» en la lista aunque no haya entrado desde que venció; lo mismo un integrante cuyo estudio venció. Mirar la lista sigue sin cambiar nada en la base.
