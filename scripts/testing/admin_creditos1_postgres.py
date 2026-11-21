@@ -3,7 +3,7 @@
 8: el mismo pedido dos veces a la vez, para la misma cuenta y para dos cuentas.
 9: la recarga pagada y la carga a la vez, en los dos órdenes.
 10: el guardado de la integrante, al tope del plan, y la carga a la vez, en los dos órdenes.
-9 y 10 con usuario solo y con integrante de un estudio; 9 también con créditos vencidos.
+9 y 10 con usuario solo y con integrante de un estudio, con créditos vencidos y al día.
 11: sin la tabla de cargas, el arranque la crea; el segundo no falla y las demás tablas no cambian.
 uso: scripts/testing/con_pg16.sh python scripts/testing/admin_creditos1_postgres.py
 Sale 1 si una fila dice MAL, 4 si una ronda no se armó, 2 si el arnés falló y 0 si no.
@@ -53,7 +53,8 @@ def cargas(pedido):
 
 
 def fila(texto, mal, codigos, dl, consultas):
-    print(f"{'MAL' if mal else 'ok '} | {texto} | {codigos} | deadlocks +{dl}" + " | NO SE ARMÓ" * (consultas is None))
+    print(f"{'MAL' if mal else 'SIN ARMAR' if consultas is None else 'ok '} | {texto} | {codigos} | deadlocks +{dl}"
+          + " | NO SE ARMÓ" * (consultas is None))
     return bool(mal), consultas is None
 
 
@@ -144,8 +145,11 @@ def main():
               c.get("/auth/me", headers=ADMIN).json()["username"])
         rondas = [lambda: mismo_pedido_misma_cuenta(c, False), lambda: mismo_pedido_misma_cuenta(c, True),
                   lambda: mismo_pedido_dos_cuentas(c)]
+        # El guardado y detrás la carga, con créditos vencidos, da 7 aun sin candado: la carga vence
+        # lo viejo igual, así que esa ronda no distingue el defecto y no se corre.
         rondas += [lambda o=o, x=x: a_la_vez(c, o, *x) for o in ("recarga", "guardado")
-                   for x in itertools.product((1, -1), (False, True), (True, False))]
+                   for x in itertools.product((1, -1), (False, True), (True, False))
+                   if not (o == "guardado" and x[0] == -1 and x[2])]
         for r in rondas:
             mal, no = r()
             malas, sin_armar = malas + mal, sin_armar + no

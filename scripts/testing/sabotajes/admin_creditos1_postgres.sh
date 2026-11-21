@@ -22,12 +22,12 @@ export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
 
 mal() { echo "MAL   | $1"; tail -25 <<<"$2"; FALLAS=$((FALLAS+1)); }
 
-# creditos <nombre> <salida esperada> <texto>...: la corrida tiene que tener cada texto.
+# creditos <nombre> <salidas esperadas, como 1|4> <texto>...: la corrida tiene que tener cada texto.
 creditos() {
   local nombre="$1" esperada="$2" salida codigo texto; shift 2
   salida="$(PY="$PY" scripts/testing/con_pg16.sh "$PY" scripts/testing/admin_creditos1_postgres.py 2>&1)"; codigo=$?
   for texto in "$@"; do
-    if [ "$codigo" -ne "$esperada" ] || ! grep -qF -- "$texto" <<<"$salida"; then
+    if ! [[ "$codigo" =~ ^($esperada)$ ]] || ! grep -qF -- "$texto" <<<"$salida"; then
       mal "$nombre: salida $codigo, esperaba $esperada y «$texto»" "$salida"; return
     fi
   done
@@ -64,10 +64,11 @@ en_codigo "$R" '        try:
             await db.rollback()
             previa, ya = await db.get(CreditoAdmin, carga.pedido), True' '        await db.commit()' &&
   creditos "sin atrapar el choque de la clave" 1 "$DOS" "[200, 500]"
-# La clave del pedido es la que hace chocar al segundo: sin ella entran los dos.
+# La clave del pedido es la que hace esperar a las dos cargas detrás del arnés: sin ella la ronda
+# no se arma. Según quién commitea primero, las dos cargan (1) o la segunda ve el pedido (4).
 en_codigo "$MO" '    pedido = Column(String(36), primary_key=True)' '    pedido = Column(String(36))
     __mapper_args__ = {"primary_key": [pedido]}' &&
-  creditos "el pedido sin clave en la tabla" 1 "$DOS" "[200, 200]"
+  creditos "el pedido sin clave en la tabla" "1|4" "el mismo pedido para dos cuentas | créditos" "NO SE ARMÓ"
 # Sin candado, la carga que espera detrás de la recarga escribe lo que leyó antes y la pisa.
 en_codigo "$R" '    bloqueada = await cuenta_bloqueada(db, username)' \
   '    db_user = (await db.execute(select(User).where(User.username == username))).scalars().first()
