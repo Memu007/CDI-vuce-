@@ -442,10 +442,10 @@ sabotaje $M "i: pagar no reinicia las operaciones del período" \
   '"trial_ends_at", "ops_used_this_period",' '"trial_ends_at",' \
   "FAILED $I3::test_pagar_el_plan_reinicia_la_cuota_del_periodo"
 sabotaje $M "i: pagar no reinicia el inicio del período" \
-  '"billing_period_started_at", "last_topup_at",' '"last_topup_at",' \
+  '"billing_period_started_at", "payment_provider",' '"payment_provider",' \
   "FAILED $I3::test_pagar_el_plan_reinicia_la_cuota_del_periodo"
-sabotaje $M "i: la recarga no guarda su vencimiento" \
-  '"last_topup_at", "extra_ops_expires_at",' '"last_topup_at",' \
+sabotaje $B "i: la recarga no guarda su vencimiento" \
+  '        cuenta.extra_ops_expires_at = ahora + timedelta(days=30)' '        pass' \
   "FAILED $I3::test_una_recarga_vence_a_los_30_dias"
 sabotaje $M "i: la prueba vigente no cuenta como tiempo pagado" \
   'in ("trial", "active", "canceled")' 'in ("active", "canceled")' \
@@ -454,8 +454,8 @@ sabotaje $M "i: el tope de recargas frena un plan" \
   'if update.get("action") == "topup" and not control[1]:' 'if not control[1]:' \
   "FAILED $I3::test_el_tope_de_recargas_no_frena_un_plan"
 sabotaje $B "i: una recarga que pasa a 101 entra" \
-  'return vigentes + TOPUP_OPS <= EXTRA_OPS_MAX, vigentes' \
-  'return vigentes + TOPUP_OPS <= EXTRA_OPS_MAX + 1, vigentes' \
+  'return vigentes + n <= EXTRA_OPS_MAX, vigentes' \
+  'return vigentes + n <= EXTRA_OPS_MAX + 1, vigentes' \
   "FAILED $V::test_una_recarga_que_no_entra_queda_rechazada_y_no_suma[91-usuario]"
 sabotaje $M "i: un monto de cero cuenta como monto" \
   'monto > 0 else None' 'monto >= 0 else None' \

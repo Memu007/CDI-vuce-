@@ -647,20 +647,6 @@ class TestTopup:
         after = _get_user(uname)
         assert after["extra_ops_remaining"] == 95
 
-    def test_topup_creditos_expiran_30_dias(self):
-        """process_payment para topup setea expiry a now+30d."""
-        payment = {
-            "id": "pay-exp-1",
-            "status": "approved",
-            "date_approved": datetime.now(timezone.utc).isoformat(),
-            "external_reference": "alice:topup",
-            "payer": {"id": "payer-1"},
-        }
-        update = billing_service.process_payment(payment)
-        assert update["action"] == "topup"
-        delta = update["extra_ops_expires_at"] - datetime.now(timezone.utc)
-        assert 29 <= delta.days <= 30
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 9. BILLING /me

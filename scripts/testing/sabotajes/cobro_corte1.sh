@@ -198,7 +198,7 @@ sabotaje $M "se escribe el archivo antes de contar" \
 sabotaje $B "la fecha de las recargas sin zona no se toma como UTC" \
   "FAILED $T::test_con_el_tope_lleno_el_extra_paga_la_operacion_nueva" \
   '    expires = como_utc(expires)' '    pass'
-sabotaje $M "cuenta el usuario y no su organización" \
+sabotaje $C "cuenta el usuario y no su organización" \
   "FAILED $T::test_la_organizacion_es_la_que_cuenta" \
   $'        if org:\n            return db_user, org' $'        if org:\n            return db_user, db_user'
 
@@ -220,7 +220,7 @@ done
 sabotaje $B "la fecha de las recargas sin zona no se toma como UTC" \
   "FAILED $T::test_con_el_tope_lleno_el_extra_paga_la_operacion_nueva" \
   '    expires = como_utc(expires)' '    pass'
-sabotaje $M "cuenta el usuario y no su organización" \
+sabotaje $C "cuenta el usuario y no su organización" \
   "FAILED $T::test_la_organizacion_es_la_que_cuenta" \
   $'        if org:\n            return db_user, org' $'        if org:\n            return db_user, db_user'
 
