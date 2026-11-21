@@ -93,6 +93,7 @@ from proyecto_maria.core import ncm_catalog
 from proyecto_maria.core import sufijos_arca
 from proyecto_maria.routers import admin_router, quote_router
 from proyecto_maria.services import billing_service
+from proyecto_maria.services.billing_service import BILLING_GRACE_DAYS_ACTIVE
 from proyecto_maria.auth.dependencies import (
     get_current_user,
     datos_del_token,
@@ -780,13 +781,6 @@ async def _migrate_add_user_billing_columns():
                     )
     except Exception as mig_err:
         print(f"⚠️ No se pudo migrar columnas de billing: {mig_err}")
-
-
-# Días de gracia antes de cortar a un usuario `active` cuyo período venció sin
-# renovación. El corte es por calendario (no por señal de impago de MP, ver G7.3);
-# la gracia evita cortar por un webhook de renovación que llegó tarde o un reintento
-# de MP. `trial` no lleva gracia: ahí nadie pagó todavía.
-BILLING_GRACE_DAYS_ACTIVE = 7
 
 
 async def _check_expired_trials():
@@ -2208,24 +2202,12 @@ async def _get_billing_entity(db: AsyncSession, db_user: User):
 
 
 def _vencer_si_corresponde(entidad, ahora=None):
-    """Pasa a past_due una cuenta vencida y dice qué venció ("trial", "active") o None.
-    Sólo la suscripción tiene gracia: un webhook de renovación puede llegar tarde."""
-    ahora = ahora or datetime.now(timezone.utc)
-    fin = entidad.trial_ends_at
-    if fin is None:
-        return None
-    if fin.tzinfo is None:
-        fin = fin.replace(tzinfo=timezone.utc)
-    if entidad.billing_status == "trial" and fin < ahora:
-        entidad.billing_status = "past_due"
-        return "trial"
-    if (
-        entidad.billing_status == "active"
-        and fin < ahora - timedelta(days=BILLING_GRACE_DAYS_ACTIVE)
-    ):
-        entidad.billing_status = "past_due"
-        return "active"
-    return None
+    """Pasa a past_due una cuenta vencida y dice si la pasó."""
+    efectivo = billing_service.cobro_efectivo(entidad, ahora)
+    if efectivo == entidad.billing_status:
+        return False
+    entidad.billing_status = efectivo
+    return True
 
 
 def _detalle_402(entidad, razon_del_plan=None):

@@ -104,16 +104,18 @@ sabotaje $B "la dependencia deja pasar la impaga" \
   '    if status in ("trial", "active", "past_due"):'
 
 # Cuándo vence (el trial sin gracia, la suscripción con 7 días).
-sabotaje $M "el trial vencido no vence" \
+sabotaje $B "el trial vencido no vence" \
   "FAILED $T::test_el_estudio_con_la_prueba_vencida_no_genera_ni_gasta_gemini" \
-  '    if entidad.billing_status == "trial" and fin < ahora:' \
-  '    if entidad.billing_status == "trial" and fin < ahora - timedelta(days=30):'
-sabotaje $M "la suscripción vence sin gracia" \
+  '    if estado == "trial" and fin < ahora:' \
+  '    if estado == "trial" and fin < ahora - timedelta(days=30):'
+sabotaje $B "la suscripción vence sin gracia" \
   "FAILED $T::test_la_suscripcion_dentro_de_la_gracia_genera" \
-  '        and fin < ahora - timedelta(days=BILLING_GRACE_DAYS_ACTIVE)' '        and fin < ahora'
-sabotaje $M "la fecha sin zona no se toma como UTC" \
+  'if estado == "active" and fin < ahora - timedelta(days=BILLING_GRACE_DAYS_ACTIVE):' \
+  'if estado == "active" and fin < ahora:'
+sabotaje $B "la fecha sin zona no se toma como UTC" \
   "FAILED $T::test_una_cuenta_que_no_esta_al_dia_no_genera_ni_gasta_gemini[suscripcion_vencida-ncm_sugerir]" \
-  $'    if fin.tzinfo is None:\n        fin = fin.replace(tzinfo=timezone.utc)' ''
+  'estado, fin = cuenta.billing_status, como_utc(cuenta.trial_ends_at)' \
+  'estado, fin = cuenta.billing_status, cuenta.trial_ends_at'
 
 # El aviso dice la razón real.
 sabotaje $M "el impago se avisa como vencido" \
@@ -126,7 +128,7 @@ sabotaje $M "el pedido que vence la cuenta da otra razón" \
   $'    if _vencer_si_corresponde(entidad):\n        try:' \
   $'    entidad._vencio = _vencer_si_corresponde(entidad)\n    if entidad._vencio:\n        try:' \
   '            message = "Venció tu prueba gratis. Suscribite para seguir usando CDI."' \
-  '            message = "Venció tu suscripción." if getattr(entidad, "_vencio", None) == "active" else "Venció tu prueba gratis. Suscribite para seguir usando CDI."'
+  '            message = "Venció tu suscripción." if getattr(entidad, "_vencio", None) else "Venció tu prueba gratis. Suscribite para seguir usando CDI."'
 sabotaje $B "el plan legado da error" \
   "FAILED $T::test_el_plan_legado_trial_genera_exporta_y_guarda" \
   '    return PLANS.get(getattr(user, "plan", None) or "premium") or PLANS["premium"]' \
