@@ -6,15 +6,18 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
 import psutil
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Dict, Any, List
 
+from pydantic import BaseModel, Field, StrictInt
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, text, or_
-from proyecto_maria.auth.dependencies import get_db
+from proyecto_maria.auth.dependencies import get_current_user, get_db
 from proyecto_maria.auth.roles import roles_de
-from proyecto_maria.database.models import User, Operation, Organization
+from proyecto_maria.database.candados import cuenta_bloqueada
+from proyecto_maria.database.models import CreditoAdmin, User, Operation, Organization
 from proyecto_maria.services import billing_service
 
 router = APIRouter(prefix='/api/admin', tags=['admin'])
@@ -451,16 +454,60 @@ async def listar_usuarios(
         filtro.append(or_(User.username.icontains(buscar.strip(), autoescape=True),
                           User.email.icontains(buscar.strip(), autoescape=True)))
     total = (await db.execute(select(func.count()).select_from(User).where(*filtro))).scalar_one()
+    filas = await db.execute(_consulta(*filtro).order_by(User.username).offset(desde).limit(cuantos))
+    return {"total": total, "desde": desde, "cuantos": cuantos,
+            "usuarios": [_cuenta_en_la_lista(f) for f in filas]}
+
+
+def _consulta(*filtro):
     columnas = [User.username, User.email, User.roles, Organization.id.label("org_id"),
                 Organization.name.label("org_name")]
     columnas += [getattr(User, c) for c in _SALDO] + [getattr(Organization, c).label("org_" + c) for c in _SALDO]
-    filas = await db.execute(
-        select(*columnas)
-        .outerjoin(Organization, Organization.id == User.organization_id)
-        .where(*filtro)
-        .order_by(User.username)
-        .offset(desde)
-        .limit(cuantos)
-    )
-    return {"total": total, "desde": desde, "cuantos": cuantos,
-            "usuarios": [_cuenta_en_la_lista(f) for f in filas]}
+    return select(*columnas).outerjoin(Organization, Organization.id == User.organization_id).where(*filtro)
+
+
+class _Carga(BaseModel):
+    cantidad: StrictInt = Field(ge=1, le=billing_service.EXTRA_OPS_MAX)
+    pedido: str = Field(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+@router.post('/usuarios/{username}/creditos')
+async def cargar_creditos(
+    username: str,
+    carga: _Carga,
+    admin=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """Suma créditos extra a la cuenta que paga, una sola vez por pedido.
+    El pedido se busca antes que el tope: el reintento de una carga que llenó a 100 no choca."""
+    bloqueada = await cuenta_bloqueada(db, username)
+    if bloqueada is None:
+        raise HTTPException(status_code=404, detail="No existe esa cuenta")
+    db_user, cuenta = bloqueada
+    previa = await db.get(CreditoAdmin, carga.pedido)
+    ya = previa is not None
+    if not ya:
+        entra, vigentes = billing_service.acreditar_extra(cuenta, carga.cantidad, datetime.now(timezone.utc))
+        if not entra:
+            await db.rollback()
+            tope = billing_service.EXTRA_OPS_MAX
+            raise HTTPException(status_code=409, detail=(
+                f"Ya tiene {vigentes} operaciones extra y el tope es {tope}: entran como mucho {tope - vigentes}."))
+        previa = CreditoAdmin(pedido=carga.pedido, admin=admin["username"], usuario=username,
+                              cuenta=f"org:{cuenta.id}" if cuenta is not db_user else username,
+                              cantidad=carga.cantidad, vigentes_antes=vigentes)
+        db.add(previa)
+        try:
+            await db.commit()
+        except IntegrityError:
+            # Otro pedido con la misma clave entró primero: se deshace lo sumado y se responde con el suyo.
+            await db.rollback()
+            previa, ya = await db.get(CreditoAdmin, carga.pedido), True
+    if (previa.usuario, previa.cantidad) != (username, carga.cantidad):
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="ese pedido ya se usó para otra carga")
+    await db.commit()
+    fila = (await db.execute(_consulta(User.username == username))).one()
+    return {**_cuenta_en_la_lista(fila), "ya_aplicado": ya,
+            "carga": {"pedido": previa.pedido, "cantidad": previa.cantidad,
+                      "vigentes_antes": previa.vigentes_antes, "admin": previa.admin}}
