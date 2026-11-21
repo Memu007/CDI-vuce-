@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-21 · fix: la lista de usuarios del panel muestra el cobro con el que decide el acceso (D278)
+
+- Una cuenta con la prueba vencida, o con la suscripción vencida hace más de 7 días, se ve «past_due» en la lista aunque no haya entrado desde que venció; lo mismo un integrante cuyo estudio venció. Mirar la lista sigue sin cambiar nada en la base.
+
 ## 2026-11-20 · fix: una cuenta al tope de su plan recibe «límite alcanzado» en la carga manual (CONEXIONES-1-PRODUCTO)
 
 - Una cuenta que ya usó todas las operaciones de su plan, sin créditos extra vigentes, recibe el aviso de límite al cargar una operación a mano, sin que se lea ni se valide lo que mandó.

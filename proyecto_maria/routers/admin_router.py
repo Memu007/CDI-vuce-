@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 import psutil
 import time
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Dict, Any, List
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -426,7 +427,7 @@ def _cuenta_en_la_lista(fila) -> Dict[str, Any]:
         "estudio": fila.org_name,
         "saldo_del_estudio": del_estudio,
         "plan": saldo["plan"],
-        "cobro": saldo["billing_status"],
+        "cobro": billing_service.cobro_efectivo(SimpleNamespace(**saldo)),
         "cobro_hasta": _iso(saldo["trial_ends_at"]),
         "operaciones_del_periodo": saldo["ops_used_this_period"] or 0,
         "creditos_extra": 0 if vencidos else saldo["extra_ops_remaining"] or 0,
