@@ -49,14 +49,26 @@ como propuesta para Emi: no entra.
    de todas las rutas que cobran) y `cobro_mp1.sh` entero; suite completa, `chequeo-6`, Opus alto y
    Sonnet alto, `/code-review high` y `/security-review`.
 
-## Tarea activa: ADMIN-CREDITOS-1, en dos tramos (2026-11-21 02:05 UTC)
+## Tarea activa: ADMIN-CREDITOS-1, tramo 2 (2026-11-21 05:58 UTC)
 
-Primero `/compact` (estás en unos 125k de 144k) y `merge` de mi rama. Próxima D: D237.
+D278 (b) de MARIA está integrada en mi rama (`647ea7da`): **arrancá el tramo 2.** Primero `merge` de
+mi rama. El tramo 1 (`404d1592`, `e4922e35`) lo vi pusheado; no es entrega todavía. Próxima D: D237.
 
-- **Ahora**, lo que no toca `main.py` ni `admin_router.py`: `acreditar_extra` y `recarga_entra(n)` en
-  `billing_service`, el modelo `creditos_admin` y sus casos SQLite. Commit y push; no es entrega.
-- **Cuando integre D278 (b) de MARIA** (te aviso): el movimiento de `_cuenta_bloqueada`, el webhook,
-  la ruta, el panel, los casos de Postgres, los sabotajes y las puertas. Ahí entregás todo junto.
+Lo que cambió debajo tuyo con D278 (b):
+- `billing_service.cobro_efectivo(cuenta, ahora=None)` y `BILLING_GRACE_DAYS_ACTIVE` viven en
+  `billing_service.py` (alrededor de las líneas 145-163). Es la única regla de «¿venció el cobro?»
+  que usan el acceso y la lista del panel.
+- `_vencer_si_corresponde` (`main.py`, cerca de 2204) ahora devuelve verdadero o falso, no el estado
+  viejo; sus dos llamadores lo usan como booleano.
+- Desde ahora `admin_router.py` y `billing_service.py` son tuyos. MARIA sólo suma pruebas de la lista
+  en Postgres; si encuentra algo de producto ahí, me lo trae a mí y no los toca.
+
+**Antes de seguir con el tramo 2**, en la unión (tu tramo 1 con D278): tus casos del tramo 1 y
+`tests/test_admin_usuarios1.py`, verdes. El merge de prueba no chocó, pero nadie corrió las dos juntas
+en `billing_service.py`. La salida va al informe.
+
+Lo del tramo 2 sigue como estaba: el movimiento de `_cuenta_bloqueada`, el webhook, la ruta, el panel,
+los casos de Postgres, los sabotajes y las puertas (ajustes 1 a 5 de arriba). Ahí entregás todo junto.
 
 ## CI-TOPE: aceptada sobre `c721f7fc` (informe `a0299443`) e integrada (2026-11-17 00:50 UTC)
 

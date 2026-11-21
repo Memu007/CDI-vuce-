@@ -1155,3 +1155,15 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - Ajustes: misma clave en dos cuentas, reintento con la cuenta llena, recarga pagada de la integrante
   a la vez, `pedido` como UUID, `cobro_corte1.sh` y `anclas_perdidas` en las puertas.
 - Orden: billing_service y modelo ahora; candado, webhook y ruta después de integrar D278 (b).
+
+## 2026-11-21 05:57 UTC — D278 (b) aceptada sobre `05ca7f71`; D279 (b)
+
+- D278 (b) de MARIA: la lista de usuarios del panel muestra el cobro con la misma regla que decide el
+  acceso (`billing_service.cobro_efectivo`). Aceptada e integrada (`647ea7da`), sin publicar.
+  Acta `REPRODUCCION-D278B-2026-11-21.md`.
+- Decidido por la PM, con el consejero: D279 (b). Las tres copias de la regla que quedan fuera de la
+  función van a `COLA-LIMPIEZA.md` (la de `get_current_user`, con D205); hoy ninguna da ni niega
+  acceso mal. El perfil con el estado guardado, riesgo escrito.
+- Antes de que ADMIN-USUARIOS-1 y D278 entren a una candidata: la lista en Postgres 16 (MARIA, sólo
+  pruebas). La Técnica sigue con el tramo 2 de ADMIN-CREDITOS-1 y desde ahora tiene
+  `admin_router.py` y `billing_service.py`.
