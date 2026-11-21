@@ -100,6 +100,22 @@ sabotaje $R "mirar vence los créditos de los estudios y guarda" \
     await db.commit()
     return {"total": total,' \
   "FAILED tests/test_admin_usuarios1.py::test_mirar_no_cambia_la_base"
+sabotaje $R "mirar vence las cuentas y guarda" \
+  '    return {"total": total,' '    for u in (await db.execute(select(User).where(*filtro))).scalars():
+        u.billing_status = billing_service.cobro_efectivo(u)
+    await db.commit()
+    return {"total": total,' \
+  "FAILED tests/test_admin_usuarios1.py::test_mirar_no_cambia_la_base"
+sabotaje $R "la lista muestra el cobro guardado" \
+  '"cobro": billing_service.cobro_efectivo(SimpleNamespace(**saldo)),' '"cobro": saldo["billing_status"],' \
+  "FAILED tests/test_admin_usuarios1.py::test_la_lista_muestra_el_cobro_con_el_que_decide_el_acceso"
+sabotaje $R "el cobro se mira en la cuenta y no en quien paga" \
+  '"cobro": billing_service.cobro_efectivo(SimpleNamespace(**saldo)),' '"cobro": billing_service.cobro_efectivo(fila),' \
+  "FAILED tests/test_admin_usuarios1.py::test_la_lista_muestra_el_cobro_con_el_que_decide_el_acceso"
+sabotaje $B "la suscripción vence sin gracia en la lista y en el acceso" \
+  'if estado == "active" and fin < ahora - timedelta(days=BILLING_GRACE_DAYS_ACTIVE):' \
+  'if estado == "active" and fin < ahora:' \
+  "FAILED tests/test_admin_usuarios1.py::test_la_lista_muestra_el_cobro_con_el_que_decide_el_acceso"
 sabotaje $B "la regla de vencido compara al revés" \
   'datetime.now(timezone.utc) > expires' 'datetime.now(timezone.utc) < expires' \
   "FAILED tests/test_admin_usuarios1.py::test_cada_cuenta_se_ve_con_su_saldo"
