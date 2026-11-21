@@ -37,20 +37,7 @@ async function abrir(p, usuario) {
   if (await p.locator('#carga-enviar').isDisabled()) falla('el diálogo de ' + usuario + ' abrió sin poder cargar');
 }
 
-(async () => {
-  const sufijo = String(Date.now()).slice(-8);
-  const admin = 'adcr_adm' + sufijo, uno = 'adcr_uno' + sufijo, otro = 'adcr_otro' + sufijo;
-  const b = await chromium.launch();
-  for (const nombre of [uno, otro]) { const c = await b.newContext(); await registrar(c, nombre); await c.close(); }
-  const ctx = await b.newContext();
-  await registrar(ctx, admin);
-  hacerAdmin(admin);
-  const p = await ctx.newPage();
-  const enviados = [];
-  p.on('request', r => { if (r.method() === 'POST' && r.url().endsWith('/creditos')) enviados.push(r.postDataJSON()); });
-  await p.goto(base + '/dev/dashboard');
-
-  // Doble clic: un pedido, y la fila se refresca con lo cargado.
+async function dobleClic(p, enviados, uno) {
   await abrir(p, uno);
   await p.fill('#carga-cantidad', '5');
   // Los dos clics van al botón dentro de la página: con dblclick el segundo cae
@@ -62,8 +49,10 @@ async function abrir(p, usuario) {
   await p.locator('#usuarios-body tr', { hasText: uno }).locator('td').nth(7).filter({ hasText: /^5$/ })
     .waitFor({ timeout: 15000 }).catch(() => falla('la fila no muestra los 5 cargados'));
   await p.click('#carga-cerrar');
+}
 
-  // La carga llega al servidor pero la respuesta se pierde: el reintento no carga otra vez.
+// La carga llega al servidor pero la respuesta se pierde: el reintento no carga otra vez.
+async function respuestaPerdida(p, enviados, uno) {
   await abrir(p, uno);
   await p.fill('#carga-cantidad', '3');
   await p.route('**/creditos', async r => { await r.fetch(); await r.abort(); }, { times: 1 });
@@ -75,16 +64,19 @@ async function abrir(p, usuario) {
   if (enviados[1].pedido !== enviados[2].pedido) falla('el reintento mandó otro pedido');
   if (enviados[0].pedido === enviados[1].pedido) falla('dos diálogos usaron el mismo pedido');
   await p.click('#carga-cerrar');
+}
 
-  // Lo que no entra en el tope se ve con el texto del servidor.
+async function tope(p, uno) {
   await abrir(p, uno);
   await p.fill('#carga-cantidad', '93');
   await p.click('#carga-enviar');
   await esperarEstado(p, 'Ya tiene 8 operaciones extra y el tope es 100: entran como mucho 92.', 'tope');
   if (await p.locator('#carga-enviar').isDisabled()) falla('después del 409 no se puede corregir la cantidad');
   await p.click('#carga-cerrar');
+}
 
-  // La respuesta de la carga de «uno» llega con el diálogo de «otro» abierto.
+// La respuesta de la carga de «uno» llega con el diálogo de «otro» abierto.
+async function respuestaAjena(p, uno, otro) {
   let soltar;
   const suelto = new Promise(r => { soltar = r; });
   await p.route('**/creditos', async r => { await suelto; await r.continue(); }, { times: 1 });
@@ -99,7 +91,24 @@ async function abrir(p, usuario) {
   await refresco;
   const ajeno = await estado(p).textContent();
   if (ajeno !== '') falla('el diálogo de otra cuenta muestra «' + ajeno + '»');
+}
 
+(async () => {
+  const sufijo = String(Date.now()).slice(-8);
+  const admin = 'adcr_adm' + sufijo, uno = 'adcr_uno' + sufijo, otro = 'adcr_otro' + sufijo;
+  const b = await chromium.launch();
+  for (const nombre of [uno, otro]) { const c = await b.newContext(); await registrar(c, nombre); await c.close(); }
+  const ctx = await b.newContext();
+  await registrar(ctx, admin);
+  hacerAdmin(admin);
+  const p = await ctx.newPage();
+  const enviados = [];
+  p.on('request', r => { if (r.method() === 'POST' && r.url().endsWith('/creditos')) enviados.push(r.postDataJSON()); });
+  await p.goto(base + '/dev/dashboard');
+  await dobleClic(p, enviados, uno);
+  await respuestaPerdida(p, enviados, uno);
+  await tope(p, uno);
+  await respuestaAjena(p, uno, otro);
   await b.close();
   console.log('OK: ADMIN-CREDITOS-1 en el navegador');
 })().catch(e => falla(e.stack || e.message));
