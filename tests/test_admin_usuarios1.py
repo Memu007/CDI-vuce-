@@ -238,7 +238,7 @@ def test_la_respuesta_no_trae_nada_secreto(sembradas):
 
 def _otra_conexion():
     # Fuera del pool de la app: ve lo guardado, no lo que quedó en una sesión.
-    return closing(sqlite3.connect(engine.url.database))
+    return closing(sqlite3.connect(engine.url.database, timeout=30))
 
 
 def _filas(prefijo=PREFIJO):
