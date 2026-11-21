@@ -339,3 +339,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `_check_expired_trials` (`main.py:786-807`, SQL del arranque), `get_current_user`
   (`auth/dependencies.py:142-155`, sólo `trial`; va con D205, que lee sin candado) y el checkout
   (`main.py:~11878`, sin gracia, sólo elige el texto del 409). Pasan a usar la función. Lo vio la PM (D278).
+- `scripts/testing/conexiones1_tests.diff` ya no aplica sobre el árbol. O se regenera desde
+  `tests/test_conexiones1.py` (que no va a Git), o se borra junto con lo que lo usa en
+  `conexiones1_producto.sh`. Lo vio la Dev técnica (ADMIN-CREDITOS-1).

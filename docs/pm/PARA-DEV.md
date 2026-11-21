@@ -3,24 +3,6 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## CONEXIONES-1-PRODUCTO y NOKEY: aceptadas sobre `b4f7e590` (informe `924cb1ca`) e integradas (2026-11-21 01:50 UTC)
-
-Acta `REPRODUCCION-CONEXIONES-1-PRODUCTO-2026-11-21.md`. Integradas con el merge de `924cb1ca`
-(`45ea6192`); fuera de `docs/pm`, `.claude` y `AGENTS.md`, el árbol es igual a `b4f7e590`. Sin publicar. Corrí todo lo de tu
-tabla con los mismos números, más `cobro_mp1.sh` entero (145 ROJO, «sabotajes con falla: 0») y dos
-negativos míos. Adversarios Opus y Sonnet alto: nada nuevo del diff.
-
-- **Tu supuesto reversible** (las 6 rutas que ya usaban la dependencia ahora sueltan): aceptado,
-  decidido por la PM. Lo sostiene la matriz de Sonnet, 9 rutas, sin diferencias contra la base.
-- **El intermitente:** cerrado con tu cadena de referencias. Mi doble pasada verde con el `soltar()`
-  viejo queda como riesgo abierto, sólo del arnés.
-- **Lo que no distingue:** mi `pm_neg_tope.py` da verde también en la base. Lo que distingue son tu
-  sabotaje D188 y `conexiones1_creditos.py`.
-- **El previo de Opus** (`_vencer_y_guardar` pisa una renovación pagada con `past_due`) es el mismo
-  mecanismo que D205: va con Emi, no es tuyo ahora.
-- `limpieza1.sh` corrido, «sabotajes con falla: 0»: su línea sale de `sabotajes-conocidos.txt`.
-- No corrido por la PM: `/code-review`.
-
 ## ADMIN-CREDITOS-1: plan aceptado con ajustes, sobre `fa609d94` (2026-11-21 02:05 UTC)
 
 Comprobé en el código lo que citás: el montaje con `require_admin` (`main.py:1690`), la importación
@@ -49,32 +31,48 @@ como propuesta para Emi: no entra.
    de todas las rutas que cobran) y `cobro_mp1.sh` entero; suite completa, `chequeo-6`, Opus alto y
    Sonnet alto, `/code-review high` y `/security-review`.
 
-## Tarea activa: ADMIN-CREDITOS-1, tramo 2 (2026-11-21 05:58 UTC)
+## Tarea activa: ADMIN-CREDITOS-1 vuelve, sobre `39d4dd8b` (informe `010e0dae`) (2026-11-21 12:10 UTC)
 
-D278 (b) de MARIA está integrada en mi rama (`647ea7da`): **arrancá el tramo 2.** Primero `merge` de
-mi rama. El tramo 1 (`404d1592`, `e4922e35`) lo vi pusheado; no es entrega todavía. Próxima D: D237.
+Acta `REPRODUCCION-ADMIN-CREDITOS-1-2026-11-21.md`. **El servidor cobra bien**: suite, `cobro_mp1.sh`,
+tus dos guiones de Postgres, `anclas_perdidas` y tus 26 sabotajes de SQLite dan lo mismo que tu informe,
+y los adversarios Opus y Sonnet alto no encontraron defecto del servidor. Vuelve por lo que sigue.
+Cada punto es criterio de aceptación salvo lo marcado «sugerencia». Próxima D: D239.
 
-Lo que cambió debajo tuyo con D278 (b):
-- `billing_service.cobro_efectivo(cuenta, ahora=None)` y `BILLING_GRACE_DAYS_ACTIVE` viven en
-  `billing_service.py` (alrededor de las líneas 145-163). Es la única regla de «¿venció el cobro?»
-  que usan el acceso y la lista del panel.
-- `_vencer_si_corresponde` (`main.py`, cerca de 2204) ahora devuelve verdadero o falso, no el estado
-  viejo; sus dos llamadores lo usan como booleano.
-- Desde ahora `admin_router.py` y `billing_service.py` son tuyos. MARIA sólo suma pruebas de la lista
-  en Postgres; si encuentra algo de producto ahí, me lo trae a mí y no los toca.
+1. **Una ronda de Postgres que dice «armada» tiene que haber armado lo que afirma.**
+   - Caso 8: «sin atrapar el choque de la clave» dio verde 2 de 20 y 3 de 26 veces. La ronda espera
+     el candado de las cuentas, no que los dos pedidos hayan buscado el pedido antes del primer
+     commit; cuando el segundo busca tarde ve la fila y va por el 409. Y «rondas sin armar: 0» la
+     cuenta como armada. *Sugerencia:* retener desde la conexión del candado un insert sin commit de
+     ese pedido.
+   - Caso 10: el alta de «guardado» (`items: []`) no gasta créditos, así que ningún sabotaje pone en
+     rojo «carga + guardado» ni «guardado + carga». Con un alta que gasta un extra y «la carga sin
+     candado», mi negativo dio 3 de 3 «extra 12 (esperaba 11)»; limpio, 3 de 3 verde.
+   - Lo que pido: cada fila del guion de Postgres tiene un sabotaje que la pone en rojo **siempre**.
+     Para los choques, la salida de 20 corridas seguidas del sabotaje, todas en rojo, va al informe.
+2. **El panel guarda la carga sin confirmar en un objeto común con el nombre de usuario como clave**
+   (`const sinConfirmar = {}`, `dev_dashboard.html`). Hoy se registran `constructor`, `__proto__`,
+   `toString` y `hasOwnProperty` (200 los cuatro), y al abrir `constructor` el diálogo dice «La carga
+   de undefined no se confirmó…». La familia es toda clave heredada de `Object.prototype`: un caso
+   que la cubra. A la vuelta pruebo una clave distinta de esas cuatro.
+3. `scripts/testing/sabotajes/admin_creditos1.sh` entró con modo 100644: tu comando copiable da
+   rc=126. Bit de ejecución, en el commit de pruebas.
+4. El informe pone `cobro_corte1.sh` sobre `39d4dd8b` en la tabla y sobre `87985bba` en «Qué no
+   corrí». Que diga uno.
 
-**Antes de seguir con el tramo 2**, en la unión (tu tramo 1 con D278): tus casos del tramo 1 y
-`tests/test_admin_usuarios1.py`, verdes. El merge de prueba no chocó, pero nadie corrió las dos juntas
-en `billing_service.py`. La salida va al informe.
+**Tus D:** D238 (a), decidido por la PM: `last_topup_at` sólo lo lee el panel (`admin_router.py:401`,
+`:415` y `:438`). D237 es de plata y va a Emi con la recomendación (a). No frena la vuelta: lo que entregaste
+ya es (a).
 
-Lo del tramo 2 sigue como estaba: el movimiento de `_cuenta_bloqueada`, el webhook, la ruta, el panel,
-los casos de Postgres, los sabotajes y las puertas (ajustes 1 a 5 de arriba). Ahí entregás todo junto.
+**Lo demás:** tus supuestos y riesgos quedan como los escribiste. Cargarle a una cuenta `past_due` o
+`canceled` da 200 sin aviso (Sonnet): riesgo bajo, escrito, y el aviso en el panel es propuesta para
+Emi, no entra. La nota de Opus (otra cantidad con una carga en vuelo aplica las dos) es lo que dice
+el panel. Tu propuesta de limpieza (`conexiones1_tests.diff` ya no aplica) pasa a `COLA-LIMPIEZA.md`.
+Las 2 advertencias de más de la suite («Event loop is closed» en `test_datos1` y `test_sesion1`) son
+de la carga de la máquina, fuera de la pieza.
 
-**Aviso (2026-11-21 07:05 UTC):** integré en mi rama la lista de usuarios en Postgres de MARIA
-(`9c5fbfc4`). Cambió `tests/test_admin_usuarios1.py` y llegó `scripts/testing/admin_usuarios1_postgres.py`.
-Hacé `merge` de mi rama antes de tocar ese test. Puerta nueva en la unión, alrededor de 1 min, que
-tiene que dar «fallas: 0» y rc=0:
-`PY=/ruta/a/tu/venv/bin/python scripts/testing/con_pg16.sh sh -c '"$PY" scripts/testing/admin_usuarios1_postgres.py "$BACKUP1A_PG_URL"'`
+**A la vuelta reviso en proporción:** el diff de producto (debería ser sólo el HTML), el guion de
+pantalla, los sabotajes de Postgres en 20 corridas y mi negativo. No vuelvo a correr la suite ni los
+de cobro si el diff no toca el servidor: si lo toca, avisalo arriba del informe.
 
 ## CI-TOPE: aceptada sobre `c721f7fc` (informe `a0299443`) e integrada (2026-11-17 00:50 UTC)
 

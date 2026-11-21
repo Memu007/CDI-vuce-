@@ -1176,3 +1176,14 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   seis `/code-review`); su riesgo 1 (superusuario, estado colgado sólo sin FK) queda escrito.
 - MARIA sin pieza: rutina apagada, se la despierta por `send_message`. La Técnica suma el guion de
   Postgres a las puertas de la unión del tramo 2.
+
+## 2026-11-21 12:10 UTC — ADMIN-CREDITOS-1 vuelve sobre `39d4dd8b`
+
+- Vuelve (informe `010e0dae`); acta REPRODUCCION-ADMIN-CREDITOS-1-2026-11-21. El servidor cobra bien;
+  vuelve por pruebas que no distinguen (caso 8 de Postgres intermitente con su sabotaje, caso 10 con
+  un alta que no gasta), el panel con `sinConfirmar = {}` y claves de `Object.prototype`, el bit de
+  ejecución de un sabotaje y una contradicción del informe.
+- Decidido por la PM, con el consejero: D238 (a), porque `last_topup_at` sólo lo muestra el panel.
+- D237 (el admin llena el tope y después se paga un link de recarga viejo) es de plata: va a Emi con
+  la recomendación (a). No frena la vuelta.
+- Cargarle a una cuenta `past_due` sin aviso: riesgo bajo, escrito; el aviso es propuesta para Emi.
