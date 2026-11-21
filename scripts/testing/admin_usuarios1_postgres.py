@@ -60,23 +60,31 @@ def admin(consulta):
 
 def casos(modulo, fijas):
     """Cada test_ del módulo, una vez por juego de parámetros; lo demás que pide sale de fijas.
-    Sabe leer un parametrize con ids y tuplas, nada más: ante otra marca se corta antes de correr."""
+    Sabe leer un parametrize de dos o más nombres, con listas de ids y de tuplas de ese largo, nada
+    más: ante otra marca, una clase o un caso async se corta antes de correr."""
     if getattr(modulo, "pytestmark", None):
         sys.exit("el módulo tiene marcas que este guion no sabe correr")
     lista = []
     for nombre, caso in vars(modulo).items():
+        propia = getattr(caso, "__module__", None) == modulo.__name__
+        if (nombre.startswith("Test") and inspect.isclass(caso) and propia
+                or nombre.startswith("test_") and inspect.iscoroutinefunction(caso)):
+            sys.exit(f"{nombre}: es una clase o un caso async, que este guion no sabe correr")
         if not nombre.startswith("test_"):
             continue
         marcas = getattr(caso, "pytestmark", [])
         juegos = [(nombre, {})]
         if marcas:
             marca = marcas[0]
+            nombres, valores = (marca.args + (None, None))[:2]
+            ids = marca.kwargs.get("ids")
+            claves = [c.strip() for c in nombres.split(",")] if type(nombres) is str else []
             if (len(marcas) > 1 or marca.name != "parametrize" or set(marca.kwargs) != {"ids"}
-                    or len(marca.kwargs["ids"]) != len(marca.args[1])
-                    or any(type(v) is not tuple for v in marca.args[1])):
+                    or len(claves) < 2 or type(valores) is not list or type(ids) is not list
+                    or not valores or len(ids) != len(valores)
+                    or any(type(v) is not tuple or len(v) != len(claves) for v in valores)):
                 sys.exit(f"{nombre}: tiene marcas que este guion no sabe correr")
-            claves = [c.strip() for c in marca.args[0].split(",")]
-            juegos = [(f"{nombre}[{id_}]", dict(zip(claves, v))) for id_, v in zip(marca.kwargs["ids"], marca.args[1])]
+            juegos = [(f"{nombre}[{id_}]", dict(zip(claves, v))) for id_, v in zip(ids, valores)]
         for id_, dados in juegos:
             argumentos = {p: dados[p] if p in dados else fijas[p] for p in inspect.signature(caso).parameters}
             lista.append((id_, functools.partial(caso, **argumentos)))
