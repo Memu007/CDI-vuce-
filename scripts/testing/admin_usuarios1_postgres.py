@@ -123,7 +123,8 @@ try:
             # Un caso async o generador devuelve algo sin haber corrido.
             devuelto = correr()
             chequear(devuelto is None, id_ if devuelto is None else f"{id_}: no corrió, devolvió {devuelto!r}")
-        except Exception as e:
+        # Un sys.exit dentro de un caso no puede terminar el guion en verde.
+        except (Exception, SystemExit) as e:
             chequear(False, f"{id_}: {type(e).__name__}: {str(e)[:600]}")
     corridos = {id_ for id_, _ in lista}
     chequear(corridos == de_pytest, f"el guion corrió {len(corridos)} casos y pytest junta {len(de_pytest)}; "
