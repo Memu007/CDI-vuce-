@@ -1144,3 +1144,14 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
   evidencia para Emi en el punto 22, no pieza nueva.
 - Asignado, con el consejero: MARIA hace D278 (b) (estado de cobro efectivo en la lista); la Técnica,
   el plan de ADMIN-CREDITOS-1 sin código, que va encima de lo de MARIA en `admin_router.py`.
+
+## 2026-11-21 02:05 UTC — ADMIN-CREDITOS-1: plan aceptado con ajustes (`fa609d94`)
+
+- Decidido por la PM, con el consejero: D232 (a) (pasa el tope: 409 sin cargar, dice cuántas
+  entran; «cortar» era palabra de la PM), D233 (a), D234 (a) (una función para acreditar, también
+  en el webhook: revisión fuerte), D235 (a) (clave por pedido desde el panel), D236 (a).
+- Supuestos aceptados: la carga renueva a 30 días todos los vigentes, como la recarga pagada; de 1 a
+  100; sin plan activo también. El historial en pantalla, propuesta para Emi.
+- Ajustes: misma clave en dos cuentas, reintento con la cuenta llena, recarga pagada de la integrante
+  a la vez, `pedido` como UUID, `cobro_corte1.sh` y `anclas_perdidas` en las puertas.
+- Orden: billing_service y modelo ahora; candado, webhook y ruta después de integrar D278 (b).
