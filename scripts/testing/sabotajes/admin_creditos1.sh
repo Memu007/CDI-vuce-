@@ -41,8 +41,10 @@ sabotaje casos $R "el registro nombra al usuario aunque pague el estudio" \
   '                              cuenta=username,' "AssertionError" "test_carga[estudio]" "test_carga[vencidos_y_cien]"
 
 # 4. Lo que no entra se dice con el número que entra.
-sabotaje casos $R "el 409 no dice cuántas entran" 'entran como mucho {tope - vigentes}.' 'entran como mucho {tope}.' \
+sabotaje casos $R "el 409 no dice cuántas entran" 'entran como mucho {max(0, tope - vigentes)}.' 'entran como mucho {tope}.' \
   "mo mucho 100.'" "test_no_entra[91-10]" "test_no_entra[1-100]"
+sabotaje casos $R "el 409 da un número negativo" 'entran como mucho {max(0, tope - vigentes)}.' \
+  'entran como mucho {tope - vigentes}.' "omo mucho -20." "test_no_entra[120-1]"
 
 # 5. El cuerpo: un entero de 1 a 100 y un pedido con forma de UUID en minúsculas.
 CANTIDAD='    cantidad: StrictInt = Field(ge=1, le=billing_service.EXTRA_OPS_MAX)'

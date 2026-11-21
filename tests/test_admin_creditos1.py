@@ -236,7 +236,7 @@ def _org_de(nombre):
     return asyncio.run(_run())
 
 
-@pytest.mark.parametrize("extra,n", [(91, 10), (1, 100)])
+@pytest.mark.parametrize("extra,n", [(91, 10), (1, 100), (120, 1)])
 def test_no_entra(sembrar, extra, n):
     nombre = sembrar(extra, AHORA_REAL() + timedelta(days=5))
     antes = asyncio.run(_saldo_de(nombre))
@@ -244,7 +244,7 @@ def test_no_entra(sembrar, extra, n):
         r = c.post(RUTA.format(nombre), json=_cuerpo(n))
     assert r.status_code == 409, r.text
     assert r.json()["detail"] == (f"Ya tiene {extra} operaciones extra y el tope es 100: "
-                                  f"entran como mucho {100 - extra}.")
+                                  f"entran como mucho {max(0, 100 - extra)}.")
     assert asyncio.run(_saldo_de(nombre)) == antes
     assert _registros(nombre) == []
 
