@@ -25,12 +25,14 @@ correr_casos() {
 # vuelve a leer con el servidor andando. Se llama dentro de «$(…)»: la trampa es
 # de ese subshell y apaga la API también si lo cortan.
 correr_pantalla() {
-  local puerto rc api
+  local puerto rc api extra
+  # Las variables de servidor que pide la cabecera, como en correr_pantallas.sh.
+  extra="$(awk '!/^\/\//{exit} index($0, "// corredor: servidor ") == 1 {print substr($0, 23)}' "$PANTALLA")"
   puerto="$("$PY" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')"
   rm -f "$TMPD/pantalla.db"
   env ENVIRONMENT=development DATABASE_URL="sqlite+aiosqlite:///$TMPD/pantalla.db" CDI_DATA_DIR="$TMPD/data" \
       JWT_SECRET_KEY=clave-inventada-solo-local-0123456789abcdef EMAIL_VERIFICATION_REQUIRED=false \
-      ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x \
+      ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x $extra \
       nice -n 19 "$PY" -m uvicorn proyecto_maria.main:app --host 127.0.0.1 --port "$puerto" \
       > "$TMPD/api.log" 2>&1 < /dev/null &
   api=$!

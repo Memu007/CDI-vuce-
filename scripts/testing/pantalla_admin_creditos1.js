@@ -34,6 +34,7 @@ async function abrir(p, usuario) {
   await p.click('#usuarios-buscar ~ button');
   const boton = p.locator('#usuarios-body tr', { hasText: usuario }).getByRole('button', { name: 'Cargar créditos' });
   await boton.click({ timeout: 15000 });
+  if (await p.locator('#carga-enviar').isDisabled()) falla('el diálogo de ' + usuario + ' abrió sin poder cargar');
 }
 
 (async () => {
@@ -53,8 +54,9 @@ async function abrir(p, usuario) {
   await abrir(p, uno);
   await p.fill('#carga-cantidad', '5');
   await p.dblclick('#carga-enviar');
-  await esperarEstado(p, 'Cargada. Ahora tiene 5 vigentes.', 'doble clic');
+  await p.waitForFunction(() => !['', 'Cargando…'].includes(document.getElementById('carga-estado').textContent));
   if (enviados.length !== 1) falla('el doble clic mandó ' + enviados.length + ' pedidos');
+  await esperarEstado(p, 'Cargada. Ahora tiene 5 vigentes.', 'doble clic');
   await p.locator('#usuarios-body tr', { hasText: uno }).locator('td').nth(7).filter({ hasText: /^5$/ })
     .waitFor({ timeout: 15000 }).catch(() => falla('la fila no muestra los 5 cargados'));
   await p.click('#carga-cerrar');
@@ -94,7 +96,6 @@ async function abrir(p, usuario) {
   await refresco;
   const ajeno = await estado(p).textContent();
   if (ajeno !== '') falla('el diálogo de otra cuenta muestra «' + ajeno + '»');
-  if (await p.locator('#carga-enviar').isDisabled()) falla('el diálogo de otra cuenta quedó sin poder cargar');
 
   await b.close();
   console.log('OK: ADMIN-CREDITOS-1 en el navegador');
