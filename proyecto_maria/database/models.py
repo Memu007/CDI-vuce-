@@ -604,6 +604,21 @@ class PagoMercadoPagoAplicado(Base):
     aplicado_en = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class CreditoAdmin(Base):
+    """Cada carga de operaciones extra que hizo un admin, una sola vez por pedido."""
+    __tablename__ = "creditos_admin"
+
+    # Sin clave foránea: el insert no toma KEY SHARE sobre la cuenta bloqueada,
+    # y el registro queda aunque la cuenta se borre.
+    pedido = Column(String(36), primary_key=True)
+    admin = Column(String(50), nullable=False)
+    cuenta = Column(String(200), nullable=False, index=True)  # usuario u «org:<id>»
+    usuario = Column(String(50), nullable=False)
+    cantidad = Column(Integer, nullable=False)
+    vigentes_antes = Column(Integer, nullable=False)
+    cargado_en = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class InicioRegistroPagosMP(Base):
     """Desde cuándo mp_pagos_aplicados anota cada pago (COBRO-MP-1, A).
 
