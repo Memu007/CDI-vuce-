@@ -74,6 +74,43 @@ en_codigo "$R" '    bloqueada = await cuenta_bloqueada(db, username)' \
     org = db_user and db_user.organization_id and await db.get(Organization, db_user.organization_id)
     bloqueada = db_user and (db_user, org or db_user)' &&
   creditos "la carga sin candado" 1 "MAL | recarga + carga | usuario | créditos vencidos" "MAL | recarga + carga | org | créditos al día"
+# Sin candado en la cuenta, la carga y el guardado que van detrás leen lo mismo y uno pisa al otro.
+C=proyecto_maria/database/candados.py
+en_codigo "$C" '        .with_for_update(key_share=True, of=User)
+' '' '            .with_for_update(key_share=True, of=Organization)
+' '' &&
+  creditos "la cuenta sin candado" 1 "MAL | carga + guardado | usuario" "MAL | carga + guardado | org"
+# Sin candado en la recarga, lee antes de que la carga que espera delante escriba y la pisa.
+en_codigo proyecto_maria/main.py 'cuenta = (await session.execute(consulta.with_for_update())).scalars().first()' \
+  'cuenta = (await session.execute(consulta)).scalars().first()' &&
+  creditos "la recarga sin candado" 1 "MAL | carga + recarga | usuario" "MAL | carga + recarga | org"
+# El reintento del mismo pedido lo frenan dos cosas: se busca con la cuenta bloqueada y, si
+# igual entra, choca con la clave. Sin las dos, el segundo vuelve a cargar.
+en_codigo "$R" '    previa = await db.get(CreditoAdmin, carga.pedido)
+    ya = previa is not None' '    previa = None
+    ya = previa is not None' '        try:
+            await db.commit()
+        except IntegrityError:
+            # Otro pedido con la misma clave entró primero: se deshace lo sumado y se responde con el suyo.
+            await db.rollback()
+            previa, ya = await db.get(CreditoAdmin, carga.pedido), True' '        await db.commit()' &&
+  creditos "la ruta no reconoce el pedido repetido" 1 "MAL | el mismo pedido dos veces, usuario" "MAL | el mismo pedido dos veces, org"
+# Cada arranque crea sólo lo que falta: con las demás tablas ya creadas, crearlas de nuevo choca.
+en_codigo proyecto_maria/database/connection.py 'Base.metadata.create_all, checkfirst=True' 'Base.metadata.create_all, checkfirst=False' &&
+  creditos "el arranque crea tablas que ya existen" 1 "MAL | el primer arranque falla"
+# Sólo la tabla de cargas sin checkfirst: el primer arranque la crea y el segundo choca.
+CREAR='        await conn.run_sync(Base.metadata.create_all, checkfirst=True)'
+en_codigo proyecto_maria/database/connection.py "$CREAR" \
+  '        await conn.run_sync(Base.metadata.create_all, tables=[t for t in Base.metadata.sorted_tables if t.name != "creditos_admin"])
+        await conn.run_sync(Base.metadata.tables["creditos_admin"].create)' &&
+  creditos "la tabla de cargas se crea sin mirar si existe" 1 "MAL | el segundo arranque falla"
+# El arranque no puede tocar las otras tablas ni dejar cargas.
+en_codigo proyecto_maria/database/connection.py "$CREAR" "$CREAR
+        await conn.execute(text(\"update users set roles = '[]'\"))" &&
+  creditos "el arranque cambia otra tabla" 1 "MAL | migración: creditos_admin con 0 filas" "public.users: el contenido no coincide"
+en_codigo proyecto_maria/database/connection.py "$CREAR" "$CREAR
+        await conn.execute(text(\"insert into creditos_admin (pedido, admin, cuenta, usuario, cantidad, vigentes_antes) values (gen_random_uuid()::text, 'a', 'a', 'a', 1, 0)\"))" &&
+  creditos "el arranque deja cargas" 1 "MAL | migración: creditos_admin con 2 filas"
 git checkout -q -- proyecto_maria
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]

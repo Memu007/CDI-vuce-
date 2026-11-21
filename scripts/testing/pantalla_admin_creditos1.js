@@ -3,19 +3,22 @@
 // manda el mismo pedido y no carga dos veces; lo que no entra en el tope se ve
 // con el texto del servidor; reabrir el diálogo tampoco repite una carga sin
 // confirmar ni, si la carga estaba en vuelo, deja de decir cómo terminó; la
-// respuesta de una carga anterior no se escribe en el diálogo de otra. Sale con error si algo no se cumple.
+// respuesta de una carga anterior no se escribe en el diálogo de otra; una cuenta que se llama como algo
+// que todo objeto trae («__proto__», «constructor») no abre como si tuviera una carga sin confirmar ni se
+// la pasa a otra. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> CDI_DB=<base sqlite del servidor> node scripts/testing/pantalla_admin_creditos1.js
 // corredor: servidor CSRF_ENFORCE=true
 const { chromium } = require('playwright');
 const { execFileSync } = require('child_process');
 const registrarCuenta = require('./_registrar');
+const ipNueva = require('./_ip_nueva');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const base = process.env.BASE_URL || 'http://127.0.0.1:8876';
 const baseLocal = process.env.CDI_DB || falla('falta CDI_DB: la base sqlite del servidor, para dar admin');
 
 async function registrar(ctx, nombre) {
   await registrarCuenta(ctx.request, base,
-    { data: { username: nombre, password: 'Clave-Inventada-123', email: nombre + '@ejemplo.test' } });
+    { headers: { 'X-Forwarded-For': ipNueva() }, data: { username: nombre, password: 'Clave-Inventada-123', email: nombre + '@ejemplo.test' } });
 }
 
 function hacerAdmin(nombre) {
@@ -138,13 +141,41 @@ async function respuestaAjena(p, uno, otro) {
   await refresco;
   const ajeno = await estado(p).textContent();
   if (ajeno !== '') falla('el diálogo de otra cuenta muestra «' + ajeno + '»');
+  await p.click('#carga-cerrar');
+}
+
+const HEREDADOS = ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'];
+async function heredados(p, otro) {
+  for (const nombre of HEREDADOS) {
+    await abrir(p, nombre);
+    await esperarEstado(p, '', 'abrir ' + nombre);
+    await p.fill('#carga-cantidad', '1');
+    await p.click('#carga-enviar');
+    await esperarEstado(p, 'Cargada. Ahora tiene 1 vigentes.', 'cargar a ' + nombre);
+    await p.click('#carga-cerrar');
+  }
+  // La carga sin confirmar de «__proto__» queda en esa cuenta y en ninguna otra.
+  await abrir(p, '__proto__');
+  await p.fill('#carga-cantidad', '2');
+  await p.route('**/creditos', async r => { await r.fetch(); await r.abort(); }, { times: 1 });
+  await p.click('#carga-enviar');
+  await esperarEstado(p, 'No se pudo cargar: sin conexión. Si la reintentás, no se carga dos veces.', '__proto__ sin red');
+  await p.click('#carga-cerrar');
+  await abrir(p, otro);
+  await esperarEstado(p, '', 'otra cuenta después de la carga sin confirmar de __proto__');
+  await p.click('#carga-cerrar');
+  await abrir(p, '__proto__');
+  await esperarEstado(p, 'La carga de 2 no se confirmó: si la enviás de nuevo, no se carga dos veces.', 'reabrir __proto__');
+  await p.click('#carga-enviar');
+  await esperarEstado(p, 'Ya estaba cargada. Ahora tiene 3 vigentes.', 'reenviar __proto__');
+  await p.click('#carga-cerrar');
 }
 
 (async () => {
   const sufijo = String(Date.now()).slice(-8);
   const admin = 'adcr_adm' + sufijo, uno = 'adcr_uno' + sufijo, otro = 'adcr_otro' + sufijo;
   const b = await chromium.launch();
-  for (const nombre of [uno, otro]) { const c = await b.newContext(); await registrar(c, nombre); await c.close(); }
+  for (const nombre of [uno, otro, ...HEREDADOS]) { const c = await b.newContext(); await registrar(c, nombre); await c.close(); }
   const ctx = await b.newContext();
   await registrar(ctx, admin);
   hacerAdmin(admin);
@@ -158,6 +189,7 @@ async function respuestaAjena(p, uno, otro) {
   await reabrir(p, enviados, uno);
   await reabrirEnVuelo(p, uno);
   await respuestaAjena(p, uno, otro);
+  await heredados(p, otro);
   await b.close();
   console.log('OK: ADMIN-CREDITOS-1 en el navegador');
 })().catch(e => falla(e.stack || e.message));

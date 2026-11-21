@@ -101,6 +101,10 @@ sabotaje pantalla $H "abrir otro diálogo deja el botón apagado" \
   "abrió sin poder cargar"
 sabotaje pantalla $H "la tabla no se refresca después de cargar" '            if (response && response.ok) fetchUsuarios(0);
 ' '' "FALLA: la fila no muestra los 5 cargados"
+sabotaje pantalla $H "las cargas sin confirmar se guardan en un objeto común" \
+  '        const sinConfirmar = new Map();' \
+  '        const sinConfirmar = { get(k) { return this[k]; }, set(k, v) { this[k] = v; }, delete(k) { delete this[k]; } };' \
+  "FALLA: abrir __proto__"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
