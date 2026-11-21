@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-20 · fix: una cuenta al tope de su plan recibe «límite alcanzado» en la carga manual (CONEXIONES-1-PRODUCTO)
+
+- Una cuenta que ya usó todas las operaciones de su plan, sin créditos extra vigentes, recibe el aviso de límite al cargar una operación a mano, sin que se lea ni se valide lo que mandó.
+
+## 2026-11-20 · fix: con créditos vencidos, cancelar o reactivar ya no chocan con una recarga (CONEXIONES-1-PRODUCTO)
+
+- Cancelar o reactivar la suscripción al mismo tiempo que una recarga, con los créditos extra vencidos, ya no termina en error.
+
 ## 2026-11-20 · feat: el panel de admin lista los usuarios con su plan y sus créditos (ADMIN-USUARIOS-1)
 
 - Sección «Usuarios» en el panel de admin, sólo para admin y sólo para mirar: usuario, email, si es admin, quién paga (la cuenta o su estudio), plan, cobro, operaciones del período, créditos extra vigentes con su vencimiento y la última recarga. Los créditos vencidos se ven en 0 sin tocar la cuenta. Va de a 50 por página, con búsqueda por usuario o email; no muestra contraseñas, tokens ni datos de pago.
@@ -13,6 +21,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-20 · fix: en los catálogos, el origen cortado se ve entero al pasar el mouse (CATALOGO-PAIS-2)
 
 - En el catálogo del proveedor y en el del cliente, al pasar el mouse por el campo del origen se ve la etiqueta entera («423 · PAISES BAJOS»), la que el campo tiene en ese momento: lo que se escribe, lo que queda al guardar, nada si está vacío.
+
+## 2026-11-20 · fix: un pedido lento de una cuenta ya no hace esperar a las demás (CONEXIONES-1-PRODUCTO)
+
+- La carga manual, sugerir NCM, la subida de clientes y las rutas que cobran sueltan la conexión a la base antes de esperar el cuerpo del pedido o la IA, así muchos pedidos lentos de una cuenta no dejan sin conexión a otra. La carga manual ya no puede perder una recarga hecha al mismo tiempo con créditos vencidos.
+
+## 2026-11-20 · fix: con créditos vencidos, una recarga ya no choca con un guardado ni con MARIA (CONEXIONES-1-NOKEY)
+
+- Con los créditos extra vencidos, una recarga al mismo tiempo que un guardado o que una consulta a MARIA ya no termina en error ni deja la recarga sin acreditar. Siguen pendientes los choques de la carga manual de una operación con el guardado, cancelar y reactivar.
 
 ## 2026-11-20 · fix: el origen habitual del cliente acepta el nombre o el código del país (ORIGEN-2)
 

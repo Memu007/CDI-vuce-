@@ -2257,11 +2257,13 @@ def _detalle_402(entidad, razon_del_plan=None):
 
 async def _cuenta_bloqueada(db: AsyncSession, username: str):
     """Bloquea usuario y organización, siempre en ese orden, hasta el commit o rollback.
-    populate_existing: sin él, valen los contadores que get_current_user leyó antes del lock."""
+    populate_existing: sin él, valen los contadores que get_current_user leyó antes del lock.
+    NO KEY: no choca con el KEY SHARE que toma un insert con clave foránea a estas filas.
+    of=: sin él, SQLAlchemy reusa el FOR UPDATE que otra consulta igual dejó en su cache."""
     result = await db.execute(
         select(User)
         .where(User.username == username)
-        .with_for_update()
+        .with_for_update(key_share=True, of=User)
         .execution_options(populate_existing=True)
     )
     db_user = result.scalars().first()
@@ -2271,7 +2273,7 @@ async def _cuenta_bloqueada(db: AsyncSession, username: str):
         result = await db.execute(
             select(Organization)
             .where(Organization.id == db_user.organization_id)
-            .with_for_update()
+            .with_for_update(key_share=True, of=Organization)
             .execution_options(populate_existing=True)
         )
         org = result.scalars().first()
@@ -2289,12 +2291,17 @@ async def _vencer_y_guardar(db: AsyncSession, entidad):
             await db.rollback()
 
 
-async def require_billing_vigente(
-    user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """402 si la cuenta no está al día. No mira el tope: ese se mira sólo donde se
-    cuenta, así lo ya contado se puede seguir validando y bajando."""
+async def _soltar_conexion(db: AsyncSession) -> None:
+    # Suelta la conexión antes de algo lento. Si la base cayó, close desprende lo
+    # leído; rollback lo vencería, y leerlo sin await da 500.
+    try:
+        await db.commit()
+    except Exception as err:
+        logging.warning("db release before slow wait failed: %s", err)
+        await db.close()
+
+
+async def _billing_vigente(user, db: AsyncSession, mirar_tope: bool):
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
     if not db_user:
@@ -2304,29 +2311,28 @@ async def require_billing_vigente(
     await _vencer_y_guardar(db, entidad)
     if not billing_service.tiene_acceso(entidad):
         raise HTTPException(status_code=402, detail=_detalle_402(entidad))
+    if mirar_tope and (razon := billing_service.razon_del_tope(entidad)):
+        raise HTTPException(status_code=402, detail=_detalle_402(entidad, razon))
+    await _soltar_conexion(db)
     return db_user
 
 
-async def require_active_billing(
-    request: Request,
+async def require_billing_vigente(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Dependencia: estado vigente y cupo del plan (402 si no). Mira el tope
-    sin bloquear: las rutas que cuentan lo vuelven a mirar con la cuenta
-    bloqueada, en la misma transacción que cuentan.
-    """
-    result = await db.execute(select(User).where(User.username == user["username"]))
-    db_user = result.scalars().first()
-    if not db_user:
-        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+    """402 si la cuenta no está al día. No mira el tope: ese se mira sólo donde se
+    cuenta, así lo ya contado se puede seguir validando y bajando."""
+    return await _billing_vigente(user, db, mirar_tope=False)
 
-    entidad, _ = await _get_billing_entity(db, db_user)
-    await _vencer_y_guardar(db, entidad)
-    ok, reason = billing_service.can_create_operation(entidad)
-    if not ok:
-        raise HTTPException(status_code=402, detail=_detalle_402(entidad, reason))
-    return db_user
+
+async def require_cupo_del_plan(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Como require_billing_vigente, y además 402 al tope del plan, antes de leer el
+    cuerpo. No vence créditos: el conteo con candado es _contar_operacion_bloqueada."""
+    return await _billing_vigente(user, db, mirar_tope=True)
 
 
 async def _contar_operacion_bloqueada(db: AsyncSession, username: str):
@@ -3754,7 +3760,7 @@ async def create_manual_operation(
     request: Request,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    db_user: User = Depends(require_active_billing),
+    _cobro=Depends(require_cupo_del_plan),
 ):
     """Crea una operación cargada manualmente (sin PDF/Excel).
 
@@ -7183,6 +7189,7 @@ async def analyze_client_migration(
         )
     )
     existing_clients = existing_result.scalars().all()
+    await _soltar_conexion(db)
     mapper = GeminiMigrationHeaderMapper(username=user["username"])
     try:
         # Con tiempo máximo, como leer un PDF (EXCEL-1).
@@ -7222,7 +7229,6 @@ async def analyze_client_migration(
     db.add(batch)
     try:
         await db.commit()
-        await db.refresh(batch)
     except Exception as exc:
         await db.rollback()
         logging.exception("analyze_client_migration staging failed")
@@ -10465,6 +10471,7 @@ async def sugerir_ncm(
         # (RENDIMIENTO-1). Si no contesta a tiempo, se sigue sin sus sugerencias.
         import asyncio
         limite = _segundos_de_entorno("NCM_GEMINI_TIMEOUT_S", 30.0)
+        await _soltar_conexion(db)
         try:
             de_gemini = await asyncio.wait_for(
                 asyncio.to_thread(_suggest_ncm_with_gemini, descripcion, 5 - len(sugerencias)),
@@ -11818,7 +11825,7 @@ async def _cuenta_con_suscripciones(db: AsyncSession, username: str):
     nombres = {username, *((await db.execute(otros_con_sid)).scalars().all() if org_previa else ())}
     filas = (await db.execute(
         select(User).where(User.username.in_(nombres)).order_by(User.username)
-        .with_for_update().execution_options(populate_existing=True)
+        .with_for_update(key_share=True, of=User).execution_options(populate_existing=True)
     )).scalars().all()
     db_user = next((u for u in filas if u.username == username), None)
     if not db_user:

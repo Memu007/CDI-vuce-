@@ -8,7 +8,7 @@ Cobertura:
  3. Webhook deduplicación: mismo payment_id no se procesa dos veces.
  4. Webhook firma inválida → 401.
  5. Webhook pago fallado/rechazado → skipped.
- 6. Límite 10 ops/mes en plan activo (via require_active_billing).
+ 6. Límite 10 ops/mes en plan activo (lo cuenta _contar_operacion_bloqueada).
  7. Trial vencido → 402 (modal de pago).
  8. Top-up: acredita 10 ops, cobra $10k, máx 100 créditos, expiran 30 días.
  9. Billing /me devuelve datos correctos.
@@ -496,7 +496,7 @@ class TestLimiteOpsActivo:
 class TestTrialVencido:
 
     def test_trial_vencido_bloquea_operaciones_con_402(self, client):
-        """Trial expirado → require_active_billing pasa a past_due y devuelve 402."""
+        """Trial expirado → require_billing_vigente pasa a past_due y devuelve 402."""
         uname = _unique("tv")
         _register(client, uname)
         _set_user(uname,
@@ -521,7 +521,7 @@ class TestTrialVencido:
         assert "code" in detail
 
     def test_trial_vencido_marca_past_due_en_db(self, client):
-        """Al detectar trial vencido, require_active_billing actualiza billing_status=past_due."""
+        """Al detectar trial vencido, require_billing_vigente actualiza billing_status=past_due."""
         uname = _unique("tv2")
         _register(client, uname)
         _set_user(uname,

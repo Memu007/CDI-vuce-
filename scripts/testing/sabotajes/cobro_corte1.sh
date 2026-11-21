@@ -203,12 +203,10 @@ sabotaje $M "cuenta el usuario y no su organización" \
 ATAJO=$'        if os.getenv("ENVIRONMENT", "").startswith("test"):\n'
 NO_ESTA=$'        raise HTTPException(status_code=401, detail="Usuario no encontrado")\n'
 VIGENTE=$'\n    entidad, _ = await _get_billing_entity(db, db_user)\n    await _vencer_y_guardar(db, entidad)\n    if not billing_service.tiene_acceso'
-ACTIVA=$'\n    entidad, _ = await _get_billing_entity(db, db_user)\n    await _vencer_y_guardar(db, entidad)\n    ok, reason'
 COMO_ANTES=$'            return User(username=user["username"], plan="premium", billing_status="active")\n'
-for paso in vigente activa bloqueada maria; do
+for paso in vigente bloqueada maria; do
   case $paso in
     vigente)   viejo="$NO_ESTA$VIGENTE"; atajo="$COMO_ANTES" ;;
-    activa)    viejo="$NO_ESTA$ACTIVA"; atajo="$COMO_ANTES" ;;
     bloqueada) viejo="$NO_ESTA    return await _contar_en_la_cuenta"; atajo=$'            return None\n' ;;
     maria)     viejo="$NO_ESTA"$'\n    operacion = await _operacion_del_usuario'; atajo=$'            return "", nombre\n' ;;
   esac
@@ -427,16 +425,16 @@ PYEOF
   echo "BASE  | el lock en verde"
   sabotaje $M "no se bloquea la fila del usuario" \
     "FALLA | tope" \
-    $'        .where(User.username == username)\n        .with_for_update()' \
+    $'        .where(User.username == username)\n        .with_for_update(key_share=True, of=User)' \
     $'        .where(User.username == username)'
   sabotaje $M "no se bloquea la fila de la organización" \
     "FALLA | estudio" \
-    $'            .where(Organization.id == db_user.organization_id)\n            .with_for_update()' \
+    $'            .where(Organization.id == db_user.organization_id)\n            .with_for_update(key_share=True, of=Organization)' \
     $'            .where(Organization.id == db_user.organization_id)'
   sabotaje $M "se cuenta con el usuario leído antes del lock" \
     "FALLA | tope" \
-    $'        .with_for_update()\n        .execution_options(populate_existing=True)\n    )\n    db_user' \
-    $'        .with_for_update()\n    )\n    db_user'
+    $'        .with_for_update(key_share=True, of=User)\n        .execution_options(populate_existing=True)\n    )\n    db_user' \
+    $'        .with_for_update(key_share=True, of=User)\n    )\n    db_user'
   sabotaje $M "borrar cliente no espera el candado de la cuenta" \
     "FALLA | borrar cliente" \
     $'        client = await _cliente_con_cuenta_bloqueada(db, client_id, username)\n        op_rows' \

@@ -35,7 +35,7 @@ if urlparse(URL).hostname not in ("127.0.0.1", "localhost"):
 os.environ.update(
     DATABASE_URL=URL, ENVIRONMENT="testing", EMAIL_VERIFICATION_REQUIRED="false",
     JWT_SECRET_KEY="clave-solo-para-esta-prueba-con-mas-de-32-caracteres",
-    GEMINI_API_KEY="test-key", VUCE_MODE="fake", TARIFAR_MODE="fake", AFIP_MODE="fake",
+    VUCE_MODE="fake", TARIFAR_MODE="fake", AFIP_MODE="fake",
     DOLARAPI_BASE="http://127.0.0.1:9/v1/dolares",
 )
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -186,8 +186,10 @@ def fase_carrera(c, de_org):
 
 
 def arbol():
-    fuente = inspect.getsource(main_mod.require_active_billing)
-    return (f"{main_mod.__file__}; db.commit() escrito en require_active_billing: {'db.commit()' in fuente}; "
+    # La base no tiene _billing_vigente: ahí el cuerpo está en require_billing_vigente.
+    dep = getattr(main_mod, "_billing_vigente", main_mod.require_billing_vigente)
+    fuente = inspect.getsource(dep)
+    return (f"{main_mod.__file__}; suelta la conexión en {dep.__name__}: {'_soltar_conexion' in fuente}; "
             f"_leer_cuerpo: {hasattr(main_mod, '_leer_cuerpo')}")
 
 

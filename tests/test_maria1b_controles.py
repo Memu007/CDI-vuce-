@@ -36,12 +36,9 @@ def _entorno(monkeypatch):
     from proyecto_maria.core.rate_limit import limiter
     monkeypatch.setattr(limiter, "enabled", False)
     main.app.dependency_overrides[main.get_current_user] = lambda: dict(USUARIO)
-    from types import SimpleNamespace
-    main.app.dependency_overrides[main.require_active_billing] = lambda: SimpleNamespace(organization_id=None)
     with cuenta_de_prueba(USUARIO["username"]):
         yield
     main.app.dependency_overrides.pop(main.get_current_user, None)
-    main.app.dependency_overrides.pop(main.require_active_billing, None)
 
 
 def _generar(**cambios):

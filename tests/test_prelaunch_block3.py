@@ -9,7 +9,7 @@ Cubre:
  5. JWT no acepta tokens firmados con la clave equivocada, expirados, malformados.
  6. Endpoints sensibles requieren autenticación (401 sin cookie/token).
  7. Webhook no loguea access_token ni datos de tarjeta en texto plano.
- 8. require_active_billing rechaza billing_status=past_due con HTTP 402.
+ 8. require_billing_vigente rechaza billing_status=past_due con HTTP 402.
  9. limiter.enabled no se desactiva accidentalmente en producción.
 """
 import asyncio
@@ -552,13 +552,13 @@ class TestLoggingSeguro:
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 8. require_active_billing rechaza past_due con 402
+# 8. require_billing_vigente rechaza past_due con 402
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class TestPastDue402:
 
     def test_past_due_rechaza_operacion_con_402(self, client):
-        """billing_status=past_due → require_active_billing devuelve 402."""
+        """billing_status=past_due → require_billing_vigente devuelve 402."""
         uname = _unique("pd")
         _register_and_login(client, uname)
         _set_user(uname, billing_status="past_due", ops_used_this_period=0)
@@ -578,7 +578,7 @@ class TestPastDue402:
         assert "code" in detail
 
     def test_none_status_rechaza_con_402(self, client):
-        """billing_status=none → require_active_billing devuelve 402."""
+        """billing_status=none → require_billing_vigente devuelve 402."""
         uname = _unique("none_s")
         _register_and_login(client, uname)
         _set_user(uname, billing_status="none", ops_used_this_period=0)

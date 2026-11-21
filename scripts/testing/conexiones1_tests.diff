@@ -1,9 +1,9 @@
 diff --git a/tests/test_conexiones1.py b/tests/test_conexiones1.py
 new file mode 100644
-index 00000000..99caa2d3
+index 00000000..032467e3
 --- /dev/null
 +++ b/tests/test_conexiones1.py
-@@ -0,0 +1,260 @@
+@@ -0,0 +1,297 @@
 +"""Las rutas lentas de RUTAS no retienen una conexión a la base mientras esperan.
 +
 +Cada ruta se frena en su punto lento (la IA, el lector de PDF, la lectura del
@@ -14,6 +14,7 @@ index 00000000..99caa2d3
 +import asyncio
 +import io
 +import uuid
++from datetime import datetime, timedelta, timezone
 +
 +import aiosqlite
 +import pytest
@@ -27,8 +28,8 @@ index 00000000..99caa2d3
 +from proyecto_maria import main
 +from proyecto_maria.core import rate_limit
 +from proyecto_maria.database import connection as _conn
-+from proyecto_maria.database.models import SystemBackup, User
-+from proyecto_maria.services import migration_service
++from proyecto_maria.database.models import Client, SystemBackup, User
++from proyecto_maria.services import billing_service, migration_service
 +
 +CLAVE = "Clave-Segura-123"
 +
@@ -134,10 +135,10 @@ index 00000000..99caa2d3
 +    assert vistas and max(vistas) == 0, f"conexiones tomadas en {punto}: {vistas}"
 +
 +
-+def _impaga(nombre):
++def _guardar(nombre, **valores):
 +    async def guardar():
 +        async with _conn.AsyncSessionLocal() as db:
-+            await db.execute(update(User).where(User.username == nombre).values(billing_status="past_due"))
++            await db.execute(update(User).where(User.username == nombre).values(**valores))
 +            await db.commit()
 +    asyncio.run(guardar())
 +
@@ -151,41 +152,45 @@ index 00000000..99caa2d3
 +
 +
 +MANUAL = {"client_id": "999999999", "items": [{"descripcion": "notebook", "cantidad": 1, "valor_unitario": 10}]}
++TOPE = billing_service.PLANS["premium"]["ops"]
 +# (cuenta, cómo queda sin poder cargar, código con el cuerpo completo)
 +CUENTAS = [
-+    ("impaga", lambda nombre, _mp: _impaga(nombre), 402),
++    ("impaga", lambda nombre, _mp: _guardar(nombre, billing_status="past_due"), 402),
++    ("al tope", lambda nombre, _mp: _guardar(nombre, ops_used_this_period=TOPE), 402),
++    ("al tope con créditos vencidos", lambda nombre, _mp: _guardar(
++        nombre, ops_used_this_period=TOPE, extra_ops_remaining=10,
++        extra_ops_expires_at=datetime.now(timezone.utc) - timedelta(days=1)), 402),
 +    ("sin cuota", lambda _nombre, mp: _sin_cuota(mp), 429),
 +]
 +
 +
-+def test_cuenta_que_no_puede_cargar_y_corta_el_cuerpo(monkeypatch, tomadas):
-+    """El corte se contesta antes que el plan o la cuota, sin tomar conexión."""
++def test_cuenta_que_no_puede_cargar_no_lee_el_cuerpo(monkeypatch):
++    """El plan y la cuota se contestan sin leer el cuerpo, esté cortado o completo."""
 +    leer, vieron = Request.body, []
 +    for cuenta, preparar, codigo in CUENTAS:
 +        with monkeypatch.context() as mp:
 +            c, nombre = _sesion(mp)
 +            gastar = preparar(nombre, mp)
-+            vistas = []
-+            # Un corte por pedido, en orden: gastar la cuota, el cortado, el completo.
-+            cortes = ([False] if gastar else []) + [True, False]
++            leidos, cortar = [], [True]
 +
 +            async def frenar(self):
 +                if not hasattr(self, "_body"):
-+                    vistas.append(tomadas())
-+                    if cortes.pop(0):
++                    leidos.append(cortar[0])
++                    if cortar[0]:
 +                        _cortar_a_mitad(self)
 +                return await leer(self)
-+            mp.setattr(Request, "body", frenar)
 +            try:
 +                with c:
 +                    if gastar:
 +                        gastar(c)
++                    mp.setattr(Request, "body", frenar)
 +                    cortado = c.post("/api/operations/manual", json=MANUAL)
++                    cortar[0] = False
 +                    completo = c.post("/api/operations/manual", json=MANUAL)
 +            finally:
 +                rate_limit.limiter.reset()
-+        vieron.append((cuenta, cortado.status_code, completo.status_code, max(vistas, default="sin leer")))
-+    assert vieron == [(cuenta, 400, codigo, 0) for cuenta, _p, codigo in CUENTAS]
++        vieron.append((cuenta, cortado.status_code, completo.status_code, leidos))
++    assert vieron == [(cuenta, codigo, codigo, []) for cuenta, _p, codigo in CUENTAS]
 +
 +
 +def _respaldos(nombre):
@@ -247,20 +252,52 @@ index 00000000..99caa2d3
 +                      ("al guardar", 200, "", 1, 200, 2)]
 +
 +
-+def test_ncm_con_la_base_caida_al_soltarla_sigue_sugiriendo(monkeypatch):
-+    """Si la conexión se cae después de la última lectura, soltarla antes de
-+    la IA no corta el pedido: se sugiere con lo que ya se leyó."""
-+    c, _ = _sesion(monkeypatch)
-+    mirar = main._looks_like_ncm_code_query
++def _cliente(nombre):
++    async def guardar():
++        async with _conn.AsyncSessionLocal() as db:
++            cliente = Client(owner_username=nombre, name="Cliente Uno", cuit="20123456786")
++            db.add(cliente)
++            await db.commit()
++            return cliente.id
++    return asyncio.run(guardar())
 +
-+    def caer_y_mirar(descripcion):
-+        async def caida(*a, **k):
++
++# (ruta, pedido con el id del cliente ya cargado, código esperado, cuántas veces suelta)
++SUELTAN = [
++    ("/api/ncm/sugerir", lambda _id: {"json": {"descripcion": "notebook de 14 pulgadas"}}, 200, 2),
++    ("/api/migrations/analyze", lambda _id: {"files": {"file": (
++        "clientes.csv", b"cuit,nombre\n20123456786,Cliente Uno\n", "text/csv")}}, 200, 2),
++    ("/api/operations/manual", lambda id_: {"json": {**MANUAL, "client_id": id_}}, 200, 1),
++]
++
++
++@pytest.mark.parametrize("ruta, pedido, codigo, veces", SUELTAN, ids=[r[0] for r in SUELTAN])
++def test_la_base_caida_al_soltarla_no_corta_el_pedido(monkeypatch, ruta, pedido, codigo, veces):
++    """Si falla el commit de una de las veces que el pedido suelta la conexión,
++    sigue con lo que ya leyó, también lo que el rollback deja vencido."""
++    c, nombre = _sesion(monkeypatch)
++    id_cliente = _cliente(nombre)
++    soltar, guardar = main._soltar_conexion, aiosqlite.Connection.commit
++    estado = {"soltadas": 0, "dentro": False, "cae": 0, "cayo": True}
++
++    async def caer_si_toca(self):
++        if estado["dentro"] and estado["soltadas"] == estado["cae"] and not estado["cayo"]:
++            estado["cayo"] = True
 +            raise RuntimeError("conexión caída")
-+        monkeypatch.setattr(aiosqlite.Connection, "commit", caida)
-+        monkeypatch.setattr(aiosqlite.Connection, "rollback", caida)
-+        return mirar(descripcion)
-+    monkeypatch.setattr(main, "_looks_like_ncm_code_query", caer_y_mirar)
++        return await guardar(self)
++
++    async def contar_y_soltar(db):
++        estado.update(soltadas=estado["soltadas"] + 1, dentro=True)
++        await soltar(db)
++        estado["dentro"] = False
++    monkeypatch.setattr(aiosqlite.Connection, "commit", caer_si_toca)
++    monkeypatch.setattr(main, "_soltar_conexion", contar_y_soltar)
 +    monkeypatch.setattr(main, "_suggest_ncm_with_gemini",
 +                        lambda *a, **k: [{"ncm": "8471.30.12", "desc": "notebook", "source": "ia"}])
-+    r = c.post("/api/ncm/sugerir", json={"descripcion": "notebook de 14 pulgadas"})
-+    assert (r.status_code, [s["ncm"] for s in r.json().get("sugerencias", [])]) == (200, ["8471.30.12"])
++    vieron = []
++    with c:
++        for cae in range(1, veces + 1):
++            estado.update(soltadas=0, dentro=False, cae=cae, cayo=False)
++            r = c.post(ruta, **pedido(id_cliente))
++            vieron.append((cae, r.status_code, estado["cayo"], estado["soltadas"]))
++    assert vieron == [(cae, codigo, True, veces) for cae in range(1, veces + 1)], r.text
