@@ -252,8 +252,10 @@ def _filas(prefijo=PREFIJO):
 COBROS = {
     "prueba_vencida": (dict(billing_status="trial", trial_ends_at=AYER), None, "past_due"),
     "prueba_vigente": (dict(billing_status="trial", trial_ends_at=EN_5_DIAS), None, "trial"),
-    "en_la_gracia": (dict(billing_status="active", trial_ends_at=AHORA - timedelta(days=3)), None, "active"),
-    "fuera_de_la_gracia": (dict(billing_status="active", trial_ends_at=AHORA - timedelta(days=8)), None, "past_due"),
+    # Una hora a cada lado de los 7 días de gracia: una gracia de 6 u 8 también da rojo.
+    "en_la_gracia": (dict(billing_status="active", trial_ends_at=AHORA - timedelta(days=7, hours=-1)), None, "active"),
+    "fuera_de_la_gracia": (dict(billing_status="active", trial_ends_at=AHORA - timedelta(days=7, hours=1)), None,
+                           "past_due"),
     "impaga": (dict(billing_status="past_due", trial_ends_at=EN_10_DIAS), None, "past_due"),
     "cancelada_terminada": (dict(billing_status="canceled", trial_ends_at=AYER), None, "canceled"),
     "de_estudio_vencido": (dict(billing_status="active", trial_ends_at=EN_10_DIAS),
