@@ -148,7 +148,7 @@ def tiene_acceso(cuenta, ahora: datetime | None = None) -> bool:
 BILLING_GRACE_DAYS_ACTIVE = 7
 
 
-def cobro_efectivo(cuenta, ahora: datetime | None = None) -> str:
+def cobro_efectivo(cuenta, ahora: datetime | None = None) -> str | None:
     """El billing_status con el que decide el acceso: past_due si la prueba o el
     período ya vencieron, aunque todavía nadie lo haya guardado. No escribe."""
     estado, fin = cuenta.billing_status, como_utc(cuenta.trial_ends_at)
