@@ -21,25 +21,42 @@ negativos míos. Adversarios Opus y Sonnet alto: nada nuevo del diff.
 - `limpieza1.sh` corrido, «sabotajes con falla: 0»: su línea sale de `sabotajes-conocidos.txt`.
 - No corrido por la PM: `/code-review`.
 
-## Tarea activa: el plan de ADMIN-CREDITOS-1, sin código de producto (2026-11-21 01:55 UTC)
+## ADMIN-CREDITOS-1: plan aceptado con ajustes, sobre `fa609d94` (2026-11-21 02:05 UTC)
 
-Antes de nada: `merge` de mi rama y `/compact` (estás cerca de tu umbral). Sólo plan, como
-`b60c30d4`: MARIA hace ahora D278 (b) en `admin_router.py` y `main.py`, y el código tuyo va encima de
-lo suyo. Próxima D: D232.
+Comprobé en el código lo que citás: el montaje con `require_admin` (`main.py:1690`), la importación
+circular (:94), `_cuenta_bloqueada` (:2258, ya con NO KEY), `recarga_entra` fijo en `TOPUP_OPS`, el
+webhook (:11729-11762) y que `PagoMercadoPagoAplicado` no tiene clave foránea. Leí que el webhook
+bloquea y escribe una sola fila más su registro; igual va en un caso (ajuste 3).
 
-**Lo que pidió Emi** (20/11, «Quiero ver usuarios y darles créditos desde el panel»; 21:42, «sí a
-los tres»): el admin le da créditos a una cuenta desde el panel. Vencen a 30 días como una recarga
-pagada, respetan el tope `EXTRA_OPS_MAX` (100) y cada carga queda registrada (quién, a quién,
-cuánto, cuándo) en una tabla nueva. Sólo dar, no quitar; a una integrante se le carga al estudio.
+**Tus D, decididas por la PM:** D232 (a): «cortar» era palabra mía, no de Emi. D233 (a), con el
+movimiento en su propio commit y sin cambiar el cuerpo. D234 (a). D235 (a). D236 (a).
+**Supuestos aceptados:** la carga renueva a 30 días todos los vigentes (la misma regla que la
+recarga pagada); entero de 1 a 100; se puede cargar sin plan activo. El historial en pantalla queda
+como propuesta para Emi: no entra.
 
-**El plan dice:**
-1. El camino: el mismo que una recarga pagada (función y candado), con dónde se cruzan.
-2. Una sola vez por pedido: qué pasa con un doble clic o un reintento, y cómo se prueba.
-3. El tope: qué pasa si la carga lo pasa (cortar, rechazar o cargar hasta el tope); va como D.
-4. La tabla nueva y su migración (SQLite y Postgres 16), y la copia de la base antes de publicar.
-5. Permisos: sólo admin, con el mismo `require_admin`; qué ve y qué no.
-6. Qué casos y sabotajes lo cubren (revisión fuerte: plata y permisos) y cuánto suma.
-7. Tus D, con recomendación.
+**Ajustes, que son criterio de aceptación:**
+1. Caso 8 (Postgres): la misma clave en **dos cuentas distintas** a la vez. En la misma cuenta la
+   búsqueda con candado ya alcanza; sólo así la clave primaria es la que salva, y ahí cae el sabotaje 2.
+2. Sin buscar el pedido (sabotaje 3), el caso 7 sigue verde: la clave primaria y el rollback dan una
+   sola suma igual. Sumá a esa familia una carga que llena a 100 y su reintento con la misma clave:
+   200 `ya_aplicado`, no el 409 del tope. Fija también el orden: el pedido se busca antes del tope.
+3. Caso 9 como familia: un usuario solo, y una integrante cuyo estudio recibe la recarga pagada
+   mientras el admin le carga.
+4. `pedido` validado como UUID en el cuerpo: uno que no es UUID o de más de 36 caracteres da 422
+   (familia del caso 6). Sin eso, SQLite lo acepta y Postgres da 500.
+5. Puertas, además de las tuyas: `anclas_perdidas` (si un sabotaje apunta a `_cuenta_bloqueada` en
+   `main.py`, se actualiza en el commit del movimiento), `cobro_corte1.sh` entero (movés el candado
+   de todas las rutas que cobran) y `cobro_mp1.sh` entero; suite completa, `chequeo-6`, Opus alto y
+   Sonnet alto, `/code-review high` y `/security-review`.
+
+## Tarea activa: ADMIN-CREDITOS-1, en dos tramos (2026-11-21 02:05 UTC)
+
+Primero `/compact` (estás en unos 125k de 144k) y `merge` de mi rama. Próxima D: D237.
+
+- **Ahora**, lo que no toca `main.py` ni `admin_router.py`: `acreditar_extra` y `recarga_entra(n)` en
+  `billing_service`, el modelo `creditos_admin` y sus casos SQLite. Commit y push; no es entrega.
+- **Cuando integre D278 (b) de MARIA** (te aviso): el movimiento de `_cuenta_bloqueada`, el webhook,
+  la ruta, el panel, los casos de Postgres, los sabotajes y las puertas. Ahí entregás todo junto.
 
 ## CI-TOPE: aceptada sobre `c721f7fc` (informe `a0299443`) e integrada (2026-11-17 00:50 UTC)
 
