@@ -1167,3 +1167,12 @@ apagada hasta que tenga pieza (su cola espera a Emi o al despachante).
 - Antes de que ADMIN-USUARIOS-1 y D278 entren a una candidata: la lista en Postgres 16 (MARIA, sólo
   pruebas). La Técnica sigue con el tramo 2 de ADMIN-CREDITOS-1 y desde ahora tiene
   `admin_router.py` y `billing_service.py`.
+
+## 2026-11-21 07:05 UTC — la lista de usuarios en Postgres 16 aceptada sobre `3abb203d`
+
+- Aceptada e integrada (merge de `d451a007`, `9c5fbfc4`); acta REPRODUCCION-ADMIN-USUARIOS-PG-2026-11-21.
+  Sólo pruebas. Con esto, ADMIN-USUARIOS-1 y D278 (b) pueden entrar a la próxima candidata.
+- Decidido por la PM, con el consejero: sin adversario de la PM (sólo pruebas, ya con tres Sonnet y
+  seis `/code-review`); su riesgo 1 (superusuario, estado colgado sólo sin FK) queda escrito.
+- MARIA sin pieza: rutina apagada, se la despierta por `send_message`. La Técnica suma el guion de
+  Postgres a las puertas de la unión del tramo 2.
